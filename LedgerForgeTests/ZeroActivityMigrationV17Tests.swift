@@ -9,15 +9,16 @@ struct ZeroActivityMigrationV17Tests {
     @Test
     func freshV17InstallsExactAdditiveSchemaAndLeavesNoInventedRows() throws {
         try withDatabase(named: "fresh") { database in
-            try database.runMigrations(allMigrations)
+            let v17 = Array(allMigrations.prefix(17))
+            try database.runMigrations(v17)
 
             let versions = try database.query(
                 sql: "SELECT version FROM schema_migrations ORDER BY version;",
                 params: []
             ) { Int($0.int64(at: 0) ?? -1) }
             #expect(versions == Array(1...17))
-            #expect(allMigrations.map(\.version) == Array(1...17))
-            #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
+            #expect(v17.map(\.version) == Array(1...17))
+            #expect(v17.map(\.checksum).allSatisfy { $0.count == 64 })
 
             let zeroObjects = try database.query(
                 sql: "SELECT type || ':' || name FROM sqlite_master WHERE name IN ('statement_zero_activity_controls','idx_zero_activity_semantic_lookup','idx_zero_activity_one_authority','validate_statement_zero_activity_control') ORDER BY type,name;",
@@ -69,7 +70,7 @@ struct ZeroActivityMigrationV17Tests {
             let indexColumnsBefore = try affectedIndexColumns(in: database)
             let triggerSQLBefore = try affectedTriggerSQL(in: database)
 
-            try database.runMigrations(allMigrations)
+            try database.runMigrations(Array(allMigrations.prefix(17)))
 
             let historyAfter = try migrationHistory(in: database, through: 16)
             #expect(historyAfter == historyBefore)

@@ -74,7 +74,8 @@ struct LedgerForgeTests {
         #expect(ValidationReviewPresentation.presentation(for: .previewReady(prepared)).kind == .validationResults)
         #expect(ValidationReviewPresentation.presentation(for: .validationFailed(prepared)).kind == .validationResults)
         #expect(ValidationReviewPresentation.presentation(for: .committing(prepared)).kind == .validationResults)
-        #expect(ValidationReviewPresentation.presentation(for: .completed(successfulOutcome)).kind == .noStatementPrepared)
+        #expect(ValidationReviewPresentation.presentation(for: .completed(successfulOutcome)).kind == .completedOutcome)
+        #expect(ValidationReviewPresentation.presentation(for: .completed(unavailableOutcome)).kind == .completedOutcome)
 
         #expect(ImportFooterPresentation.presentation(for: .previewReady(prepared)).kind == .confirmation)
         #expect(ImportFooterPresentation.presentation(for: .validationFailed(prepared)).kind == .none)
@@ -100,11 +101,14 @@ struct LedgerForgeTests {
 
         let dashboardAccounts = try sourceSection(
             contentViewSource,
-            startingAt: "private var dashboardAccountsCard: some View",
-            endingBefore: "private var importActivityCard: some View"
+            startingAt: "private func dashboardDomain(",
+            endingBefore: "private func dashboardAccountName("
         )
         #expect(!dashboardAccounts.contains("Image(systemName: \"chevron.right\")"))
-        #expect(dashboardAccounts.contains("linkButton(\"View all\")"))
+        #expect(!dashboardAccounts.contains("linkButton("))
+        #expect(!dashboardAccounts.contains("performDashboardRoute("))
+        #expect(dashboardAccounts.contains("Bank balances"))
+        #expect(dashboardAccounts.contains("No card accounts"))
 
         let accountDetail = try sourceSection(
             contentViewSource,

@@ -598,6 +598,9 @@ final class RepositoryStoreHydrator {
         let accountIDs = Set(accounts.filter { $0.workspaceId == workspaceID }.map(\.id))
         let planIDs = Set(dtos.map(\.id))
         return try dtos.map { dto in
+            // Applied external evidence must still bind the durable plan at
+            // readback/restore, before any canonical stores are published.
+            if dto.alDarReference != nil { try SalaryPersistenceDTOValidator.validate(plan: dto) }
             guard let month = try? SelectedStatementMonth(canonical: dto.planMonthISO),
                   dto.rolloverSourcePlanId.map(planIDs.contains) ?? true else {
                 throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid month or rollover")
@@ -707,6 +710,7 @@ final class RepositoryStoreHydrator {
                 configuredTransferFee: try persistedMoney(currency: "QAR", minor: dto.configuredFeeMinor, decimal: dto.configuredFeeDecimal),
                 configuredTransferFeeProvenance: try inputProvenance(dto.configuredFeeProvenance),
                 planningFX: fx,
+                alDarReference: try dto.alDarReference?.evidence(),
                 plannedInvestment: try persistedMoney(currency: "QAR", minor: dto.plannedInvestmentMinor, decimal: dto.plannedInvestmentDecimal),
                 plannedInvestmentProvenance: try inputProvenance(dto.plannedInvestmentProvenance),
                 updatedAtISO: dto.updatedAtISO

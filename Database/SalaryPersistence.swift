@@ -94,6 +94,57 @@ public struct FundingPlanCommitmentDTO: nonisolated Equatable, Sendable {
     public let carriedSourcePlanId: String?
 }
 
+nonisolated public struct FundingPlanAlDarReferenceDTO: Equatable, Sendable {
+    public let fundingPlanId: String
+    public let providerCode: String
+    public let sourceContractCode: String
+    public let directionCode: String
+    public let submittedQARMinor: Int64
+    public let submittedQARDecimal: String
+    public let returnedINRRawDecimal: String
+    public let boundShortfallINRMinor: Int64
+    public let boundShortfallINRDecimal: String
+    public let fetchedAtISO: String
+    public let classificationCode: String
+
+    func evidence() throws -> AlDarReferenceEvidence {
+        guard providerCode == "al_dar", sourceContractCode == "public_home_get_rate_v1",
+              directionCode == "qar_to_inr", classificationCode == "indicative_reference" else {
+            throw AlDarReferenceError.invalidBinding
+        }
+        let submitted = try Money(canonicalDecimal: submittedQARDecimal, currency: "QAR")
+        let shortfall = try Money(canonicalDecimal: boundShortfallINRDecimal, currency: "INR")
+        guard try submitted.minorUnits() == submittedQARMinor,
+              try shortfall.minorUnits() == boundShortfallINRMinor else { throw AlDarReferenceError.invalidBinding }
+        return try AlDarReferenceEvidence(quote: AlDarReferenceQuote(
+            submittedQAR: submitted, returnedINR: AlDarReturnedINRDecimal(rawToken: returnedINRRawDecimal),
+            fetchedAtISO: fetchedAtISO), boundShortfallINR: shortfall)
+    }
+
+    init(planID: String, evidence: AlDarReferenceEvidence) throws {
+        fundingPlanId = planID
+        providerCode = "al_dar"; sourceContractCode = "public_home_get_rate_v1"
+        directionCode = "qar_to_inr"; classificationCode = "indicative_reference"
+        submittedQARMinor = try evidence.quote.submittedQAR.minorUnits()
+        submittedQARDecimal = try evidence.quote.submittedQAR.canonicalDecimalString()
+        returnedINRRawDecimal = evidence.quote.returnedINR.rawToken
+        boundShortfallINRMinor = try evidence.boundShortfallINR.minorUnits()
+        boundShortfallINRDecimal = try evidence.boundShortfallINR.canonicalDecimalString()
+        fetchedAtISO = evidence.quote.fetchedAtISO
+    }
+
+    init(fundingPlanId: String, providerCode: String, sourceContractCode: String, directionCode: String,
+         submittedQARMinor: Int64, submittedQARDecimal: String, returnedINRRawDecimal: String,
+         boundShortfallINRMinor: Int64, boundShortfallINRDecimal: String, fetchedAtISO: String, classificationCode: String) {
+        self.fundingPlanId = fundingPlanId; self.providerCode = providerCode
+        self.sourceContractCode = sourceContractCode; self.directionCode = directionCode
+        self.submittedQARMinor = submittedQARMinor; self.submittedQARDecimal = submittedQARDecimal
+        self.returnedINRRawDecimal = returnedINRRawDecimal
+        self.boundShortfallINRMinor = boundShortfallINRMinor; self.boundShortfallINRDecimal = boundShortfallINRDecimal
+        self.fetchedAtISO = fetchedAtISO; self.classificationCode = classificationCode
+    }
+}
+
 public struct FundingPlanDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String
@@ -119,6 +170,7 @@ public struct FundingPlanDTO: nonisolated Equatable, Sendable {
     public let updatedAtISO: String
     public let balances: [FundingPlanBalanceDTO]
     public let commitments: [FundingPlanCommitmentDTO]
+    public var alDarReference: FundingPlanAlDarReferenceDTO? = nil
 }
 
 public protocol FundingPlanRepository {
@@ -233,6 +285,26 @@ nonisolated enum SalaryPersistenceDTOValidator {
             let amount = try money(commitment.amountDecimal, commitment.amountMinor, commitment.amountCurrency)
             guard amount.currency == expectedCurrency else {
                 throw RepositoryError.relationshipViolation("Funding commitment currency is invalid.")
+            }
+        }
+        if let reference = plan.alDarReference {
+            guard reference.fundingPlanId == plan.id, plan.fxINRPerQARDecimal == nil,
+                  plan.fxObservationDateISO == nil else {
+                throw RepositoryError.relationshipViolation("Only one planning reference may be selected.")
+            }
+            let evidence = try reference.evidence()
+            let zero = PersistedMoney(currency: "INR", minorUnits: 0)
+            let balances = try plan.balances.filter { $0.included && $0.nativeCurrency == "INR" }.map { row in
+                guard let decimal = row.amountDecimal, let minor = row.amountMinor else {
+                    throw RepositoryError.relationshipViolation("Reference requires a complete INR shortfall.")
+                }
+                return try money(decimal, minor, "INR")
+            }
+            let commitments = try plan.commitments.filter { $0.included && $0.regionCode == "india" }
+                .map { try money($0.amountDecimal, $0.amountMinor, "INR") }
+            let shortfall = try subtract(aggregate([zero] + commitments), aggregate([zero] + balances))
+            guard max(0, shortfall.minorUnits) == (try evidence.boundShortfallINR.minorUnits()) else {
+                throw RepositoryError.relationshipViolation("Planning reference no longer matches the INR shortfall.")
             }
         }
     }

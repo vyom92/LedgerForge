@@ -392,8 +392,8 @@ struct SQLiteOwnershipTests {
         ) { row in
             row.int64(at: 0) ?? -1
         }
-        #expect(versions == Array(1...17).map { Int64($0) })
-        #expect(try database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 17)
+        #expect(versions == allMigrations.map { Int64($0.version) })
+        #expect(try database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == allMigrations.count)
         #expect(try integrityCheck(database) == "ok")
         try database.checkpointAndClose()
     }

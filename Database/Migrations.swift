@@ -2735,7 +2735,43 @@ PRAGMA legacy_alter_table = OFF;
     requiresForeignKeysDisabled: true
 )
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17]
+nonisolated public let migrationV18 = Migration(version: 18, name: "funding_plan_al_dar_reference_v18", sql: """
+CREATE TABLE funding_plan_al_dar_references (
+  funding_plan_id TEXT PRIMARY KEY NOT NULL REFERENCES funding_plans(id) ON DELETE CASCADE,
+  provider_code TEXT NOT NULL CHECK(provider_code = 'al_dar'),
+  source_contract_code TEXT NOT NULL CHECK(source_contract_code = 'public_home_get_rate_v1'),
+  direction_code TEXT NOT NULL CHECK(direction_code = 'qar_to_inr'),
+  submitted_qar_minor INTEGER NOT NULL CHECK(typeof(submitted_qar_minor) = 'integer' AND submitted_qar_minor > 0),
+  submitted_qar_decimal TEXT NOT NULL,
+  returned_inr_raw_decimal TEXT NOT NULL CHECK(length(returned_inr_raw_decimal) BETWEEN 1 AND 33),
+  bound_shortfall_inr_minor INTEGER NOT NULL CHECK(typeof(bound_shortfall_inr_minor) = 'integer' AND bound_shortfall_inr_minor > 0),
+  bound_shortfall_inr_decimal TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  classification_code TEXT NOT NULL CHECK(classification_code = 'indicative_reference')
+);
+
+CREATE TRIGGER funding_al_dar_no_manual_insert BEFORE INSERT ON funding_plan_al_dar_references
+WHEN EXISTS(SELECT 1 FROM funding_plans WHERE id = NEW.funding_plan_id
+  AND (fx_inr_per_qar_decimal IS NOT NULL OR fx_observation_date IS NOT NULL OR fx_provenance IS NOT NULL))
+BEGIN SELECT RAISE(ABORT, 'planning_reference_conflict'); END;
+
+CREATE TRIGGER funding_al_dar_no_manual_update BEFORE UPDATE ON funding_plan_al_dar_references
+WHEN EXISTS(SELECT 1 FROM funding_plans WHERE id = NEW.funding_plan_id
+  AND (fx_inr_per_qar_decimal IS NOT NULL OR fx_observation_date IS NOT NULL OR fx_provenance IS NOT NULL))
+BEGIN SELECT RAISE(ABORT, 'planning_reference_conflict'); END;
+
+CREATE TRIGGER funding_manual_no_al_dar_insert BEFORE INSERT ON funding_plans
+WHEN (NEW.fx_inr_per_qar_decimal IS NOT NULL OR NEW.fx_observation_date IS NOT NULL OR NEW.fx_provenance IS NOT NULL)
+  AND EXISTS(SELECT 1 FROM funding_plan_al_dar_references WHERE funding_plan_id = NEW.id)
+BEGIN SELECT RAISE(ABORT, 'planning_reference_conflict'); END;
+
+CREATE TRIGGER funding_manual_no_al_dar_update BEFORE UPDATE ON funding_plans
+WHEN (NEW.fx_inr_per_qar_decimal IS NOT NULL OR NEW.fx_observation_date IS NOT NULL OR NEW.fx_provenance IS NOT NULL)
+  AND EXISTS(SELECT 1 FROM funding_plan_al_dar_references WHERE funding_plan_id = NEW.id)
+BEGIN SELECT RAISE(ABORT, 'planning_reference_conflict'); END;
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

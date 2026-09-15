@@ -4,12 +4,147 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 94 — Current Al Dar and This Month Planning — 2026-09-15](#sprint-94)
 - [Accepted Sprint 93 — Verified Backup, Restore and Disaster Recovery — 2026-09-15](#sprint-93)
 - [Accepted Sprint 92 — Information Presentation and R1 Polish — 2026-09-14](#sprint-92)
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-15:** the owner/coordinator accepts Sprint 93 and authorizes documentation closure/publication of the unchanged verified candidate. The original accepted Sprint-90, Sprint-91A and Sprint-92 records below retain their then-current planning, evidence and limitations. Sprint 94 is **NEXT / NOT STARTED**; **PERSONAL-V1: NOT YET ADOPTED**.
+**Current alignment — 2026-09-15:** the owner/coordinator accepts Sprint 94 and authorizes closure/publication of the unchanged accepted implementation. Original Sprint-90 through Sprint-93 records retain their then-current evidence and limitations. The post-94 correction gate precedes Sprint 95; **PERSONAL-V1 remains NOT YET ADOPTED**.
+
+---
+
+<a id="sprint-94"></a>
+## Accepted Sprint 94 — Current Al Dar and This Month Planning — 2026-09-15
+
+**OWNER/COORDINATOR-ACCEPTED** under `SPRINT_94_CURRENT_AL_DAR_AND_THIS_MONTH_PLANNING_ACCEPTED`. Accepted predecessor and publication parent: `main@99f27b376fe6f3a37e6a15f7cd65c5e16a49caed` (Sprint 93). The owner authorizes documentation reconciliation, exact-path commit and normal push of the complete accepted candidate. The commit containing this record publishes the accepted implementation and closure together. Closure changes no product/test behavior and reruns no builds, tests, provider requests, source campaigns or recovery drills. **PERSONAL-V1 remains NOT YET ADOPTED.**
+
+### Accepted product contract
+
+- Explicit Refresh Al Dar always requests QAR 1, independently of Salary input completion or a positive India shortfall. This is a **QAR-1 current Al Dar unit planning reference**, indicative and used to estimate a transfer, not settlement or general market-FX authority.
+- A fetched reference stays pending until explicit Use Reference, which binds it to the current positive INR shortfall. Save/Command-S remains explicit. Manual planning FX is a mutually exclusive planner-only fallback; it is not shown on Dashboard. There is no Dashboard Planning FX card.
+- The UI displays exactly two rate decimals with fetch context. The raw provider token, full precision, exact-ratio calculation and persisted evidence remain authoritative internally. The display value never feeds calculations or persistence.
+- Planning balances select active QAR/INR bank accounts with a valid saved identity, without institution/name/nickname/NRE/NRO heuristics. Same-currency credit cards may link manually entered commitment amounts. Previously saved funding-bank references remain intact and explicitly labelled.
+- Untouched zero inputs are blank with a 0 placeholder; meaningful entered/saved/rolled zeros remain valid. Actual months use Aug 2026 format. A native picker selects the manual FX observation date without changing imported source-date meaning.
+- Available for investment is floored at zero; the underlying funds-before-investment and final QAR buffer retain deficits. Missing required inputs remain unavailable.
+- The measured Dashboard layout correction is retained with the existing native-currency composition, Money, colours and responsive arrangements. It does not close the remaining navigation-performance defect.
+
+### Accepted schema and backup compatibility
+
+**V18 is current**, under accepted [ADR-045](../../ADR.md#adr-045) and [ADR-047](../../ADR.md#adr-047) alignments. The additive reference child table and manual/external exclusion triggers preserve V1–V17 byte-for-byte; no parent-table rebuild or new closure migration/ADR is introduced. Save and staged hydration validate the external reference's durable shortfall binding before canonical publication.
+
+Backup format remains **1**. New backups use V18; exact V18 restore and exactly V17 format-1 isolated upgrade are supported. The selected original V17 package remains untouched. Its original payload SHA remains receipt identity; only the separate app-owned candidate upgrades and receives its own in-memory hash. Valid retained V17 receipt startup can verify, apply V18, hydrate and complete relaunch confirmation. V16/earlier, future, incomplete or unknown histories reject. Appearance remains device-local and excluded from backup.
+
+The earlier genuine V17/V18 isolated restore, product backup, retained-receipt startup, selected rollback/process-interruption and actual Current Database migration/relaunch results remain accepted as recorded in the [implementation history](../../Work%20notes/Salary_and_current_AlDar.md#prior-bounded-verification--2026-09-15). They are not rerun or reclassified as new closure evidence.
+
+### Accepted validation: two distinct byte boundaries
+
+The preceding owner-correction fingerprint covers **334 source/test/build/resource inputs**, SHA-256 `04879c91629c439f8eac09feba2c1e1ff947bca9474233692f2b2cbdb0e82e90`.
+
+| Preceding owner-correction evidence | Accepted result |
+| --- | --- |
+| Ordinary app regression | **567 definitions / 627 executions / 0 failures / 0 skips**; `LedgerForge-validation.CRey7v/TestResults.xcresult`. Twelve parameterized definitions produced 72 runs, accounting for the extra 60 executions. |
+| Final focused correction | **45 definitions / 46 executions / 0 failures / 0 skips**; AlDarReferenceTests 18/18, PlannerEditorTests 19/20, SalaryParserAndPlannerTests 8/8; `LedgerForge-validation.fLIohN/TestResults.xcresult`. Includes populated manual-FX rollover under V18, final hydration, typed account/card eligibility and the owner corrections. |
+| Debug / optimized Release | Both PASS; `LedgerForge-validation.73IEXm` / `LedgerForge-validation.Ghb8Gn`. |
+| Native / saved state | Owner reported “verified all”; genuine mixed INR/QAR bank/card presentation passed. The corrected restart/native checks preserved all 54 logical tables and preference bytes against the owner's saved baseline. |
+
+The final two-decimal-only fingerprint covers the same **334 inputs**, SHA-256 `4f262c7d8ba35110d9aa77aec162a0d951723c93a57d62455a8c36cde15d1986`.
+
+| Final presentation-only evidence | Accepted result |
+| --- | --- |
+| Focused display / exact ratio | `AlDarReferenceTests.testUnitRateDisplayUsesTwoDecimalsWithoutChangingExactRatio`: **1 definition / 1 execution / 0 failures / 0 skips**; `LedgerForge-validation.CVNCeX/TestResults.xcresult`. Rounding/trailing zeros and retained raw precision pass, including a calculation case that would differ if the display-rounded rate were used. |
+| Fresh Debug / optimized Release | Both PASS; `LedgerForge-validation.5UxLZQ` / `LedgerForge-validation.PbrqL8`. |
+| Quick native check | **1 QAR = 26.25 INR**, with **Fetched 15 Sep 2026 at 20:25 · UTC+03:00**. One explicit QAR-1 Refresh through the unchanged client remained pending/not applied. No Apply, Save, financial-field edit, resize or appearance change. |
+| Saved state / containment | All **54 tables** and preference bytes remained unchanged. Debug/Release resource containment passed; no statement, credential, database, screenshot or financial comparison artifact entered Git. |
+
+**The 567/627 ordinary run did not execute against the final two-decimal-only bytes.** The owner accepts it as retained evidence from the immediately preceding fingerprint because the final delta changed presentation only and passed its own bounded verification. It is **ordinary app regression, not complete authentic/source acceptance**. No new ordinary, corpus, provider or recovery execution is performed during closure. Earlier failures, retries, superseded fingerprints and unobserved native states remain in the linked work-note history rather than being rewritten as final passes.
+
+### Seventeen definitions retained outside the ordinary selection
+
+The unchanged [TestPlan](../../../TestPlan.xctestplan) uses 12 selectors covering these exact **17 definitions**. The unchanged [validation driver](../../../script/validate.sh) forwards those selectors because plan-only Swift Testing exclusions were not reliably honored. No additional exclusion was introduced for a failed test. The categories remain 13 corpus definitions, one evidence-destination preflight, two copied-source checks and one separately authorized live-client check.
+
+- `AmericanExpressPrivateAcceptanceTests/completePrivateCorpusMatchesFrozenOracleAndImportCampaigns()`
+- `AxisBankAuthenticAcceptanceTests/completeAuthenticCorpusMatchesIndependentOracleAndCrossFormatProjection()`
+- `AxisBankAuthenticAcceptanceTests/completeAuthenticCorpusPersistsWithProviderParityReplayReopenAndHydration()`
+- `AxisBankV17AuthenticMigrationTests/authenticPopulatedV16UpgradesLosslesslyThenAcceptsAllAxisCarriers()`
+- `AxisBankV17AuthenticMigrationTests/authenticPopulatedV16CardGraphSurvivesV17AndReopen()`
+- `AxisBankV17AuthenticMigrationTests/historicalAuthenticCBQV16GraphPreservesMissingMinimumDueThroughV17()`
+- `AxisCreditCardAuthenticAcceptanceTests/completeAuthenticCorpusMatchesIndependentSourceOracle()`
+- `AxisCreditCardAuthenticAcceptanceTests/completeAuthenticCorpusPersistsThroughOrdinaryConfirmationWithParityReplayAndReopen()`
+- `CBQBankAuthenticAcceptanceTests/completeOriginalsPersistReplayAndReopen()`
+- `CBQCreditCardPrivateAcceptanceTests/completePrivateCorpusMatchesProductionGrammarAndIndependentOracle()`
+- `GlobalAuthenticCorpusAcceptanceTests/configuredEvidenceDestinationSupportsAtomicWrites()`
+- `GlobalAuthenticCorpusAcceptanceTests/completeAuthenticCorpusUsesMixedOrdinaryImportReplayAndReopen()`
+- `HDFCBankAccountAuthenticAcceptanceTests/completeOriginalsMatchSourcePersistReplayAndReopen()`
+- `ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()`
+- `SalaryAuthenticCorpusAcceptanceTests/completeAuthenticCorpusUsesOrdinaryImportPersistenceReplayAndReopen()`
+- `SourceSnapshotConfirmationTests/preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL()`
+- `Sprint94LiveClientTests/testOneApprovedPublicSample()`
+
+### Accepted limitations and required handoff
+
+Navigation remains an **OPEN defect**: the owner reports approximately five seconds switching to Transactions and two seconds for other destinations. The retained Dashboard correction establishes one measured layout cost; it does not diagnose or resolve every transition. Keep the populated disposable Current Database for the dedicated measured correction and the expected ongoing growth of roughly five authentic statements per month. The [long-term proposal](../../Work%20notes/Salary_and_current_AlDar.md#populated-dashboard-layout-correction-and-growth-observation) remains a proposal, not implemented performance work.
+
+The [post-94/pre-95 correction gate](../../FUTURE_WORK.MD#post-94-pre-95-corrections) requires navigation performance, Amex unsupported currency, Amex account/card chooser cleanup, import-created account naming/type/currency, and Transaction Preview layout before Sprint 95. No permanent sprint number is assigned and closure implements none of them. Uninvestigated reports do not become proven causes or fixes by inclusion here.
+
+Sprint-93 hardware power-loss, real disk-full/permission/durability failure, interruption within individual preservation/rollback loops, real cleanup failure and long genuine-copy cancellation remain **NOT_OBSERVED / NOT_TESTED**. The separate Release owner database was not opened by Sprint-94 final checks. Genuine Debug recovery and the historical separate Release drill retain their own scope. No source-support expansion, original mutation or derived financial evidence is implied by a green ordinary suite or native mixed-currency observation.
+
+### Settled 95–100 sequence
+
+| Sprint | Accepted planning position |
+| --- | --- |
+| 95 | Salary → Budget Planner / This Month, using Budget Analysis Dashboard as workflow reference; Salary History remains supporting evidence. **Acceptance is a hard prerequisite for Sprint 100.** |
+| 96 | Investment domain and identity foundation; no prices in this foundation. |
+| 97 | Current holdings followed by current valuation, two ordered phases. Prices never establish ownership. |
+| 98 | Separate integrated current portfolio acceptance. |
+| 99 | One shared current-market QAR/INR/USD FX authority and net worth. Two-decimal presentation retains greater internal precision; direction/reporting selection recalculates locally without fetching. Dashboard-open, manual and periodic refresh plus the accepted stale/weekend policy remain required. Al Dar stays separate. |
+| 100 | Personal-v1 adoption certification after accepted prerequisites; not started by this closure. |
+
+The [90–99 roadmap](../../Sprint%20roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md) owns the numbering and the [100 entry gate](../../Sprint%20roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md#sprint-100--ledgerforge-10-personal-adoption-verification) retains the hard Budget Planner prerequisite. Future architecture/implementation remains separately authorized.
+
+### Publication inventory
+
+The accepted working candidate contained **38 paths**. Closure adds this existing accepted-outcomes collection for **39 published paths: 35 modified and four added**. All **27 non-Markdown product/test/project/validation files** remain byte-for-byte unchanged during closure. The final 334-input fingerprint remains the accepted two-decimal fingerprint above. Exact-path staging, full/staged diff, links, whitespace, source/privacy residue and Git convergence are reviewed separately from the retained runtime evidence. No new build/test/provider/source/recovery campaign is run.
+
+- [ContentView.swift](../../../ContentView.swift)
+- [Database/BackupPackage.swift](../../../Database/BackupPackage.swift)
+- [Database/Migrations.swift](../../../Database/Migrations.swift)
+- [Database/SQLiteSalaryRepository.swift](../../../Database/SQLiteSalaryRepository.swift)
+- [Database/SalaryPersistence.swift](../../../Database/SalaryPersistence.swift)
+- [LedgerForge.xcodeproj/project.pbxproj](../../../LedgerForge.xcodeproj/project.pbxproj)
+- [LedgerForgeApp.swift](../../../LedgerForgeApp.swift)
+- [LedgerForgeTests/AlDarReferenceTests.swift](../../../LedgerForgeTests/AlDarReferenceTests.swift)
+- [LedgerForgeTests/BackupPackageTests.swift](../../../LedgerForgeTests/BackupPackageTests.swift)
+- [LedgerForgeTests/DashboardViewModelTests.swift](../../../LedgerForgeTests/DashboardViewModelTests.swift)
+- [LedgerForgeTests/LedgerForgeTests.swift](../../../LedgerForgeTests/LedgerForgeTests.swift)
+- [LedgerForgeTests/MigrationChainIntegrityTests.swift](../../../LedgerForgeTests/MigrationChainIntegrityTests.swift)
+- [LedgerForgeTests/PlannerEditorTests.swift](../../../LedgerForgeTests/PlannerEditorTests.swift)
+- [LedgerForgeTests/SQLiteOwnershipTests.swift](../../../LedgerForgeTests/SQLiteOwnershipTests.swift)
+- [LedgerForgeTests/SalaryParserAndPlannerTests.swift](../../../LedgerForgeTests/SalaryParserAndPlannerTests.swift)
+- [LedgerForgeTests/Sprint94LiveClientTests.swift](../../../LedgerForgeTests/Sprint94LiveClientTests.swift)
+- [LedgerForgeTests/ZeroActivityMigrationV17Tests.swift](../../../LedgerForgeTests/ZeroActivityMigrationV17Tests.swift)
+- [Models/AlDarReference.swift](../../../Models/AlDarReference.swift)
+- [Models/Salary.swift](../../../Models/Salary.swift)
+- [Project documents/ADR.md](../../../Project%20documents/ADR.md)
+- [Project documents/Archive/Accepted outcomes/Sprints_90-99.md](../../../Project%20documents/Archive/Accepted%20outcomes/Sprints_90-99.md)
+- [Project documents/BUILD_AND_PROJECT_CONVENTIONS.md](../../../Project%20documents/BUILD_AND_PROJECT_CONVENTIONS.md)
+- [Project documents/FUTURE_WORK.MD](../../../Project%20documents/FUTURE_WORK.MD)
+- [Project documents/PROJECT_STATE.md](../../../Project%20documents/PROJECT_STATE.md)
+- [Project documents/SCOPE_DECISIONS.md](../../../Project%20documents/SCOPE_DECISIONS.md)
+- [Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md](../../../Project%20documents/Sprint%20roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md)
+- [Project documents/Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md](../../../Project%20documents/Sprint%20roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md)
+- [Project documents/Work notes/Backup_and_export.md](../../../Project%20documents/Work%20notes/Backup_and_export.md)
+- [Project documents/Work notes/Current_FX_and_net_worth.md](../../../Project%20documents/Work%20notes/Current_FX_and_net_worth.md)
+- [Project documents/Work notes/Salary_and_current_AlDar.md](../../../Project%20documents/Work%20notes/Salary_and_current_AlDar.md)
+- [Services/AlDarCurrentReferenceProvider.swift](../../../Services/AlDarCurrentReferenceProvider.swift)
+- [Services/BackupRestoreCoordinator.swift](../../../Services/BackupRestoreCoordinator.swift)
+- [Services/RepositoryStoreHydrator.swift](../../../Services/RepositoryStoreHydrator.swift)
+- [TestPlan.xctestplan](../../../TestPlan.xctestplan)
+- [ViewModels/DashboardViewModel.swift](../../../ViewModels/DashboardViewModel.swift)
+- [ViewModels/SalaryWorkspaceViewModel.swift](../../../ViewModels/SalaryWorkspaceViewModel.swift)
+- [Views/SalaryView.swift](../../../Views/SalaryView.swift)
+- [script/README.md](../../../script/README.md)
+- [script/validate.sh](../../../script/validate.sh)
 
 ---
 

@@ -334,7 +334,10 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var recentActivityState: DashboardContentState = .loading
     @Published private(set) var fundingState: DashboardContentState = .loading
     @Published private(set) var fundingCalculation: FundingPlanCalculation?
-    @Published private(set) var fundingRateContext: String?
+
+    var fundingMonthTitle: String {
+        Self.currentMonth(at: now()).map(SalaryWorkspaceViewModel.monthTitle) ?? "Month unavailable"
+    }
 
     private let accountStore: AccountStore
     private let transactionStore: TransactionStore
@@ -409,7 +412,6 @@ final class DashboardViewModel: ObservableObject {
         recentActivity = []
         activityComparison = nil
         fundingCalculation = nil
-        fundingRateContext = nil
         positionState = .unavailable
         recentActivityState = .unavailable
         fundingState = .unavailable
@@ -463,10 +465,6 @@ final class DashboardViewModel: ObservableObject {
         fundingState = .resolve(availability: state, isEmpty: plan == nil)
         if (isCurrent && !fundingIsCurrent) || fundingCalculation?.incompleteReasons.contains(.invalidCurrency) == true {
             fundingState = .unavailable
-        }
-        fundingRateContext = nil
-        if let fx = plan?.planningFX, fundingCalculation?.requiredQARPrincipal != nil {
-            fundingRateContext = "Plan-local rate: 1 QAR = \(NSDecimalNumber(decimal: fx.inrPerQAR).stringValue) INR, observed \(fx.observationDate.presentation)."
         }
     }
 

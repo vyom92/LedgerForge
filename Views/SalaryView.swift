@@ -7,14 +7,15 @@ struct SalaryView: View {
     @State private var section = "This Month"
     @State private var confirmingCopy = false
     @State private var confirmingDiscard = false
-    @State private var editedMoneyFields: Set<String> = []
+    @State private var showingFXDatePicker = false
+    @State private var fxDateSelection = Date()
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     Picker("Salary section", selection: $section) {
-                        Text("This Month").tag("This Month")
+                        Text(viewModel.planMonthTitle).tag("This Month")
                         Text("Salary History").tag("Salary History")
                     }.pickerStyle(.segmented).frame(maxWidth: 380)
                     if section == "This Month" {
@@ -39,14 +40,14 @@ struct SalaryView: View {
             Button("Discard and reload", role: .destructive) { viewModel.discardAndReload() }
             Button("Keep draft", role: .cancel) {}
         }
-        .onChange(of: viewModel.plan.id) { _, _ in editedMoneyFields.removeAll() }
+        .onDisappear { viewModel.cancelAlDarRefresh() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text("Funding plan · \(viewModel.plan.month.canonical)").font(theme.typography.formTitle.weight(.semibold))
+                    Text("Funding plan · \(viewModel.planMonthTitle)").font(theme.typography.formTitle.weight(.semibold))
                     Text(viewModel.statusText).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 }
                 Spacer()
@@ -92,8 +93,11 @@ struct SalaryView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Planning rate (INR per QAR)").font(theme.typography.formBody)
                     input("INR per QAR", key: "fx.rate", binding: Binding(get: { viewModel.rawText["fx.rate"] ?? "" }, set: { viewModel.setFX(rateText: $0, dateText: viewModel.rawText["fx.date"] ?? "") }))
-                    input("Observed YYYY-MM-DD", key: "fx.date", binding: Binding(get: { viewModel.rawText["fx.date"] ?? "" }, set: { viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: $0) }))
-                    Text("Your planning rate · used only for this month’s transfer").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                    manualFXObservationDate
+                    Text("Your planning rate · used only for \(viewModel.planMonthTitle)").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                    Divider()
+                    alDarReference
+                    Divider()
                     moneyInput("Transfer fee", .fee, viewModel.plan.configuredTransferFeeProvenance)
                     moneyInput("Planned investment", .investment, viewModel.plan.plannedInvestmentProvenance)
                 }
@@ -101,27 +105,117 @@ struct SalaryView: View {
         }
     }
 
+    private var manualFXObservationDate: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Button {
+                fxDateSelection = viewModel.manualFXPickerDate()
+                showingFXDatePicker = true
+            } label: {
+                HStack {
+                    Text(viewModel.manualFXObservationDateTitle)
+                    Spacer()
+                    Image(systemName: "calendar")
+                }.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).lfTextField()
+            .accessibilityLabel("Observed date").accessibilityValue(viewModel.rawText["fx.date"] ?? "Not selected")
+            .accessibilityIdentifier("planner.fx.date")
+            .popover(isPresented: $showingFXDatePicker) {
+                VStack(alignment: .leading, spacing: 12) {
+                    DatePicker("Observed date", selection: $fxDateSelection, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .environment(\.calendar, Calendar(identifier: .gregorian))
+                    HStack {
+                        Button("Clear") {
+                            viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: "")
+                            showingFXDatePicker = false
+                        }.disabled((viewModel.rawText["fx.date"] ?? "").isEmpty)
+                        Spacer()
+                        Button("Cancel") { showingFXDatePicker = false }.keyboardShortcut(.cancelAction)
+                        Button("Use date") {
+                            viewModel.setManualFXObservationDate(fxDateSelection)
+                            showingFXDatePicker = false
+                        }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    }
+                }.padding().frame(width: 310)
+            }
+            if let error = viewModel.fieldErrors["fx.date"] {
+                Text(error).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning)
+            }
+        }
+    }
+
     private func moneyInput(_ label: String, _ field: SalaryWorkspaceViewModel.MoneyField, _ provenance: FundingPlanValueProvenance) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack { Text(label); Spacer(); Text("QAR").foregroundStyle(theme.palette.secondaryText)
-                input(label, key: field.rawValue, binding: Binding(
-                    get: {
-                        !editedMoneyFields.contains(field.rawValue) && viewModel.isInitialZeroInput(field)
-                            ? "" : viewModel.moneyText(field)
-                    },
-                    set: {
-                        editedMoneyFields.insert(field.rawValue)
-                        _ = viewModel.updateMoney(field, text: $0)
-                    }
+                input(label, key: field.rawValue, placeholder: "0", binding: Binding(
+                    get: { viewModel.amountInputText(field.rawValue) },
+                    set: { _ = viewModel.updateMoney(field, text: $0) }
                 )).frame(maxWidth: 150)
             }
             Text(viewModel.provenanceText(provenance)).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
         }
     }
 
-    private func input(_ title: String, key: String, binding: Binding<String>) -> some View {
+    private var alDarReference: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Al Dar reference").font(theme.typography.formHeading.weight(.semibold))
+                Spacer()
+                if viewModel.isRefreshingAlDar { ProgressView().controlSize(.small).accessibilityLabel("Refreshing Al Dar reference") }
+                Button("Refresh Al Dar") { viewModel.startAlDarRefresh() }
+                    .lfSecondaryAction().disabled(!viewModel.canRefreshAlDar)
+                    .accessibilityIdentifier("planner.aldar.refresh")
+            }
+            Text(viewModel.alDarGuidance).font(theme.typography.formCaption)
+                .foregroundStyle(theme.palette.secondaryText).fixedSize(horizontal: false, vertical: true)
+            if let pending = viewModel.pendingAlDarReference {
+                referenceDetails(pending, status: "Candidate · not applied")
+                Button("Use Reference") { viewModel.useAlDarReference() }
+                    .lfSecondaryAction().disabled(!viewModel.canUseAlDarReference)
+                    .accessibilityIdentifier("planner.aldar.apply")
+                if !viewModel.canUseAlDarReference {
+                    Text(viewModel.alDarApplicationGuidance).font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if let applied = viewModel.plan.alDarReference {
+                referenceDetails(applied.quote, status: viewModel.isDirty ? "Selected reference · draft" : "Reference used by saved plan")
+                if applied.quote.submittedQAR.amount != 1, viewModel.hasValidCalculation,
+                   let principal = viewModel.calculation.requiredQARPrincipal, principal != applied.quote.submittedQAR {
+                    LFInfoRow(title: "Current estimate after applying reference", value: MoneyFormatting.display(principal))
+                    Text("Estimated using this saved reference. A new lookup uses QAR 1.")
+                        .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if viewModel.pendingAlDarReference == nil, let previous = viewModel.previousAlDarContext {
+                referenceDetails(previous.quote, status: "Previous reference · not applied")
+            }
+        }
+    }
+
+    private func referenceDetails(_ quote: AlDarReferenceQuote, status: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(status).font(theme.typography.formCaption.weight(.medium))
+            if quote.submittedQAR.amount == 1 {
+                LFInfoRow(title: "Rate", value: "1 QAR = \(quote.displayRate) INR")
+            } else {
+                LFInfoRow(title: "Reference requested for", value: MoneyFormatting.display(quote.submittedQAR))
+                LFInfoRow(title: "Returned INR · exact", value: quote.returnedINR.rawToken)
+                Text("Approx. \(quote.displayRate) INR per QAR · display only")
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
+            Text("Al Dar · QAR → INR · indicative reference")
+                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            Text("Fetched \(ImportInstantFormatting.display(quote.fetchedAtISO))")
+                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+        }.textSelection(.enabled)
+    }
+
+    private func input(_ title: String, key: String, placeholder: String? = nil, binding: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            TextField(title, text: binding).lfTextField().accessibilityIdentifier("planner." + key)
+            TextField(title, text: binding, prompt: Text(placeholder ?? title)).lfTextField()
+                .accessibilityLabel(title).accessibilityIdentifier("planner." + key)
             if let error = viewModel.fieldErrors[key] { Text(error).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning).fixedSize(horizontal: false, vertical: true) }
         }
     }
@@ -137,7 +231,7 @@ struct SalaryView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Toggle(account.nickname ?? account.name, isOn: Binding(get: { balance?.included ?? false }, set: { viewModel.setAccountIncluded(account, included: $0) }))
                         HStack {
-                            input("Planning balance", key: key, binding: Binding(get: { viewModel.rawText[key] ?? "" }, set: { viewModel.setManualBalance(account, text: $0) }))
+                            input("Planning balance", key: key, placeholder: "0", binding: Binding(get: { viewModel.amountInputText(key) }, set: { viewModel.setManualBalance(account, text: $0) }))
                             Button("Capture current") { viewModel.captureAccountBalance(account) }
                         }
                         Text(balance.map { viewModel.provenanceText($0.provenance) } ?? "No planning balance").font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
@@ -163,11 +257,15 @@ struct SalaryView: View {
                         }
                         HStack {
                             Text(region == "qatar" ? "QAR" : "INR")
-                            input("Amount", key: "amount.\(value.id)", binding: Binding(get: { viewModel.rawText["amount.\(value.id)"] ?? "" }, set: { update(value, region: region, amount: $0) }))
+                            input("Amount", key: "amount.\(value.id)", placeholder: "0", binding: Binding(get: { viewModel.amountInputText("amount.\(value.id)") }, set: { update(value, region: region, amount: $0) }))
                         }
-                        Picker("Funding account", selection: Binding(get: { value.fundingAccountID ?? "" }, set: { update(value, region: region, account: $0) })) {
+                        let cards = viewModel.eligibleCommitmentAccounts.filter { $0.nativeCurrency.code == value.money.currency.code }
+                        Picker("Credit card", selection: Binding(get: { value.fundingAccountID ?? "" }, set: { update(value, region: region, account: $0) })) {
                             Text("Unassigned").tag("")
-                            ForEach(viewModel.eligibleAccounts.filter { $0.nativeCurrency.code == value.money.currency.code }, id: \.id) { Text($0.nickname ?? $0.name).tag($0.repositoryAccountId ?? "") }
+                            ForEach(cards, id: \.id) { Text($0.nickname ?? $0.name).tag($0.repositoryAccountId ?? "") }
+                            if let savedID = value.fundingAccountID, !cards.contains(where: { $0.repositoryAccountId == savedID }) {
+                                Text(viewModel.retainedCommitmentAccountLabel(id: savedID)).tag(savedID)
+                            }
                         }
                         Text(viewModel.provenanceText(value.provenance)).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
                     }
@@ -195,12 +293,13 @@ struct SalaryView: View {
                 valueRow("Selected QAR liquidity", viewModel.calculation.selectedQARLiquidity, truth: "Included planning balances")
                 valueRow("Selected INR liquidity", viewModel.calculation.selectedINRLiquidity, truth: "Included planning balances")
                 valueRow("India funding shortfall", viewModel.calculation.indiaFundingShortfall, truth: "After included INR liquidity")
-                valueRow("Required QAR principal", viewModel.calculation.requiredQARPrincipal, truth: "Using this plan’s dated FX rate")
+                valueRow("Required QAR principal", viewModel.calculation.requiredQARPrincipal, truth: viewModel.plan.alDarReference == nil ? "Using this plan’s dated FX rate" : "Using this plan’s Al Dar reference")
                 valueRow("Effective transfer fee", viewModel.calculation.effectiveTransferFee, truth: "Zero when no transfer is required")
                 valueRow("Available for investment", viewModel.calculation.availableForInvestment, truth: "After commitments and transfer")
                 valueRow("Final QAR buffer", viewModel.calculation.finalQARBuffer, truth: "After planned investment")
                 if !viewModel.hasValidCalculation { Text("Correct the marked inputs to calculate this plan.").foregroundStyle(LFTheme.warning) }
                 if viewModel.calculation.incompleteReasons.contains(.missingPlanningFX) { Text("Add a dated FX rate to calculate the India transfer.").foregroundStyle(LFTheme.warning) }
+                if viewModel.calculation.incompleteReasons.contains(.invalidPlanningReference) { Text("The selected reference cannot calculate this transfer. Refresh or enter a manual rate.").foregroundStyle(LFTheme.warning) }
                 if viewModel.calculation.incompleteReasons.contains(.includedQARBalanceMissing) || viewModel.calculation.incompleteReasons.contains(.includedINRBalanceMissing) { Text("An included account needs a planning balance.").foregroundStyle(LFTheme.warning) }
             }
         }
@@ -215,7 +314,7 @@ struct SalaryView: View {
                 }
             }
             ForEach(viewModel.historyGroups, id: \.month) { group in
-                LFPanel(title: group.month.canonical) {
+                LFPanel(title: SalaryWorkspaceViewModel.monthTitle(group.month)) {
                     textValueRow("Salary actuals", MoneyFormatting.display(group.actual), truth: "Total from payslips")
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(group.statements) { statement in
@@ -225,7 +324,7 @@ struct SalaryView: View {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(statement.evidence.kind.displayName).font(theme.typography.formHeading)
-                                        Text("Pay period \(statement.evidence.financialPeriod.canonical) · Print date \(statement.evidence.printDate?.canonical ?? "Not printed")")
+                                        Text("Pay period \(SalaryWorkspaceViewModel.monthTitle(statement.evidence.financialPeriod)) · Print date \(statement.evidence.printDate?.canonical ?? "Not printed")")
                                             .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                                     }
                                     Spacer()

@@ -19,9 +19,30 @@ directly.
 `build-debug` and `build-release` run a fresh signed build in the named Xcode
 configuration. `test-focused` requires one or more real Xcode test selectors
 and translates each to `-only-testing:`. A focused result with zero executed
-tests is failed evidence. `test-full` invokes the complete canonical `TestPlan`.
+tests is failed evidence. `test-full` invokes the ordinary app regression plan selection in
+the canonical `TestPlan`.
 `cycle-close` uses separate fresh Debug, Release and test artifact roots, then
-runs one complete `TestPlan` after both builds pass.
+runs that same ordinary app regression plan selection after both builds pass.
+
+The Sprint-94 owner decision separates 17 existing definitions from ordinary
+regression: 13 corpus campaigns, their evidence-destination preflight, two tests
+that copy statement files, and the separately authorized live-provider check.
+Their definitions are retained. `TestPlan.xctestplan` owns the exclusion list;
+`test-full` also forwards it as explicit `-skip-testing:` arguments because the
+current Xcode runner does not consistently apply Swift Testing exclusions from
+the plan alone. This applies to both direct testing and external-environment
+testing. Use this driver for the ordinary run; an unfiltered Xcode run is not
+the owner-approved selection. The earlier Sprint-94 ordinary app regression plan passed 554 definitions /
+614 executions. Final owner corrections added 13 definitions; the renewed
+ordinary app regression plan passed 567 definitions / 627 executions with zero
+failures/skips. It is not complete authentic/source acceptance. The same 12
+selectors cover 17 retained, separately gated definitions; no exclusions were
+added by the corrections. No definition may be excluded because it fails.
+Parameterized cases may produce more executions than definitions. The final
+two-decimal-only Sprint-94 correction adds one focused definition and passed
+1/1 plus Debug, optimized Release and native inspection. The owner explicitly
+retains the preceding 567/627 ordinary result without a rerun; do not describe
+it as an execution on the last display-only fingerprint.
 
 App-hosted tests do not reliably inherit arbitrary variables exported only in
 the invoking shell. When authentic tests require private paths, temporary
@@ -49,7 +70,11 @@ removed. Do not publish passwords, authentic-source paths, source oracles or the
 environment file. Merely exporting the underlying variables in the shell is
 not evidence that an app-hosted test received them.
 
-The global authentic-corpus gate requires `LEDGERFORGE_GLOBAL_AUTHENTIC_RESULT_FILE`
+The separately gated global authentic-corpus campaign is excluded from the
+current ordinary selection. Its historical workflow below creates derived
+financial evidence and is incompatible with the current in-memory-only source
+processing rule; it must not run without a new explicit owner decision.
+That historical gate requires `LEDGERFORGE_GLOBAL_AUTHENTIC_RESULT_FILE`
 to name a writable test-host destination. Forwarding a path does not grant sandbox
 write access: use a task-owned directory inside the app's container, then copy the
 completed result to the external evidence archive after the run. A source-independent
@@ -57,8 +82,8 @@ atomic-write/readback/remove preflight runs before the corpus and can also be se
 alone as `LedgerForgeTests/GlobalAuthenticCorpusAcceptanceTests/configuredEvidenceDestinationSupportsAtomicWrites()`.
 The final report write remains mandatory and any write failure fails the gate.
 
-A missing authentic corpus, password or oracle is a failed test environment,
-not a passing result and never a reason to disable or skip a test. The script
+A missing required original, password or oracle in the approved selection is a
+failed test environment, not a passing result or a reason to disable that test. The script
 continues to require a readable nonzero test-result summary after execution.
 
 The test plan keeps timeouts enabled and permits a maximum allowance of 1,200

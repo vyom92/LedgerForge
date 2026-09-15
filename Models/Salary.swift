@@ -246,6 +246,7 @@ struct FundingPlan: Identifiable, Equatable, Sendable {
     var configuredTransferFee: Money
     var configuredTransferFeeProvenance: FundingPlanValueProvenance
     var planningFX: FundingPlanFX?
+    var alDarReference: AlDarReferenceEvidence? = nil
     var plannedInvestment: Money
     var plannedInvestmentProvenance: FundingPlanValueProvenance
     var updatedAtISO: String
@@ -256,6 +257,7 @@ enum FundingPlanIncompleteReason: String, Equatable, Sendable {
     case includedINRBalanceMissing
     case invalidCurrency
     case missingPlanningFX
+    case invalidPlanningReference
 }
 
 struct FundingPlanCalculation: Equatable, Sendable {
@@ -275,6 +277,9 @@ struct FundingPlanCalculation: Equatable, Sendable {
 enum FundingPlanCalculator {
     static func calculate(_ plan: FundingPlan) -> FundingPlanCalculation {
         var reasons = Set<FundingPlanIncompleteReason>()
+        guard plan.planningFX == nil || plan.alDarReference == nil else {
+            return unavailable(.invalidPlanningReference)
+        }
         guard let qar = try? CurrencyCode("QAR"), let inr = try? CurrencyCode("INR") else {
             return unavailable(.invalidCurrency)
         }
@@ -313,6 +318,14 @@ enum FundingPlanCalculator {
             if shortfall.amount == .zero {
                 principal = try? Money(amount: .zero, currency: qar)
                 effectiveFee = try? Money(amount: .zero, currency: qar)
+            } else if let reference = plan.alDarReference {
+                if reference.boundShortfallINR == shortfall,
+                   let amount = try? reference.quote.principal(for: shortfall) {
+                    principal = amount
+                    effectiveFee = plan.configuredTransferFee
+                } else {
+                    reasons.insert(.invalidPlanningReference)
+                }
             } else if let fx = plan.planningFX {
                 var exact = shortfall.amount / fx.inrPerQAR
                 var rounded = Decimal()
@@ -334,6 +347,7 @@ enum FundingPlanCalculator {
             beforeInvestment = nil
         }
         let finalBuffer = beforeInvestment.flatMap { try? $0 - plan.plannedInvestment }
+        let availableForInvestment = beforeInvestment.flatMap { try? Money(amount: max(.zero, $0.amount), currency: qar) }
         return FundingPlanCalculation(
             expectedNet: expectedNet,
             selectedQARLiquidity: selectedQAR,
@@ -343,7 +357,7 @@ enum FundingPlanCalculator {
             requiredQARPrincipal: principal,
             effectiveTransferFee: effectiveFee,
             qarBeforeInvestment: beforeInvestment,
-            availableForInvestment: beforeInvestment,
+            availableForInvestment: availableForInvestment,
             finalQARBuffer: finalBuffer,
             incompleteReasons: reasons
         )

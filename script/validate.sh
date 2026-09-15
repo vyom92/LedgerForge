@@ -280,9 +280,24 @@ run_focused_test() {
 
 run_full_test() {
     local status
+    local excluded_selectors
+    local selector
+    local -a skip_testing_arguments=()
+
+    # Xcode does not consistently apply Swift Testing exclusions from a plan.
+    # Forward the plan's same selection explicitly for both execution paths.
+    excluded_selectors="$(/usr/bin/jq -r '
+        .testTargets[] | select(.enabled != false)
+        | .target.name as $target
+        | .skippedTests[]?
+        | if startswith($target + "/") then . else $target + "/" + . end
+    ' "$ROOT_DIR/$TEST_PLAN.xctestplan")" || fail "unable to read the test plan exclusions" 65
+    while IFS= read -r selector; do
+        [[ -n "$selector" ]] && skip_testing_arguments+=("-skip-testing:$selector")
+    done <<< "$excluded_selectors"
 
     if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
-        run_test_with_external_environment "test-full"
+        run_test_with_external_environment "test-full" "${skip_testing_arguments[@]}"
     else
         run_xcodebuild "test-full" \
             -project "$PROJECT_PATH" \
@@ -291,6 +306,7 @@ run_full_test() {
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RESULT_BUNDLE" \
             -testPlan "$TEST_PLAN" \
+            "${skip_testing_arguments[@]}" \
             test
     fi
     status=$?

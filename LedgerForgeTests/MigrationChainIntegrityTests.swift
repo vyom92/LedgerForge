@@ -52,7 +52,8 @@ struct MigrationChainIntegrityTests {
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
         #expect(migrationV13.name == "multi-section card statements and exact semantic sources")
         #expect(migrationV14.name == "generalized card reconciliation and structural section evidence")
-        #expect(migrationV17.version == allMigrations.count)
+        #expect(migrationV17.version == 17)
+        #expect(migrationV18.version == allMigrations.count)
     }
 
     @Test

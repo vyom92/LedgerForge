@@ -1634,43 +1634,50 @@ struct ContentView: View {
     }
 
     private var dashboardContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                dashboardPositionHeading
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
-                        dashboardPrimaryContent.frame(minWidth: 640, maxWidth: .infinity, alignment: .leading)
+        GeometryReader { viewport in
+            let contentWidth = min(1320, max(0, viewport.size.width - theme.spacing.pagePadding * 2))
+            let usesColumns = contentWidth >= 640 + dashboardSupportingColumnWidth + theme.spacing.majorModuleGap
+            let primaryWidth = usesColumns
+                ? contentWidth - dashboardSupportingColumnWidth - theme.spacing.majorModuleGap
+                : contentWidth
+            let layout = usesColumns
+                ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.majorModuleGap))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.majorModuleGap))
+            ScrollView {
+                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                    dashboardPositionHeading
+                    // Select from the viewport instead of measuring two complete
+                    // Dashboard trees during AppKit's initial window sizing.
+                    layout {
+                        dashboardPrimaryContent(availableWidth: primaryWidth)
+                            .frame(minWidth: usesColumns ? 640 : 0, maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
                             salaryDashboardSummary
                             importActivityCard
-                        }.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
+                        }
+                        .frame(width: usesColumns ? dashboardSupportingColumnWidth : nil, alignment: .leading)
                     }
-                    VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
-                        dashboardPrimaryContent
-                        salaryDashboardSummary
-                        importActivityCard
-                    }
-                }
-                if let attention = dashboardAttention {
-                    LFPanel(title: "Attention") {
-                        Label(attention.title, systemImage: attention.iconName)
-                            .foregroundStyle(attention.tone.color)
-                        Text(attention.explanation)
-                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    if let attention = dashboardAttention {
+                        LFPanel(title: "Attention") {
+                            Label(attention.title, systemImage: attention.iconName)
+                                .foregroundStyle(attention.tone.color)
+                            Text(attention.explanation)
+                                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        }
                     }
                 }
+                .frame(maxWidth: 1320, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(theme.spacing.pagePadding)
+                .font(theme.typography.body)
             }
-            .frame(maxWidth: 1320, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(theme.spacing.pagePadding)
-            .font(theme.typography.body)
         }
         .onAppear { dashboardViewModel.refreshPresentation() }
     }
 
-    private var dashboardPrimaryContent: some View {
+    private func dashboardPrimaryContent(availableWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
-            dashboardPositionPanel
+            dashboardPositionPanel(availableWidth: availableWidth)
             DashboardActivityComparisonView(
                 comparison: dashboardViewModel.activityComparison,
                 state: dashboardViewModel.recentActivityState
@@ -1696,7 +1703,7 @@ struct ContentView: View {
         }
     }
 
-    private var dashboardPositionPanel: some View {
+    private func dashboardPositionPanel(availableWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
             switch dashboardViewModel.positionState {
             case .loading:
@@ -1707,18 +1714,21 @@ struct ContentView: View {
                 dashboardState("Data unavailable", detail: "Current bank and card positions are unavailable.")
             case .populated:
                 if dashboardViewModel.positions.count == 1, let group = dashboardViewModel.positions.first {
-                    dashboardCurrencyGroup(group, allowsHorizontalDomains: true)
+                    dashboardCurrencyGroup(group, availableWidth: availableWidth, allowsHorizontalDomains: true)
                 } else {
-                    ViewThatFits(in: .horizontal) {
-                        if dashboardViewModel.positions.count <= 2 {
-                            HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                                ForEach(dashboardViewModel.positions) { group in
-                                    dashboardCurrencyGroup(group).frame(minWidth: 304, maxWidth: .infinity)
-                                }
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                            ForEach(dashboardViewModel.positions) { dashboardCurrencyGroup($0) }
+                    let count = dashboardViewModel.positions.count
+                    let horizontal = count <= 2
+                        && availableWidth >= CGFloat(count) * 304 + CGFloat(count - 1) * theme.spacing.sectionGap
+                    let groupWidth = horizontal
+                        ? (availableWidth - CGFloat(count - 1) * theme.spacing.sectionGap) / CGFloat(count)
+                        : availableWidth
+                    let layout = horizontal
+                        ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
+                        : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
+                    layout {
+                        ForEach(dashboardViewModel.positions) { group in
+                            dashboardCurrencyGroup(group, availableWidth: groupWidth)
+                                .frame(minWidth: horizontal ? 304 : 0, maxWidth: .infinity)
                         }
                     }
                 }
@@ -1726,25 +1736,23 @@ struct ContentView: View {
         }
     }
 
-    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition, allowsHorizontalDomains: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition, availableWidth: CGFloat, allowsHorizontalDomains: Bool = false) -> some View {
+        let bankWidth = dashboardDomainMinimumWidth("Bank balances", total: group.bankTotal)
+        let cardWidth = dashboardDomainMinimumWidth("Card liabilities", total: group.cardTotal)
+        let horizontal = allowsHorizontalDomains && availableWidth >= bankWidth + cardWidth + theme.spacing.sectionGap
+        let layout = horizontal
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
+        return VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
             if !allowsHorizontalDomains {
                 Text(group.currency.code)
                     .font(theme.typography.secondary.weight(.medium))
             }
-            ViewThatFits(in: .horizontal) {
-                if allowsHorizontalDomains {
-                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
-                            .frame(minWidth: dashboardDomainMinimumWidth("Bank balances", total: group.bankTotal), maxWidth: .infinity)
-                        dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
-                            .frame(minWidth: dashboardDomainMinimumWidth("Card liabilities", total: group.cardTotal), maxWidth: .infinity)
-                    }
-                }
-                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                    dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
-                    dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
-                }
+            layout {
+                dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
+                    .frame(minWidth: horizontal ? bankWidth : 0, maxWidth: .infinity)
+                dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+                    .frame(minWidth: horizontal ? cardWidth : 0, maxWidth: .infinity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1882,11 +1890,11 @@ struct ContentView: View {
                     }
                 }
             } else {
-                dashboardSupportingHeading("Current-month Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
+                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
                 if dashboardViewModel.fundingState == .loading {
                     dashboardState("Loading Salary / Funding…", loading: true)
                 } else {
-                    Text("Planning estimates · saved current-month plan")
+                    Text("Planning estimates · saved \(dashboardViewModel.fundingMonthTitle) plan")
                         .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                     LFLabelValueGroup(rows: DashboardFundingMetric.allCases) { metric in
                         Text(metric.rawValue).font(theme.typography.body)
@@ -1904,10 +1912,6 @@ struct ContentView: View {
                         Text("Missing required input. Affected outputs are unavailable.")
                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }
-                    if let context = dashboardViewModel.fundingRateContext {
-                        Text(context).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
                 dashboardRouteButton(.salary)
             }
@@ -1916,8 +1920,8 @@ struct ContentView: View {
 
     private var dashboardMissingPlanMessage: some View {
         VStack(alignment: .leading, spacing: theme.spacing.small) {
-            dashboardSupportingHeading("Current-month Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
-            Text("No saved plan for the current month.")
+            dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
+            Text("No saved plan for \(dashboardViewModel.fundingMonthTitle).")
                 .font(theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3815,7 +3819,7 @@ struct ContentView: View {
         case .imports:
             return "Import statements in a few simple steps"
         case .salary:
-            return "Imported salary actuals and current-month funding plan"
+            return "Imported salary actuals and \(salaryViewModel.planMonthTitle) funding plan"
         case .settings:
             return "Configure LedgerForge to work the way you do"
         case .developer:

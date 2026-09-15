@@ -55,8 +55,8 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
                            "appearance_window_profile_preferences", "private_screenshots", "development_artifacts"]
 
     func validate() throws {
-        guard formatVersion == 1, schemaVersion == BackupCompatibility.supportedSchemaVersion,
-              migrations == BackupCompatibility.migrationIdentities else { throw BackupError.incompatible }
+        guard formatVersion == 1,
+              migrations == (try BackupCompatibility.identities(for: schemaVersion)) else { throw BackupError.incompatible }
         guard database.file == "ledger.sqlite", database.byteSize > 0,
               database.sha256.count == 64, database.sha256.allSatisfy({ "0123456789abcdef".contains($0) }),
               ISO8601DateFormatter().date(from: createdAt) != nil,
@@ -67,9 +67,17 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
 /// This is the one backup compatibility policy. A future schema requires an
 /// explicit policy decision here; the migration registry alone does not grant it.
 nonisolated enum BackupCompatibility {
-    static let supportedSchemaVersion = 17
+    static let supportedSchemaVersion = 18
     static var migrationIdentities: [BackupManifest.MigrationIdentity] {
         allMigrations.map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
+    }
+    static func migrations(for version: Int) throws -> [Migration] {
+        guard [17, 18].contains(version), allMigrations.last?.version == 18,
+              allMigrations.map(\.version) == Array(1...18) else { throw BackupError.incompatible }
+        return allMigrations.filter { $0.version <= version }
+    }
+    static func identities(for version: Int) throws -> [BackupManifest.MigrationIdentity] {
+        try migrations(for: version).map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
     }
     struct SchemaObject: Equatable, Sendable {
         let kind: String?
@@ -77,13 +85,14 @@ nonisolated enum BackupCompatibility {
         let table: String?
         let sql: String?
     }
-    private static let expectedInventory: Result<[SchemaObject], Error> = Result {
-        guard allMigrations.last?.version == supportedSchemaVersion else { throw BackupError.incompatible }
+    private static let v17Inventory = Result { try expectedInventory(version: 17) }
+    private static let v18Inventory = Result { try expectedInventory(version: 18) }
+    private static func expectedInventory(version: Int) throws -> [SchemaObject] {
         // Empty, source-independent schema authority; no financial fixture/data.
         let schema = SQLiteDatabase(path: ":memory:")
         try schema.open()
         defer { schema.close() }
-        try schema.runMigrations(allMigrations)
+        try schema.runMigrations(migrations(for: version))
         let inventory = try schemaInventory(schema)
         try schema.closeChecked()
         return inventory
@@ -100,16 +109,46 @@ nonisolated enum BackupCompatibility {
             throw BackupError.excludedPayload
         }
     }
-    static func verifyDatabase(_ db: SQLiteDatabase) throws {
-        guard allMigrations.last?.version == supportedSchemaVersion else { throw BackupError.incompatible }
-        do { _ = try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true) }
+    static func verifyDatabase(_ db: SQLiteDatabase, schemaVersion: Int = supportedSchemaVersion) throws {
+        let chain = try migrations(for: schemaVersion)
+        do { _ = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: true) }
         catch { throw BackupError.incompatible }
-        guard try schemaInventory(db) == expectedInventory.get() else { throw BackupError.incompatible }
+        let inventory = try (schemaVersion == 17 ? v17Inventory : v18Inventory).get()
+        guard try schemaInventory(db) == inventory else { throw BackupError.incompatible }
         let integrity = try db.query(sql: "PRAGMA integrity_check;") { $0.string(at: 0) }
         guard integrity == ["ok"], try db.query(sql: "PRAGMA foreign_key_check;", map: { _ in true }).isEmpty else {
             throw BackupError.damaged
         }
         try checkContents(db)
+    }
+
+    /// Receipt-owned startup and isolated V17 candidates share this exact
+    /// bridge. The caller must already own an existing open database.
+    static func upgradeV17IfNeeded(_ db: SQLiteDatabase) throws {
+        let chain = try migrations(for: 18)
+        let history = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: false)
+        guard history.count == 17 || history.count == 18 else { throw BackupError.incompatible }
+        if history.count == 17 {
+            try verifyDatabase(db, schemaVersion: 17)
+            // runMigrations validates the immutable prefix and applies only
+            // its missing V18 tail inside SQLite migration ownership.
+            try db.runMigrations(chain)
+        }
+        try verifyDatabase(db)
+    }
+
+    static func prepareCandidate(package: URL, manifest: BackupManifest, destination: URL) throws -> String {
+        let original = package.appendingPathComponent("ledger.sqlite")
+        try FileManager.default.copyItem(at: original, to: destination)
+        guard try BackupFiles.hash(destination).sha256 == manifest.database.sha256 else { throw BackupError.candidateChanged }
+        let db = SQLiteDatabase(path: destination.path)
+        try db.open(access: .existing)
+        do {
+            try verifyDatabase(db, schemaVersion: manifest.schemaVersion)
+            if manifest.schemaVersion == 17 { try upgradeV17IfNeeded(db) }
+            try db.checkpointAndClose()
+        } catch { try? db.closeChecked(); throw error }
+        return try BackupFiles.hash(destination).sha256
     }
 }
 
@@ -219,7 +258,7 @@ nonisolated enum BackupFiles {
         guard payload.size == manifest.database.byteSize, payload.sha256 == manifest.database.sha256 else { throw BackupError.damaged }
         let db = SQLiteDatabase(path: databaseURL.path)
         try db.open(access: .readOnlySnapshot)
-        do { try BackupCompatibility.verifyDatabase(db); try db.closeChecked() }
+        do { try BackupCompatibility.verifyDatabase(db, schemaVersion: manifest.schemaVersion); try db.closeChecked() }
         catch { try? db.closeChecked(); throw error }
         return manifest
     }

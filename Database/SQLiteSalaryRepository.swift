@@ -184,7 +184,8 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                     fxObservationDateISO: row.string(at: 17), plannedInvestmentMinor: row.int64(at: 18) ?? 0,
                     plannedInvestmentDecimal: row.string(at: 19) ?? "", plannedInvestmentProvenance: row.string(at: 20) ?? "",
                     updatedAtISO: row.string(at: 21) ?? "", balances: try self.balances(planID: id),
-                    commitments: try self.commitments(planID: id)
+                    commitments: try self.commitments(planID: id),
+                    alDarReference: try self.alDarReference(planID: id)
                 )
             }
     }
@@ -200,6 +201,9 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                     try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
                 }
                 try validateRelationships(plan)
+                // Clear the old authority inside this transaction before the
+                // parent upsert; a rollback restores the complete prior plan.
+                try db.executePrepared(sql: "DELETE FROM funding_plan_al_dar_references WHERE funding_plan_id = ?;", params: [plan.id])
                 try db.executePrepared(sql: """
                     INSERT INTO funding_plans (
                       id, workspace_id, plan_month, rollover_source_plan_id,
@@ -236,6 +240,18 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 for commitment in plan.commitments {
                     try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
                 }
+                if let reference = plan.alDarReference {
+                    try db.executePrepared(sql: """
+                        INSERT INTO funding_plan_al_dar_references
+                          (funding_plan_id, provider_code, source_contract_code, direction_code,
+                           submitted_qar_minor, submitted_qar_decimal, returned_inr_raw_decimal,
+                           bound_shortfall_inr_minor, bound_shortfall_inr_decimal, fetched_at, classification_code)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?);
+                        """, params: [reference.fundingPlanId, reference.providerCode, reference.sourceContractCode,
+                                      reference.directionCode, reference.submittedQARMinor, reference.submittedQARDecimal,
+                                      reference.returnedINRRawDecimal, reference.boundShortfallINRMinor,
+                                      reference.boundShortfallINRDecimal, reference.fetchedAtISO, reference.classificationCode])
+                }
                 try db.execute(sql: "COMMIT;")
                 return plan
             } catch {
@@ -243,6 +259,22 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 throw error
             }
         }
+    }
+
+    private func alDarReference(planID: String) throws -> FundingPlanAlDarReferenceDTO? {
+        try db.query(sql: """
+            SELECT funding_plan_id, provider_code, source_contract_code, direction_code,
+                   submitted_qar_minor, submitted_qar_decimal, returned_inr_raw_decimal,
+                   bound_shortfall_inr_minor, bound_shortfall_inr_decimal, fetched_at, classification_code
+            FROM funding_plan_al_dar_references WHERE funding_plan_id = ?;
+            """, params: [planID]) { row in
+                FundingPlanAlDarReferenceDTO(fundingPlanId: row.string(at: 0) ?? "", providerCode: row.string(at: 1) ?? "",
+                    sourceContractCode: row.string(at: 2) ?? "", directionCode: row.string(at: 3) ?? "",
+                    submittedQARMinor: row.int64(at: 4) ?? 0, submittedQARDecimal: row.string(at: 5) ?? "",
+                    returnedINRRawDecimal: row.string(at: 6) ?? "", boundShortfallINRMinor: row.int64(at: 7) ?? 0,
+                    boundShortfallINRDecimal: row.string(at: 8) ?? "", fetchedAtISO: row.string(at: 9) ?? "",
+                    classificationCode: row.string(at: 10) ?? "")
+            }.first
     }
 
     private func validateRelationships(_ plan: FundingPlanDTO) throws {

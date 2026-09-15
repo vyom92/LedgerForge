@@ -133,6 +133,9 @@
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A69C100189964B7F80F52710 /* BackupPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 685D016F85D34981A5D36C74 /* BackupPackage.swift */; };
+		A94000000000000000000002 /* AlDarReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000001 /* AlDarReference.swift */; };
+		A94000000000000000000003 /* AlDarReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000001 /* AlDarReference.swift */; };
+		A94000000000000000000005 /* AlDarCurrentReferenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000001 /* RuntimeDiagnostics.swift */; };
 		AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
@@ -354,6 +357,8 @@
 		91AA00012026091400000001 /* LFAppearancePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFAppearancePreferences.swift; sourceTree = "<group>"; };
 		91AA00032026091400000001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
+		A94000000000000000000001 /* AlDarReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarReference.swift; sourceTree = "<group>"; };
+		A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarCurrentReferenceProvider.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreCoordinator.swift; sourceTree = "<group>"; };
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
@@ -592,6 +597,7 @@
 			children = (
 				A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */,
 				7A790000307A000000000001 /* Salary.swift */,
+				A94000000000000000000001 /* AlDarReference.swift */,
 				760000133076000000000001 /* Card.swift */,
 				D57000013057000000000001 /* Category.swift */,
 				3A4400013004000000000001 /* Money.swift */,
@@ -631,6 +637,7 @@
 			isa = PBXGroup;
 			children = (
 				AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */,
+				A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */,
 				3C12603929AE4251B5B549B9 /* DatabaseActivityGate.swift */,
 				DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */,
 				DBA00004305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift */,
@@ -1050,6 +1057,8 @@
 				7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */,
 				7A79000B307A000000000001 /* SalaryStore.swift in Sources */,
 				7A790001307A000000000001 /* Salary.swift in Sources */,
+				A94000000000000000000002 /* AlDarReference.swift in Sources */,
+				A94000000000000000000005 /* AlDarCurrentReferenceProvider.swift in Sources */,
 				7A790003307A000000000001 /* QatarAirwaysSalaryPDFParser.swift in Sources */,
 				7A790005307A000000000001 /* SalaryPersistence.swift in Sources */,
 				7A790007307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
@@ -1209,6 +1218,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
+				A94000000000000000000003 /* AlDarReference.swift in Sources */,
 				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
 				B60000013050000000000001 /* main.swift in Sources */,
 				B60000023050000000000001 /* Repository.swift in Sources */,

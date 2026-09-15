@@ -150,6 +150,113 @@ struct PlannerEditorTests {
         #expect(throws: Error.self) { try PlannerInputCodec.money("5000.5", currency: "QAR", locale: Locale(identifier: "de_DE")) }
     }
 
+    @Test func untouchedZeroDefaultsAreBlankAndExplicitZeroRemainsVisible() throws {
+        let setup = try editor()
+        for field in [SalaryWorkspaceViewModel.MoneyField.fixed, .variable, .deductions, .investment] {
+            #expect(setup.vm.amountInputText(field.rawValue) == "")
+            #expect(setup.vm.moneyText(field) == "0")
+        }
+        #expect(setup.vm.amountInputText("fee") == "25")
+        #expect(!setup.vm.isDirty)
+        #expect(setup.vm.updateMoney(.fixed, text: "0"))
+        #expect(setup.vm.amountInputText("fixed") == "0")
+        #expect(!setup.vm.isDirty)
+        #expect(setup.vm.updateMoney(.fee, text: "0"))
+        #expect(setup.vm.amountInputText("fee") == "0")
+        setup.vm.save()
+        #expect(setup.vm.saveState == .saved)
+        for field in SalaryWorkspaceViewModel.MoneyField.allCases {
+            #expect(setup.vm.amountInputText(field.rawValue) == "0")
+        }
+    }
+
+    @Test func newCommitmentZerosStayBlankUntilAmountEditingAndSaveExactly() throws {
+        let setup = try editor()
+        for region in ["qatar", "india"] {
+            setup.vm.addCommitment(region: region)
+            let row = try #require((region == "qatar" ? setup.vm.plan.qatarCommitments : setup.vm.plan.indiaCommitments).first)
+            let key = "amount.\(row.id)"
+            #expect(setup.vm.amountInputText(key) == "")
+            #expect(setup.vm.rawText[key] == "0")
+            setup.vm.editCommitment(region: region, id: row.id, field: "label", text: "My commitment")
+            setup.vm.editCommitment(region: region, id: row.id, field: "included", text: "false")
+            #expect(setup.vm.amountInputText(key) == "")
+            setup.vm.editCommitment(region: region, id: row.id, field: "amount", text: "0")
+            #expect(setup.vm.amountInputText(key) == "0")
+        }
+        setup.vm.save()
+        #expect(setup.vm.saveState == .saved)
+        let saved = try #require(setup.spy.plans(workspaceId: "default-workspace").first)
+        #expect(saved.commitments.count == 2)
+        #expect(saved.commitments.allSatisfy { $0.amountDecimal == "0.00" })
+        let row = try #require(setup.vm.plan.qatarCommitments.first)
+        setup.vm.editCommitment(region: "qatar", id: row.id, field: "amount", text: "")
+        #expect(setup.vm.amountInputText("amount.\(row.id)") == "")
+        #expect(setup.vm.fieldErrors["amount.\(row.id)"] != nil)
+        setup.vm.save()
+        #expect(setup.spy.saves == 1)
+    }
+
+    @Test func rolledZerosAndEnteredBalanceZerosRemainVisible() throws {
+        let setup = try editor()
+        setup.vm.save()
+        let next = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(canonical: "2026-10"),
+            provider: { setup.holder.active }, accountStore: AccountStore(), salaryStore: SalaryStore(),
+            fundingPlanStore: setup.store, locale: locale, refresh: { _ in })
+        next.rolloverFromPreviousPlan()
+        for field in [SalaryWorkspaceViewModel.MoneyField.fixed, .variable, .deductions, .investment] {
+            #expect(next.amountInputText(field.rawValue) == "0")
+        }
+        // An ordinary manually entered balance is separate from an untouched default.
+        let account = Account(repositoryAccountId: "manual-bank", institution: "My bank", name: "My balance", type: .bank, currencyCode: "QAR")
+        next.setManualBalance(account, text: "0")
+        #expect(next.amountInputText("balance.manual-bank") == "0")
+    }
+
+    @Test func manualFXCalendarSelectionPreservesTheChosenDayAndSaveBoundary() throws {
+        #expect(SalaryWorkspaceViewModel.monthTitle(try SelectedStatementMonth(canonical: "2026-08")) == "Aug 2026")
+        for zone in ["Asia/Qatar", "America/Los_Angeles", "Pacific/Kiritimati"] {
+            let timeZone = try #require(TimeZone(identifier: zone))
+            let setup = try editor()
+            setup.vm.setFX(rateText: "25", dateText: "2026-08-31")
+            let before = setup.vm.plan
+            let selection = setup.vm.manualFXPickerDate(timeZone: timeZone)
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            let parts = calendar.dateComponents([.year, .month, .day], from: selection)
+            #expect(parts.year == 2026 && parts.month == 8 && parts.day == 31)
+            #expect(setup.vm.plan == before)
+            #expect(setup.spy.saves == 0)
+            let chosen = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 12)))
+            setup.vm.setManualFXObservationDate(chosen, timeZone: timeZone)
+            #expect(setup.vm.rawText["fx.date"] == "2026-09-01")
+            #expect(setup.vm.plan.planningFX?.inrPerQAR == 25)
+            #expect(setup.spy.saves == 0)
+            setup.vm.save()
+            #expect(setup.vm.saveState == .saved)
+            #expect(setup.vm.plan.planningFX?.observationDate.canonical == "2026-09-01")
+        }
+    }
+
+    @Test func investmentAvailabilityStopsAtZeroWithoutHidingTheFundingDeficit() throws {
+        for deductions in ["0", "10", "20"] {
+            let setup = try editor()
+            _ = setup.vm.updateMoney(.fixed, text: "10")
+            _ = setup.vm.updateMoney(.deductions, text: deductions)
+            _ = setup.vm.updateMoney(.investment, text: "5")
+            let expectedBefore = Decimal(10) - (try #require(Decimal(string: deductions)))
+            #expect(setup.vm.calculation.qarBeforeInvestment?.amount == expectedBefore)
+            #expect(setup.vm.calculation.availableForInvestment?.amount == max(0, expectedBefore))
+            #expect(setup.vm.calculation.finalQARBuffer?.amount == expectedBefore - 5)
+        }
+        let incomplete = try editor()
+        incomplete.vm.addCommitment(region: "india")
+        let row = try #require(incomplete.vm.plan.indiaCommitments.first)
+        incomplete.vm.editCommitment(region: "india", id: row.id, field: "amount", text: "1")
+        #expect(incomplete.vm.calculation.availableForInvestment == nil)
+        #expect(incomplete.vm.calculation.finalQARBuffer == nil)
+    }
+
     @Test func unknownWriteFailureRetainsDraftAndBlocksBlindRetry() throws {
         let setup = try editor()
         setup.spy.reject = true

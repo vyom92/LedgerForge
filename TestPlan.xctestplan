@@ -21,6 +21,20 @@
   "testTargets" : [
     {
       "parallelizable" : false,
+      "skippedTests" : [
+        "AmericanExpressPrivateAcceptanceTests/completePrivateCorpusMatchesFrozenOracleAndImportCampaigns()",
+        "AxisBankAuthenticAcceptanceTests",
+        "AxisBankV17AuthenticMigrationTests",
+        "AxisCreditCardAuthenticAcceptanceTests",
+        "CBQBankAuthenticAcceptanceTests",
+        "CBQCreditCardPrivateAcceptanceTests",
+        "GlobalAuthenticCorpusAcceptanceTests",
+        "HDFCBankAccountAuthenticAcceptanceTests",
+        "ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()",
+        "SalaryAuthenticCorpusAcceptanceTests",
+        "SourceSnapshotConfirmationTests/preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL()",
+        "Sprint94LiveClientTests"
+      ],
       "target" : {
         "containerPath" : "container:LedgerForge.xcodeproj",
         "identifier" : "288EB0B92FF7955300F09BC9",

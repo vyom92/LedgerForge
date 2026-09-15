@@ -2,7 +2,7 @@
 
 **Status:** PREPARED FUTURE ROADMAP / NOT CURRENT AUTHORITY.
 **Prepared:** 2026-09-10; scope reset by explicit owner decision, 2026-09-11.
-**Current authority:** [Sprints 90–99](../LedgerForge_Roadmap_Sprints_90-99_Current.md), explicitly activated through accepted Sprint 90. Sprint 91 remains PREPARED / NOT YET CHAT-AUTHORIZED; the 100–109 cycle remains non-current.
+**Current authority:** [Sprints 90–99](../LedgerForge_Roadmap_Sprints_90-99_Current.md), through accepted Sprint 94. The owner settled the revised 95–99 sequence on 2026-09-15; the 100–109 cycle remains non-current.
 **PERSONAL-V1: NOT YET ADOPTED.**
 
 Only Sprint 100 is fixed. This document authorizes no implementation, verification run, architecture, migration or cycle activation. Apply the [Private Personal App Scope Gate](../../../AGENTS.md#private-personal-app-scope-gate) before priority triage. Rejected categories are **NOT REQUIRED-DO NOT CONSIDER** and cannot become dependencies or future sprint candidates.
@@ -27,7 +27,7 @@ Is LedgerForge safe, correct and complete enough for the owner to use as the per
 
 ## Entry gates
 
-Chat must have accepted the adopted Swift-6 and R1 boundaries through Sprint 92; verified backup/restore; current Salary/This Month Al Dar planning with its actual ADR-045 alignment/access/freshness/amount-binding/manual-override contract; current holdings/valuation sufficient for the owner's actual holdings; current market FX/net worth in the selected reporting currency/currencies; and the [private supported-source matrix](../../FUTURE_WORK.MD#fw-p2-79).
+Chat must have accepted the adopted Swift-6 and R1 boundaries through Sprint 92; verified backup/restore; Sprint-94 QAR-1 indicative Al Dar unit planning reference and manual fallback under ADR-045; **Sprint-95 Budget Planner / This Month**; current investment identity, holdings/valuation and integrated portfolio from Sprints 96–98; Sprint-99 shared current-market QAR/INR/USD FX and net worth; and the [private supported-source matrix](../../FUTURE_WORK.MD#fw-p2-79). **Sprint-95 planner acceptance is a hard prerequisite.** Finishing Sprint-94 planning plumbing or retaining the existing Salary page does not satisfy the monthly workflow gate.
 
 Roadmap positions do not establish accepted architecture, current behavior or readiness. Existing exact Import Centre, credential, source, provider, duplicate/equivalence and Salary contracts remain binding. Complete structured export remains optional unless explicitly adopted.
 
@@ -37,7 +37,7 @@ Roadmap positions do not establish accepted architecture, current behavior or re
 2. **Independent financial truth:** independent authentic-source evidence agrees with exact Money/currency/scale, date meaning, direction, identity, source order, multiplicity, provenance and duplicate/equivalence behavior. Rejection leaves zero accepted durable residue.
 3. **Durable database:** accepted migration identities, SQLite integrity/foreign keys, applicable SQLite/In-Memory parity, canonical hydration and ordinary same-database quit/relaunch are safe.
 4. **Recovery:** owner backup creation, consistent snapshot, manifest/integrity/version checks, isolated restore, nonempty-target protection, explicit confirmation, activation rollback, restored hydration and relaunch actually work. A copied live database file is not proof.
-5. **Salary/planning:** adopted Qatar Airways actuals, Salary History, This Month, accepted fee/rounding/underfunding rules and current amount-bound Al Dar/manual-rate planning work; stale/unavailable evidence stays explicit.
+5. **Budget Planner / This Month:** the accepted Sprint-95 workflow uses available funds, selected bank balances, card commitments, expected/actual salary, Qatar/India requirements, remittance, fees, planned investment and the resulting Qatar buffer coherently. Salary History remains supporting evidence. QAR-1 indicative Al Dar unit references and manual fallback preserve full internal precision, accepted fee/rounding/underfunding rules and explicit stale/unavailable states. The Budget Analysis workbook is the workflow reference, not financial source authority.
 6. **Current investments:** genuine ownership, exact units, typed cost evidence and independently qualified price/NAV identity/currency/date support the adopted holdings and valuation.
 7. **Current FX/net worth:** qualified current market observations, explicit reporting orientation, non-overlapping membership and approved rounding preserve native facts; missing/stale balances, holdings, prices or rates make results incomplete rather than zero. Al Dar remains Salary-planning-only.
 8. **Source truth table:** the private supported-source matrix accurately names actual institutions/products, accepted formats/families, exact boundaries and relevant limitations, including source-uncertified gaps.

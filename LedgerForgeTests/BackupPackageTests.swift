@@ -10,19 +10,19 @@ final class BackupPackageTests: XCTestCase {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         return url
     }
-    private func package(at parent: URL) throws -> URL {
+    private func package(at parent: URL, version: Int = BackupCompatibility.supportedSchemaVersion) throws -> URL {
         let package = parent.appendingPathComponent("test.ledgerforgebackup")
         try BackupFiles.createDirectory(package)
         let source = SQLiteDatabase(path: ":memory:")
         try source.open(); defer { source.close() }
-        try source.runMigrations(allMigrations)
+        try source.runMigrations(BackupCompatibility.migrations(for: version))
         let payload = package.appendingPathComponent("ledger.sqlite")
         try source.createBackup(at: payload.path)
         let hash = try BackupFiles.hash(payload)
         let manifest = BackupManifest(formatVersion: 1, backupID: UUID(), createdAt: "2026-09-14T00:00:00Z",
             application: .init(identifier: nil, version: nil, build: nil),
             database: .init(file: "ledger.sqlite", byteSize: hash.size, sha256: hash.sha256),
-            schemaVersion: BackupCompatibility.supportedSchemaVersion, migrations: BackupCompatibility.migrationIdentities,
+            schemaVersion: version, migrations: try BackupCompatibility.identities(for: version),
             contents: BackupManifest.contentDescription, exclusions: BackupManifest.excluded)
         try JSONEncoder().encode(manifest).write(to: package.appendingPathComponent("manifest.json"))
         return package
@@ -55,7 +55,7 @@ final class BackupPackageTests: XCTestCase {
     }
     func testOlderSchemaRejected() throws {
         try withPackage { url in
-            try changeMetadata(url) { $0["schemaVersion"] = BackupCompatibility.supportedSchemaVersion - 1 }
+            try changeMetadata(url) { $0["schemaVersion"] = 16 }
             XCTAssertThrowsError(try BackupFiles.verifyPackage(url)) { XCTAssertEqual($0 as? BackupError, .incompatible) }
         }
     }
@@ -64,6 +64,42 @@ final class BackupPackageTests: XCTestCase {
             try changeMetadata(url) { $0["schemaVersion"] = BackupCompatibility.supportedSchemaVersion + 1 }
             XCTAssertThrowsError(try BackupFiles.verifyPackage(url)) { XCTAssertEqual($0 as? BackupError, .incompatible) }
         }
+    }
+    func testV17BridgeLeavesOriginalPackageUntouched() throws {
+        let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try package(at: directory, version: 17)
+        let manifestHash = try BackupFiles.hash(source.appendingPathComponent("manifest.json")).sha256
+        let manifest = try BackupFiles.verifyPackage(source)
+        let candidate = directory.appendingPathComponent("candidate.sqlite")
+        let hash = try BackupCompatibility.prepareCandidate(package: source, manifest: manifest, destination: candidate)
+        XCTAssertEqual(try BackupFiles.hash(candidate).sha256, hash)
+        XCTAssertEqual(try BackupFiles.verifyPackage(source), manifest)
+        XCTAssertEqual(try BackupFiles.hash(source.appendingPathComponent("manifest.json")).sha256, manifestHash)
+        let db = SQLiteDatabase(path: candidate.path)
+        try db.open(access: .readOnlySnapshot); defer { db.close() }
+        try BackupCompatibility.verifyDatabase(db)
+        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 18)
+        XCTAssertEqual(try db.queryInt("SELECT count(*) FROM funding_plan_al_dar_references;"), 0)
+    }
+    func testRetainedV17ReceiptCanonicalCanUpgradeButMissingCannotCreate() throws {
+        let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try package(at: directory, version: 17)
+        let manifest = try BackupFiles.verifyPackage(source)
+        let layout = RestoreLayout(current: directory.appendingPathComponent("current.sqlite"))
+        try FileManager.default.copyItem(at: source.appendingPathComponent("ledger.sqlite"), to: layout.current)
+        let record = RestoreOperation(version: 1, operationID: UUID(), backupID: manifest.backupID,
+            payloadSHA256: manifest.database.sha256, currentFile: layout.current.lastPathComponent,
+            priorFiles: [], priorWasUsable: true, phase: .relaunchConfirmed)
+        try layout.write(record)
+        let db = SQLiteDatabase(path: layout.current.path)
+        try db.open(access: .existing)
+        try BackupCompatibility.upgradeV17IfNeeded(db)
+        try db.checkpointAndClose()
+        XCTAssertEqual(try layout.readReceipt(), record)
+        XCTAssertNotEqual(try BackupFiles.hash(layout.current).sha256, record.payloadSHA256)
+        let missing = directory.appendingPathComponent("missing.sqlite")
+        XCTAssertThrowsError(try SQLiteDatabase(path: missing.path).open(access: .existing))
+        XCTAssertFalse(BackupFiles.exists(missing))
     }
     func testActualDatabaseHistoryMustMatchManifest() throws {
         try withPackage { url in

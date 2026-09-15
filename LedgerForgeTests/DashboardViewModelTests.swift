@@ -239,7 +239,8 @@ struct DashboardViewModelTests {
     func shellSizingAndRailThresholdRemainDestinationSpecific() {
         check(AppShellSizing.minimumSize(for: .dashboard) == CGSize(width: 640, height: 608), "Dashboard minimum size remains accepted")
         check(AppShellSizing.minimumSize(for: .transactions) == CGSize(width: 1024, height: 736), "Transactions minimum size remains accepted")
-        check(AppShellSizing.minimumSize(for: .settings) == CGSize(width: 1180, height: 760), "Other screen minimum size remains accepted")
+        check(AppShellSizing.minimumSize(for: .settings) == CGSize(width: 760, height: 608), "Settings minimum size remains accepted")
+        check(AppShellSizing.minimumSize(for: .accounts) == CGSize(width: 1180, height: 760), "Other screen minimum size remains accepted")
         check(AppShellSizing.dashboardUsesRail(at: 999), "Dashboard uses rail below the width threshold")
         check(!AppShellSizing.dashboardUsesRail(at: 1000), "Dashboard uses expanded navigation at the width threshold")
     }

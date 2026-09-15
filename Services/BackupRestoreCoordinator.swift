@@ -17,6 +17,7 @@ final class BackupRestoreCoordinator: ObservableObject {
     @Published private(set) var restoredReceipt: RestoreOperation?
     @Published private(set) var canCreateNewLedger = false
     private var candidateID: UUID?
+    private var preparedCandidateSHA256: String?
     private var verifiedGeneration: ProviderGenerationToken?
     private var targetChangeCounter: Int64?
     private var needsRelaunchConfirmation = false
@@ -53,10 +54,16 @@ final class BackupRestoreCoordinator: ObservableObject {
         case "hydration": failuresForTesting = [.hydration]
         case "activation-record": failuresForTesting = [.activationRecord]
         case "rollback-unavailable": failuresForTesting = [.afterPreservation, .rollbackOpen]
-        case "restore", "reopen": failuresForTesting = []
+        case "restore", "reopen", "backup": failuresForTesting = []
         default: return
         }
-        if mode != "reopen" {
+        if mode == "backup" {
+            let destination = layout.parent.appendingPathComponent("verified-backups", isDirectory: true)
+            do {
+                try BackupFiles.createDirectory(destination)
+                await createBackup(to: destination)
+            } catch { message = "Isolated backup destination unavailable." }
+        } else if mode != "reopen" {
             await verifyRestore(from: layout.parent.appendingPathComponent("input.ledgerforgebackup"))
             if candidateID != nil { await replaceLedger() }
         }
@@ -66,7 +73,8 @@ final class BackupRestoreCoordinator: ObservableObject {
         let receipt = try? layout.readReceipt()
         let result: [String: String] = ["mode": mode, "phase": receipt?.phase.rawValue ?? "none",
             "hydration": ApplicationAvailability.shared.permitsMutation ? "current" : "unavailable",
-            "canonical": "isolated-current", "operation": receipt?.operationID.uuidString ?? "none"]
+            "canonical": "isolated-current", "operation": receipt?.operationID.uuidString ?? "none",
+            "backupCreated": lastBackupURL == nil ? "false" : "true"]
         if let bytes = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) {
             print("SPRINT93_RECOVERY_PROBE " + text); fflush(stdout)
         }
@@ -279,16 +287,24 @@ final class BackupRestoreCoordinator: ObservableObject {
                 try BackupFiles.copyPackage(source, to: layout.package(id))
                 return try BackupFiles.verifyPackage(layout.package(id))
             }
-            try checkHydration(layout.package(id).appendingPathComponent("ledger.sqlite"))
+            // Keep the copied source package immutable, including V17's
+            // manifest hash. Only this separate operation-owned file upgrades.
+            let candidate = layout.package(id).deletingLastPathComponent().appendingPathComponent("candidate.sqlite")
+            let preparedHash = try await Self.work {
+                try BackupCompatibility.prepareCandidate(package: layout.package(id), manifest: manifest, destination: candidate)
+            }
+            try checkHydration(candidate)
             try Task.checkCancellation()
             guard generation == DatabaseProvider.shared.generationToken else { throw BackupError.candidateChanged }
             candidateID = id; candidateManifest = manifest; verifiedGeneration = generation
+            preparedCandidateSHA256 = preparedHash
             let current = try currentProvider()
             targetChangeCounter = current.flatMap { try? $0.database.totalChangeCounter() }
             message = "Backup verified · compatible with this app. Restoring will replace current ledger data."
         } catch {
             canCancel = false
             candidateID = nil; candidateManifest = nil; verifiedGeneration = nil
+            preparedCandidateSHA256 = nil
             report(error, fallback: "Backup verification failed. Current Database is unchanged.")
             do { try layout.removeOperation(id) } catch { message += " Temporary-file cleanup is pending." }
         }
@@ -297,12 +313,15 @@ final class BackupRestoreCoordinator: ObservableObject {
     func discardCandidate() async {
         guard let id = candidateID, let layout else { return }
         candidateID = nil; candidateManifest = nil; verifiedGeneration = nil; canCancel = false
+        preparedCandidateSHA256 = nil
         do { try layout.removeOperation(id); message = "Restore cancelled. Current Database is unchanged." }
         catch { message = "Restore cancelled. Temporary-file cleanup is pending." }
     }
 
     func replaceLedger() async {
-        guard !isBusy, let id = candidateID, let manifest = candidateManifest, let layout else { return }
+        guard !isBusy, let id = candidateID, let manifest = candidateManifest,
+              let preparedHash = preparedCandidateSHA256, let layout else { return }
+        let candidate = layout.package(id).deletingLastPathComponent().appendingPathComponent("candidate.sqlite")
         guard verifiedGeneration == DatabaseProvider.shared.generationToken,
               (try? currentProvider()?.database.totalChangeCounter()) == targetChangeCounter else {
             await discardCandidate()
@@ -322,6 +341,13 @@ final class BackupRestoreCoordinator: ObservableObject {
         do {
             let reverified = try await Self.work { try BackupFiles.verifyPackage(layout.package(id)) }
             guard reverified == manifest else { throw BackupError.candidateChanged }
+            try await Self.work {
+                guard try BackupFiles.hash(candidate).sha256 == preparedHash else { throw BackupError.candidateChanged }
+                let db = SQLiteDatabase(path: candidate.path)
+                try db.open(access: .readOnlySnapshot)
+                do { try BackupCompatibility.verifyDatabase(db); try db.closeChecked() }
+                catch { try? db.closeChecked(); throw error }
+            }
             let current = try currentProvider()
             let priorUsable = current != nil && DatabaseProvider.shared.persistenceState.isUsable && targetChangeCounter != nil
             if let current {
@@ -355,7 +381,8 @@ final class BackupRestoreCoordinator: ObservableObject {
 #endif
             message = "Installing and loading the verified ledger…"
             try await Self.work {
-                try BackupFiles.moveWithoutOverwrite(layout.package(id).appendingPathComponent("ledger.sqlite"), layout.current)
+                guard try BackupFiles.hash(candidate).sha256 == preparedHash else { throw BackupError.candidateChanged }
+                try BackupFiles.moveWithoutOverwrite(candidate, layout.current)
                 try BackupFiles.sync(layout.current)
             }
 #if DEBUG

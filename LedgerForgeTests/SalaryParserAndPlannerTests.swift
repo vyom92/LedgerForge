@@ -94,7 +94,7 @@ struct SalaryParserAndPlannerTests {
         let previous = Self.plan(month: try SelectedStatementMonth(year: 2026, month: 7), id: "previous")
         plans.installWithoutObservation([previous], generation: DatabaseProvider.shared.generationToken)
         let viewModel = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(year: 2026, month: 8), workspaceID: "default-workspace", accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: plans)
-        #expect(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId) == ["axis-nre", "cbq"])
+        #expect(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId) == ["axis-nre", "axis-other", "cbq"])
         #expect(viewModel.plan.balances.isEmpty)
         viewModel.rolloverFromPreviousPlan()
         #expect(viewModel.plan.rolloverSourcePlanID == "previous")
@@ -102,6 +102,119 @@ struct SalaryParserAndPlannerTests {
         #expect(viewModel.updateMoney(.fixed, text: "123.00"))
         #expect(viewModel.plan.expectedFixedProvenance == .manual)
         #expect(previous.expectedFixedEarnings.amount == 0)
+    }
+
+    @Test func plannerEligibilityIgnoresDisplayNameAndNickname() throws {
+        // Source-independent account-metadata checks; no statement or balance evidence is asserted.
+        let initial = [
+            Account(repositoryAccountId: "axis", institution: Institution.axis.rawValue, name: "NRE", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "hdfc", institution: Institution.hdfc.rawValue, name: "NRO", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "cbq", institution: Institution.cbq.rawValue, name: "Current", type: .bank, currencyCode: "QAR"),
+            Account(repositoryAccountId: "inr-card", institution: Institution.axis.rawValue, name: "Card", type: .creditCard, currencyCode: "INR"),
+            Account(repositoryAccountId: "qar-card", institution: Institution.cbq.rawValue, name: "Card", type: .creditCard, currencyCode: "QAR")
+        ]
+        let accounts = AccountStore()
+        accounts.installAccountsWithoutObservation(initial)
+        let viewModel = SalaryWorkspaceViewModel(accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: FundingPlanStore())
+        let expectedIDs: Set<String> = ["axis", "hdfc", "cbq"]
+        let expectedCardIDs: Set<String> = ["inr-card", "qar-card"]
+        #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
+        #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
+
+        for (name, nickname) in [("Everyday funds", nil), ("Travel USD card", "Reserve"), ("NRE", "NRO")] as [(String, String?)] {
+            accounts.installAccountsWithoutObservation(initial.map { account in
+                var renamed = account
+                renamed.name = name
+                renamed.nickname = nickname
+                return renamed
+            })
+            #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
+            #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
+            #expect(viewModel.plan.balances.isEmpty)
+        }
+    }
+
+    @Test func plannerEligibilityUsesNativeCurrencyAndAccountRoleWithoutInstitutionRestrictions() throws {
+        let accounts = AccountStore()
+        var candidates = [
+            Account(repositoryAccountId: "axis", institution: Institution.axis.rawValue, name: "Axis Bank INR", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "hdfc", institution: Institution.hdfc.rawValue, name: "HDFC Bank INR", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "cbq", institution: Institution.cbq.rawValue, name: "CBQ Bank QAR", type: .bank, currencyCode: "QAR"),
+            Account(institution: Institution.axis.rawValue, name: "NRE", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "", institution: Institution.axis.rawValue, name: "NRE", type: .bank, currencyCode: "INR"),
+            Account(repositoryAccountId: "archived", institution: Institution.axis.rawValue, name: "NRE", type: .bank, currencyCode: "INR", status: .archived),
+            Account(repositoryAccountId: "closed", institution: Institution.cbq.rawValue, name: "Current", type: .bank, currencyCode: "QAR", status: .closed),
+            Account(repositoryAccountId: "unsupported-currency", institution: Institution.axis.rawValue, name: "NRE INR", type: .bank, currencyCode: "USD"),
+            Account(repositoryAccountId: "other-bank", institution: "Other institution", name: "Everyday", type: .bank, currencyCode: "QAR"),
+            Account(repositoryAccountId: "other-card", institution: "Other institution", name: "Everyday", type: .creditCard, currencyCode: "INR"),
+            Account(repositoryAccountId: "closed-card", institution: Institution.cbq.rawValue, name: "Current", type: .creditCard, currencyCode: "QAR", status: .closed),
+            Account(repositoryAccountId: "usd-card", institution: Institution.cbq.rawValue, name: "QAR card", type: .creditCard, currencyCode: "USD"),
+            Account(repositoryAccountId: "", institution: Institution.cbq.rawValue, name: "QAR card", type: .creditCard, currencyCode: "QAR"),
+            Account(institution: Institution.cbq.rawValue, name: "QAR card", type: .creditCard, currencyCode: "QAR")
+        ]
+        for (institution, currency) in [(Institution.axis, "INR"), (.hdfc, "INR"), (.cbq, "QAR")] {
+            for type in [AccountType.creditCard, .investment, .cash, .loan] {
+                candidates.append(Account(repositoryAccountId: "\(institution.rawValue)-\(type.rawValue)", institution: institution.rawValue,
+                                          name: "NRE NRO Bank", nickname: "Current", type: type, currencyCode: currency))
+            }
+        }
+        accounts.installAccountsWithoutObservation(candidates)
+        let viewModel = SalaryWorkspaceViewModel(accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: FundingPlanStore())
+        #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == ["axis", "hdfc", "cbq", "other-bank"])
+        #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == [
+            "other-card", "\(Institution.axis.rawValue)-creditCard", "\(Institution.hdfc.rawValue)-creditCard", "\(Institution.cbq.rawValue)-creditCard"
+        ])
+        #expect(viewModel.plan.balances.isEmpty)
+    }
+
+    @Test func manualCardCommitmentLinkHydratesWithoutChangingAmountOrLegacyBankLink() throws {
+        // Isolated metadata and ordinary manual planning input only; no imported financial graph.
+        let sqlite = try SQLiteRepositoryProvider(path: ":memory:")
+        defer { sqlite.database.close() }
+        let active = DatabaseProvider(workspaceRepo: sqlite.workspaceRepo, transactionRepo: sqlite.transactionRepo,
+            accountRepo: sqlite.accountRepo, importSessionRepo: sqlite.importSessionRepo, fundingPlanRepo: sqlite.fundingPlanRepo)
+        let workspace = "default-workspace"
+        _ = try sqlite.workspaceRepo.upsertWorkspace(WorkspaceDTO(id: workspace, name: "Planner input", createdAtISO: "2026-09-15T00:00:00Z"))
+        for (id, type, currency) in [("bank", "bank", "QAR"), ("qar-card", "credit_card", "QAR"), ("inr-card", "credit_card", "INR")] {
+            _ = try sqlite.accountRepo.upsertAccount(AccountDTO(id: id, workspaceId: workspace, name: id,
+                institutionId: "Other institution", accountType: type, nativeCurrency: currency, createdAtISO: "2026-09-15T00:00:00Z"))
+        }
+        let accounts = AccountStore(), plans = FundingPlanStore()
+        let hydrator = RepositoryStoreHydrator(accountRepo: active.accountRepo, importSessionRepo: active.importSessionRepo,
+            transactionRepo: active.transactionRepo, fundingPlanRepo: active.fundingPlanRepo,
+            accountStore: accounts, transactionStore: TransactionStore(), categoryStore: CategoryStore(), cardStore: CardStore(),
+            salaryStore: SalaryStore(), fundingPlanStore: plans, importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(),
+            providerGeneration: active.generationToken, participatesInLifecycleGate: false)
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        let month = try SelectedStatementMonth(canonical: "2026-09")
+        let viewModel = SalaryWorkspaceViewModel(month: month, provider: { active }, accountStore: accounts,
+            salaryStore: SalaryStore(), fundingPlanStore: plans, locale: Locale(identifier: "en_US_POSIX"),
+            refresh: { _ in _ = try hydrator.hydrateIfNeeded(forceRefresh: true) })
+        #expect(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId) == ["bank"])
+        #expect(viewModel.eligibleCommitmentAccounts.filter { $0.nativeCurrency.code == "QAR" }.compactMap(\.repositoryAccountId) == ["qar-card"])
+        #expect(viewModel.eligibleCommitmentAccounts.filter { $0.nativeCurrency.code == "INR" }.compactMap(\.repositoryAccountId) == ["inr-card"])
+
+        viewModel.addCommitment(region: "qatar")
+        let cardRow = try #require(viewModel.plan.qatarCommitments.first?.id)
+        viewModel.updateCommitment(region: "qatar", id: cardRow, label: "Manual payment", amountText: "12.34", included: true, fundingAccountID: nil)
+        let amount = try #require(viewModel.plan.qatarCommitments.first?.money)
+        let calculation = viewModel.calculation
+        viewModel.editCommitment(region: "qatar", id: cardRow, field: "account", text: "qar-card")
+        #expect(viewModel.plan.qatarCommitments.first?.money == amount)
+        #expect(viewModel.calculation == calculation)
+        #expect(viewModel.plan.qatarCommitments.first?.provenance == .manual)
+
+        viewModel.addCommitment(region: "qatar")
+        let bankRow = try #require(viewModel.plan.qatarCommitments.last?.id)
+        viewModel.updateCommitment(region: "qatar", id: bankRow, label: "Existing bank routing", amountText: "5", included: true, fundingAccountID: "bank")
+        viewModel.save()
+        #expect(viewModel.saveState == .saved)
+        let reloaded = try #require(plans.plan(for: month, workspaceID: workspace))
+        #expect(reloaded.qatarCommitments.first { $0.id == cardRow }?.fundingAccountID == "qar-card")
+        #expect(reloaded.qatarCommitments.first { $0.id == cardRow }?.money == amount)
+        #expect(reloaded.qatarCommitments.first { $0.id == bankRow }?.fundingAccountID == "bank")
+        #expect(viewModel.retainedCommitmentAccountLabel(id: "bank") == "Saved funding bank · bank")
+        #expect(viewModel.plan.balances.isEmpty)
     }
 
     private static func plan(fixed: Money? = nil, variable: Money? = nil, deductions: Money? = nil,

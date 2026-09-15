@@ -147,9 +147,17 @@ struct LedgerForgeApp: App {
         // Production creation requires the explicit first-use Settings action.
         guard exists || (path != nil && usesIsolatedTestPersistence()) else { throw BackupError.recoveryUnavailable }
         if !parentExisted { try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true) }
-        // Ordinary legacy startup keeps its registered migration behavior.
-        // Receipt-owned recovery always opens the already-verified chain strictly.
+        // Resolve receipt ownership first, then permit only the explicitly
+        // approved V17→V18 existing-ledger bridge under the recovery gate.
         let isRecoveryOpen = try recovery.layout?.readReceipt() != nil
+        if isRecoveryOpen {
+            let database = SQLiteDatabase(path: target.path)
+            try database.open(access: .existing)
+            do {
+                try BackupCompatibility.upgradeV17IfNeeded(database)
+                try database.checkpointAndClose()
+            } catch { try? database.closeChecked(); throw error }
+        }
         let provider = try SQLiteRepositoryProvider(path: target.path, migrations: allMigrations,
             access: exists ? .existing : .createIfMissing, migrateExisting: !isRecoveryOpen)
 #if DEBUG
