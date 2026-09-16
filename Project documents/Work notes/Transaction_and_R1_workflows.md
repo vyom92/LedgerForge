@@ -7,11 +7,13 @@
 
 **Owners:** [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04), [FW-P2-05](../FUTURE_WORK.MD#fw-p2-05), [FW-P2-06](../FUTURE_WORK.MD#fw-p2-06), [FW-P2-07](../FUTURE_WORK.MD#fw-p2-07), [FW-P2-08](../FUTURE_WORK.MD#fw-p2-08), [FW-P2-09](../FUTURE_WORK.MD#fw-p2-09), [FW-P2-12](../FUTURE_WORK.MD#fw-p2-12), [FW-P2-40](../SCOPE_DECISIONS.md#fw-p2-40), [FW-P2-41](../SCOPE_DECISIONS.md#fw-p2-41), [FW-P2-43](../FUTURE_WORK.MD#fw-p2-43), [FW-P2-44](../FUTURE_WORK.MD#fw-p2-44), [FW-P2-46](../FUTURE_WORK.MD#fw-p2-46), [FW-P2-47](../SCOPE_DECISIONS.md#fw-p2-47), [FW-P2-48](../FUTURE_WORK.MD#fw-p2-48), [FW-P2-50](../SCOPE_DECISIONS.md#fw-p2-50), [FW-P2-52](../SCOPE_DECISIONS.md#fw-p2-52), [FW-P2-79](../FUTURE_WORK.MD#fw-p2-79).
 
-Substantive unresolved evidence, not accepted architecture or execution authority. Topic/owner order inherits [Guide rule I](../Project_Guide.md#documentation-order); dated observations follow the current conclusion, newest first. Original evidence interiors preserve their semantic order.
+Accepted correction evidence and remaining subject work are distinguished below; this note does not independently authorize new implementation. Topic/owner order inherits [Guide rule I](../Project_Guide.md#documentation-order); dated observations follow the current conclusion, newest first. Original evidence interiors preserve their semantic order.
 
 ## Current conclusion
 
-**Current conclusion — owner acceptance, 2026-09-14:** Sprint 92 is **ACCEPTED** under `SPRINT_92_INFORMATION_PRESENTATION_AND_R1_POLISH_ACCEPTED`, following `SPRINT_92_FINAL_VISUAL_REVIEW_READY`, from baseline `main@3f1e7e97d5cac0ba9f1c3010ae8c30a79d106c96`. [The accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) owns final product/build identity, bounded independent comparison, native observations and unobserved cases. Publication of the accepted bytes and closure documentation is authorized. No further visual tuning, preference reset, build/native campaign or regression run is part of closure. **Regression tests: SUSPENDED / 0 new executions. Sprint 93: NEXT / NOT STARTED.**
+**Current conclusion — 2026-09-16:** the owner/Chat accepts the [post-94 / pre-95 correction batch](../Archive/Accepted%20outcomes/Unnumbered_2026-09.md#post-94-pre-95-corrections) under **POST_94_PRE_95_CORRECTIONS_ACCEPTED**, from Sprint-94 baseline `main@17549ff43e3c1be8aa0f30d006a5de38158e3de6`. The commit containing this closure publishes the already-verified corrections, including the owner's ZIPFoundation manifest edit. Completed technical/native evidence, failures and material limits remain below. This is an unnumbered correction batch; Sprint 95 is NOT STARTED. Publication changes documentation status only and reruns no completed validation campaign.
+
+**Historical Sprint-92 closure — owner acceptance, 2026-09-14:** Sprint 92 is **ACCEPTED** under `SPRINT_92_INFORMATION_PRESENTATION_AND_R1_POLISH_ACCEPTED`, following `SPRINT_92_FINAL_VISUAL_REVIEW_READY`, from baseline `main@3f1e7e97d5cac0ba9f1c3010ae8c30a79d106c96`. [The accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) owns final product/build identity, bounded independent comparison, native observations and unobserved cases. Its closure authorized publication of accepted bytes and documentation, with **regression tests suspended / 0 new executions and Sprint 93 then next / not started**. That historical closure did not authorize later work; the current correction prompt does.
 
 **Accepted predecessor:** Sprint 91A remains **ACCEPTED** under `SPRINT_91A_DARK_APPEARANCE_AND_VISUAL_FOUNDATION_ACCEPTED`. Its [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) owns the exact scope and accepted **FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED** limitation. Sprint-92 observations do not rewrite that history. Dark-only local preferences, responsive Settings and the accepted visual foundation remain; original System/Light planning stays superseded.
 
@@ -20,6 +22,142 @@ Substantive unresolved evidence, not accepted architecture or execution authorit
 Saved filters remain separate work: their preference scope and persistence contract are not implied by transient Sprint-89 filters. Sprint 89 does not select transfer matching, analytics, hidden FX, spending/income inference, parser/source-family work, persistence/schema changes or a formal accessibility programme.
 
 [Sprint 90](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) is accepted at `619c39ec07402a63c90b646cbba9ced806f5e99d` under `SPRINT_90_DASHBOARD_NATIVE_CURRENCY_HIERARCHY_ACCEPTED`, completing FW-P2-78. Its native-currency bank/card hierarchy, saved-plan reuse, read-only activity, responsive layouts and three ordinary keyboard actions are settled; detailed acceptance and the bounded calendar-day crash correction belong in that outcome record.
+
+<a id="post-94-candidate"></a>
+## Accepted post-94 correction batch — 2026-09-16
+
+Root is the sole source/document writer; independent source and implementation reviewers are read-only. The owner has subsequently authorized originals-based app imports, a common trailing Import footer, visibility of incompatible account choices, session-long transaction caching, clearer Dashboard cards and the small sidebar/titlebar alignment correction. These corrections are accepted under POST_94_PRE_95_CORRECTIONS_ACCEPTED; no new sprint or ADR is introduced.
+
+| Boundary | Cause / accepted behavior | Evidence and limit |
+| --- | --- | --- |
+| Transactions navigation | The destination-owned model and amount-width measurements were discarded on leaving the tab. The app now owns one session model and measurement cache. Canonical rows refresh on transaction/account/category content or provider availability/generation changes; only the current query result is retained. Search, filter controls and selection survive navigation. Font changes invalidate native amount measurements. | Focused cache/provider checks passed. Final-build native search returned zero matches for a nonmatching query, retained it across Dashboard→Transactions, then restored all 3,327 rows on Clear; selection opened the corresponding transaction details. Root availability forwarding withdraws cached rows even while Transactions is closed. |
+| Dashboard / shell refresh | Dashboard rebuilt on every appearance; latest-import selection repeatedly parsed every history timestamp during root view evaluation. Dashboard now keeps its installed presentation and coalesces store pulses while retaining availability and calendar refresh. Import history chooses its latest durable attempt once per installed history snapshot, retaining identical timestamp/tie ordering. | Same-count replacements, invalid/tied instants, empty history and calendar refresh are covered by the focused tests. The current source review found no outstanding cache/withdrawal defect. This is one-session reuse, not a persistent cache or a claim of unlimited growth. |
+| Pending account creation | The source determines Bank/Credit Card and currency; the display name is editable before confirmation and trimmed at mapping. Blank names reject. No account/card is written before confirmation. | Native HDFC creation showed Bank/INR defaults, disabled confirmation for whitespace, and cancellation left zero accounts, transactions, import sessions, attempts and instruments in the isolated app ledger. Provider tests cover named persistence/reopen and losing paths. |
+| Existing bank choices | Earlier filtering hid already identified HDFC accounts while presenting unrelated unseeded accounts. The list now shows every account and disables incompatible choices with a reason. Coordinator and both repositories guard type, currency and institution; identifier ownership remains authoritative. | NRE and NRO are both Bank accounts with separate account numbers. No tax-type model or ledger merge is introduced. An existing identifier without a verified match is described as unverified, not a proven conflicting number. Authentic provider tests reject wrong identity/type/currency choices without accepted residue. Final native NRO review showed the existing NRE bank account and Amex credit-card account, both disabled with their respective identity/type reasons; NRO was then imported into its own Bank account. |
+| Amex confirmation | A multi-section confirmation recorded user-confirmed section observations, but later automatic single-section reuse manufactured an optional legacy-instrument prior-mapping observation with no matching historical anchor. The mapper now omits that optional legacy observation on automatic reuse, while coordinator mappings require exact user-confirmed account/section anchors. | Original-based red/green reproduction and the complete Amex campaign passed before the final shared-eligibility recheck. Native August 2025 imported successfully; subsequent all-20 native batch completed with 9 imports, 11 prior imports and zero rejected/preparation-failed items. This was an identity-confirmation correction; the reported currency-parser cause was not reproduced. |
+| Amex chooser | Choose the liability account, then the card for each exact source section. New cards expose an optional relationship; incomplete relationships cannot confirm. Ambiguous duplicate display labels cannot silently select by a hidden ID. | Final native review of a genuine later Amex statement showed the existing liability account, three explicit source-section card choices, source-labelled reuse options and a new-card option. Partial section assignment kept Confirm disabled. The optional relationship remained “No relationship asserted”; review was cancelled with all 53 isolated-ledger tables unchanged. Source identity, section coverage and both-provider campaigns remain authoritative. |
+| Preview and footer | One source-ordered preview uses the right pane below Validation when measured width and actual validation height leave useful rows (A), otherwise a bounded full-width area below (B). All footer actions share the Confirm Import surface and align trailing, with a narrow vertical fallback. | Final Debug native checks passed at 1710×1073 and 1180×792. A placed the preview below right-side Validation; B exposed one bounded full-width preview with both scroll directions, including full rightmost balances at the horizontal endpoint. Active, equivalent-source and completed footer states stayed trailing with the common style. The preview remains limited to the existing first 12 rows. |
+| Dashboard readability | Owner screenshots showed account names almost the same size as dates and a tall Salary card with competing labels/values. Names and exact amounts now use body text, dates use captions and stay inline only when their actual text fits. Salary uses smaller labels, aligned body-size values, a content-sized supporting column and quieter supporting text. | Native Current Database inspection showed all four INR bank names/dates/amounts and both QAR card rows clearly separated; Salary values aligned in rows. Financial selectors, source dates, unavailable states and calculator semantics are unchanged. |
+| Sidebar/top edge | The sidebar material ignored the top safe area while its one-point separator did not. Extend that existing separator into the same top safe area. | Final Debug native inspection showed the top separator aligned in both expanded and collapsed states. Starting expanded state and window frame were restored; no sidebar width, color or appearance preference was changed. |
+| Salary capture controls / defaults | The owner identified low-contrast “Capture current” text and chose **refresh captured balances on each open**. Use the existing secondary-action style (Primary text / Input-neutral control). Opening Salary fills missing bank balances and refreshes captured values in the draft; preserve manual/carried values, invalid input and Include switches. Keep unchanged captures clean and do not Save automatically. | Final native checks proved initial auto-fill and a genuine later-statement capture refresh remained unsaved, while a manual zero and its Include switch survived. Current saved manual values and all Include switches also survived both relaunches. A genuine HDFC earlier→later statement and second-account test passed in both providers within 43 focused tests. It verifies changed captures, additional-account defaults, saved-plan preservation, invalid/manual input, inclusion and provider withdrawal. The canonical bank selector is reused without its Account zero fallback. A per-account message now marks unavailable refreshes while retaining earlier captured Money/time; a genuine unavailable/ambiguous latest-source shape remains unobserved. |
+
+### Populated workload measurements
+
+The first workload contained 997 transactions. Owner/root authorized imports subsequently grew it through 1,769 to **3,156 transactions, eight accounts, five card instruments, 93 import sessions and 127 attempts**. These are different workloads; the early measurements do not establish the final improvement.
+
+The renewed comparison used the same 3,156-row Current Database, 1710×1073 window and owner Gill Sans appearance. All 53 application tables and the appearance dictionary compared unchanged across the comparison. Three runs per route measured the opt-in Debug marker's time from route selection to first draw. The first revised Transactions opening is included. Figures are **median / worst milliseconds**:
+
+| Route | Before session/history changes | Revised candidate |
+| --- | ---: | ---: |
+| Dashboard→Transactions | 840 / 6,365 | 640 / 942 |
+| Transactions→Settings | 504 / 504 | 418 / 456 |
+| Settings→Transactions | 707 / 713 | 407 / 459 |
+| Transactions→Dashboard | 1,189 / 1,200 | 767 / 772 |
+| Dashboard→Accounts | 373 / 375 | 414 / 444 |
+| Accounts→Dashboard | 1,106 / 1,116 | 690 / 695 |
+
+The slow baseline outlier is retained. Dashboard→Accounts regressed by about 40 ms at the median; five routes improved. Accessibility-ready observations include automation overhead and are not presented as application-only latency. First draw is not an input-readiness guarantee; the separate native search/clear/navigation exercise supplies interaction evidence. No heavy build or test ran during these timing cycles. The subsequent one-point separator change is outside the timed fingerprint.
+
+The owner requested the populated transaction list back after the isolated cancellation check. Root reopened the unchanged Current Database and verified **3,156 matching / 3,156 total**. The isolated empty ledger is a normal app database under a separate development namespace; it did not replace Current. The later owner imports and final technical results are recorded below. The owner subsequently selected discard of the unsaved Salary draft; the final-build restart and consolidated native check are completed below.
+
+During the first final ordinary run, two further owner imports grew Current Database to **3,193 transactions**. A Dashboard test's separate read queries straddled one commit and rejected a card/transaction relationship; a single committed read found zero missing or mismatched relationships. The existing Dashboard and Transactions read-only helpers now hold one SQLite read transaction during snapshot assembly. No production hydration guard or ledger row was changed. The same ordinary run exposed a remaining file-oracle dependency in the mixed queue, corrected by reusing the complete in-memory source oracles. The first run was **576 definitions / 636 executions, two failures**; both repairs passed the subsequent **31-test** focused selection. The six-family recheck subsequently passed **11/11** and the captured-planner selection passed **43/43**. The final ordinary result below includes the new genuine capture-refresh definition. These are separate selections, not additive unique-coverage claims.
+
+### Final technical and native verification
+
+The final source/build-input fingerprint is **333 files**, SHA-256 `1e4e4d5e3f5b998ade1a210a410099f71361ea9331e673da6059c93e17e08a1d`. The fingerprint sorts repository paths and hashes `path + NUL + file-SHA256 + LF` for Swift/C/headers, project/test-plan/scheme/configuration/entitlement/shell/plist/xib inputs, asset-catalog contents and Package.resolved; documentation is separate. No source edit followed these final checks.
+
+| Gate | Result |
+| --- | --- |
+| Fresh Debug and optimized Release | **PASS**, `LedgerForge-validation.3wHdbK/build-debug` and `build-release`. Both actually recompiled `ole.c` and `xlstool.c`. Zero project/vendor compiler warnings; the toolchain emitted its existing AppIntents metadata notice. Release was built, not launched against the separate Release database. |
+| Complete ordinary plan | **PASS: 577 definitions / 637 executions / 0 failures / 0 skips**, `LedgerForge-validation.3wHdbK/test-full/TestResults.xcresult`. The same 12 exclusion selectors retain 17 separately gated definitions. The result also records 25 test-harness warnings about reading LFTheme outside an installed View; these are reported separately, not described as compiler or vendor warnings. |
+| Complete affected statement families | **PASS: 11/11 in seven suites**, `LedgerForge-validation.MLmXEw/test-full/TestResults-six-families-11-passed.xcresult`; exact family inventory and oracle qualifications are in [Source relationships](Source_relationships.md). Subsequent changes concern Salary draft presentation/refresh and bank-selector visibility, not the imported financial grammar or selector body. |
+| LegacyXLS mechanics | **PASS** with AddressSanitizer, UndefinedBehaviorSanitizer and `-Werror=shorten-64-to-32`; reproducible command is in the existing script guide. Original warnings were at `ole.c` 146/151/327/781/838 and `xlstool.c` 206/270/277/321. No diagnostic suppression or unrelated vendor upgrade. |
+| Ordinary Xcode issue view | The owner-reported nine warnings were visible at stale source locations. Building the open project succeeded and left the unfiltered Issue Navigator empty; neither issue filter nor Clear All Issues was used to hide them. |
+| Native evidence | **PASS on the final Debug bytes:** consolidated Current Database and isolated-ledger checks below. Current contains 3,327 transactions / eight accounts / five instruments / 96 sessions / 130 attempts. Earlier Amex campaigns and the matched 3,156-row before/after comparison retain their own observed-build/workload boundaries. |
+| Restart and durable baseline | The owner explicitly chose to discard the unsaved Salary draft. Clean quit, final Debug relaunch, Salary review, isolated verification and final Current relaunch preserved the last explicitly saved plan and all 53 Current application tables. No Salary Save was invoked. The completed review was subsequently accepted under **POST_94_PRE_95_CORRECTIONS_ACCEPTED** for this publication. |
+
+The final Debug app is available at `/private/var/folders/cx/mf26lvyn7bb4bt65f3fb334m0000gn/T/LedgerForge-validation.3wHdbK/build-debug/DerivedData/Build/Products/Debug/LedgerForge.app`. Its executable SHA-256 is `6050951a20829c8f0118946324c7c8dcf0e560b76fe82ebfd21424b74619c451`, and Debug dylib SHA-256 is `25648aa35ceb5d57c1eb625e2199efbc0f8655e65b82dd475e357b024fcadebe`. Optimized Release executable SHA-256 is `f858c82f8f8590c8c76fdd503e527912fec12d76faf31becfaa180f825cab0b7`. These exact local Debug/Release products are the accepted verification artifacts for the correction publication; no distribution release or additional Release runtime campaign is claimed. All validation processes have finished. The owner-directed native continuation required no source change and no build/test rerun; its final 333-input fingerprint still equals the verified build. The owner subsequently authorized exact-path commit/push with this acceptance closure. Root releases writer ownership after final local/remote equality and clean-state verification; no later-run automation is created.
+
+### Final native continuation — 2026-09-16
+
+The owner explicitly required discard of the live unsaved Salary draft, using the last saved plan as the durable baseline. Root compared all **53 application tables** in memory before discard, after clean quit, after opening Salary and after restoring Current Database at the end. Every table's row count and logical row hash remained identical; the appearance dictionary also remained identical. The saved plan retained its five balance rows, manual/captured provenance, amounts, capture times and Include switches. No Salary Save, Command-S, Al Dar fetch/apply, preference reset or database replacement occurred. SQLite sidecar/file-layout bytes are not treated as logical plan changes.
+
+Final native observations on the verified Debug app:
+
+- Dashboard/account names, subordinate dates and aligned values were inspected on populated Current at the starting width and at 1180×792; the Salary summary kept aligned label/value rows. The sidebar seam was straight with the sidebar expanded and collapsed.
+- Transactions retained a no-match search across a Dashboard round trip, cleared back to **3,327 matching / 3,327 total**, and opened details for the selected real transaction. The final app is left on that populated transaction list.
+- The existing isolated development ledger received four ordinary authentic-original imports through the app: earlier NRE, NRO and later NRE bank statements plus the initial Amex statement, yielding 175 transactions and three accounts. These writes did not target Current Database. Initial Salary opening filled both eligible bank balances and showed **Unsaved changes**. After the later NRE import, opening Salary refreshed that captured balance, preserved a manual zero on the other bank account and retained its selected Include switch. All 53 isolated tables compared unchanged across each Salary visit; funding-plan and funding-balance tables remained empty, including after quitting to discard the test draft.
+- Current's already matching captured balances retained their original capture time and left the draft **Ready**, while saved manual amounts and all Include switches were preserved. The actual saved plan has no carried balances. Existing automated checks cover rollover provenance, and source review confirms the refresh guard skips non-captured balances that have Money; a dedicated carried-balance refresh and a native carried case were not exercised. A genuine missing/ambiguous latest-balance source also remains unobserved; no source case was fabricated.
+- Pending Bank/INR and Credit Card/QAR creation displayed source-fixed type/currency and an editable name; a blank name disabled confirmation. Review before the first isolated confirmation left every table empty. Existing NRE and Amex choices remained visible but disabled for the NRO statement, with identity/type reasons. Both NRE and NRO persisted as ordinary Bank accounts with distinct identities.
+- A genuine later Amex statement exposed three section-specific card selectors with identifiable existing-card labels, new-card choice and optional relationship. Partial selection could not confirm. Both Amex review cancellations and the final two-file HDFC review/skip/cancel exercise left the post-import isolated database unchanged.
+- Preview A and constrained B, horizontal/vertical fallback scrolling, complete rightmost Money at the horizontal endpoint, Cancel Current/Skip/Cancel Batch/Confirm, equivalent-source confirmation and completed-batch controls were inspected. Remaining conditional footer branches share the reviewed common style; not every failure-only branch was newly triggered.
+
+The recorded starting LedgerForge frame was restored and read back as **position (0, 39), size 1710×1073**, with the sidebar expanded. The final verified Debug app runs against Current Database. No private screenshot or derived financial evidence file was written; private comparisons and native observations stayed in memory.
+
+The final-build warm-navigation check used the later **3,327-row** Current workload, unchanged appearance and the restored starting frame. Three runs per route produced the following first-draw **median / worst milliseconds**: Dashboard→Transactions **632 / 942**; Transactions→Settings **422 / 453**; Settings→Transactions **409 / 410**; Transactions→Dashboard **759 / 761**; Dashboard→Accounts **394 / 398**; Accounts→Dashboard **683 / 686**. No heavy build/test ran during these checks. This is a final-build observation, not a replacement before/after comparison against the earlier 3,156-row workload, and first draw is not a claim of zero lag or instant input readiness. The 3,327 live rows include later owner imports and do not enlarge the independently qualified source inventory.
+
+Growth remains an observation boundary: keep one canonical session snapshot and one query result, measure again as authentic monthly history grows, and consider background projection or narrower invalidation only if a new profile shows a material cost. No paging, duplicated ledger rows, historical-query cache or speculative database change is selected.
+
+### Published paths and accepted baseline
+
+The publication starts from `main@17549ff43e3c1be8aa0f30d006a5de38158e3de6`, freshly equal to remote main. The commit containing this accepted closure publishes the following **52 paths**: the unchanged 48-path verified candidate plus four existing owning documents for current state, completed-ID routing, roadmap status and accepted-outcome indexing. Product/test/build inputs retain the accepted 333-file fingerprint. The intentional owner edit to `Vendor/ZIPFoundation/Package@swift-5.9.swift` remains watchOS v4→v9 only, with macOS 10.13 unchanged; SHA-256 `bde5f91710f47cb34dac3115eb8b2ceb007913fb5e377beb5d2501a38e21c928`. `IntegerBufferMechanics.c` is the sole new file; no discovery document, ADR or migration is created. Git history identifies the publishing commit; the final handoff records the independently checked remote SHA and clean state.
+
+```text
+AppShellPresentation.swift
+ContentView.swift
+Database/InMemoryRepositoryProvider.swift
+Database/SQLiteConfirmedImportRepository.swift
+Import/Coordinator/ImportCentreCoordinator.swift
+ImportCentreFooterRenderer.swift
+LedgerForgeApp.swift
+LedgerForgeTests/AmericanExpressPrivateAcceptanceTests.swift
+LedgerForgeTests/AxisBankAuthenticAcceptanceTests.swift
+LedgerForgeTests/AxisBankV17AuthenticMigrationTests.swift
+LedgerForgeTests/AxisCreditCardAuthenticAcceptanceTests.swift
+LedgerForgeTests/CBQBankAuthenticAcceptanceTests.swift
+LedgerForgeTests/CBQCreditCardPrivateAcceptanceTests.swift
+LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
+LedgerForgeTests/DashboardViewModelTests.swift
+LedgerForgeTests/GlobalAuthenticCorpusAcceptanceTests.swift
+LedgerForgeTests/HDFCBankAccountPDFAndProjectionTests.swift
+LedgerForgeTests/IdentifierOwnershipMigrationV5Tests.swift
+LedgerForgeTests/ImportAccountChoiceTests.swift
+LedgerForgeTests/ImportCentreAuthenticBatchTests.swift
+LedgerForgeTests/ImportCentreCoordinatorTests.swift
+LedgerForgeTests/ImportLifecycleTests.swift
+LedgerForgeTests/ImportOutcomePresentationTests.swift
+LedgerForgeTests/ImportRepositoryIntegrationTests.swift
+LedgerForgeTests/ImportSnapshotAcquisitionTests.swift
+LedgerForgeTests/PasswordProviderTests.swift
+LedgerForgeTests/PersistenceAvailabilityTests.swift
+LedgerForgeTests/StatementDropIntakeAdapterTests.swift
+LedgerForgeTests/TransactionListViewModelTests.swift
+Project documents/Archive/Accepted outcomes/Unnumbered_2026-09.md
+Project documents/FUTURE_WORK.MD
+Project documents/PROJECT_STATE.md
+Project documents/SCOPE_DECISIONS.md
+Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md
+Project documents/Work notes/Salary_and_current_AlDar.md
+Project documents/Work notes/Source_relationships.md
+Project documents/Work notes/Transaction_and_R1_workflows.md
+Services/ImportPersistenceCoordinator.swift
+Services/ImportPersistenceMapper.swift
+Services/RepositoryStoreHydrator.swift
+Vendor/LegacyXLS/Sources/CLegacyXLS/include/libxls/ole.h
+Vendor/LegacyXLS/Sources/CLegacyXLS/src/ole.c
+Vendor/LegacyXLS/Sources/CLegacyXLS/src/xlstool.c
+Vendor/LegacyXLS/Tests/IntegerBufferMechanics.c
+Vendor/ZIPFoundation/Package@swift-5.9.swift
+ViewModels/AccountsViewModel.swift
+ViewModels/DashboardViewModel.swift
+ViewModels/SalaryWorkspaceViewModel.swift
+ViewModels/TransactionListViewModel.swift
+Views/SalaryView.swift
+Views/TransactionListView.swift
+script/README.md
+```
+
+Schema migrations V1–V18, the format-1 backup contract and the exact V17→V18 bridge remain unchanged. Current Database still has migration versions 1 through 18. The HDFC statement password was saved through the existing Keychain service/scope and read back successfully; no password is recorded here or in source/test environment files. Final Debug/Release bundle inspection found no original statements, SQLite files or project/UI reference documents packaged in the app. Root has not staged, committed or pushed.
 
 ## Remaining work after Sprint-92 acceptance
 

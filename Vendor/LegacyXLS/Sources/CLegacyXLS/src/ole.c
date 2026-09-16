@@ -118,18 +118,22 @@ static int ole2_bufread(OLE2Stream* olest)
     if (olest == NULL || olest->ole == NULL)
         return -1;
 
-    if ((DWORD)olest->fatpos!=ENDOFCHAIN)
+    if (olest->fatpos != ENDOFCHAIN)
     {
+		if (olest->fatpos == FREESECT)
+            return -1;
 		if(olest->sfat) {
             if (olest->ole->SSAT == NULL || olest->buf == NULL || olest->ole->SSecID == NULL)
                 return -1;
 
-            if (olest->fatpos*olest->ole->lssector + olest->bufsize > olest->ole->SSATCount) {
+            size_t fat_offset = (size_t)olest->fatpos * olest->ole->lssector;
+            if (olest->bufsize > olest->ole->SSATCount ||
+                fat_offset > olest->ole->SSATCount - olest->bufsize) {
                 if (xls_debug) fprintf(stderr, "Error: fatpos %d out-of-bounds for SSAT\n", (int)olest->fatpos);
                 return -1;
             }
 
-			ptr = olest->ole->SSAT + olest->fatpos*olest->ole->lssector;
+			ptr = olest->ole->SSAT + fat_offset;
 			memcpy(olest->buf, ptr, olest->bufsize); 
 
             if (olest->fatpos >= olest->ole->SSecIDCount) {
@@ -142,8 +146,7 @@ static int ole2_bufread(OLE2Stream* olest)
 			olest->pos=0;
 			olest->cfat++;
 		} else {
-			if ((int)olest->fatpos < 0 ||
-                sector_read(olest->ole, olest->buf, olest->bufsize, olest->fatpos) == -1) {
+			if (sector_read(olest->ole, olest->buf, olest->bufsize, olest->fatpos) == -1) {
                 if (xls_debug) fprintf(stderr, "Error: Unable to read sector #%d\n", (int)olest->fatpos);
                 return -1;
             }
@@ -775,10 +778,16 @@ static ssize_t read_MSAT_trailer(OLE2 *ole2) {
     if(ole2->sfatstart == ENDOFCHAIN)
         return 0;
 
-    if ((ole2->SSecID = ole_malloc(ole2->csfat*(size_t)ole2->lsector)) == NULL) {
+    if (ole2->lsector == 0 || ole2->csfat > SIZE_MAX / ole2->lsector)
+        return -1;
+    size_t short_bytes = (size_t)ole2->csfat * ole2->lsector;
+    size_t short_count = short_bytes / sizeof(DWORD);
+    if (short_count > UINT32_MAX)
+        return -1;
+    if ((ole2->SSecID = ole_malloc(short_bytes)) == NULL) {
         return -1;
     }
-    ole2->SSecIDCount = ole2->csfat*(size_t)ole2->lsector/4;
+    ole2->SSecIDCount = (DWORD)short_count;
     sector = ole2->sfatstart;
     wptr=(BYTE*)ole2->SSecID;
     bytes_left = ole2->SSecIDCount * sizeof(DWORD);
@@ -835,7 +844,13 @@ static ssize_t read_MSAT(OLE2* ole2, OLE2Header* oleh)
     }
     total_bytes_read += bytes_read;
 
-    if ((bytes_read = read_MSAT_body(ole2, total_bytes_read / ole2->lsector, count)) == -1) {
+    if (total_bytes_read < 0 || ole2->lsector == 0 ||
+        (size_t)(total_bytes_read / ole2->lsector) > UINT32_MAX) {
+        total_bytes_read = -1;
+        goto cleanup;
+    }
+    DWORD header_sectors = (DWORD)(total_bytes_read / ole2->lsector);
+    if ((bytes_read = read_MSAT_body(ole2, header_sectors, count)) == -1) {
         total_bytes_read = -1;
         goto cleanup;
     }

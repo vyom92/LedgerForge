@@ -301,7 +301,7 @@ struct PersistenceAvailabilityTests {
         )
         let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
 
-        let result = await engine.commitPreparedImport(prepared, accountChoice: .createNewAccount)
+        let result = await engine.commitPreparedImport(prepared, accountChoice: .createNewAccount(displayName: "Imported review account"))
         let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
         let attempt = try #require(attempts.first)
 

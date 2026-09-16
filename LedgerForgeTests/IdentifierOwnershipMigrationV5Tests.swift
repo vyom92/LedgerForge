@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
+@MainActor
 struct IdentifierOwnershipMigrationV5Tests {
     @Test func v5IsActiveAndValidatesItsSchema() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

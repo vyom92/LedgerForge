@@ -7,6 +7,32 @@ import Foundation
 @MainActor
 struct ImportAccountChoiceTests {
 
+    @Test func creationNamesAndExplicitRelationshipsMustBeComplete() {
+        for name in ["", " \n\t"] {
+            #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+                review: .choiceRequired(eligibleAccountIds: []),
+                choice: .createNewAccount(displayName: name)
+            ))
+            #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+                review: .cardChoiceRequired(eligibleLiabilityAccountIds: []),
+                choice: .createNewCardLiabilityAccountAndInstrument(displayName: name)
+            ))
+        }
+        let review = ImportIdentityReview.cardChoiceRequired(eligibleLiabilityAccountIds: ["liability"])
+        let incomplete = ImportCardInstrumentChoice.createNewInstrument(relationship: .replacement)
+        #expect(!incomplete.isComplete)
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: review,
+            choice: .useExistingCardLiabilityAccount(accountId: "liability", instrumentChoice: incomplete)
+        ))
+        #expect(ImportCardInstrumentChoice.createNewInstrument().isComplete)
+        #expect(ImportCardInstrumentChoice.createNewInstrument(relationship: .replacement, relatedInstrumentId: "existing").isComplete)
+        #expect(!ImportCardInstrumentChoice.createNewInstrument(relatedInstrumentId: "existing").isComplete)
+        let zeroSectionChoice = ImportAccountChoice.useExistingCardLiabilityAccountSections(accountId: "liability", sectionChoices: [:])
+        #expect(ImportAccountConfirmationPolicy.allowsConfirmation(review: review, choice: zeroSectionChoice, requiredCardSectionIDs: []))
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(review: review, choice: zeroSectionChoice, requiredCardSectionIDs: ["section"]))
+    }
+
     @Test func noIdentityReviewStateSelectsAnAccountAutomatically() {
         let reviews: [ImportIdentityReview] = [
             .matchedExisting(accountId: "repository-account-private"),
@@ -48,7 +74,7 @@ struct ImportAccountChoiceTests {
         ))
         #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
             review: review,
-            choice: .createNewAccount
+            choice: .createNewAccount(displayName: "Imported review account")
         ))
     }
 
@@ -56,7 +82,7 @@ struct ImportAccountChoiceTests {
         let choices: [ImportAccountChoice?] = [
             nil,
             .useExistingAccount(accountId: "candidate-account-private"),
-            .createNewAccount
+            .createNewAccount(displayName: "Imported review account")
         ]
 
         for choice in choices {
@@ -75,6 +101,12 @@ struct ImportAccountChoiceTests {
         #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
             review: .unavailable,
             choice: nil
+        ))
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: .unavailable, choice: nil, requiresNamedCreation: true
+        ))
+        #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: .unavailable, choice: .createNewAccount(displayName: "Bank account"), requiresNamedCreation: true
         ))
     }
 
@@ -111,7 +143,7 @@ struct ImportAccountChoiceTests {
         ))
         #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
             review: review,
-            choice: .createNewCardLiabilityAccountAndInstrument
+            choice: .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
         ))
     }
 
@@ -132,7 +164,7 @@ struct ImportAccountChoiceTests {
         ))
         #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
             review: review,
-            choice: .createNewAccount
+            choice: .createNewAccount(displayName: "Imported review account")
         ))
         #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
             review: review,
@@ -159,7 +191,7 @@ struct ImportAccountChoiceTests {
                     "section": .reuseExistingInstrument(instrumentId: "instrument")
                 ]
             ),
-            .createNewCardLiabilityAccountAndInstrument
+            .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
         ]
 
         for choice in instrumentChoices {

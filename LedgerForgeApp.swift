@@ -30,6 +30,8 @@ private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDeleg
 @main
 struct LedgerForgeApp: App {
     @NSApplicationDelegateAdaptor(LedgerForgeTerminationDelegate.self) private var terminationDelegate
+    @StateObject private var transactionViewModel = TransactionListViewModel()
+    @State private var transactionAmountMeasurement = TransactionAmountWidthMeasurement()
 #if !DEBUG
     private static var sqliteProvider: SQLiteRepositoryProvider?
 #endif
@@ -44,7 +46,7 @@ struct LedgerForgeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement)
         }
         .windowStyle(.hiddenTitleBar)
     }

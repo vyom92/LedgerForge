@@ -344,6 +344,26 @@ nonisolated enum TransactionPresentationEngine {
         sort: TransactionPresentationSortSpec,
         availability: TransactionPresentationAvailability
     ) -> TransactionPresentationResult {
+        evaluate(
+            rows: availability == .available ? rows(
+                transactions: transactions, accounts: accounts,
+                categories: categories, assignments: assignments
+            ) : [],
+            accounts: accounts, categories: categories,
+            filter: filter, sort: sort, availability: availability
+        )
+    }
+
+    /// Evaluate one query over the current canonical projection. Callers may
+    /// reuse that projection without changing selection or financial algebra.
+    static func evaluate(
+        rows allRows: [TransactionPresentationRow],
+        accounts: [Account],
+        categories: [Category],
+        filter: TransactionPresentationFilterSpec,
+        sort: TransactionPresentationSortSpec,
+        availability: TransactionPresentationAvailability
+    ) -> TransactionPresentationResult {
         guard availability == .available else { return .unavailable }
         guard filter.amountRange?.isValid ?? true else {
             return invalid(.invalidAmountRange)
@@ -358,12 +378,6 @@ nonisolated enum TransactionPresentationEngine {
             return invalid(.invalidUnknownDomainOrEffectRestriction)
         }
 
-        let allRows = rows(
-            transactions: transactions,
-            accounts: accounts,
-            categories: categories,
-            assignments: assignments
-        )
         guard selectionIsKnown(filter: filter, rows: allRows, accounts: accounts, categories: categories) else {
             return invalid(.invalidSelection)
         }
@@ -622,13 +636,32 @@ final class TransactionListViewModel: ObservableObject {
     private var synchronizedGeneration: ProviderGenerationToken?
     private var presentationAvailability: TransactionPresentationAvailability = .unavailable
     private var cancellables = Set<AnyCancellable>()
+    private var cachedCanonicalRows: [TransactionPresentationRow]?
+    private var cachedPresentationResult: TransactionPresentationResult?
+    /// Advances for every relevant input publication, including same-count
+    /// metadata changes and provider/availability replacement.
+    private(set) var canonicalContentRevision: UInt64 = 0
+#if DEBUG
+    private(set) var canonicalProjectionBuildCount = 0
+    private(set) var queryEvaluationCount = 0
+#endif
+
+    @Published var presentationControls = TransactionPresentationControls()
 
     /// Transient criteria, owned by presentation rather than a repository.
     @Published var presentationFilter = TransactionPresentationFilterSpec.empty {
-        didSet { reconcilePresentationSelection() }
+        didSet {
+            guard oldValue != presentationFilter else { return }
+            cachedPresentationResult = nil
+            reconcilePresentationSelection()
+        }
     }
     @Published var presentationSort = TransactionPresentationSortSpec() {
-        didSet { reconcilePresentationSelection() }
+        didSet {
+            guard oldValue != presentationSort else { return }
+            cachedPresentationResult = nil
+            reconcilePresentationSelection()
+        }
     }
     @Published private(set) var selectedPresentationRowID: String?
 
@@ -648,36 +681,46 @@ final class TransactionListViewModel: ObservableObject {
         categorySnapshot = categoryStore.snapshot
 
         transactionStore.$transactions
+            .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] tx in
-                self?.transactions = tx
-                self?.reconcilePresentationSelection()
+                guard let self else { return }
+                self.transactions = tx
+                self.invalidateCanonicalProjection()
+                self.reconcilePresentationSelection()
             }
             .store(in: &cancellables)
 
         importSessionStore.$importSessions
+            .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] sessions in
-                self?.importSessions = sessions
+                guard let self else { return }
+                self.objectWillChange.send()
+                self.importSessions = sessions
             }
             .store(in: &cancellables)
 
         accountStore.$accounts
+            .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] accounts in
                 guard let self else { return }
                 self.objectWillChange.send()
                 self.accounts = accounts
+                self.invalidateCanonicalProjection()
                 self.reconcilePresentationSelection()
             }
             .store(in: &cancellables)
 
         categoryStore.$snapshot
+            .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] snapshot in
                 guard let self else { return }
                 self.objectWillChange.send()
                 self.categorySnapshot = snapshot
+                self.invalidateCanonicalProjection()
                 self.reconcilePresentationSelection()
             }
             .store(in: &cancellables)
@@ -702,7 +745,14 @@ final class TransactionListViewModel: ObservableObject {
         }
         synchronizedGeneration = generation
         presentationAvailability = availability
+        invalidateCanonicalProjection()
         reconcilePresentationSelection()
+    }
+
+    private func invalidateCanonicalProjection() {
+        canonicalContentRevision &+= 1
+        cachedCanonicalRows = nil
+        cachedPresentationResult = nil
     }
 
     func clearPresentationCriteria() {
@@ -724,24 +774,35 @@ final class TransactionListViewModel: ObservableObject {
     /// Menu construction may use these rows without changing matching or totals.
     var allPresentationRows: [TransactionPresentationRow] {
         guard presentationAvailability == .available else { return [] }
-        return TransactionPresentationEngine.rows(
+        if let cachedCanonicalRows { return cachedCanonicalRows }
+        let rows = TransactionPresentationEngine.rows(
             transactions: transactions,
             accounts: accounts,
             categories: categorySnapshot.categories,
             assignments: categorySnapshot.assignments
         )
+        cachedCanonicalRows = rows
+#if DEBUG
+        canonicalProjectionBuildCount += 1
+#endif
+        return rows
     }
 
     var transactionPresentationResult: TransactionPresentationResult {
-        TransactionPresentationEngine.evaluate(
-            transactions: transactions,
+        if let cachedPresentationResult { return cachedPresentationResult }
+        let result = TransactionPresentationEngine.evaluate(
+            rows: allPresentationRows,
             accounts: accounts,
             categories: categorySnapshot.categories,
-            assignments: categorySnapshot.assignments,
             filter: presentationFilter,
             sort: presentationSort,
             availability: presentationAvailability
         )
+        cachedPresentationResult = result
+#if DEBUG
+        queryEvaluationCount += 1
+#endif
+        return result
     }
 
     var selectedPresentationRow: TransactionPresentationRow? {

@@ -248,6 +248,27 @@ struct ImportOutcomePresentationTests {
         #expect(ImportActivityPresentation.latestDurableAttempt(from: [older, malformed, newest])?.id == "newest")
         #expect(ImportActivityPresentation.latestDurableAttempt(from: [equalTimestampLowerID, equalTimestampHigherID])?.id == "attempt-b")
         #expect(ImportActivityPresentation.latestDurableAttempt(from: [malformedLowerID, malformedHigherID])?.id == "malformed-b")
+        let offset = durableAttempt(id: "attempt-z", createdAtISO: "2026-07-20T03:03:00+03:00", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        let fractional = durableAttempt(id: "attempt-c", createdAtISO: "2026-07-20T00:03:00.000Z", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        #expect(ImportActivityPresentation.latestDurableAttempt(from: [offset, fractional, equalTimestampHigherID])?.id == "attempt-z")
+    }
+
+    @Test func latestAttemptCacheTracksSameCountReplacementAndEmptyPublication() async throws {
+        let original = durableAttempt(id: "retained", createdAtISO: "2026-07-20T00:01:00Z", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        let other = durableAttempt(id: "other", createdAtISO: "2026-07-20T00:02:00Z", outcomeCode: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
+        let store = ImportAttemptStore()
+        store.replaceAttempts([original, other])
+        let model = ImportHistoryViewModel(store: store)
+        #expect(model.latestDurableAttempt?.id == "other")
+        model.select(id: "retained")
+        let replacement = durableAttempt(id: "retained", createdAtISO: "2026-07-20T00:03:00Z", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        store.replaceAttempts([replacement, other])
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(model.latestDurableAttempt?.id == "retained")
+        #expect(model.selectedAttempt?.createdAtISO == replacement.createdAtISO)
+        store.replaceAttempts([])
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(model.latestDurableAttempt == nil && model.selectedAttempt == nil)
     }
 
     @Test func currentWorkflowStateOverridesHydratedDurableHistory() {

@@ -500,6 +500,19 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         }
     }
 
+    func selectCardLiabilityAccount(accountID: String, requiredSectionIDs: [String]) {
+        guard let item = currentItem, item.phase == .awaitingConfirmation else { return }
+        updateAccountChoice(nil)
+        mutateItem(item.id) {
+            $0.cardSectionDraftAccountID = accountID
+            if requiredSectionIDs.isEmpty {
+                $0.accountChoice = .useExistingCardLiabilityAccountSections(
+                    accountId: accountID, sectionChoices: [:]
+                )
+            }
+        }
+    }
+
     func updateCardSectionChoice(
         accountID: String,
         sectionID: String,
@@ -515,7 +528,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 item.cardSectionDraftChoices = [:]
             }
             item.cardSectionDraftChoices[sectionID] = choice
-            if Set(item.cardSectionDraftChoices.keys) == Set(requiredSectionIDs) {
+            if Set(item.cardSectionDraftChoices.keys) == Set(requiredSectionIDs),
+               item.cardSectionDraftChoices.values.allSatisfy(\.isComplete) {
                 item.accountChoice = .useExistingCardLiabilityAccountSections(
                     accountId: accountID,
                     sectionChoices: item.cardSectionDraftChoices

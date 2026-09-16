@@ -140,7 +140,7 @@ typedef struct OLE2Stream
     size_t	pos;
     size_t	cfat;
     size_t	size;
-    size_t	fatpos;
+    DWORD	fatpos;	// CFB sector ID, including ENDOFCHAIN/FREESECT sentinels
     BYTE*	buf;
     DWORD	bufsize;
     BYTE	eof;

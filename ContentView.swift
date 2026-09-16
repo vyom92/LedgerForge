@@ -655,11 +655,19 @@ enum ImportAccountConfirmationPolicy {
 
     static func allowsConfirmation(
         review: ImportIdentityReview,
-        choice: ImportAccountChoice?
+        choice: ImportAccountChoice?,
+        requiredCardSectionIDs: [String]? = nil,
+        requiresNamedCreation: Bool = false
     ) -> Bool {
+        if let name = choice?.proposedAccountDisplayName,
+           name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
         switch (review, choice) {
-        case (.matchedExisting, _), (.unavailable, _):
+        case (.matchedExisting, _):
             return true
+        case (.unavailable, let choice):
+            guard requiresNamedCreation else { return true }
+            if case .createNewAccount = choice { return true }
+            return false
         case let (.choiceRequired(eligibleAccountIDs), .some(.useExistingAccount(accountID))):
             return eligibleAccountIDs.contains(accountID)
         case (.choiceRequired, .some(.createNewAccount)):
@@ -668,10 +676,12 @@ enum ImportAccountConfirmationPolicy {
             return eligibleAccountIDs.contains(accountID)
         case (.liabilityAccountChoiceRequired, .some(.createNewAccount)):
             return true
-        case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccount(accountID, _))):
-            return eligibleAccountIDs.contains(accountID)
+        case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccount(accountID, instrumentChoice))):
+            return eligibleAccountIDs.contains(accountID) && instrumentChoice.isComplete &&
+                (requiredCardSectionIDs == nil || requiredCardSectionIDs?.count == 1)
         case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccountSections(accountID, sectionChoices))):
-            return eligibleAccountIDs.contains(accountID) && !sectionChoices.isEmpty
+            return eligibleAccountIDs.contains(accountID) && sectionChoices.values.allSatisfy(\.isComplete) &&
+                (requiredCardSectionIDs.map { Set($0) == Set(sectionChoices.keys) } ?? !sectionChoices.isEmpty)
         case (.cardChoiceRequired, .some(.createNewCardLiabilityAccountAndInstrument)):
             return true
         case (.choiceRequired, _), (.liabilityAccountChoiceRequired, _),
@@ -1298,26 +1308,21 @@ struct ImportActivityPresentation: Equatable {
     }
 
     nonisolated static func latestDurableAttempt(from attempts: [RepositoryImportAttempt]) -> RepositoryImportAttempt? {
-        attempts.max(by: isEarlier)
-    }
-
-    private nonisolated static func isEarlier(_ lhs: RepositoryImportAttempt, _ rhs: RepositoryImportAttempt) -> Bool {
-        switch (createdAt(from: lhs.createdAtISO), createdAt(from: rhs.createdAtISO)) {
-        case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
-            return lhsDate < rhsDate
-        case (.some, nil):
-            return false
-        case (nil, .some):
-            return true
-        default:
-            return lhs.id < rhs.id
+        guard !attempts.isEmpty else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let wholeSeconds = ISO8601DateFormatter()
+        let dated = attempts.map { attempt in
+            (attempt: attempt, date: fractional.date(from: attempt.createdAtISO) ?? wholeSeconds.date(from: attempt.createdAtISO))
         }
-    }
-
-    private nonisolated static func createdAt(from value: String) -> Date? {
-        let fractionalFormatter = ISO8601DateFormatter()
-        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractionalFormatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+        return dated.max { lhs, rhs in
+            switch (lhs.date, rhs.date) {
+            case let (left?, right?) where left != right: return left < right
+            case (.some, nil): return false
+            case (nil, .some): return true
+            default: return lhs.attempt.id < rhs.attempt.id
+            }
+        }?.attempt
     }
 
     private init(durableAttempt: RepositoryImportAttempt) {
@@ -1348,9 +1353,12 @@ struct ContentView: View {
     @ObservedObject private var importCentre = ProductionImportCentre.shared
     @State private var confirmedImportRecoveryActionExecutor = ConfirmedImportRecoveryActionExecutor()
     @State private var importCentrePresentationOwnerID = UUID()
+    @State private var importValidationContentHeight: CGFloat = 0
     @ObservedObject private var availability = ApplicationAvailability.shared
     @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
     @StateObject private var dashboardViewModel = DashboardViewModel()
+    @ObservedObject private var transactionViewModel: TransactionListViewModel
+    private let transactionAmountMeasurement: TransactionAmountWidthMeasurement
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
     @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
@@ -1461,6 +1469,12 @@ struct ContentView: View {
         }
     }
 
+    init(transactionViewModel: TransactionListViewModel? = nil,
+         transactionAmountMeasurement: TransactionAmountWidthMeasurement? = nil) {
+        self.transactionViewModel = transactionViewModel ?? TransactionListViewModel()
+        self.transactionAmountMeasurement = transactionAmountMeasurement ?? TransactionAmountWidthMeasurement()
+    }
+
     var body: some View {
         AppShellView(
             selectedSection: selectedSection,
@@ -1493,6 +1507,9 @@ struct ContentView: View {
             destination: { destinationContent }
         )
         .environment(\.lfTheme, theme)
+        .onReceive(availability.$state) { state in
+            transactionViewModel.synchronizePresentation(generation: availability.generation, availabilityState: state)
+        }
         .font(theme.typography.secondary)
         .tint(theme.palette.accent)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
@@ -1618,7 +1635,8 @@ struct ContentView: View {
             dashboard: { dashboardContent },
             accounts: { accountsContent },
             transactions: {
-                TransactionListView(generation: availability.generation, availabilityState: availability.state)
+                TransactionListView(viewModel: transactionViewModel, amountMeasurement: transactionAmountMeasurement,
+                                    generation: availability.generation, availabilityState: availability.state)
             },
             imports: { importWizardContent },
             salary: { SalaryView(viewModel: salaryViewModel) },
@@ -1672,7 +1690,6 @@ struct ContentView: View {
                 .font(theme.typography.body)
             }
         }
-        .onAppear { dashboardViewModel.refreshPresentation() }
     }
 
     private func dashboardPrimaryContent(availableWidth: CGFloat) -> some View {
@@ -1749,9 +1766,9 @@ struct ContentView: View {
                     .font(theme.typography.secondary.weight(.medium))
             }
             layout {
-                dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
+                dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal, availableWidth: horizontal ? bankWidth : availableWidth)
                     .frame(minWidth: horizontal ? bankWidth : 0, maxWidth: .infinity)
-                dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+                dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal, availableWidth: horizontal ? cardWidth : availableWidth)
                     .frame(minWidth: horizontal ? cardWidth : 0, maxWidth: .infinity)
             }
         }
@@ -1762,9 +1779,15 @@ struct ContentView: View {
         _ title: String,
         icon: String,
         positions: [DashboardAccountPosition],
-        total: Money?
+        total: Money?,
+        availableWidth: CGFloat
     ) -> some View {
-        LFPanel(contentSpacing: theme.spacing.controlGap) {
+        let detailWidth = max(0, availableWidth - 2 * theme.spacing.panelPadding - 36 - theme.spacing.controlGap)
+        let amountWidth = positions.map {
+            dashboardTextWidth(dashboardMoneyText($0.amount), role: .body, tabular: true)
+        }.max() ?? 0
+        let identityWidth = positions.count == 1 ? detailWidth : max(0, detailWidth - amountWidth - theme.spacing.valueGutter)
+        return LFPanel(contentSpacing: theme.spacing.controlGap) {
             HStack(spacing: theme.spacing.controlGap) {
                 Image(systemName: icon)
                     .font(theme.typography.domainIcon)
@@ -1791,13 +1814,13 @@ struct ContentView: View {
                         ForEach(positions) { position in
                             VStack(alignment: .leading, spacing: theme.spacing.micro) {
                                 // The sole account's full amount is the domain headline.
-                                dashboardAccountName(position)
+                                dashboardAccountIdentity(position, availableWidth: identityWidth)
                                 dashboardAccountContext(position, domain: title)
                             }
                         }
                     } else {
-                        LFLabelValueGroup(rows: positions, rowSpacing: theme.spacing.micro, valueRole: .secondary) { position in
-                            dashboardAccountName(position)
+                        LFLabelValueGroup(rows: positions, rowSpacing: theme.spacing.controlGap, valueRole: .body) { position in
+                            dashboardAccountIdentity(position, availableWidth: identityWidth)
                         } value: { position in
                             dashboardAccountAmount(position)
                         } context: { position in
@@ -1813,28 +1836,45 @@ struct ContentView: View {
 
     private func dashboardAccountName(_ position: DashboardAccountPosition) -> some View {
         Text(position.displayName)
-            .font(theme.typography.secondary)
+            .font(theme.typography.body)
+            .foregroundStyle(theme.palette.primaryText)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func dashboardAccountIdentity(_ position: DashboardAccountPosition, availableWidth: CGFloat) -> some View {
+        let inlineWidth = dashboardTextWidth(position.displayName, role: .body)
+            + theme.spacing.controlGap
+            + dashboardTextWidth(dashboardSourceContextText(position), role: .caption)
+        let layout = inlineWidth <= availableWidth
+            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.micro))
+        return layout {
+            dashboardAccountName(position)
+            if position.amount != nil { dashboardSourceContext(position) }
+        }
     }
 
     private func dashboardAccountAmount(_ position: DashboardAccountPosition) -> some View {
         Text(position.amount.map { MoneyFormatting.display($0) } ?? "Data unavailable")
-            .font(theme.typography.font(.secondary, tabularDigits: true))
+            .font(theme.typography.font(.body, tabularDigits: true))
             .fixedSize(horizontal: true, vertical: false)
     }
 
     private func dashboardAccountContext(_ position: DashboardAccountPosition, domain: String) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            if position.amount != nil { dashboardSourceContext(position) }
             if domain == "Card liabilities", let money = position.amount, money.amount < .zero {
                 Text("Card credit balance").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             }
         }
     }
 
+    private func dashboardSourceContextText(_ position: DashboardAccountPosition) -> String {
+        DashboardAccountPosition.asOfLabel(for: position.asOf)
+            + (position.sourceContext.map { " · \($0)" } ?? "")
+    }
+
     private func dashboardSourceContext(_ position: DashboardAccountPosition) -> some View {
-        Text(DashboardAccountPosition.asOfLabel(for: position.asOf)
-             + (position.sourceContext.map { " · \($0)" } ?? ""))
+        Text(dashboardSourceContextText(position))
         .font(theme.typography.caption)
         .foregroundStyle(theme.palette.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
@@ -1870,9 +1910,12 @@ struct ContentView: View {
     private var dashboardSupportingColumnWidth: CGFloat {
         guard dashboardViewModel.fundingState != .empty else { return 336 }
         let valueWidth = DashboardFundingMetric.allCases.map {
-            dashboardTextWidth(dashboardFundingText($0), role: .rowTitle, tabular: true)
+            dashboardTextWidth(dashboardFundingText($0), role: .body, tabular: true)
         }.max() ?? 0
-        return max(336, valueWidth + 2 * theme.spacing.panelPadding)
+        let labelWidth = DashboardFundingMetric.allCases.map {
+            dashboardTextWidth($0.rawValue, role: .secondary)
+        }.max() ?? 0
+        return max(336, labelWidth + theme.spacing.valueGutter + valueWidth + 2 * theme.spacing.panelPadding)
     }
 
     private var salaryDashboardSummary: some View {
@@ -1890,27 +1933,29 @@ struct ContentView: View {
                     }
                 }
             } else {
-                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
+                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.body.weight(.medium))
                 if dashboardViewModel.fundingState == .loading {
                     dashboardState("Loading Salary / Funding…", loading: true)
                 } else {
                     Text("Planning estimates · saved \(dashboardViewModel.fundingMonthTitle) plan")
                         .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                    LFLabelValueGroup(rows: DashboardFundingMetric.allCases) { metric in
-                        Text(metric.rawValue).font(theme.typography.body)
+                    LFLabelValueGroup(rows: DashboardFundingMetric.allCases, rowSpacing: theme.spacing.controlGap, valueRole: .body) { metric in
+                        Text(metric.rawValue)
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(theme.palette.secondaryText)
                     } value: { metric in
                         Text(dashboardFundingText(metric))
-                            .font(theme.typography.font(.rowTitle, tabularDigits: true))
+                            .font(theme.typography.font(.body, tabularDigits: true))
                             .foregroundStyle(theme.palette.primaryText)
                     } context: { _ in
                         EmptyView()
                     }
                     if dashboardViewModel.fundingState == .unavailable {
-                        Text("Data unavailable").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        Text("Data unavailable").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                     } else if let calculation = dashboardViewModel.fundingCalculation,
                               !calculation.incompleteReasons.isEmpty {
                         Text("Missing required input. Affected outputs are unavailable.")
-                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                     }
                 }
                 dashboardRouteButton(.salary)
@@ -2025,6 +2070,15 @@ struct ContentView: View {
             }
 #endif
 
+            GeometryReader { geometry in
+                let prepared = preparedTransactionPreview
+                let columns = prepared.map(previewColumns)
+                let minimumLeft = max(380, theme.typography.size(.formBody) * 27) + 2 * theme.spacing.panelPadding
+                let minimumRight = (columns?.minimumWidth ?? 0) + 2 * theme.spacing.panelPadding
+                let rightWidth = max(minimumRight, (geometry.size.width - 18) * 0.53)
+                let useRightPreview = prepared != nil && geometry.size.width >= minimumLeft + rightWidth + 18 &&
+                    previewCanShareValidation(prepared, height: geometry.size.height)
+                VStack(spacing: 18) {
             HStack(alignment: .top, spacing: 18) {
                 LFPanel {
                     ScrollView {
@@ -2128,74 +2182,100 @@ struct ContentView: View {
                 LFPanel {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
-                            Text("Validation Review")
-                                .font(theme.typography.formSection.weight(.semibold))
-
-                            validationReviewPanel
+                            VStack(alignment: .leading, spacing: 18) {
+                                Text("Validation Review")
+                                    .font(theme.typography.formSection.weight(.semibold))
+                                validationReviewPanel
+                            }
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                importValidationContentHeight = $0
+                            }
+                            if useRightPreview, let prepared, let columns {
+                                transactionPreviewPanel(prepared, columns: columns)
+                            }
                         }
                     }
                     .frame(maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(minWidth: useRightPreview ? rightWidth : nil,
+                       maxWidth: useRightPreview ? rightWidth : .infinity,
+                       maxHeight: .infinity, alignment: .top)
             }
             .frame(maxHeight: .infinity)
-
-            HStack {
-                if case .committing = importState {
-                    Label("Current commit cannot be cancelled", systemImage: "lock.fill")
-                        .font(theme.typography.formCaption.weight(.semibold))
-                        .foregroundStyle(theme.palette.secondaryText)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 13)
-                        .background(theme.palette.controlSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                if canCancelPreparation {
-                    Button("Cancel Current", action: cancelPreparedImport)
-                        .lfSecondaryAction()
-                }
-
-                if importCentre.permitsSkip {
-                    Button("Skip") {
-                        statementPassword = ""
-                        importCentre.skipCurrent()
+                    if !useRightPreview, let prepared, let columns {
+                        LFPanel {
+                            ScrollView([.horizontal, .vertical]) {
+                                transactionPreviewPanel(prepared, columns: columns)
+                                    .frame(minWidth: max(columns.minimumWidth, geometry.size.width - 2 * theme.spacing.panelPadding - 20))
+                            }
+                        }
+                        .frame(height: max(160, min(320, geometry.size.height * 0.44)))
                     }
-                    .lfSecondaryAction()
                 }
-
-                if importCentre.permitsContinue {
-                    Button("Continue") {
-                        importCentre.continueAfterCurrent()
-                    }
-                    .lfSecondaryAction()
-                }
-
-                if importCentre.permitsBatchCancellation {
-                    Button(
-                        importCentre.batchLifecycle == .committing
-                            ? "Cancel Remaining After Current Import"
-                            : "Cancel Batch"
-                    ) {
-                        statementPassword = ""
-                        importCentre.cancelBatch()
-                    }
-                    .lfSecondaryAction()
-                    .disabled(importCentre.batchCancellationRequested)
-                }
-
-                if importCentre.batchSummary.isComplete {
-                    Button("Start New Batch", action: startNewImportBatch)
-                        .lfSecondaryAction()
-                }
-
-                Spacer()
-
-                importFooterAction
             }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: theme.spacing.controlGap) { importFooterControls }
+                    .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .trailing, spacing: theme.spacing.controlGap) { importFooterControls }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(theme.spacing.pagePadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder
+    private var importFooterControls: some View {
+        if case .committing = importState {
+            Label("Current commit cannot be cancelled", systemImage: "lock.fill")
+                .font(theme.typography.formCaption.weight(.semibold))
+                .foregroundStyle(theme.palette.secondaryText)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 13)
+                .background(theme.palette.controlSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+
+        if canCancelPreparation {
+            Button("Cancel Current", action: cancelPreparedImport)
+                .buttonStyle(ImportFooterButtonStyle())
+        }
+
+        if importCentre.permitsSkip {
+            Button("Skip") {
+                statementPassword = ""
+                importCentre.skipCurrent()
+            }
+            .buttonStyle(ImportFooterButtonStyle())
+        }
+
+        if importCentre.permitsContinue {
+            Button("Continue") {
+                importCentre.continueAfterCurrent()
+            }
+            .buttonStyle(ImportFooterButtonStyle())
+        }
+
+        if importCentre.permitsBatchCancellation {
+            Button(
+                importCentre.batchLifecycle == .committing
+                    ? "Cancel Remaining After Current Import"
+                    : "Cancel Batch"
+            ) {
+                statementPassword = ""
+                importCentre.cancelBatch()
+            }
+            .buttonStyle(ImportFooterButtonStyle())
+            .disabled(importCentre.batchCancellationRequested)
+        }
+
+        if importCentre.batchSummary.isComplete {
+            Button("Start New Batch", action: startNewImportBatch)
+                .buttonStyle(ImportFooterButtonStyle())
+        }
+
+        importFooterAction
     }
 
     private var settingsContent: some View {
@@ -3098,20 +3178,7 @@ struct ContentView: View {
                 partialImportReviewPanel(plan, preparedImport: preparedImport)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Transaction Preview")
-                    .font(theme.typography.formBody.weight(.semibold))
-                tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
-                ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
-                    previewTransactionRow(
-                        transaction,
-                        cardEvidence: preparedImport.financialDocument.cardStatementEvidence
-                    )
-                }
-            }
-            .padding(12)
-            .background(theme.palette.contentSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+
         }
     }
 
@@ -3136,7 +3203,8 @@ struct ContentView: View {
                 }
 
                 if case .choiceRequired = importIdentityReview {
-                    ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
+                    ForEach(accountsViewModel.accounts) { account in
+                        let eligible = projection.eligibleAccountIDs.contains(account.id)
                         Button {
                             importCentre.updateAccountChoice(.useExistingAccount(accountId: account.id))
                         } label: {
@@ -3146,6 +3214,11 @@ struct ContentView: View {
                                     Text(account.institution)
                                         .font(theme.typography.formCaption)
                                         .foregroundStyle(theme.palette.secondaryText)
+                                    if !eligible {
+                                        Text(accountMatchUnavailableReason(account, for: preparedImport))
+                                            .font(theme.typography.formCaption)
+                                            .foregroundStyle(theme.palette.secondaryText)
+                                    }
                                 }
                                 Spacer()
                                 Image(systemName: importAccountChoice == .useExistingAccount(accountId: account.id) ? "checkmark.circle.fill" : "circle")
@@ -3156,21 +3229,9 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(theme.palette.primaryText)
+                        .disabled(!eligible)
                     }
-                    Button {
-                        importCentre.updateAccountChoice(.createNewAccount)
-                    } label: {
-                        HStack {
-                            Text("Create New Account")
-                            Spacer()
-                            Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
-                        }
-                        .padding(10)
-                        .background(theme.palette.controlSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.palette.primaryText)
+                    newAccountCreationChoice(preparedImport, instrumentAware: false)
                 }
                 if case .liabilityAccountChoiceRequired = importIdentityReview {
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
@@ -3196,182 +3257,224 @@ struct ContentView: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(theme.palette.primaryText)
                     }
-                    Button {
-                        importCentre.updateAccountChoice(.createNewAccount)
-                    } label: {
-                        HStack {
-                            Text("Create separate Axis credit-card liability account")
-                            Spacer()
-                            Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
-                        }
-                        .padding(10)
-                        .background(theme.palette.controlSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.palette.primaryText)
+                    newAccountCreationChoice(preparedImport, instrumentAware: false)
                 }
                 if case .cardChoiceRequired = importIdentityReview {
-                    let statementSections = preparedImport.financialDocument.cardStatementEvidence?.instrumentSections ?? []
+                    let sections = preparedImport.financialDocument.cardStatementEvidence?.instrumentSections ?? []
+                    let sectionIDs = sections.map(\.documentScopedSectionID)
+                    Text("Liability account")
+                        .font(theme.typography.formBody.weight(.semibold))
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
-                        let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(account.displayName).font(theme.typography.formBody.weight(.semibold))
-                            if statementSections.count > 1 {
-                                ForEach(statementSections, id: \.documentScopedSectionID) { section in
-                                    multiInstrumentSectionChoices(
-                                        section: section,
-                                        allSectionIDs: statementSections.map(\.documentScopedSectionID),
-                                        accountID: account.id,
-                                        instruments: instruments,
-                                        preparedImport: preparedImport
-                                    )
-                                }
-                            } else {
-                                ForEach(instruments) { instrument in
-                                    cardChoiceButton(
-                                        title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
-                                        choice: .useExistingCardLiabilityAccount(
-                                            accountId: account.id,
-                                            instrumentChoice: .reuseExistingInstrument(instrumentId: instrument.id)
-                                        ), preparedImport: preparedImport
-                                    )
-                                    ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
-                                        cardChoiceButton(
-                                            title: "New instrument · \(cardRelationshipTitle(relationship))",
-                                            choice: .useExistingCardLiabilityAccount(
-                                                accountId: account.id,
-                                                instrumentChoice: .createNewInstrument(
-                                                    relationship: relationship,
-                                                    relatedInstrumentId: instrument.id
-                                                )
-                                            ), preparedImport: preparedImport
-                                        )
+                        let selected = cardSectionDraftAccountID == account.id
+                        VStack(alignment: .leading, spacing: 10) {
+                            Button {
+                                importCentre.selectCardLiabilityAccount(accountID: account.id, requiredSectionIDs: sectionIDs)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(account.displayName)
+                                        Text(account.institution).font(theme.typography.formCaption)
+                                            .foregroundStyle(theme.palette.secondaryText)
                                     }
+                                    Spacer()
+                                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                                 }
-                                cardChoiceButton(
-                                    title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
-                                    choice: .useExistingCardLiabilityAccount(
-                                        accountId: account.id,
-                                        instrumentChoice: .createNewInstrument()
-                                    ), preparedImport: preparedImport
-                                )
+                            }
+                            .buttonStyle(.plain)
+                            if selected {
+                                let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
+                                ForEach(sections, id: \.documentScopedSectionID) { section in
+                                    cardSectionSelection(section: section, allSectionIDs: sectionIDs,
+                                                         accountID: account.id, instruments: instruments)
+                                }
+                                if sections.isEmpty {
+                                    Text("This statement contains no card sections to assign.")
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
+                                }
                             }
                         }
                         .padding(10)
                         .background(theme.palette.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    cardChoiceButton(
-                        title: "Create separate liability account and instrument",
-                        choice: .createNewCardLiabilityAccountAndInstrument,
-                        preparedImport: preparedImport
-                    )
+                    newAccountCreationChoice(preparedImport, instrumentAware: true)
                 }
             }
             .padding(12)
             .background(theme.palette.accent.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else if case .unavailable = importIdentityReview,
+                  preparedImport.detectedDocumentType == .bankAccount {
+            newAccountCreationChoice(preparedImport, instrumentAware: false)
+                .onChange(of: preparedImport.id, initial: true) { _, _ in
+                    if importAccountChoice == nil {
+                        importCentre.updateAccountChoice(.createNewAccount(displayName: proposedAccountName(preparedImport)))
+                    }
+                }
         }
     }
 
-    private func cardChoiceButton(title: String, choice: ImportAccountChoice, preparedImport: PreparedImport) -> some View {
-        Button {
-            importCentre.updateAccountChoice(choice)
-        } label: {
-            HStack {
-                Text(title)
-                Spacer()
-                Image(systemName: importAccountChoice == choice ? "checkmark.circle.fill" : "circle")
-            }
-            .padding(8)
+    private func accountMatchUnavailableReason(_ account: AccountsAccountPresentation, for prepared: PreparedImport) -> String {
+        let expectedType: AccountType = prepared.detectedDocumentType == .creditCard ? .creditCard : .bank
+        if account.accountType != expectedType {
+            return "Different account type: " + account.accountTypeLabel + "."
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(theme.palette.primaryText)
+        if account.currencyCode != prepared.detectedCurrency {
+            return "Different account currency: " + account.currencyCode + "."
+        }
+        if account.institution != prepared.detectedInstitution.rawValue {
+            return "This statement belongs to a different institution."
+        }
+        if !account.identitySummaries.isEmpty {
+            return "An account identifier is already recorded; this statement is not a verified match."
+        }
+        return "Not compatible with this statement’s account evidence."
     }
 
-    private func multiInstrumentSectionChoices(
-        section: CardInstrumentSectionEvidence,
-        allSectionIDs: [String],
-        accountID: String,
-        instruments: [CardInstrument],
-        preparedImport: PreparedImport
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(section.holderLabel ?? "Card section \(section.sourceOrdinal)")
-                .font(theme.typography.formCaption.weight(.semibold))
-            if let observed = section.sourceIdentityObservations.first?.value {
-                Text(observed)
-                    .font(theme.typography.finePrint.monospaced())
-                    .foregroundStyle(theme.palette.secondaryText)
-            }
-            Text("Signed section total: \(formatCurrency(section.signedNetTotal.amount, currencyCode: section.signedNetTotal.currency.code))")
-                .font(theme.typography.finePrint)
-                .foregroundStyle(section.signedNetTotal.amount < .zero ? theme.financialPositive : theme.palette.secondaryText)
-            ForEach(instruments) { instrument in
-                cardSectionChoiceButton(
-                    title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
-                    accountID: accountID,
-                    sectionID: section.documentScopedSectionID,
-                    choice: .reuseExistingInstrument(instrumentId: instrument.id),
-                    requiredSectionIDs: allSectionIDs,
-                    preparedImport: preparedImport
-                )
-                ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
-                    cardSectionChoiceButton(
-                        title: "New instrument · \(cardRelationshipTitle(relationship))",
-                        accountID: accountID,
-                        sectionID: section.documentScopedSectionID,
-                        choice: .createNewInstrument(
-                            relationship: relationship,
-                            relatedInstrumentId: instrument.id
-                        ),
-                        requiredSectionIDs: allSectionIDs,
-                        preparedImport: preparedImport
-                    )
+    private func proposedAccountName(_ prepared: PreparedImport) -> String {
+        let sourceName = prepared.accountMetadata?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let sourceName, !sourceName.isEmpty,
+           sourceName != prepared.detectedInstitution.rawValue { return sourceName }
+        return ImportPersistenceMapper.displayAccountName(
+            institutionName: prepared.detectedInstitution.rawValue,
+            documentType: prepared.detectedDocumentType,
+            currency: prepared.detectedCurrency,
+            fallbackFileName: prepared.fileName
+        )
+    }
+
+    private func newAccountCreationChoice(_ prepared: PreparedImport, instrumentAware: Bool) -> some View {
+        let isCard = prepared.detectedDocumentType == .creditCard
+        let selected = importAccountChoice?.proposedAccountDisplayName != nil
+        let makeChoice: (String) -> ImportAccountChoice = { name in
+            instrumentAware ? .createNewCardLiabilityAccountAndInstrument(displayName: name)
+                : .createNewAccount(displayName: name)
+        }
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                importCentre.updateAccountChoice(makeChoice(proposedAccountName(prepared)))
+            } label: {
+                HStack {
+                    Text(isCard ? "Create separate credit card account" : "Create new bank account")
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 }
             }
-            cardSectionChoiceButton(
-                title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
-                accountID: accountID,
-                sectionID: section.documentScopedSectionID,
-                choice: .createNewInstrument(),
-                requiredSectionIDs: allSectionIDs,
-                preparedImport: preparedImport
-            )
+            .buttonStyle(.plain)
+            if selected {
+                LabeledContent("Display name") {
+                    TextField("Account display name", text: Binding(
+                        get: { importAccountChoice?.proposedAccountDisplayName ?? proposedAccountName(prepared) },
+                        set: { importCentre.updateAccountChoice(makeChoice($0)) }
+                    ))
+                    .lfTextField()
+                    .accessibilityIdentifier("import.newAccountDisplayName")
+                }
+                LFInfoRow(title: "Account type", value: isCard ? "Credit Card" : "Bank")
+                LFInfoRow(title: "Currency", value: prepared.detectedCurrency ?? "Unavailable")
+                if isCard { LFInfoRow(title: "Treatment", value: "Credit-card liability") }
+                Text("The account is created only when you confirm this import.")
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
+                if importAccountChoice?.proposedAccountDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                    Text("Enter an account display name.")
+                        .font(theme.typography.formCaption).foregroundStyle(LFTheme.warning)
+                }
+            }
         }
-        .padding(8)
-        .background(theme.palette.contentSurface)
+        .font(theme.typography.formBody)
+        .padding(10)
+        .background(theme.palette.controlSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func cardSectionChoiceButton(
-        title: String,
-        accountID: String,
-        sectionID: String,
-        choice: ImportCardInstrumentChoice,
-        requiredSectionIDs: [String],
-        preparedImport: PreparedImport
+    private enum CardSelection: Hashable {
+        case pending, new, existing(String)
+    }
+
+    private func cardLabel(_ instrument: CardInstrument) -> String {
+        let statements = cardStore.snapshot.statements.filter { $0.instrumentIDs.contains(instrument.id) }
+        let sections = statements.flatMap(\.sections).filter { $0.instrumentID == instrument.id }
+        let holders = Set(sections.compactMap(\.holderLabel)).sorted()
+        let identifiers = Set((instrument.sourceObservations + sections.flatMap(\.sourceObservations)).map(\.value)).sorted()
+        let parts = holders + identifiers
+        let dates = Set(statements.compactMap(\.statementDate)).sorted()
+        let context: String
+        if let first = dates.first, let last = dates.last {
+            context = first == last ? "Statement \(formatDate(first))" : "Statements \(formatDate(first)) – \(formatDate(last))"
+        } else { context = "Statement date unavailable" }
+        return (parts.isEmpty ? "Card details unavailable" : parts.joined(separator: " · ")) + " · " + context
+    }
+
+    private func cardSectionSelection(
+        section: CardInstrumentSectionEvidence, allSectionIDs: [String],
+        accountID: String, instruments: [CardInstrument]
     ) -> some View {
-        Button {
-            importCentre.updateCardSectionChoice(
-                accountID: accountID,
-                sectionID: sectionID,
-                choice: choice,
-                requiredSectionIDs: requiredSectionIDs
-            )
-        } label: {
-            HStack {
-                Text(title)
-                Spacer()
-                let selected = cardSectionDraftAccountID == accountID &&
-                    cardSectionDraftChoices[sectionID] == choice
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-            }
-            .padding(8)
+        let draft = cardSectionDraftChoices[section.documentScopedSectionID]
+        let selection: CardSelection = switch draft {
+        case .reuseExistingInstrument(let id): .existing(id)
+        case .createNewInstrument: .new
+        case nil: .pending
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(theme.palette.primaryText)
+        let update: (ImportCardInstrumentChoice) -> Void = { choice in
+            importCentre.updateCardSectionChoice(accountID: accountID, sectionID: section.documentScopedSectionID,
+                                                 choice: choice, requiredSectionIDs: allSectionIDs)
+        }
+        let labels = instruments.map(cardLabel)
+        let ambiguousLabels = Set(Dictionary(grouping: labels, by: { $0 }).filter { $0.value.count > 1 }.keys)
+        return VStack(alignment: .leading, spacing: 9) {
+            Text(section.holderLabel ?? "Card section \(section.sourceOrdinal)")
+                .font(theme.typography.formBody.weight(.semibold))
+            if let observed = section.sourceIdentityObservations.first?.value {
+                Text(observed).font(theme.typography.formCaption.monospaced())
+                    .foregroundStyle(theme.palette.secondaryText)
+            }
+            Picker("Card", selection: Binding(get: { selection }, set: { choice in
+                switch choice {
+                case .existing(let id): update(.reuseExistingInstrument(instrumentId: id))
+                case .new: update(.createNewInstrument())
+                case .pending: break
+                }
+            })) {
+                Text("Choose a card").tag(CardSelection.pending)
+                ForEach(instruments) { instrument in
+                    Text("Reuse · " + cardLabel(instrument)).tag(CardSelection.existing(instrument.id))
+                        .disabled(ambiguousLabels.contains(cardLabel(instrument)))
+                }
+                Text("Create new card").tag(CardSelection.new)
+            }
+            if Set(labels).count != labels.count {
+                Text("Some recorded cards have indistinguishable source details. They need your identification before reuse or a relationship can be selected; those choices are unavailable.")
+                    .font(theme.typography.formCaption).foregroundStyle(LFTheme.warning)
+            }
+            if case .createNewInstrument(let relationship, let relatedID) = draft, !instruments.isEmpty {
+                Picker("Relationship", selection: Binding<CardInstrumentRelationshipKind?>(
+                    get: { relationship },
+                    set: { update(.createNewInstrument(relationship: $0, relatedInstrumentId: $0 == nil ? nil : relatedID)) }
+                )) {
+                    Text("No relationship asserted").tag(Optional<CardInstrumentRelationshipKind>.none)
+                    ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { kind in
+                        Text(cardRelationshipTitle(kind)).tag(Optional(kind))
+                    }
+                }
+                if relationship != nil {
+                    Picker("Related card", selection: Binding<String?>(
+                        get: { relatedID },
+                        set: { update(.createNewInstrument(relationship: relationship, relatedInstrumentId: $0)) }
+                    )) {
+                        Text("Choose the related card").tag(Optional<String>.none)
+                        ForEach(instruments) { instrument in
+                            Text(cardLabel(instrument)).tag(Optional(instrument.id))
+                                .disabled(ambiguousLabels.contains(cardLabel(instrument)))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(theme.palette.contentSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func cardRelationshipTitle(_ relationship: CardInstrumentRelationshipKind) -> String {
@@ -3502,13 +3605,95 @@ struct ContentView: View {
         .accessibilityLabel("Reviewed partial import. \(plan.recognizedCount) already represented. \(plan.importedCount) will import. Zero blocked.")
     }
 
+    private var preparedTransactionPreview: PreparedImport? {
+        switch importState {
+        case .previewReady(let prepared), .validationFailed(let prepared), .committing(let prepared):
+            return prepared.financialDocument.salaryStatementEvidence == nil ? prepared : nil
+        default: return nil
+        }
+    }
+
+    private struct PreviewColumns {
+        let date: CGFloat, description: CGFloat, currency: CGFloat, effect: CGFloat, amount: CGFloat, balance: CGFloat
+        var minimumWidth: CGFloat { date + description + currency + effect + amount + balance + 70 }
+        var widths: [CGFloat?] { [date, nil, currency, effect, amount, balance] }
+    }
+
+    private func previewEffect(_ transaction: Transaction) -> String {
+        transaction.cardLiabilityEffect == .increasesAmountOwed ? "Charge" :
+            transaction.cardLiabilityEffect == .decreasesAmountOwed ? "Payment/Credit" :
+            transaction.credit != nil ? "Credit" : "Debit"
+    }
+
+    private func previewColumns(_ prepared: PreparedImport) -> PreviewColumns {
+        let rows = Array(prepared.financialDocument.transactions.prefix(12))
+        let font = theme.typography.nativeFont(.formCaption)
+        let moneyFont = theme.typography.nativeFont(.formCaption, tabularDigits: true)
+        func width(_ header: String, _ values: [String], money: Bool = false) -> CGFloat {
+            ceil(([header] + values).map {
+                ($0 as NSString).size(withAttributes: [.font: money ? moneyFont : font]).width
+            }.max() ?? 0) + 8
+        }
+        return PreviewColumns(
+            date: width("Date", rows.map { formatDate($0.statementDate) }),
+            description: max(width("Description", []), font.pointSize * 13),
+            currency: width("Currency", rows.map(\.currency)),
+            effect: width("Type", rows.map(previewEffect)),
+            amount: width("Amount", rows.map(\.signedAmountDisplay), money: true),
+            balance: width("Balance", rows.map { balanceText($0.balance, currency: $0.currency) }, money: true)
+        )
+    }
+
+    private func previewCanShareValidation(_ prepared: PreparedImport?, height: CGFloat) -> Bool {
+        guard let prepared, importValidationContentHeight > 0 else { return false }
+        let font = theme.typography.nativeFont(.formCaption)
+        let rowHeight = font.pointSize * 1.4 + 16 +
+            (prepared.financialDocument.cardStatementEvidence == nil ? 0 : theme.typography.nativeFont(.finePrint).pointSize * 1.4 + 2)
+        let previewHeaderHeight = theme.typography.nativeFont(.formBody).pointSize * 1.4 + font.pointSize * 2.8 + 44
+        // Use the rendered review height, including its controls and empty-state
+        // spacing. Keep at least three rows visible before sharing the column.
+        return height >= importValidationContentHeight + 2 * theme.spacing.panelPadding + 18 +
+            previewHeaderHeight + CGFloat(min(3, prepared.transactionCount)) * (rowHeight + 8)
+    }
+
+    private func transactionPreviewPanel(_ prepared: PreparedImport, columns: PreviewColumns) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Transaction Preview").font(theme.typography.formBody.weight(.semibold))
+            if prepared.transactionCount > 12 {
+                Text("First 12 of \(prepared.transactionCount) transactions · source order")
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
+            HStack(spacing: 14) {
+                ForEach(Array(["Date", "Description", "Currency", "Type", "Amount", "Balance"].enumerated()), id: \.offset) { index, title in
+                    Text(title)
+                        .frame(minWidth: index == 1 ? columns.description : nil,
+                               maxWidth: index == 1 ? .infinity : nil, alignment: index >= 4 ? .trailing : .leading)
+                        .frame(width: columns.widths[index], alignment: index >= 4 ? .trailing : .leading)
+                }
+            }
+            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            .padding(.vertical, 10)
+            ForEach(prepared.financialDocument.transactions.prefix(12)) { transaction in
+                previewTransactionRow(transaction, columns: columns,
+                                      cardEvidence: prepared.financialDocument.cardStatementEvidence)
+            }
+            if prepared.transactionCount == 0 {
+                Text("This statement has no transaction rows.")
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }
+        .frame(minWidth: columns.minimumWidth, maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("import.transactionPreview")
+    }
+
     private func previewTransactionRow(
         _ transaction: Transaction,
+        columns: PreviewColumns,
         cardEvidence: CardStatementEvidence? = nil
     ) -> some View {
         HStack(spacing: 14) {
             Text(formatDate(transaction.statementDate))
-                .frame(width: 84, alignment: .leading)
+                .frame(width: columns.date, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.description)
                     .lineLimit(1)
@@ -3518,21 +3703,23 @@ struct ContentView: View {
                         .foregroundStyle(theme.palette.secondaryText)
                 }
             }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: columns.description, maxWidth: .infinity, alignment: .leading)
             Text(transaction.currency)
                 .foregroundStyle(theme.palette.secondaryText)
-                .frame(width: 92, alignment: .leading)
-            Text(transaction.cardLiabilityEffect == .increasesAmountOwed ? "Charge" : transaction.cardLiabilityEffect == .decreasesAmountOwed ? "Payment/Credit" : transaction.credit != nil ? "Credit" : "Debit")
+                .frame(width: columns.currency, alignment: .leading)
+            Text(previewEffect(transaction))
                 .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
-                .frame(width: 68, alignment: .leading)
+                .frame(width: columns.effect, alignment: .leading)
             Text(transaction.signedAmountDisplay)
                 .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
                 .monospacedDigit()
-                .frame(width: 112, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: columns.amount, alignment: .trailing)
             Text(balanceText(transaction.balance, currency: transaction.currency))
                 .foregroundStyle(theme.palette.secondaryText)
                 .monospacedDigit()
-                .frame(width: 86, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: columns.balance, alignment: .trailing)
         }
         .font(theme.typography.formCaption)
         .padding(.vertical, 8)
@@ -3563,7 +3750,9 @@ struct ContentView: View {
                 (preparedImport.financialDocument.salaryStatementEvidence == nil &&
                     !ImportAccountConfirmationPolicy.allowsConfirmation(
                         review: importIdentityReview,
-                        choice: importAccountChoice
+                        choice: importAccountChoice,
+                        requiredCardSectionIDs: preparedImport.financialDocument.cardStatementEvidence?.instrumentSections.map(\.documentScopedSectionID),
+                        requiresNamedCreation: preparedImport.detectedDocumentType == .bankAccount
                     )) ||
                     partialReviewBlocksConfirmation ||
                     statementEquivalenceBlocksConfirmation(preparedImport)
@@ -3686,39 +3875,6 @@ struct ContentView: View {
         .padding(.vertical, 11)
     }
 
-    private func tableHeader(_ titles: [String]) -> some View {
-        HStack(spacing: 14) {
-            ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
-                Text(title)
-                    .frame(
-                        maxWidth: index == 1 ? .infinity : nil,
-                        alignment: index >= 4 ? .trailing : .leading
-                    )
-                    .frame(width: fixedHeaderWidth(index), alignment: index >= 4 ? .trailing : .leading)
-            }
-        }
-        .font(theme.typography.formCaption)
-        .foregroundStyle(theme.palette.secondaryText)
-        .padding(.vertical, 10)
-    }
-
-    private func fixedHeaderWidth(_ index: Int) -> CGFloat? {
-        switch index {
-        case 0:
-            return 84
-        case 2:
-            return 92
-        case 3:
-            return 68
-        case 4:
-            return 112
-        case 5:
-            return 86
-        default:
-            return nil
-        }
-    }
-
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .buttonStyle(.plain)
@@ -3735,7 +3891,7 @@ struct ContentView: View {
         }
         return ImportActivityPresentation(
             importState: importState,
-            latestDurableAttempt: ImportActivityPresentation.latestDurableAttempt(from: importHistoryViewModel.attempts),
+            latestDurableAttempt: importHistoryViewModel.latestDurableAttempt,
             completedAttempt: completedAttempt
         )
     }

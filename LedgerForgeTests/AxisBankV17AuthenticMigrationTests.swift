@@ -398,7 +398,7 @@ struct AxisBankV17AuthenticMigrationTests {
                     snapshot: v16Provider.cardRepo.snapshot(workspaceId: workspaceID)
                 )
             } else {
-                choice = .createNewCardLiabilityAccountAndInstrument
+                choice = .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
             }
             let committed = await engine.commitPreparedImport(prepared, accountChoice: choice)
             try #require(committed.persisted && committed.transactionCount == source.rows.count)
@@ -952,7 +952,7 @@ struct AxisBankV17AuthenticMigrationTests {
             let createsAccount = createdAccounts.insert(carrier.account).inserted
             let committed = await engine.commitPreparedImport(
                 prepared,
-                accountChoice: createsAccount ? .createNewAccount : nil
+                accountChoice: createsAccount ? .createNewAccount(displayName: "Imported review account") : nil
             )
             engine.cancelPreparedImport(prepared)
             #expect(committed.persisted)
@@ -992,7 +992,7 @@ struct AxisBankV17AuthenticMigrationTests {
             let createsAccount = createdAccounts.insert(carrier.accountIdentifierSha256).inserted
             let committed = await engine.commitPreparedImport(
                 prepared,
-                accountChoice: createsAccount ? .createNewAccount : nil
+                accountChoice: createsAccount ? .createNewAccount(displayName: "Imported review account") : nil
             )
             engine.cancelPreparedImport(prepared)
             #expect(committed.persisted)

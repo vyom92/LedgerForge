@@ -211,7 +211,7 @@ struct PasswordProviderTests {
 
         #expect(result.status == .failed)
         #expect(result.error == .passwordRequired)
-        #expect(await reader.attempts() == [nil, "fictional-first-password", "fictional-second-password"])
+        #expect(reader.attempts() == [nil, "fictional-first-password", "fictional-second-password"])
         #expect(await challenge.callCount() == 1)
     }
 
@@ -316,9 +316,9 @@ struct PasswordProviderTests {
         )
 
         #expect(result.status == .succeeded)
-        #expect(await reader.attempts() == [nil, "fictional-axis-wrong-app", "fictional-axis-correct-traditional"])
+        #expect(reader.attempts() == [nil, "fictional-axis-wrong-app", "fictional-axis-correct-traditional"])
         #expect(await challenge.callCount() == 0)
-        #expect(await store.saveCalls().isEmpty)
+        #expect(store.saveCalls().isEmpty)
     }
 
     @Test func exactCanonicalAxisAppAndTraditionalSuccessesDoNotWrite() async throws {
@@ -351,7 +351,7 @@ struct PasswordProviderTests {
             target: .init(institutionCode: axisScope, scope: traditionalScope)
         )
 
-        #expect(await store.saveCalls().isEmpty)
+        #expect(store.saveCalls().isEmpty)
     }
 
     @Test func axisChallengeUpdatesOnlyExactFamilyScopeAndIndependentRotationsWorkBothOrders() async throws {
@@ -383,7 +383,7 @@ struct PasswordProviderTests {
 
             #expect(await store.storedValue(institutionCode: appScope) == "fictional-axis-\(appScope)-v2")
             #expect(await store.storedValue(institutionCode: traditionalScope) == "fictional-axis-\(traditionalScope)-v2")
-            #expect(await store.saveScopes() == scopes)
+            #expect(store.saveScopes() == scopes)
         }
     }
 
@@ -409,7 +409,7 @@ struct PasswordProviderTests {
 
         #expect(await store.storedValue(institutionCode: appScope) == value)
         #expect(await store.storedValue(institutionCode: axisScope) == value)
-        #expect(await store.saveScopes() == [appScope])
+        #expect(store.saveScopes() == [appScope])
     }
 
     @Test func axisLegacyCredentialMigratesToExactTargetAndRemains() async throws {
@@ -435,7 +435,7 @@ struct PasswordProviderTests {
 
         #expect(await store.storedValue(institutionCode: traditionalScope) == value)
         #expect(await store.storedValue(institutionCode: axisScope) == value)
-        #expect(await store.saveScopes() == [traditionalScope])
+        #expect(store.saveScopes() == [traditionalScope])
     }
 
     @Test func challengeCancellationAndWrongChallengeNeverWrite() async throws {
@@ -469,7 +469,7 @@ struct PasswordProviderTests {
         )
         #expect(wrongResult.status == .failed)
         #expect(wrongResult.error == .incorrectPassword)
-        #expect(await store.saveCalls().isEmpty)
+        #expect(store.saveCalls().isEmpty)
 
         // Keep the target in scope so this test also exercises the same exact
         // family target used by the post-validation confirmation seam.
@@ -504,7 +504,7 @@ struct PasswordProviderTests {
             for: request,
             target: .init(institutionCode: axisScope, scope: appScope)
         )
-        #expect(await store.saveCalls().isEmpty)
+        #expect(store.saveCalls().isEmpty)
     }
 
     @Test func keychainWriteFailureIsSurfacedAndLeavesExistingCredential() async throws {
@@ -553,7 +553,7 @@ struct PasswordProviderTests {
             for: request,
             target: .init(institutionCode: scope)
         )
-        #expect(await store.saveCalls().isEmpty)
+        #expect(store.saveCalls().isEmpty)
     }
 
     @Test func keychainCredentialStoreSmokeUsesOnlyOneUniqueTestItem() async throws {
@@ -669,7 +669,7 @@ struct PasswordProviderTests {
 
         #expect(await store.storedValue(institutionCode: scope) == legacySecret)
         #expect(await store.storedValue(institutionCode: appScope) == legacySecret)
-        #expect(await store.saveScopes() == [appScope])
+        #expect(store.saveScopes() == [appScope])
     }
 
 }
@@ -728,7 +728,8 @@ private actor PasswordChallengeSpy {
     }
 }
 
-private actor AttemptRecordingReader: ImportFramework.DocumentReader {
+@MainActor
+private final class AttemptRecordingReader: ImportFramework.DocumentReader {
     let supportedFileExtensions: Set<String> = ["pdf"]
     private var recordedAttempts = [String?]()
 
@@ -746,7 +747,8 @@ private actor AttemptRecordingReader: ImportFramework.DocumentReader {
     }
 }
 
-private actor SuccessfulPasswordReader: ImportFramework.DocumentReader {
+@MainActor
+private final class SuccessfulPasswordReader: ImportFramework.DocumentReader {
     let supportedFileExtensions: Set<String> = ["pdf"]
     private let expectedPassword: String
     private var recordedAttempts = [String?]()
@@ -764,7 +766,7 @@ private actor SuccessfulPasswordReader: ImportFramework.DocumentReader {
         guard password == expectedPassword else {
             throw password == nil ? ImportError.passwordRequired : ImportError.incorrectPassword
         }
-        return await RawDocument(
+        return RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
             fileExtension: request.fileExtension,
@@ -781,7 +783,8 @@ private enum TestCredentialStoreError: Error, Equatable {
     case writeFailed
 }
 
-private actor RecordingPasswordCredentialStore: StatementPasswordCredentialStore {
+@MainActor
+private final class RecordingPasswordCredentialStore: StatementPasswordCredentialStore {
     private var records: [String: [StatementPasswordStoredCredential]]
     private let failWrites: Bool
     private var writes = [(scope: String, value: String)]()
@@ -802,7 +805,7 @@ private actor RecordingPasswordCredentialStore: StatementPasswordCredentialStore
 
     func password(institutionCode: String) async throws -> String? {
         let credential = records[institutionCode]?.first
-        return await credential?.value
+        return credential?.value
     }
 
     func save(_ password: String, institutionCode: String) async throws {
@@ -829,6 +832,6 @@ private actor RecordingPasswordCredentialStore: StatementPasswordCredentialStore
 
     func storedValue(institutionCode: String) async -> String? {
         let credential = records[institutionCode]?.first
-        return await credential?.value
+        return credential?.value
     }
 }

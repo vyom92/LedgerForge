@@ -997,9 +997,9 @@ struct GlobalAuthenticCorpusAcceptanceTests {
         guard let accountID = state.accountIDs[key] else {
             switch carrier.family {
             case .cbqCard, .amexCard:
-                return .createNewCardLiabilityAccountAndInstrument
+                return .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
             default:
-                return .createNewAccount
+                return .createNewAccount(displayName: "Imported review account")
             }
         }
         switch carrier.family {

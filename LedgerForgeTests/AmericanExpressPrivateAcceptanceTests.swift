@@ -5,8 +5,8 @@ import Testing
 @testable import LedgerForge
 
 /// Required acceptance for the encrypted American Express originals. The
-/// manifest is an independently frozen source oracle; production output is
-/// compared only after the source bytes have been checked against that oracle.
+/// oracle is independently interpreted from original PDFKit evidence in memory;
+/// production output is compared only after those source controls reconcile.
 /// No private value is committed, printed, or used as a fixture.
 @MainActor
 struct AmericanExpressPrivateAcceptanceTests {
@@ -26,8 +26,7 @@ struct AmericanExpressPrivateAcceptanceTests {
         #expect(throws: PrivateAcceptanceError.self) {
             try PrivateAmexContext.load(environment: [
                 PrivateAmexContext.rootKey: " ",
-                PrivateAmexContext.passwordKey: "\n",
-                PrivateAmexContext.oracleKey: ""
+                PrivateAmexContext.passwordKey: "\n"
             ])
         }
         #expect(throws: PrivateAcceptanceError.self) {
@@ -40,9 +39,9 @@ struct AmericanExpressPrivateAcceptanceTests {
 
     @Test(.globalRuntimeStateIsolation)
     func completePrivateCorpusMatchesFrozenOracleAndImportCampaigns() async throws {
-        let context = try PrivateAmexContext.load()
+        let context = try await PrivateAmexContext.load()
         let sources = try context.loadSources()
-        try context.validateManifest(sources: sources)
+        try context.validateCorpus(sources: sources)
 
         // The first pass is deliberately preparation-only. It exercises the
         // real encrypted snapshot, password orchestration, PDFKit reader,
@@ -55,6 +54,14 @@ struct AmericanExpressPrivateAcceptanceTests {
                 ($1.oracle.statementPeriod.start, $1.oracle.basename)
         }
         let reverse = Array(chronological.reversed())
+        // Confirm the multi-card statement first, then let the ordinary review
+        // resolve later single-card statements from those confirmed sections.
+        let automatic = chronological.sorted {
+            if $0.oracle.sections.count != $1.oracle.sections.count {
+                return $0.oracle.sections.count > $1.oracle.sections.count
+            }
+            return $0.oracle.periodKey < $1.oracle.periodKey
+        }
         let mixed = chronological.sorted {
             ($0.oracle.sourceSHA256, $0.oracle.basename) <
                 ($1.oracle.sourceSHA256, $1.oracle.basename)
@@ -63,6 +70,7 @@ struct AmericanExpressPrivateAcceptanceTests {
         var baseline: String?
         for inMemory in [true, false] {
             for (name, order) in [
+                ("automatic", automatic),
                 ("chronological", chronological),
                 ("reverse", reverse),
                 ("mixed", mixed)
@@ -270,7 +278,7 @@ struct AmericanExpressPrivateAcceptanceTests {
                   descriptionCanonicalMatchesExpected,
                   originalMoneyMatchesExpected else {
                 throw PrivateAcceptanceError.productionMismatchAt(
-                    "row \(expected.globalSourceOrdinal): money=\(moneyMatchesExpected), rawDescription=\(descriptionMatchesExpected), canonicalDescription=\(descriptionCanonicalMatchesExpected), originalMoney=\(originalMoneyMatchesExpected); actual description=\(transaction.description), source description=\(expected.descriptionSourceExact); actual original=\(String(describing: annotation.originalMerchantMoney)), source original=\(String(describing: expected.signedOriginalMoney))"
+                    "row \(expected.globalSourceOrdinal): money=\(moneyMatchesExpected), rawDescription=\(descriptionMatchesExpected), canonicalDescription=\(descriptionCanonicalMatchesExpected), originalMoney=\(originalMoneyMatchesExpected)"
                 )
             }
 
@@ -308,6 +316,7 @@ struct AmericanExpressPrivateAcceptanceTests {
         let expected = try CampaignExpectation(sources: sources)
         var accountID: String?
         var importedPeriods = Set<String>()
+        var automaticSingleSectionReuses = 0
 
         let cancelled = try await runtime.engine.prepareImport(from: try #require(sources.first).url)
         runtime.engine.cancelPreparedImport(cancelled)
@@ -331,14 +340,21 @@ struct AmericanExpressPrivateAcceptanceTests {
                 }
                 choice = nil
             } else if let accountID {
-                choice = try explicitSectionChoice(
-                    document: prepared.financialDocument,
-                    accountID: accountID,
-                    provider: runtime.provider,
-                    workspaceID: workspaceID
-                )
+                if name == "automatic",
+                   case .matchedExisting(let reviewedID) = try runtime.engine.reviewPreparedImport(prepared) {
+                    #expect(reviewedID == accountID)
+                    choice = nil
+                    if source.oracle.sections.count == 1 { automaticSingleSectionReuses += 1 }
+                } else {
+                    choice = try explicitSectionChoice(
+                        document: prepared.financialDocument,
+                        accountID: accountID,
+                        provider: runtime.provider,
+                        workspaceID: workspaceID
+                    )
+                }
             } else {
-                choice = .createNewCardLiabilityAccountAndInstrument
+                choice = .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
             }
 
             let result = await runtime.engine.commitPreparedImport(prepared, accountChoice: choice)
@@ -362,6 +378,10 @@ struct AmericanExpressPrivateAcceptanceTests {
             }
         }
 
+        if name == "automatic" {
+            #expect(try #require(sources.first).oracle.sections.count > 1)
+            #expect(automaticSingleSectionReuses > 0)
+        }
         for source in sources {
             let replay = try await runtime.engine.prepareImport(from: source.url)
             defer { runtime.engine.cancelPreparedImport(replay) }
@@ -406,7 +426,7 @@ struct AmericanExpressPrivateAcceptanceTests {
         let first = try await runtime.engine.prepareImport(from: source.url)
         defer { runtime.engine.cancelPreparedImport(first) }
         let firstResult = await runtime.engine.commitPreparedImport(first,
-            accountChoice: .createNewCardLiabilityAccountAndInstrument)
+            accountChoice: .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card"))
         guard firstResult.persisted else { throw PrivateAcceptanceError.persistenceRejectedSource }
         runtime.engine.cancelPreparedImport(first)
 
@@ -898,6 +918,7 @@ private struct PrivateRuntime {
 private enum PrivateAcceptanceError: Error {
     case malformedContext
     case malformedOracle
+    case sourceOracleFailure(String)
     case unreadableSource
     case unlockFailed
     case oracleMismatch
@@ -914,61 +935,48 @@ private enum PrivateAcceptanceError: Error {
 private struct PrivateAmexContext {
     static let rootKey = "LEDGERFORGE_PRIVATE_AMEX_ROOT"
     static let passwordKey = "LEDGERFORGE_PRIVATE_AMEX_PASSWORD"
-    static let oracleKey = "LEDGERFORGE_PRIVATE_AMEX_ORACLE_PATH"
-    static let oracleSHAKey = "LEDGERFORGE_PRIVATE_AMEX_ORACLE_SHA256"
 
     let root: URL
     let password: String
-    let oracleURL: URL
-    let manifest: OracleManifest
 
-    static var explicitContextRequested: Bool {
-        explicitContextRequested(in: ProcessInfo.processInfo.environment)
-    }
-
-    /// Presence of any private-context key is an explicit opt-in, even when
-    /// the value is empty or whitespace. This keeps malformed requests from
-    /// silently disabling the acceptance lane through the test's conditional
-    /// enablement predicate; `load(environment:)` then fails closed.
     static func explicitContextRequested(in environment: [String: String]) -> Bool {
-        [rootKey, passwordKey, oracleKey, oracleSHAKey].contains { environment[$0] != nil }
+        [rootKey, passwordKey].contains { environment[$0] != nil }
     }
 
-    static func load() throws -> PrivateAmexContext {
-        try load(environment: ProcessInfo.processInfo.environment)
+    static func load() async throws -> Self {
+        var environment = ProcessInfo.processInfo.environment
+        if environment[passwordKey] == nil {
+            environment[passwordKey] = try await KeychainStatementPasswordCredentialStore().password(
+                institutionCode: Institution.amex.statementPasswordCredentialScope
+            )
+        }
+        return try load(environment: environment)
     }
 
-    static func load(environment: [String: String]) throws -> PrivateAmexContext {
-        guard let rootRaw = environment[rootKey],
-              let password = environment[passwordKey],
-              let oracleRaw = environment[oracleKey],
-              let frozenOracleSHA256 = environment[oracleSHAKey],
-              frozenOracleSHA256.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil else {
+    static func load(environment: [String: String]) throws -> Self {
+        guard let rawRoot = environment[rootKey],
+              let password = environment[passwordKey] else {
             throw PrivateAcceptanceError.malformedContext
         }
-        let rootValue = rootRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let oracleValue = oracleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !rootValue.isEmpty,
-              !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !oracleValue.isEmpty else {
+
+        let rootPath = rawRoot.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rootPath.isEmpty,
+              !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw PrivateAcceptanceError.malformedContext
         }
-        let root = URL(fileURLWithPath: rootValue, isDirectory: true)
-        let oracleURL = URL(fileURLWithPath: oracleValue)
-        var rootIsDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &rootIsDirectory), rootIsDirectory.boolValue else {
+
+        let root = URL(fileURLWithPath: rootPath, isDirectory: true)
+        var isDirectory: ObjCBool = false
+        guard root.resolvingSymlinksInPath().path.hasPrefix("/Users/vyom/Documents/Ledger Forge/Originals/"),
+              FileManager.default.fileExists(
+            atPath: root.path,
+            isDirectory: &isDirectory
+        ),
+        isDirectory.boolValue else {
             throw PrivateAcceptanceError.malformedContext
         }
-        var oracleIsDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: oracleURL.path, isDirectory: &oracleIsDirectory), !oracleIsDirectory.boolValue else {
-            throw PrivateAcceptanceError.malformedContext
-        }
-        let oracleBytes = try Data(contentsOf: oracleURL, options: [.mappedIfSafe])
-        let oracleSHA = SHA256.hash(data: oracleBytes).map { String(format: "%02x", $0) }.joined()
-        guard oracleSHA == frozenOracleSHA256 else { throw PrivateAcceptanceError.malformedOracle }
-        let manifest = try JSONDecoder().decode(OracleManifest.self, from: oracleBytes)
-        guard manifest.sources.isEmpty == false else { throw PrivateAcceptanceError.malformedOracle }
-        return PrivateAmexContext(root: root, password: password, oracleURL: oracleURL, manifest: manifest)
+
+        return Self(root: root, password: password)
     }
 
     func loadSources() throws -> [PrivateAmexSource] {
@@ -976,36 +984,47 @@ private struct PrivateAmexContext {
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
-        ).filter {
+        )
+        .filter {
             $0.pathExtension.caseInsensitiveCompare("pdf") == .orderedSame &&
-                (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-        }.sorted { $0.lastPathComponent < $1.lastPathComponent }
-        guard Set(urls.map(\.lastPathComponent)) == Set(manifest.sources.map(\.basename)), urls.count == manifest.sources.count else {
+                (try? $0.resourceValues(forKeys: [.isRegularFileKey])
+                    .isRegularFile) == true
+        }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        guard urls.count == 20 else {
             throw PrivateAcceptanceError.malformedOracle
         }
-        let byName = Dictionary(uniqueKeysWithValues: manifest.sources.map { ($0.basename, $0) })
-        return try urls.map { url in
-            guard let oracle = byName[url.lastPathComponent] else { throw PrivateAcceptanceError.malformedOracle }
-            return try PrivateAmexSource(url: url, oracle: oracle, password: password)
+
+        return try urls.map {
+            try PrivateAmexSource(url: $0, password: password)
         }
     }
 
-    func validateManifest(sources: [PrivateAmexSource]) throws {
-        guard manifest.aggregate.statementCount == sources.count,
-              manifest.aggregate.financialRowCount == sources.reduce(0, { $0 + $1.oracle.rows.count }),
-              manifest.aggregate.sectionCount == sources.reduce(0, { $0 + $1.oracle.sections.count }),
-              manifest.aggregate.foreignMoneyRowCount == sources.reduce(0, { $0 + $1.oracle.rows.filter { $0.originalForeignMoney != nil }.count }),
-              manifest.aggregate.reconciliationFailureCount == 0,
-              manifest.aggregate.sectionFailureCount == 0 else {
-            throw PrivateAcceptanceError.malformedOracle
+    func validateCorpus(sources: [PrivateAmexSource]) throws {
+        let rows = sources.reduce(0) { $0 + $1.oracle.rows.count }
+        let sections = sources.reduce(0) { $0 + $1.oracle.sections.count }
+        let foreignRows = sources.reduce(0) {
+            $0 + $1.oracle.rows.filter {
+                $0.originalForeignMoney != nil
+            }.count
         }
-        for source in sources {
-            guard source.oracle.summary.reconciliationResidual == 0,
-                  source.oracle.summary.oracleCalculated.statementEquationResidualMinorUnits == 0,
-                  source.oracle.rows.allSatisfy({ $0.globalSourceOrdinal > 0 }),
-                  source.oracle.sections.enumerated().allSatisfy({ $0.element.rowOrdinals.allSatisfy { $0 > 0 } }) else {
-                throw PrivateAcceptanceError.malformedOracle
-            }
+
+        guard sources.count == 20,
+              rows == 902,
+              sections == 31,
+              foreignRows == 456,
+              sources.allSatisfy({
+                  $0.oracle.summary.reconciliationResidual == 0 &&
+                      $0.oracle.summary.oracleCalculated
+                      .statementEquationResidualMinorUnits == 0 &&
+                      $0.oracle.sections.allSatisfy {
+                          $0.oracleCalculated.allPrintedTotalsMatch &&
+                          $0.oracleCalculated.printedTotalComparisons
+                              .allSatisfy(\.matches)
+                      }
+              }) else {
+            throw PrivateAcceptanceError.malformedOracle
         }
     }
 }
@@ -1014,32 +1033,30 @@ private struct PrivateAmexSource {
     let url: URL
     let oracle: OracleSource
 
-    init(url: URL, oracle: OracleSource, password: String) throws {
+    init(url: URL, password: String) throws {
         let bytes = try Data(contentsOf: url, options: [.mappedIfSafe])
-        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        guard bytes.count == oracle.sourceByteSize, digest == oracle.sourceSHA256 else {
-            throw PrivateAcceptanceError.oracleMismatch
+        guard let pdf = PDFDocument(data: bytes) else {
+            throw PrivateAcceptanceError.unreadableSource
         }
-        guard let pdf = PDFDocument(data: bytes) else { throw PrivateAcceptanceError.unreadableSource }
-        let lockedBefore = pdf.isLocked
-        if lockedBefore {
-            guard pdf.unlock(withPassword: password) else { throw PrivateAcceptanceError.unlockFailed }
+
+        let lockedBeforeUnlock = pdf.isLocked
+        let unlockSuccess = !lockedBeforeUnlock ||
+            pdf.unlock(withPassword: password)
+        let lockedAfterUnlock = pdf.isLocked
+
+        guard unlockSuccess, !lockedAfterUnlock else {
+            throw PrivateAcceptanceError.unlockFailed
         }
-        let lockedAfter = pdf.isLocked
-        let nativeTextPageCount = (0..<pdf.pageCount).filter {
-            guard let text = pdf.page(at: $0)?.string else { return false }
-            return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }.count
-        guard lockedBefore == oracle.lockedBeforeUnlock,
-              lockedAfter == oracle.lockedAfterUnlock,
-              oracle.encrypted == lockedBefore,
-              oracle.unlockSuccess == !lockedAfter,
-              pdf.pageCount == oracle.pageCount,
-              nativeTextPageCount == oracle.nativeTextPageCount else {
-            throw PrivateAcceptanceError.oracleMismatch
-        }
+
         self.url = url
-        self.oracle = oracle
+        self.oracle = try IndependentAmexOracleBuilder.make(
+            fileName: url.lastPathComponent,
+            sourceBytes: bytes,
+            lockedBeforeUnlock: lockedBeforeUnlock,
+            lockedAfterUnlock: lockedAfterUnlock,
+            unlockSuccess: unlockSuccess,
+            pdf: pdf
+        )
     }
 }
 
@@ -1087,21 +1104,7 @@ private struct CampaignExpectation {
     }
 }
 
-private struct OracleManifest: Decodable {
-    let sources: [OracleSource]
-    let aggregate: OracleAggregate
-}
-
-private struct OracleAggregate: Decodable {
-    let statementCount: Int
-    let financialRowCount: Int
-    let sectionCount: Int
-    let foreignMoneyRowCount: Int
-    let reconciliationFailureCount: Int
-    let sectionFailureCount: Int
-}
-
-private struct OracleSource: Decodable {
+private struct OracleSource: Equatable {
     let basename: String
     let sourceByteSize: Int
     let sourceSHA256: String
@@ -1121,111 +1124,81 @@ private struct OracleSource: Decodable {
     let sections: [OracleSection]
     let rows: [OracleRow]
 
-    enum CodingKeys: String, CodingKey {
-        case basename, sourceByteSize, sourceSHA256, encrypted, lockedBeforeUnlock, lockedAfterUnlock, unlockSuccess
-        case pageCount, nativeTextPageCount, statementDate, statementPeriod, dueDate, nativeCurrency
-        case membershipLiabilityIdentityEvidence, summary, pages, sections, rows
+    var periodKey: String {
+        "\(statementPeriod.start)/\(statementPeriod.end)"
     }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        basename = try values.decode(String.self, forKey: .basename)
-        sourceByteSize = try values.decode(Int.self, forKey: .sourceByteSize)
-        sourceSHA256 = try values.decode(String.self, forKey: .sourceSHA256)
-        encrypted = try values.decode(Bool.self, forKey: .encrypted)
-        lockedBeforeUnlock = try values.decode(Bool.self, forKey: .lockedBeforeUnlock)
-        lockedAfterUnlock = try values.decode(Bool.self, forKey: .lockedAfterUnlock)
-        unlockSuccess = try values.decode(Bool.self, forKey: .unlockSuccess)
-        pageCount = try values.decode(Int.self, forKey: .pageCount)
-        nativeTextPageCount = try values.decode(Int.self, forKey: .nativeTextPageCount)
-        statementDate = try values.decode(String.self, forKey: .statementDate)
-        statementPeriod = try values.decode(OraclePeriod.self, forKey: .statementPeriod)
-        dueDate = try values.decode(String.self, forKey: .dueDate)
-        nativeCurrency = try values.decode(String.self, forKey: .nativeCurrency)
-        identity = try values.decode(OracleIdentity.self, forKey: .membershipLiabilityIdentityEvidence)
-        summary = try values.decode(OracleSummary.self, forKey: .summary)
-        pages = try values.decode([OraclePage].self, forKey: .pages)
-        sections = try values.decode([OracleSection].self, forKey: .sections)
-        rows = try values.decode([OracleRow].self, forKey: .rows)
-    }
-
-    var periodKey: String { "\(statementPeriod.start)/\(statementPeriod.end)" }
 
     func isFinanciallyEquivalent(to other: OracleSource) -> Bool {
-        statementDate == other.statementDate && statementPeriod == other.statementPeriod &&
-            dueDate == other.dueDate && nativeCurrency == other.nativeCurrency && identity == other.identity &&
-            summary == other.summary && sections == other.sections && rows == other.rows
+        statementDate == other.statementDate &&
+            statementPeriod == other.statementPeriod &&
+            dueDate == other.dueDate &&
+            nativeCurrency == other.nativeCurrency &&
+            identity == other.identity &&
+            summary == other.summary &&
+            sections == other.sections &&
+            rows == other.rows
     }
 
     func holderLabelDigest(for section: OracleSection) -> String? {
-        let associatedHeaders = pages
+        let headers = pages
             .flatMap(\.sectionHeaderOccurrences)
             .filter { $0.accountKeyHash == section.accountKeyHash }
-        guard associatedHeaders.count == section.occurrences.count,
-              !associatedHeaders.isEmpty else { return nil }
-        let holders = associatedHeaders.compactMap { occurrence -> String? in
-            let prefix = "New Transactions For "
-            let suffix = " Card Account Number:"
-            guard occurrence.headerText.hasPrefix(prefix),
-                  let suffixRange = occurrence.headerText.range(of: suffix),
-                  suffixRange.lowerBound > occurrence.headerText.index(occurrence.headerText.startIndex, offsetBy: prefix.count) else {
+
+        guard headers.count == section.occurrences.count,
+              !headers.isEmpty else {
+            return nil
+        }
+
+        let prefix = "New Transactions For "
+        let suffix = " Card Account Number:"
+        let holders = headers.compactMap { header -> String? in
+            guard header.headerText.hasPrefix(prefix),
+                  let suffixRange = header.headerText.range(of: suffix) else {
                 return nil
             }
-            let holderStart = occurrence.headerText.index(occurrence.headerText.startIndex, offsetBy: prefix.count)
-            let holder = occurrence.headerText[holderStart..<suffixRange.lowerBound]
+            let start = header.headerText.index(
+                header.headerText.startIndex,
+                offsetBy: prefix.count
+            )
+            let holder = header.headerText[start..<suffixRange.lowerBound]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return holder.isEmpty ? nil : String(holder)
         }
-        guard holders.count == associatedHeaders.count,
+
+        guard holders.count == headers.count,
               let first = holders.first,
-              holders.allSatisfy({ $0 == first }) else { return nil }
-        return SHA256.hash(data: Data(first.utf8)).map { String(format: "%02x", $0) }.joined()
+              holders.allSatisfy({ $0 == first }) else {
+            return nil
+        }
+
+        return IndependentAmexOracleBuilder.sha256(Data(first.utf8))
     }
 }
 
-private struct OraclePage: Decodable {
+private struct OraclePage: Equatable {
     let sectionHeaderOccurrences: [OracleSectionHeaderOccurrence]
 }
 
-private struct OracleSectionHeaderOccurrence: Decodable {
+private struct OracleSectionHeaderOccurrence: Equatable {
     let accountKeyHash: String
     let headerText: String
 }
 
-private struct OraclePeriod: Decodable, Equatable {
+private struct OraclePeriod: Equatable {
     let start: String
     let end: String
 }
 
-private struct OracleIdentity: Decodable, Equatable {
+private struct OracleIdentity: Equatable {
     let membershipNumberMasked: String
 }
 
-private struct OracleMoney: Decodable, Equatable {
+private struct OracleMoney: Equatable {
     let currency: String
     let minorUnits: Int64
-
-    init(currency: String, minorUnits: Int64) {
-        self.currency = currency
-        self.minorUnits = minorUnits
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case currency, minorUnits, unscaledIntegerAtSourceDisplayedScale
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        currency = try values.decode(String.self, forKey: .currency)
-        if let minorUnits = try values.decodeIfPresent(Int64.self, forKey: .minorUnits) {
-            self.minorUnits = minorUnits
-        } else {
-            self.minorUnits = try values.decode(Int64.self, forKey: .unscaledIntegerAtSourceDisplayedScale)
-        }
-    }
 }
 
-private struct OracleSummary: Decodable, Equatable {
+private struct OracleSummary: Equatable {
     let previousBalance: OracleMoney
     let newCredits: OracleMoney
     let newDebits: OracleMoney
@@ -1234,11 +1207,11 @@ private struct OracleSummary: Decodable, Equatable {
     let oracleCalculated: OracleSummaryCalculation
 }
 
-private struct OracleSummaryCalculation: Decodable, Equatable {
+private struct OracleSummaryCalculation: Equatable {
     let statementEquationResidualMinorUnits: Int64
 }
 
-private struct OracleSection: Decodable, Equatable {
+private struct OracleSection: Equatable {
     let accountMasked: String
     let accountKeyHash: String
     let occurrences: [OracleSectionOccurrence]
@@ -1248,12 +1221,12 @@ private struct OracleSection: Decodable, Equatable {
     let oracleCalculated: OracleSectionCalculation
 }
 
-private struct OracleSectionOccurrence: Decodable, Equatable {
+private struct OracleSectionOccurrence: Equatable {
     let page: Int
     let line: Int
 }
 
-private struct OraclePrintedTotal: Decodable, Equatable {
+private struct OraclePrintedTotal: Equatable {
     let currency: String
     let sourceDecimal: String
     let page: Int
@@ -1261,14 +1234,14 @@ private struct OraclePrintedTotal: Decodable, Equatable {
     let lineText: String
 }
 
-private struct OracleSectionCalculation: Decodable, Equatable {
+private struct OracleSectionCalculation: Equatable {
     let allPrintedTotalsMatch: Bool
     let netActivity: OracleMoney
     let printedTotalComparisons: [OraclePrintedTotalComparison]
     let rowCount: Int
 }
 
-private struct OraclePrintedTotalComparison: Decodable, Equatable {
+private struct OraclePrintedTotalComparison: Equatable {
     let calculatedSignedMinorUnits: Int64
     let currency: String
     let line: Int
@@ -1280,7 +1253,7 @@ private struct OraclePrintedTotalComparison: Decodable, Equatable {
     let sourceDecimal: String
 }
 
-private struct OracleRow: Decodable, Equatable {
+private struct OracleRow: Equatable {
     let globalSourceOrdinal: Int
     let page: Int
     let transactionDate: String
@@ -1320,5 +1293,682 @@ private struct OracleRow: Decodable, Equatable {
                 ? -originalForeignMoney.minorUnits
                 : originalForeignMoney.minorUnits
         )
+    }
+}
+
+private enum IndependentAmexOracleBuilder {
+    private static let nativeCurrency = "QAR"
+
+    private static let scales: [String: Int] = [
+        "AED": 2,
+        "AUD": 2,
+        "BHD": 3,
+        "BRL": 2,
+        "CHF": 2,
+        "CNY": 2,
+        "EUR": 2,
+        "GBP": 2,
+        "IDR": 2,
+        "INR": 2,
+        "KRW": 0,
+        "NZD": 2,
+        "QAR": 2,
+        "USD": 2,
+        "XPF": 0,
+        "ZAR": 2
+    ]
+
+    private static let membershipPattern =
+        #"Membership Number\s+Statement date\s+Statement Period\s+([0-9X-]+)\s+(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2}) to (\d{2}/\d{2}/\d{2})"#
+
+    private static let summaryPattern =
+        #"Previous Balance\s+New Credits\s+New Debits\s+New Balance\s+Due Date\s+- \(QAR\) \+ \(QAR\) = \(QAR\)\s+(?:\(QAR\)\s+)?([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+(\d{2}/\d{2}/\d{2})"#
+
+    private static let sectionPattern =
+        #"^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"#
+
+    private static let totalPattern =
+        #"^Total of New Transactions For (.+?) ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: ?(CR))?$"#
+
+    private static let rowPattern =
+        #"^(\d{2}-[A-Za-z]{3}-\d{4}) (\d{2}-[A-Za-z]{3}-\d{4}) (.+)$"#
+
+    private static let foreignAmountPattern =
+        #"^([0-9]+(?:,[0-9]{3})*(?:\.\d+)?) ([A-Z]{3})(?: (CR))? ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: (CR))?$"#
+
+    private static let postedAmountPattern =
+        #"^([0-9]+(?:,[0-9]{3})*\.\d{2})(?: (CR))?$"#
+
+    private struct OpenSection {
+        let holder: String
+        let accountMasked: String
+        let page: Int
+        let line: Int
+        var rowOrdinals: [Int]
+        var signedRowMinorUnits: [Int64]
+    }
+
+    private struct ParsedSectionTotal {
+        let holder: String
+        let amount: String
+        let isCredit: Bool
+        let page: Int
+        let line: Int
+        let sourceLine: String
+    }
+
+    static func make(
+        fileName: String,
+        sourceBytes: Data,
+        lockedBeforeUnlock: Bool,
+        lockedAfterUnlock: Bool,
+        unlockSuccess: Bool,
+        pdf: PDFDocument
+    ) throws -> OracleSource {
+        let pageTexts = try (0..<pdf.pageCount).map { index -> String in
+            guard let text = pdf.page(at: index)?.string,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw PrivateAcceptanceError.unreadableSource
+            }
+            return text
+        }
+
+        let joined = pageTexts.joined(separator: "\n")
+        guard joined.contains("The Platinum Card (QAR)"),
+              joined.contains("Statement of Account"),
+              joined.contains("AMEX (MIDDLE EAST) B.S.C. (C)"),
+              joined.contains("Transaction Date"),
+              joined.contains("Posting Date"),
+              joined.contains("Non QAR Spending"),
+              joined.contains("Amount in QAR") else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 86")
+        }
+
+        let membership = try uniqueCapture(membershipPattern, in: joined)
+        guard membership.count == 4 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 91")
+        }
+
+        let summaryMatches = pageTexts.flatMap {
+            captures(summaryPattern, in: $0)
+        }
+        guard summaryMatches.count == 1,
+              let summaryValues = summaryMatches.first,
+              summaryValues.count == 5 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 100")
+        }
+
+        let summary = try makeSummary(summaryValues)
+        let parsed = try parsePages(pageTexts)
+
+        let statementDate = try canonicalShortDate(membership[1])
+        let periodStart = try canonicalShortDate(membership[2])
+        let periodEnd = try canonicalShortDate(membership[3])
+        let dueDate = try canonicalShortDate(summaryValues[4])
+
+        return OracleSource(
+            basename: fileName,
+            sourceByteSize: sourceBytes.count,
+            sourceSHA256: sha256(sourceBytes),
+            encrypted: lockedBeforeUnlock,
+            lockedBeforeUnlock: lockedBeforeUnlock,
+            lockedAfterUnlock: lockedAfterUnlock,
+            unlockSuccess: unlockSuccess,
+            pageCount: pdf.pageCount,
+            nativeTextPageCount: pageTexts.count,
+            statementDate: statementDate,
+            statementPeriod: OraclePeriod(
+                start: periodStart,
+                end: periodEnd
+            ),
+            dueDate: dueDate,
+            nativeCurrency: nativeCurrency,
+            identity: OracleIdentity(
+                membershipNumberMasked: membership[0]
+            ),
+            summary: summary,
+            pages: parsed.pages,
+            sections: parsed.sections,
+            rows: parsed.rows
+        )
+    }
+
+    private static func parsePages(
+        _ pageTexts: [String]
+    ) throws -> (
+        pages: [OraclePage],
+        sections: [OracleSection],
+        rows: [OracleRow]
+    ) {
+        var pages = [OraclePage]()
+        var rows = [OracleRow]()
+        var openSection: OpenSection?
+        var completedSections = [(
+            header: OpenSection,
+            total: ParsedSectionTotal
+        )]()
+
+        for (pageIndex, pageText) in pageTexts.enumerated() {
+            let page = pageIndex + 1
+            let lines = pageText
+                .components(separatedBy: .newlines)
+                .map {
+                    $0.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                }
+
+            var headers = [OracleSectionHeaderOccurrence]()
+            var lineIndex = 0
+
+            while lineIndex < lines.count {
+                let line = lines[lineIndex]
+
+                if let fields = capture(sectionPattern, in: line),
+                   fields.count == 2 {
+                    guard openSection == nil else {
+                        throw PrivateAcceptanceError.sourceOracleFailure("builder line 172")
+                    }
+
+                    let accountHash = sha256(Data(fields[1].utf8))
+                    headers.append(
+                        OracleSectionHeaderOccurrence(
+                            accountKeyHash: accountHash,
+                            headerText: line
+                        )
+                    )
+                    openSection = OpenSection(
+                        holder: fields[0],
+                        accountMasked: fields[1],
+                        page: page,
+                        line: lineIndex + 1,
+                        rowOrdinals: [],
+                        signedRowMinorUnits: []
+                    )
+                    lineIndex += 1
+                    continue
+                }
+
+                if let fields = capture(totalPattern, in: line),
+                   fields.count == 3 {
+                    guard let section = openSection,
+                          section.holder == fields[0] else {
+                        throw PrivateAcceptanceError.sourceOracleFailure("builder line 198")
+                    }
+
+                    completedSections.append((
+                        header: section,
+                        total: ParsedSectionTotal(
+                            holder: fields[0],
+                            amount: fields[1],
+                            isCredit: fields[2] == "CR",
+                            page: page,
+                            line: lineIndex + 1,
+                            sourceLine: line
+                        )
+                    ))
+                    openSection = nil
+                    lineIndex += 1
+                    continue
+                }
+
+                guard let start = capture(rowPattern, in: line),
+                      start.count == 3 else {
+                    lineIndex += 1
+                    continue
+                }
+
+                let transactionDate = try canonicalLongDate(start[0])
+                let postingDate = try canonicalLongDate(start[1])
+                var block = [start[2]]
+                lineIndex += 1
+
+                while lineIndex < lines.count {
+                    let candidate = lines[lineIndex]
+                    if capture(rowPattern, in: candidate) != nil ||
+                        capture(sectionPattern, in: candidate) != nil ||
+                        capture(totalPattern, in: candidate) != nil {
+                        break
+                    }
+                    block.append(candidate)
+                    lineIndex += 1
+                }
+
+                let parsed = try row(
+                    ordinal: rows.count + 1,
+                    page: page,
+                    transactionDate: transactionDate,
+                    postingDate: postingDate,
+                    lines: block,
+                    section: openSection
+                )
+                rows.append(parsed)
+
+                if var section = openSection {
+                    section.rowOrdinals.append(parsed.globalSourceOrdinal)
+                    section.signedRowMinorUnits.append(
+                        parsed.signedPostedMoney.minorUnits
+                    )
+                    openSection = section
+                }
+            }
+
+            pages.append(
+                OraclePage(sectionHeaderOccurrences: headers)
+            )
+        }
+
+        guard openSection == nil else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 264")
+        }
+
+        let sections = try completedSections.map {
+            try makeSection(header: $0.header, total: $0.total)
+        }
+
+        let accountedSectionRows = Set(
+            sections.flatMap(\.rowOrdinals)
+        )
+        guard accountedSectionRows.isSubset(
+            of: Set(rows.map(\.globalSourceOrdinal))
+        ) else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 277")
+        }
+
+        return (pages, sections, rows)
+    }
+
+    private static func row(
+        ordinal: Int,
+        page: Int,
+        transactionDate: String,
+        postingDate: String,
+        lines: [String],
+        section: OpenSection?
+    ) throws -> OracleRow {
+        var posted: OracleMoney?
+        var original: OracleMoney?
+        var effect: String?
+        var reference: String?
+        var details = [String]()
+        var footerSeen = false
+
+        for line in lines {
+            if line.hasPrefix("This Card is issued by AMEX (Middle East)") {
+                footerSeen = true
+                continue
+            }
+
+            if let fields = capture(foreignAmountPattern, in: line),
+               fields.count == 5 {
+                guard posted == nil,
+                      original == nil,
+                      fields[2].isEmpty == fields[4].isEmpty else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("builder line 309")
+                }
+
+                original = try money(
+                    fields[0],
+                    currency: fields[1]
+                )
+                posted = try money(
+                    fields[3],
+                    currency: nativeCurrency
+                )
+                effect = fields[4].isEmpty
+                    ? "liability_increase"
+                    : "liability_decrease"
+                continue
+            }
+
+            if let fields = capture(postedAmountPattern, in: line),
+               fields.count == 2 {
+                guard posted == nil else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("builder line 329")
+                }
+
+                posted = try money(
+                    fields[0],
+                    currency: nativeCurrency
+                )
+                effect = fields[1].isEmpty
+                    ? "liability_increase"
+                    : "liability_decrease"
+                continue
+            }
+
+            if line == "Reference:" || line.hasPrefix("Reference: ") {
+                let raw = line.hasPrefix("Reference: ")
+                    ? String(line.dropFirst("Reference: ".count))
+                    : ""
+                let value = raw.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                guard !value.isEmpty, reference == nil else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("builder line 350")
+                }
+                reference = value
+                continue
+            }
+
+            // Footer text is not transaction narration. PDFKit can emit it
+            // before the final amount line; retaining amount/reference parsing
+            // after the marker preserves the row while excluding footer prose.
+            if !footerSeen, !line.isEmpty,
+               !isPreamble(line) {
+                details.append(line)
+            }
+        }
+
+        guard let posted,
+              let effect,
+              !details.isEmpty else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 368")
+        }
+
+        let rawDescription = details.joined(separator: "\n")
+        let canonicalDescription = details.joined(separator: " ")
+        let account = section?.accountMasked
+
+        return OracleRow(
+            globalSourceOrdinal: ordinal,
+            page: page,
+            transactionDate: transactionDate,
+            postingDate: postingDate,
+            sourceReference: reference,
+            descriptionSourceExact: canonicalDescription,
+            descriptionSourceRawSegmentsSHA256: sha256(
+                Data(rawDescription.utf8)
+            ),
+            postedNativeMoney: posted,
+            creditDebitLiabilityDirection: effect,
+            financialScope: account == nil
+                ? "account_level"
+                : "instrument_level",
+            sectionAccountMasked: account,
+            sectionAccountKeyHash: account.map {
+                sha256(Data($0.utf8))
+            },
+            originalForeignMoney: original
+        )
+    }
+
+    private static func makeSection(
+        header: OpenSection,
+        total: ParsedSectionTotal
+    ) throws -> OracleSection {
+        guard header.holder == total.holder else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 403")
+        }
+
+        let calculated = header.signedRowMinorUnits.reduce(0, +)
+        let magnitude = try money(
+            total.amount,
+            currency: nativeCurrency
+        ).minorUnits
+        let printed = total.isCredit ? -magnitude : magnitude
+        let residual = printed - calculated
+        let accountHash = sha256(Data(header.accountMasked.utf8))
+
+        let printedTotal = OraclePrintedTotal(
+            currency: nativeCurrency,
+            sourceDecimal: total.amount,
+            page: total.page,
+            line: total.line,
+            lineText: total.sourceLine
+        )
+
+        let comparison = OraclePrintedTotalComparison(
+            calculatedSignedMinorUnits: calculated,
+            currency: nativeCurrency,
+            line: total.line,
+            lineText: total.sourceLine,
+            matches: residual == 0,
+            page: total.page,
+            printedSignedMinorUnits: printed,
+            residualMinorUnits: residual,
+            sourceDecimal: total.amount
+        )
+
+        guard residual == 0 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 436")
+        }
+
+        return OracleSection(
+            accountMasked: header.accountMasked,
+            accountKeyHash: accountHash,
+            occurrences: [
+                OracleSectionOccurrence(
+                    page: header.page,
+                    line: header.line
+                )
+            ],
+            printedTotalCount: 1,
+            printedTotals: [printedTotal],
+            rowOrdinals: header.rowOrdinals,
+            oracleCalculated: OracleSectionCalculation(
+                allPrintedTotalsMatch: true,
+                netActivity: OracleMoney(
+                    currency: nativeCurrency,
+                    minorUnits: calculated
+                ),
+                printedTotalComparisons: [comparison],
+                rowCount: header.rowOrdinals.count
+            )
+        )
+    }
+
+    private static func makeSummary(
+        _ values: [String]
+    ) throws -> OracleSummary {
+        guard values.count == 5 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 467")
+        }
+
+        let previous = try money(values[0], currency: nativeCurrency)
+        let credits = try money(values[1], currency: nativeCurrency)
+        let debits = try money(values[2], currency: nativeCurrency)
+        let balance = try money(values[3], currency: nativeCurrency)
+
+        let expected = previous.minorUnits -
+            credits.minorUnits +
+            debits.minorUnits
+        let residual = balance.minorUnits - expected
+
+        guard residual == 0 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 481")
+        }
+
+        return OracleSummary(
+            previousBalance: previous,
+            newCredits: credits,
+            newDebits: debits,
+            newBalance: balance,
+            reconciliationResidual: 0,
+            oracleCalculated: OracleSummaryCalculation(
+                statementEquationResidualMinorUnits: 0
+            )
+        )
+    }
+
+    private static func money(
+        _ sourceDecimal: String,
+        currency: String
+    ) throws -> OracleMoney {
+        guard let scale = scales[currency] else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 501")
+        }
+
+        let cleaned = sourceDecimal.replacingOccurrences(
+            of: ",",
+            with: ""
+        )
+        let parts = cleaned.split(
+            separator: ".",
+            omittingEmptySubsequences: false
+        )
+
+        guard parts.count <= 2,
+              let whole = Int64(parts[0]),
+              whole >= 0 else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 516")
+        }
+
+        let fraction = parts.count == 2 ? String(parts[1]) : ""
+        guard fraction.count <= scale,
+              fraction.allSatisfy(\.isNumber) else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 522")
+        }
+
+        let paddedFraction = fraction.padding(
+            toLength: scale,
+            withPad: "0",
+            startingAt: 0
+        )
+        let fractionUnits: Int64
+        if scale == 0 {
+            fractionUnits = 0
+        } else {
+            guard let value = Int64(paddedFraction) else {
+                throw PrivateAcceptanceError.sourceOracleFailure("builder line 535")
+            }
+            fractionUnits = value
+        }
+
+        let multiplier = Int64(pow(10.0, Double(scale)))
+        let (scaledWhole, overflow) = whole.multipliedReportingOverflow(
+            by: multiplier
+        )
+        let (minorUnits, addingOverflow) = scaledWhole.addingReportingOverflow(
+            fractionUnits
+        )
+
+        guard !overflow, !addingOverflow else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 549")
+        }
+
+        return OracleMoney(
+            currency: currency,
+            minorUnits: minorUnits
+        )
+    }
+
+    private static func canonicalShortDate(
+        _ source: String
+    ) throws -> String {
+        let parts = source.split(separator: "/")
+        guard parts.count == 3,
+              let day = Int(parts[0]),
+              let month = Int(parts[1]),
+              let year = Int(parts[2]),
+              (1...31).contains(day),
+              (1...12).contains(month),
+              (0...99).contains(year) else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 569")
+        }
+
+        return String(
+            format: "%04d-%02d-%02d",
+            2_000 + year,
+            month,
+            day
+        )
+    }
+
+    private static func canonicalLongDate(
+        _ source: String
+    ) throws -> String {
+        let parts = source.split(separator: "-")
+        let months = [
+            "jan", "feb", "mar", "apr", "may", "jun",
+            "jul", "aug", "sep", "oct", "nov", "dec"
+        ]
+
+        guard parts.count == 3,
+              let day = Int(parts[0]),
+              let month = months.firstIndex(
+                of: parts[1].lowercased()
+              ),
+              let year = Int(parts[2]),
+              (1...31).contains(day) else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 596")
+        }
+
+        return String(
+            format: "%04d-%02d-%02d",
+            year,
+            month + 1,
+            day
+        )
+    }
+
+    private static func isPreamble(_ line: String) -> Bool {
+        if [
+            "Transaction Date Posting Date Details Non QAR Spending Amount in QAR",
+            "Previous Balance",
+            "New Credits",
+            "New Debits",
+            "New Balance",
+            "Due Date"
+        ].contains(line) {
+            return true
+        }
+
+        return line.range(
+            of: #"^- \(QAR\) \+ \(QAR\) = \(QAR\)(?: \(QAR\))? [0-9]+(?:,[0-9]{3})*\.\d{2}(?: [0-9]+(?:,[0-9]{3})*\.\d{2}){0,3}(?: \d{2}/\d{2}/\d{2})?$"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    private static func captures(
+        _ pattern: String,
+        in value: String
+    ) -> [[String]] {
+        guard let regex = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.anchorsMatchLines]
+        ) else {
+            return []
+        }
+
+        return regex.matches(
+            in: value,
+            range: NSRange(value.startIndex..., in: value)
+        ).map { match in
+            (1..<match.numberOfRanges).map { index in
+                guard let range = Range(
+                    match.range(at: index),
+                    in: value
+                ) else {
+                    return ""
+                }
+                return String(value[range])
+            }
+        }
+    }
+
+    private static func capture(
+        _ pattern: String,
+        in value: String
+    ) -> [String]? {
+        captures(pattern, in: value).first
+    }
+
+    private static func uniqueCapture(
+        _ pattern: String,
+        in value: String
+    ) throws -> [String] {
+        let values = captures(pattern, in: value)
+        guard let result = values.first,
+              values.allSatisfy({ $0 == result }) else {
+            throw PrivateAcceptanceError.sourceOracleFailure("builder line 666")
+        }
+        return result
+    }
+
+    static func sha256(_ value: Data) -> String {
+        SHA256.hash(data: value)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }

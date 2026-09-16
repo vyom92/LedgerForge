@@ -1315,6 +1315,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         case .useExistingAccount(let accountID):
             guard let existing = accounts[accountID] else { return .selectedAccountUnavailable }
             guard existing.workspaceId == plan.workspace.id else { return .selectedAccountWorkspaceMismatch }
+            guard existing.accountType == plan.proposedAccount.accountType,
+                  existing.nativeCurrency == plan.proposedAccount.nativeCurrency,
+                  existing.institutionId == plan.proposedAccount.institutionId else {
+                return .selectedAccountIneligible
+            }
             if let currentOwner {
                 guard currentOwner == accountID else { return .identifierOwnershipConflict }
             } else if identifiers.values.contains(where: { $0.accountId == accountID && $0.workspaceId == plan.workspace.id }) {

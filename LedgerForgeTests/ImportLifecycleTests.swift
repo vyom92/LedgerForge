@@ -439,12 +439,12 @@ struct ImportLifecycleTests {
         let consumedFingerprintSet = consumed.fingerprintSet
         let failed = await engine.commitPreparedImport(
             consumed,
-            accountChoice: .createNewAccount
+            accountChoice: .createNewAccount(displayName: "Imported review account")
         )
 
         #expect(failed.recoveryRoute == .prepareAgain(.persistenceContention))
         #expect(persistence.persistInvocationCount == 1)
-        #expect(persistence.receivedAccountChoices == [.createNewAccount])
+        #expect(persistence.receivedAccountChoices == [.createNewAccount(displayName: "Imported review account")])
         #expect(throws: SourceContentSnapshotError.invalidated) {
             try consumed.sourceSnapshot.withBytes { $0 }
         }
@@ -481,7 +481,7 @@ struct ImportLifecycleTests {
         #expect(fresh.sourceSnapshot.sourceByteFingerprint == consumedSourceFingerprint)
         #expect(fresh.fingerprintSet == consumedFingerprintSet)
         #expect(persistence.persistInvocationCount == 1)
-        #expect(persistence.receivedAccountChoices == [.createNewAccount])
+        #expect(persistence.receivedAccountChoices == [.createNewAccount(displayName: "Imported review account")])
 
         let explicitlyConfirmed = await engine.commitPreparedImport(
             fresh,
@@ -490,7 +490,7 @@ struct ImportLifecycleTests {
 
         #expect(explicitlyConfirmed.recoveryRoute == .prepareAgain(.persistenceContention))
         #expect(persistence.persistInvocationCount == 2)
-        #expect(persistence.receivedAccountChoices == [.createNewAccount, nil])
+        #expect(persistence.receivedAccountChoices == [.createNewAccount(displayName: "Imported review account"), nil])
     }
 
     @Test func prepareAgainWithoutRetainedURLExposesNoActionOrPreparation() async throws {

@@ -10,6 +10,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var rawText: [String: String] = [:]
     @Published private(set) var fieldErrors: [String: String] = [:]
+    @Published private(set) var unavailableCurrentBalanceAccountIDs: Set<String> = []
     @Published private var untouchedZeroFields: Set<String> = []
     @Published private(set) var isDirty = false
     @Published private(set) var saveState: SaveState = .ready
@@ -61,6 +62,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private let workspaceID: String
     private let provider: () -> DatabaseProvider
     private let accountStore: AccountStore
+    private let transactionStore: TransactionStore
     private let salaryStore: SalaryStore
     private let fundingPlanStore: FundingPlanStore
 
@@ -69,6 +71,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         workspaceID: String = "default-workspace",
         provider: (() -> DatabaseProvider)? = nil,
         accountStore: AccountStore? = nil,
+        transactionStore: TransactionStore? = nil,
         salaryStore: SalaryStore? = nil,
         fundingPlanStore: FundingPlanStore? = nil,
         locale: Locale = .current,
@@ -88,6 +91,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         self.refresh = refresh ?? { active in _ = try RepositoryStoreHydrator(databaseProvider: active).hydrateIfNeeded(forceRefresh: true) }
         self.fetchAlDar = fetchAlDar
         self.accountStore = resolvedAccountStore
+        self.transactionStore = transactionStore ?? .shared
         self.salaryStore = resolvedSalaryStore
         self.fundingPlanStore = resolvedFundingPlanStore
         let canonicalIsCurrent = resolvedFundingPlanStore.generation == self.baseGeneration
@@ -303,23 +307,75 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func captureAccountBalance(_ account: Account) {
         guard canEdit else { return }
-        guard let id = account.repositoryAccountId else { return }
-        markEdited()
-        rawText["balance.\(id)"] = (try? account.currentBalanceMoney.canonicalDecimalString()).map(localized) ?? ""
-        fieldErrors["balance.\(id)"] = nil
+        guard let money = currentBankBalance(account) else {
+            if let id = account.repositoryAccountId { unavailableCurrentBalanceAccountIDs.insert(id) }
+            errorMessage = "The current bank balance is unavailable. You can enter a planning balance manually."
+            return
+        }
+        captureAccountBalance(account, money: money, capturedAt: ISO8601DateFormatter().string(from: Date()))
+        recalculate()
+    }
+
+    /// Opening Salary refreshes captured values in the draft only. Manual and
+    /// carried amounts, inclusion choices and invalid in-progress text survive.
+    func refreshCapturedAccountBalances() {
+        canonicalDidPublish()
+        unavailableCurrentBalanceAccountIDs = []
+        let active = provider()
+        guard canEdit, active.persistenceState.isUsable,
+              active.generationToken == baseGeneration,
+              fundingPlanStore.generation == baseGeneration else { return }
         let capturedAt = ISO8601DateFormatter().string(from: Date())
+        var changed = false
+        for account in eligibleAccounts {
+            guard let id = account.repositoryAccountId,
+                  fieldErrors["balance.\(id)"] == nil else { continue }
+            let existing = plan.balances.first { $0.accountID == id }
+            if let existing, existing.money != nil {
+                guard case .capturedAccountBalance = existing.provenance else { continue }
+            }
+            guard let money = currentBankBalance(account) else {
+                unavailableCurrentBalanceAccountIDs.insert(id)
+                continue
+            }
+            // An unchanged value keeps its truthful earlier capture time and
+            // does not create an unsaved change merely from reopening a tab.
+            guard existing?.money != money else { continue }
+            captureAccountBalance(account, money: money, capturedAt: capturedAt)
+            changed = true
+        }
+        if changed { recalculate() }
+    }
+
+    private func currentBankBalance(_ account: Account) -> Money? {
+        guard let id = account.repositoryAccountId,
+              account.type == .bank else { return nil }
+        // Reuse canonical bank source selection; Account's zero fallback is
+        // not evidence that an unavailable balance is actually zero.
+        return try? RepositoryStoreHydrator.latestRunningBalance(
+            from: transactionStore.transactions.filter { $0.repositoryAccountId == id },
+            currency: account.nativeCurrency.code
+        )
+    }
+
+    private func captureAccountBalance(_ account: Account, money: Money, capturedAt: String) {
+        guard let id = account.repositoryAccountId else { return }
+        unavailableCurrentBalanceAccountIDs.remove(id)
+        markEdited()
+        rawText["balance.\(id)"] = (try? money.canonicalDecimalString()).map(localized) ?? ""
+        fieldErrors["balance.\(id)"] = nil
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
-            plan.balances[index].money = account.currentBalanceMoney
+            plan.balances[index].money = money
             plan.balances[index].provenance = .capturedAccountBalance(capturedAtISO: capturedAt)
         } else {
-            plan.balances.append(FundingPlanBalance(id: UUID().uuidString, accountID: id, nativeCurrency: account.nativeCurrency, included: false, money: account.currentBalanceMoney, provenance: .capturedAccountBalance(capturedAtISO: capturedAt)))
+            plan.balances.append(FundingPlanBalance(id: UUID().uuidString, accountID: id, nativeCurrency: account.nativeCurrency, included: false, money: money, provenance: .capturedAccountBalance(capturedAtISO: capturedAt)))
         }
-        recalculate()
     }
 
     func setManualBalance(_ account: Account, text: String) {
         guard canEdit else { return }
         guard let id = account.repositoryAccountId else { return }
+        unavailableCurrentBalanceAccountIDs.remove(id)
         let key = "balance.\(id)"
         untouchedZeroFields.remove(key)
         rawText[key] = text

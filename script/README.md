@@ -86,6 +86,59 @@ A missing required original, password or oracle in the approved selection is a
 failed test environment, not a passing result or a reason to disable that test. The script
 continues to require a readable nonzero test-result summary after execution.
 
+### Post-94 affected-family checks
+
+The six existing affected family suites support the current in-memory-only
+source rule. They read the approved originals directly and retain source/oracle
+comparisons only in memory. Their external environment dictionary needs paths,
+not passwords: `LEDGERFORGE_PRIVATE_AMEX_ROOT`, `LEDGERFORGE_AXIS_BANK_ROOT`,
+`LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_ROOT`, `LEDGERFORGE_CBQ_BANK_ROOT`,
+`LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY` (the retained key now points to original
+CBQ card PDFs), and `LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY`. Ordinary
+original-backed tests use `LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY` as well.
+Passwords come from the existing statement-password Keychain scopes. A missing
+credential is an explicit test-environment failure; never put a password in a
+checked-in command or source file. The older file-output global workflow above
+remains separately gated and incompatible with the current source rule.
+
+Use the existing focused selection, after authorizing the relevant authentic
+campaign:
+
+```bash
+LEDGERFORGE_TEST_ENVIRONMENT_FILE=/absolute/external/paths-only.json \
+  ./script/validate.sh test-focused \
+  LedgerForgeTests/AmericanExpressPrivateAcceptanceTests \
+  LedgerForgeTests/AxisBankAuthenticAcceptanceTests \
+  LedgerForgeTests/HDFCBankAccountAuthenticAcceptanceTests \
+  LedgerForgeTests/CBQBankAuthenticAcceptanceTests \
+  LedgerForgeTests/CBQCreditCardPrivateAcceptanceTests \
+  LedgerForgeTests/AxisCreditCardAuthenticAcceptanceTests
+```
+
+LegacyXLS's source-independent integer/buffer check constructs no workbook or
+financial row. It covers fixed-width sector identifiers, sentinel/range paths,
+allocation overflow and transcoding errors/growth. Run it with both sanitizers
+and the original narrowing-warning category treated as an error:
+
+```bash
+xcrun clang -std=c11 -g -fsanitize=address,undefined \
+  -Wshorten-64-to-32 -Werror=shorten-64-to-32 \
+  -I Vendor/LegacyXLS/Sources/CLegacyXLS \
+  -I Vendor/LegacyXLS/Sources/CLegacyXLS/include \
+  Vendor/LegacyXLS/Tests/IntegerBufferMechanics.c \
+  Vendor/LegacyXLS/Sources/CLegacyXLS/src/xls.c \
+  Vendor/LegacyXLS/Sources/CLegacyXLS/src/endian.c \
+  Vendor/LegacyXLS/Sources/CLegacyXLS/src/locale.c \
+  -liconv -o "$TMPDIR/LedgerForge-integer-buffer-check"
+"$TMPDIR/LedgerForge-integer-buffer-check"
+```
+
+This mechanics result does not replace complete genuine XLS-family comparison
+or fresh Debug/Release compilation. Isolated validation builds also do not
+refresh diagnostics shown by an older ordinary Xcode build; build the open
+project and verify its unfiltered Issue Navigator separately when that is the
+reported problem. Do not hide or suppress diagnostics to make it look clean.
+
 The test plan keeps timeouts enabled and permits a maximum allowance of 1,200
 seconds. The complete six-order authentic-corpus test explicitly requests a
 20-minute limit because its ordinary import/replay/reopen campaign exceeds the

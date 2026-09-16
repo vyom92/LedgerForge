@@ -246,7 +246,7 @@ struct DashboardViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func backgroundCalendarDayNotificationRefreshesThroughMainActorAfterInitialEmissionsDrain() throws {
+    func backgroundCalendarDayNotificationRefreshesThroughMainActorAfterInitialEmissionsDrain() async throws {
         let boundaries = try dashboardDayChangeBoundaries()
         guard let beforeMonth = DashboardViewModel.currentMonth(at: boundaries.before),
               let afterMonth = DashboardViewModel.currentMonth(at: boundaries.after) else {
@@ -266,9 +266,10 @@ struct DashboardViewModelTests {
         )
         defer { withExtendedLifetime(viewModel) {} }
 
-        try pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) {
-            probe.refreshCount >= 7
+        try await pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) {
+            probe.refreshCount == 1
         }
+        check(probe.refreshCount == 1, "Initial current-value emissions reuse the one initial snapshot refresh")
         check(probe.observedMonths.allSatisfy { $0 == beforeMonth }, "Initial store emissions observe the initial month")
         probe.resetObservation()
         probe.advance(to: boundaries.after)
@@ -281,10 +282,38 @@ struct DashboardViewModelTests {
             postFinished.leave()
         }
 
-        try pumpDashboardMainRunLoopUntil(.backgroundNotificationTimeout) {
+        try await pumpDashboardMainRunLoopUntil(.backgroundNotificationTimeout) {
             postFinished.wait(timeout: .now()) == .success && probe.refreshCount > 0
         }
         check(probe.observedMonths.last == afterMonth, "Background calendar notification refreshes the newly applicable month")
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func coherentStoreNotificationsCoalesceAndAvailabilityWithdrawalIsImmediate() async throws {
+        let context = try dashboardCurrentDatabaseContext()
+        let availability = ApplicationAvailability()
+        availability.didHydrate(context.snapshot.hydrationResult, generation: context.provider.generationToken)
+        let probe = DashboardDayChangeProbe(currentDate: Date())
+        let model = DashboardViewModel(
+            accountStore: context.accountStore, transactionStore: context.transactionStore,
+            cardStore: context.cardStore, categoryStore: context.categoryStore,
+            fundingPlanStore: context.fundingPlanStore, availability: availability,
+            workspaceID: context.workspaceID, now: { probe.now() }
+        )
+        check(probe.refreshCount == 1, "One initial coherent projection")
+        context.accountStore.notifyAccountsOfInstalledValue()
+        context.transactionStore.notifyTransactionsOfInstalledValues()
+        context.categoryStore.notifySnapshotOfInstalledValue()
+        try await pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) { probe.refreshCount == 2 }
+        check(probe.refreshCount == 2, "One refresh for the coherently installed store notifications")
+        context.accountStore.notifyAccountsOfInstalledValue()
+        availability.begin()
+        check(model.positionState == .loading, "Loading invalidates synchronously")
+        check(model.positions.isEmpty && model.recentActivity.isEmpty, "Old positions and activity are withdrawn immediately")
+        check(model.activityComparison == nil && model.fundingCalculation == nil, "Old aggregates are withdrawn immediately")
+        try await Task.sleep(for: .milliseconds(30))
+        check(probe.refreshCount == 2, "Withdrawal cancels the previously queued refresh")
+        withExtendedLifetime(model) {}
     }
 }
 
@@ -342,11 +371,11 @@ private func dashboardDayChangeBoundaries() throws -> (before: Date, after: Date
 private func pumpDashboardMainRunLoopUntil(
     _ timeout: DashboardDayChangeTestError,
     condition: () -> Bool
-) throws {
+) async throws {
     let deadline = Date(timeIntervalSinceNow: 2)
     while !condition() {
         guard Date() < deadline else { throw timeout }
-        _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        try await Task.sleep(for: .milliseconds(10))
     }
 }
 
@@ -383,6 +412,10 @@ private func dashboardCurrentDatabaseContext() throws -> DashboardReadOnlyContex
 
     let provider = try SQLiteRepositoryProvider(path: databaseURL.absoluteString + "?mode=ro")
     try provider.database.execute(sql: "PRAGMA query_only = ON;")
+    // The owner may import in the separate app process during this read-only
+    // check. All hydration queries must observe one committed SQLite snapshot.
+    try provider.database.execute(sql: "BEGIN DEFERRED TRANSACTION;")
+    defer { try? provider.database.execute(sql: "ROLLBACK;") }
     let workspaces = try provider.database.query(sql: "SELECT id FROM workspaces ORDER BY id", params: []) {
         $0.string(at: 0)
     }.compactMap { $0 }

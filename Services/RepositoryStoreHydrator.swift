@@ -2151,7 +2151,7 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private static func latestRunningBalance(from transactions: [Transaction], currency: String) throws -> Money? {
+    static func latestRunningBalance(from transactions: [Transaction], currency: String) throws -> Money? {
         let dated = transactions.compactMap { transaction -> (Transaction, Money)? in
             guard transaction.statementDate != nil, let balance = transaction.runningBalanceMoney else { return nil }
             return (transaction, balance)

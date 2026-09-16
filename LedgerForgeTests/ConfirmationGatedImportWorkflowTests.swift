@@ -9,6 +9,175 @@ import Testing
 struct ConfirmationGatedImportWorkflowTests {
 
     @Test(.globalRuntimeStateIsolation)
+    func capturedPlanningBalancesRefreshFromLaterOriginalWithoutSavingOrOverwritingManualInput() async throws {
+        let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY"]))
+        let password = try await HDFCBankAccountAuthenticAcceptanceTests()
+            .sourceOraclePassword(ProcessInfo.processInfo.environment)
+        for inMemory in [true, false] {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-captured-plan-\(UUID())")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let sqlite = inMemory ? nil : try SQLiteRepositoryProvider(path: folder.appendingPathComponent("planning.sqlite").path)
+            defer { sqlite?.database.close() }
+            let provider = sqlite.map { DatabaseProvider.verifiedSQLite($0, protectsGeneration: false) } ?? DatabaseProvider(inMemory: true)
+            var active = provider
+            let workspace = "captured-plan"
+            let accounts = AccountStore(), transactions = TransactionStore()
+            let salaries = SalaryStore(), plans = FundingPlanStore()
+            let hydrator = RepositoryStoreHydrator(
+                accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
+                transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo,
+                salaryRepo: provider.salaryRepo, fundingPlanRepo: provider.fundingPlanRepo,
+                accountStore: accounts, transactionStore: transactions, categoryStore: CategoryStore(),
+                salaryStore: salaries, fundingPlanStore: plans,
+                importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(),
+                workspaceId: workspace, persistenceState: provider.persistenceState,
+                providerGeneration: provider.generationToken, categoryReconciliationGate: nil, participatesInLifecycleGate: false
+            )
+            let engine = ImportEngine(
+                importCoordinator: DefaultImportCoordinator(readerRegistry: DefaultReaderRegistry(),
+                    passwordProvider: DefaultPasswordProvider(
+                        credentialStore: InMemoryStatementPasswordCredentialStore(passwords: [Institution.hdfc.statementPasswordCredentialScope: password]),
+                        supportedInstitutionCodes: [Institution.hdfc.statementPasswordCredentialScope], challenge: { _ in nil })),
+                importPersistenceCoordinator: DefaultImportPersistenceCoordinator(databaseProvider: provider,
+                    mapper: ImportPersistenceMapper(workspaceId: workspace, workspaceName: "Captured planning balance")),
+                persistenceStateProvider: { provider.persistenceState }, providerGenerationProvider: { provider.generationToken },
+                forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) }, rejectedAttemptHydration: {}
+            )
+            let first = try await engine.prepareImport(from: root.appendingPathComponent("HDFC/HDFC NRE FY 25-26.pdf"))
+            let firstResult = await engine.commitPreparedImport(first, accountChoice: .createNewAccount(displayName: "HDFC NRE"))
+            #expect(firstResult.persisted)
+            let account = try #require(accounts.accounts.first)
+            let initialMoney = account.currentBalanceMoney
+            let model = SalaryWorkspaceViewModel(
+                workspaceID: workspace, provider: { active }, accountStore: accounts, transactionStore: transactions,
+                salaryStore: salaries, fundingPlanStore: plans, locale: Locale(identifier: "en_US_POSIX"),
+                refresh: { _ in _ = try hydrator.hydrateIfNeeded(forceRefresh: true) }
+            )
+            model.refreshCapturedAccountBalances()
+            let firstBalance = try #require(model.plan.balances.first)
+            let initialCaptureMatches = firstBalance.money == initialMoney && !firstBalance.included
+            #expect(initialCaptureMatches)
+            if case .capturedAccountBalance = firstBalance.provenance {} else { Issue.record("Expected genuine captured provenance") }
+            model.setAccountIncluded(account, included: true)
+            model.save()
+            #expect(model.saveState == .saved)
+            let saved = try provider.fundingPlanRepo.plans(workspaceId: workspace)
+            let savedDraft = model.plan
+            model.refreshCapturedAccountBalances()
+            let unchangedOpen = model.plan == savedDraft && !model.isDirty
+            #expect(unchangedOpen)
+
+            let later = try await engine.prepareImport(from: root.appendingPathComponent("HDFC/HDFC NRE FY 26-27.pdf"))
+            let laterResult = await engine.commitPreparedImport(later)
+            #expect(laterResult.persisted)
+            let latest = try #require(accounts.accounts.first)
+            let authenticBalanceChanged = latest.currentBalanceMoney != initialMoney
+            #expect(authenticBalanceChanged)
+            model.refreshCapturedAccountBalances()
+            let refreshed = try #require(model.plan.balances.first)
+            let refreshMatchesCurrent = refreshed.money == latest.currentBalanceMoney && refreshed.included && model.isDirty
+            #expect(refreshMatchesCurrent)
+            let savedPlanUnchanged = try provider.fundingPlanRepo.plans(workspaceId: workspace) == saved
+            #expect(savedPlanUnchanged)
+
+            model.setManualBalance(latest, text: "-")
+            model.refreshCapturedAccountBalances()
+            let inputKey = "balance.\(try #require(latest.repositoryAccountId))"
+            let incompleteEditPreserved = model.rawText[inputKey] == "-" && model.fieldErrors[inputKey] != nil
+            #expect(incompleteEditPreserved)
+            model.setManualBalance(latest, text: "0") // Ordinary owner-editable planning input, not a source fact.
+            model.refreshCapturedAccountBalances()
+            let manual = try #require(model.plan.balances.first)
+            let manualPreserved = manual.provenance == .manual && manual.money?.amount == .zero && manual.included
+            #expect(manualPreserved)
+
+            let other = try await engine.prepareImport(from: root.appendingPathComponent("HDFC/HDFC NRO FY 25-26.pdf"))
+            let otherResult = await engine.commitPreparedImport(other, accountChoice: .createNewAccount(displayName: "HDFC NRO"))
+            #expect(otherResult.persisted)
+            model.refreshCapturedAccountBalances()
+            let otherID = try #require(otherResult.accountId)
+            let otherAccount = try #require(accounts.accounts.first { $0.repositoryAccountId == otherID })
+            let otherBalance = try #require(model.plan.balances.first { $0.accountID == otherID })
+            let newAccountPopulated = model.plan.balances.count == 2 && otherBalance.money == otherAccount.currentBalanceMoney && !otherBalance.included
+            #expect(newAccountPopulated)
+            let draft = model.plan
+            active = .unavailable(reason: .notInitialized)
+            model.refreshCapturedAccountBalances()
+            let withdrawalPreservedDraft = model.plan == draft && model.saveState == .providerChanged
+            #expect(withdrawalPreservedDraft)
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func authenticBankChoiceRejectsDifferentIdentifiersTypesAndCurrenciesAcrossProviders() async throws {
+        let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY"]))
+        var passwords: [String: String] = [:]
+        for institution in [Institution.hdfc, .amex, .cbq] {
+            let scope = institution.statementPasswordCredentialScope
+            let password: String = try #require(try await KeychainStatementPasswordCredentialStore().password(institutionCode: scope))
+            passwords[scope] = password
+        }
+        for inMemory in [true, false] {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-account-compatibility-\(UUID())")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let sqlite = inMemory ? nil : try SQLiteRepositoryProvider(path: folder.appendingPathComponent("confirmation.sqlite").path)
+            defer { sqlite?.database.close() }
+            let provider = sqlite.map { DatabaseProvider.verifiedSQLite($0, protectsGeneration: false) } ?? DatabaseProvider(inMemory: true)
+            let workspace = "account-compatibility"
+            let hydrator = RepositoryStoreHydrator(
+                accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
+                transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo, cardRepo: provider.cardRepo,
+                accountStore: AccountStore(), transactionStore: TransactionStore(), categoryStore: CategoryStore(), cardStore: CardStore(),
+                importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(),
+                workspaceId: workspace, categoryReconciliationGate: nil, participatesInLifecycleGate: false
+            )
+            let persistence = DefaultImportPersistenceCoordinator(databaseProvider: provider,
+                mapper: ImportPersistenceMapper(workspaceId: workspace, workspaceName: "Account compatibility"))
+            let engine = ImportEngine(
+                importCoordinator: DefaultImportCoordinator(readerRegistry: DefaultReaderRegistry(),
+                    passwordProvider: DefaultPasswordProvider(credentialStore: InMemoryStatementPasswordCredentialStore(passwords: passwords),
+                        supportedInstitutionCodes: passwords.keys.sorted(), challenge: { _ in nil })),
+                importPersistenceCoordinator: persistence,
+                persistenceStateProvider: { provider.persistenceState }, providerGenerationProvider: { provider.generationToken },
+                forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) }, rejectedAttemptHydration: {}
+            )
+            var accountIDs: [String] = []
+            for relative in ["HDFC/HDFC NRE FY 25-26.pdf", "AmericanExpress/amex 24 apr 2025.pdf", "CBQ/BankAccounts/Jan 2025.pdf"] {
+                let source = try await engine.prepareImport(from: root.appendingPathComponent(relative))
+                defer { engine.cancelPreparedImport(source) }
+                let choice: ImportAccountChoice = source.detectedDocumentType == .creditCard
+                    ? .createNewCardLiabilityAccountAndInstrument(displayName: "Reviewed card")
+                    : .createNewAccount(displayName: "Reviewed bank")
+                let result = await engine.commitPreparedImport(source, accountChoice: choice)
+                #expect(result.persisted)
+                accountIDs.append(try #require(result.accountId))
+            }
+            let accountsBefore = try provider.accountRepo.accounts(workspaceId: workspace)
+            let rowsBefore = try provider.transactionRepo.trustedTransactions(workspaceId: workspace).count
+            let nroURL = root.appendingPathComponent("HDFC/HDFC NRO FY 25-26.pdf")
+            for incompatibleID in accountIDs {
+                let source = try await engine.prepareImport(from: nroURL)
+                defer { engine.cancelPreparedImport(source) }
+                let review = try engine.reviewPreparedImport(source)
+                #expect(review == .choiceRequired(eligibleAccountIds: []))
+                let result = await engine.commitPreparedImport(source, accountChoice: .useExistingAccount(accountId: incompatibleID))
+                #expect(!result.persisted)
+                let unchanged = try provider.accountRepo.accounts(workspaceId: workspace) == accountsBefore
+                #expect(unchanged)
+                #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspace).count == rowsBefore)
+                #expect(try provider.importSessionRepo.importSession(id: source.importSession.id.uuidString) == nil)
+            }
+            let source = try await engine.prepareImport(from: nroURL)
+            defer { engine.cancelPreparedImport(source) }
+            let result = await engine.commitPreparedImport(source, accountChoice: .createNewAccount(displayName: "HDFC NRO review"))
+            #expect(result.persisted && result.accountId != accountIDs.first)
+            #expect(try provider.accountRepo.accounts(workspaceId: workspace).count == accountsBefore.count + 1)
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func prepareImportParsesAndValidatesWithoutPersistenceOrRuntimeStoreMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
@@ -220,6 +389,62 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func authenticCreationNamePersistsThroughSQLiteReopenAndBlankNameWritesNoAccount() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-name-confirmation-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("confirmation.sqlite").path
+        let sqlite = try SQLiteRepositoryProvider(path: path)
+        defer { sqlite.database.close() }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
+        let workspaceID = "name-confirmation"
+        let accounts = AccountStore()
+        let hydrator = RepositoryStoreHydrator(
+            accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo,
+            accountStore: accounts, transactionStore: TransactionStore(), categoryStore: CategoryStore(),
+            importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(),
+            workspaceId: workspaceID, categoryReconciliationGate: nil, participatesInLifecycleGate: false
+        )
+        let persistence = DefaultImportPersistenceCoordinator(
+            databaseProvider: provider,
+            mapper: ImportPersistenceMapper(workspaceId: workspaceID, workspaceName: "Account name confirmation")
+        )
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) },
+            rejectedAttemptHydration: { _ = try hydrator.stageHydration() }
+        )
+        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let blank = try await engine.prepareImport(from: source)
+        let rejected = await engine.commitPreparedImport(blank, accountChoice: .createNewAccount(displayName: " \n "))
+        #expect(!rejected.persisted)
+        #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).isEmpty)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
+        #expect(try sqlite.database.queryInt("SELECT COUNT(*) FROM account_identifiers;") == 0)
+
+        let prepared = try await engine.prepareImport(from: source)
+        let result = await engine.commitPreparedImport(prepared, accountChoice: .createNewAccount(displayName: "  Everyday bank  "))
+        #expect(result.persisted)
+        let accountID = try #require(result.accountId)
+        let saved = try #require(try provider.accountRepo.account(id: accountID))
+        #expect(saved.name == "Everyday bank")
+        #expect(saved.accountType == "bank" && saved.nativeCurrency == prepared.detectedCurrency)
+        #expect(accounts.accounts.first?.name == "Everyday bank")
+
+        let duplicate = try await engine.prepareImport(from: source)
+        let replay = await engine.commitPreparedImport(duplicate, accountChoice: .createNewAccount(displayName: "Must not rename"))
+        #expect(!replay.persisted)
+        #expect(try provider.accountRepo.account(id: accountID) == saved)
+        sqlite.database.close()
+        let reopened = try SQLiteRepositoryProvider(path: path)
+        defer { reopened.database.close() }
+        #expect(try reopened.accountRepo.account(id: accountID) == saved)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func competingSameProcessConfirmationsProduceOneFinancialHistory() async throws {
         let provider = InMemoryRepositoryProvider()
         let firstCoordinator = DefaultImportPersistenceCoordinator(
@@ -252,8 +477,8 @@ struct ConfirmationGatedImportWorkflowTests {
         let first = try await firstEngine.prepareImport(from: source)
         let second = try await secondEngine.prepareImport(from: source)
 
-        async let firstResult = firstEngine.commitPreparedImport(first, accountChoice: .createNewAccount)
-        async let secondResult = secondEngine.commitPreparedImport(second, accountChoice: .createNewAccount)
+        async let firstResult = firstEngine.commitPreparedImport(first, accountChoice: .createNewAccount(displayName: "Imported review account"))
+        async let secondResult = secondEngine.commitPreparedImport(second, accountChoice: .createNewAccount(displayName: "Imported review account"))
         let results = await [firstResult, secondResult]
 
         #expect(results.filter(\.persisted).count == 1)

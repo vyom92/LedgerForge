@@ -19,6 +19,7 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case conflictingPreparedSourceFormat
     case missingLegacyRawTextFingerprint
     case duplicateAuthorityFormatMismatch
+    case invalidAccountDisplayName
 
     var errorDescription: String? {
         switch self {
@@ -52,6 +53,8 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
             return "Import persistence requires the prepared raw-text fingerprint."
         case .duplicateAuthorityFormatMismatch:
             return "Import persistence found a source-format and duplicate-authority mismatch."
+        case .invalidAccountDisplayName:
+            return "Enter an account display name before confirming the import."
         }
     }
 }
@@ -194,7 +197,8 @@ struct ImportPersistenceMapper {
         importSession: ImportSession,
         validation: ImportValidationResult,
         accountId: String,
-        fingerprintSet: PreparedDocumentFingerprintSet
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        proposedAccountDisplayName: String? = nil
     ) throws -> ImportPersistencePayload {
         guard validation.passed else {
             throw ImportPersistenceError.validationFailed
@@ -224,7 +228,8 @@ struct ImportPersistenceMapper {
             financialDocument: financialDocument,
             importSession: importSession,
             accountId: accountId,
-            createdAtISO: importedAtISO
+            createdAtISO: importedAtISO,
+            proposedDisplayName: proposedAccountDisplayName
         )
         let importSessionId = importSession.id.uuidString
         let documentId = "document-\(importSession.id.uuidString.lowercased())"
@@ -339,6 +344,7 @@ struct ImportPersistenceMapper {
         advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
         accountChoice: ConfirmedImportAccountChoiceDTO,
         selectedAccountId: String,
+        proposedAccountDisplayName: String? = nil,
         cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
         cardAssociationAuthority: String = "user_confirmed",
         cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
@@ -363,6 +369,7 @@ struct ImportPersistenceMapper {
             advisoryIdentity: advisoryIdentity,
             accountChoice: accountChoice,
             selectedAccountId: selectedAccountId,
+            proposedAccountDisplayName: proposedAccountDisplayName,
             cardInstrumentChoice: cardInstrumentChoice,
             cardAssociationAuthority: cardAssociationAuthority,
             cardRelationshipKind: cardRelationshipKind,
@@ -382,6 +389,7 @@ struct ImportPersistenceMapper {
         advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
         accountChoice: ConfirmedImportAccountChoiceDTO,
         selectedAccountId: String,
+        proposedAccountDisplayName: String? = nil,
         cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
         cardAssociationAuthority: String = "user_confirmed",
         cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
@@ -395,7 +403,8 @@ struct ImportPersistenceMapper {
             importSession: importSession,
             validation: validation,
             accountId: selectedAccountId,
-            fingerprintSet: fingerprintSet
+            fingerprintSet: fingerprintSet,
+            proposedAccountDisplayName: accountChoice == .createProposedAccount ? proposedAccountDisplayName : nil
         )
         let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(
             from: financialDocument.financialIdentifiers
@@ -852,7 +861,12 @@ struct ImportPersistenceMapper {
         }
         let firstDecision = sectionDecisions.first
         let legacyInstrumentObservations: [CardSourceIdentityObservationDTO]
-        if sectionCount == 1, let firstDecision {
+        // Section observations are the authority for a reused card. A card
+        // first confirmed in a multi-section statement has no legacy instrument
+        // observation to inherit. Do not manufacture a prior legacy mapping
+        // when a later statement happens to contain only that card.
+        if sectionCount == 1, let firstDecision,
+           firstDecision.sourceObservations.allSatisfy({ $0.associationAuthority != "prior_user_confirmed_mapping" }) {
             legacyInstrumentObservations = zip(
                 evidence.instrumentSections[0].sourceIdentityObservations,
                 firstDecision.sourceObservations
@@ -965,11 +979,14 @@ struct ImportPersistenceMapper {
         financialDocument: FinancialDocument,
         importSession: ImportSession,
         accountId: String,
-        createdAtISO: String
+        createdAtISO: String,
+        proposedDisplayName: String? = nil
     ) throws -> AccountDTO {
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
         let institutionId = Self.institutionId(for: importSession.institution)
-        let accountName = Self.displayAccountName(
+        let trimmedName = proposedDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedName?.isEmpty != true else { throw ImportPersistenceError.invalidAccountDisplayName }
+        let accountName = trimmedName ?? Self.displayAccountName(
             institutionName: institutionName,
             documentType: importSession.documentType,
             currency: financialDocument.bookedCurrency?.code,

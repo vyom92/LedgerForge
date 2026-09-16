@@ -387,7 +387,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
                     workspaceID: workspaceID
                 )
             } else {
-                choice = .createNewCardLiabilityAccountAndInstrument
+                choice = .createNewCardLiabilityAccountAndInstrument(displayName: "Imported review card")
             }
             let result = await engine.commitPreparedImport(prepared, accountChoice: choice)
             #expect(result.hydrationOutcome == .committedAndHydrated, "\(source.url.lastPathComponent): \(result.errorMessage ?? "no error")")

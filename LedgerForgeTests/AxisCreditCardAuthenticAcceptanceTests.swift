@@ -11,10 +11,6 @@ import Testing
 @MainActor
 struct AxisCreditCardAuthenticAcceptanceTests {
     private static let rootKey = "LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY"
-    private static let oracleKey = "LEDGERFORGE_AXIS_CARD_SOURCE_ORACLE"
-    private static let appPasswordKey = "LEDGERFORGE_AXIS_CARD_APP_PASSWORD"
-    private static let traditionalPasswordKey = "LEDGERFORGE_AXIS_CARD_TRADITIONAL_PASSWORD"
-    private static let privateResultFileKey = "LEDGERFORGE_PRIVATE_RESULT_FILE"
 
     @MainActor private static var completedPhases = Set<String>()
     @MainActor private static var completedCorpus: LogicalCorpus?
@@ -116,7 +112,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
 
     private struct LogicalCorpus {
         let oracle: SourceOracle
-        let oracleFileDigest: String
+        let inMemoryOracleDigest: String
         let sources: [PhysicalSource]
         let byCycle: [String: [SourceFormat: PhysicalSource]]
     }
@@ -224,27 +220,16 @@ struct AxisCreditCardAuthenticAcceptanceTests {
 
     private static func requireCorpus() async throws -> LogicalCorpus {
         if let completedCorpus { return completedCorpus }
-        guard let rootPath = ProcessInfo.processInfo.environment[rootKey], !rootPath.isEmpty,
-              let oraclePath = ProcessInfo.processInfo.environment[oracleKey], !oraclePath.isEmpty else {
+        guard let rootPath = ProcessInfo.processInfo.environment[rootKey], !rootPath.isEmpty else {
             throw AuthenticAcceptanceError.oracleUnavailable
         }
-        let corpus = try await authenticCorpus(
-            root: URL(fileURLWithPath: rootPath, isDirectory: true),
-            oracleURL: URL(fileURLWithPath: oraclePath)
-        )
+        let corpus = try await authenticCorpus(root: URL(fileURLWithPath: rootPath, isDirectory: true))
         completedCorpus = corpus
         return corpus
     }
 
-    private static func authenticCorpus(root: URL, oracleURL: URL) async throws -> LogicalCorpus {
-        let oracleBytes: Data
-        let oracle: SourceOracle
-        do {
-            oracleBytes = try Data(contentsOf: oracleURL, options: [.mappedIfSafe])
-            oracle = try JSONDecoder().decode(SourceOracle.self, from: oracleBytes)
-        } catch {
-            throw AuthenticAcceptanceError.oracleUnavailable
-        }
+    private static func authenticCorpus(root: URL) async throws -> LogicalCorpus {
+        let oracle = try await loadInMemorySourceOracle(root: root)
         try validateOracleContract(oracle)
 
         let recordDigests = oracle.records.map(\.sourceSHA256)
@@ -254,7 +239,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         })
 
         let challengeProbe = ChallengeInvocationProbe()
-        let passwordProvider = try makePasswordProvider(challengeProbe: challengeProbe)
+        let passwordProvider = try await makePasswordProvider(challengeProbe: challengeProbe)
         let preparationProvider = DatabaseProvider(inMemory: true)
         let preparationCoordinator = DefaultImportPersistenceCoordinator(
             databaseProvider: preparationProvider,
@@ -358,7 +343,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }
         let corpus = LogicalCorpus(
             oracle: oracle,
-            oracleFileDigest: sha256Hex(oracleBytes),
+            inMemoryOracleDigest: sourceOracleProjectionDigest(oracle),
             sources: sources,
             byCycle: byCycle
         )
@@ -367,12 +352,12 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     }
 
     private static func validateOracleContract(_ oracle: SourceOracle) throws {
-        try require(oracle.schema == "ledgerforge.axis.source-oracle.v4", error: .oracleMismatch)
+        try require(oracle.schema == "ledgerforge.axis.source-oracle.v5", error: .oracleMismatch)
         try require(
-            oracle.authority == "raw-authentic-source-text-independent-projection",
+            oracle.authority == "authentic-originals-independent-in-memory-projection",
             error: .oracleMismatch
         )
-        try require(oracle.sourceInventorySHA256.count == 64, error: .oracleMismatch)
+        try require(oracle.sourceInventorySHA256 == "db2414293ca3cb04a661f56638bde6e592ab39d66468aa18534b8ff8d383f92e", error: .oracleMismatch)
         try require(oracle.corpus.carrierCount == 32, error: .oracleMismatch)
         try require(oracle.corpus.logicalStatementCount == 18, error: .oracleMismatch)
         try require(
@@ -665,7 +650,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         try require(orderedSources.count == 32, error: .campaignInvariant)
         try require(Set(orderedSources.map(\.rawDigest)).count == 32, error: .campaignInvariant)
         let workspaceID = "axis-authentic-\(UUID().uuidString)"
-        let runtime = try makeRuntime(workspaceID: workspaceID, inMemory: inMemory)
+        let runtime = try await makeRuntime(workspaceID: workspaceID, inMemory: inMemory)
         defer { runtime.cleanup() }
 
         var accountID: String?
@@ -679,7 +664,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             let isSupporting = seenCycles.contains(source.cycle)
             let choice: ImportAccountChoice = accountID.map {
                 .useExistingAccount(accountId: $0)
-            } ?? .createNewAccount
+            } ?? .createNewAccount(displayName: "Imported review account")
             let result = await runtime.engine.commitPreparedImport(
                 prepared,
                 accountChoice: choice
@@ -768,7 +753,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     private static func makeRuntime(
         workspaceID: String,
         inMemory: Bool
-    ) throws -> PrivateRuntime {
+    ) async throws -> PrivateRuntime {
         let provider: DatabaseProvider
         let sqlite: SQLiteRepositoryProvider?
         let databaseURL: URL?
@@ -793,7 +778,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }
 
         let challengeProbe = ChallengeInvocationProbe()
-        let passwordProvider = try makePasswordProvider(challengeProbe: challengeProbe)
+        let passwordProvider = try await makePasswordProvider(challengeProbe: challengeProbe)
         let coordinator = DefaultImportPersistenceCoordinator(
             databaseProvider: provider,
             mapper: ImportPersistenceMapper(
@@ -1072,15 +1057,9 @@ struct AxisCreditCardAuthenticAcceptanceTests {
 
     private static func makePasswordProvider(
         challengeProbe: ChallengeInvocationProbe
-    ) throws -> DefaultPasswordProvider {
-        guard let appPassword = ProcessInfo.processInfo.environment[appPasswordKey],
-              !appPassword.isEmpty else {
-            throw AuthenticAcceptanceError.appCredentialUnavailable
-        }
-        guard let traditionalPassword = ProcessInfo.processInfo.environment[traditionalPasswordKey],
-              !traditionalPassword.isEmpty else {
-            throw AuthenticAcceptanceError.traditionalCredentialUnavailable
-        }
+    ) async throws -> DefaultPasswordProvider {
+        let appPassword = try await sourceOraclePassword("axis-bank.credit-card.app-pdf")
+        let traditionalPassword = try await sourceOraclePassword("axis-bank.credit-card.traditional-pdf")
         let store = InMemoryStatementPasswordCredentialStore(passwords: [
             KeychainStatementPasswordCredentialStore.axisAppPDFScope: appPassword,
             KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope: traditionalPassword
@@ -1195,60 +1174,367 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     ) throws {
         completedCorpus = corpus
         completedPhases.insert(phase)
-        guard completedPhases == Set(["corpus", "persistence"]),
-              let resultPath = ProcessInfo.processInfo.environment[privateResultFileKey],
-              !resultPath.isEmpty else { return }
+        // Acceptance progress remains in memory; never emit a derived result file.
+    }
 
-        let physicalRows = corpus.oracle.records.reduce(0) { $0 + $1.rowCount }
-        let payload: [String: Any] = [
-            "contract": "ledgerforge-axis-credit-card-authentic-acceptance-v4",
-            "tests": ["corpus": true, "persistence": true],
-            "non_vacuity": [
-                "selected_physical_source_count": corpus.sources.count,
-                "logical_statement_count": expectedCycles.count,
-                "cycles_exercised": expectedCycles,
-                "production_tests_executed": 2,
-                "selected_private_tests_skipped": 0,
-                "rows_processed": physicalRows,
-                "ordinary_prepare_validate_confirm": true,
-                "exact_byte_replay_all_sources": true,
-                "sqlite_campaign_execution": true,
-                "in_memory_campaign_execution": true,
-                "checkpoint_close_reopen_execution": true,
-                "hydration_execution": true
-            ],
-            "source_oracle": [
-                "schema": corpus.oracle.schema,
-                "authority": corpus.oracle.authority,
-                "oracle_file_sha256": corpus.oracleFileDigest,
-                "source_inventory_sha256": corpus.oracle.sourceInventorySHA256,
-                "carrier_count": 32,
-                "format_counts": ["app_pdf": 18, "xlsx": 7, "traditional_pdf": 7],
-                "canonical_transaction_rows": expectedCanonicalTransactionCount,
-                "physical_financial_rows": physicalRows,
-                "physical_structured_references": 164,
-                "canonical_structured_references": 66
-            ],
-            "persistence": [
-                "campaigns": 6,
-                "in_memory_campaigns": 3,
-                "sqlite_campaigns": 3,
-                "canonical_transactions": expectedCanonicalTransactionCount,
-                "liability_accounts": 1,
-                "accepted_statements": 32,
-                "transaction_evidence": expectedCanonicalTransactionCount,
-                "semantic_projections": 32,
-                "semantic_groups": 18,
-                "semantic_members": 32,
-                "supporting_members": 14,
-                "hydrated_reference_and_parser_provenance_verified": true,
-                "axis_repository_preferred_cbq_digest_is_nil": true,
-                "sqlite_inmemory_parity_verified": true,
-                "sqlite_checkpoint_reopen_verified": true
-            ]
+    /// Builds expected truth only from original source bytes and generic readers.
+    /// No Axis parser/normalizer or retained financial output participates.
+    private static func loadInMemorySourceOracle(root: URL) async throws -> SourceOracle {
+        try await constructSourceOracle(
+            root: root,
+            tagged: { url, bytes, password in
+                let snapshot = SourceContentSnapshot(bytes: bytes)
+                defer { snapshot.invalidate() }
+                let raw = try await PDFDocumentReader().read(
+                    request: ImportRequest(fileURL: url), snapshot: snapshot, password: password
+                )
+                return raw.pdfTaggedTables ?? []
+            },
+            workbook: { url, bytes in
+                let snapshot = SourceContentSnapshot(bytes: bytes)
+                defer { snapshot.invalidate() }
+                let raw = try await OOXMLDocumentReader().read(
+                    request: ImportRequest(fileURL: url), snapshot: snapshot, password: nil
+                )
+                guard case .tabular(let sheet) = raw.content else { throw AuthenticAcceptanceError.oracleMismatch }
+                return sheet.rows.map { row in row.cells.map { $0.value.canonicalText } }
+            }
+        )
+    }
+
+    private static func sourceOraclePassword(_ scope: String) async throws -> String {
+        guard let password = try await KeychainStatementPasswordCredentialStore().password(institutionCode: scope),
+              !password.isEmpty else { throw AuthenticAcceptanceError.oracleUnavailable }
+        return password
+    }
+
+    private static func constructSourceOracle(
+        root: URL,
+        tagged: (URL, Data, String) async throws -> [RawPDFTaggedTableEvidence],
+        workbook: (URL, Data) async throws -> [[String]]
+    ) async throws -> SourceOracle {
+        let approved = URL(fileURLWithPath: "/Users/vyom/Documents/Ledger Forge/Originals/Axis/CreditCard")
+        guard root.resolvingSymlinksInPath().standardizedFileURL == approved.resolvingSymlinksInPath().standardizedFileURL else {
+            throw AuthenticAcceptanceError.sourceDirectoryUnreadable
+        }
+        let files = try regularFinancialFiles(under: root)
+        guard files.count == 32 else { throw AuthenticAcceptanceError.unexpectedCorpusShape }
+        let passwords = [try await sourceOraclePassword("axis-bank.credit-card.app-pdf"),
+                         try await sourceOraclePassword("axis-bank.credit-card.traditional-pdf")]
+        var records: [OracleRecord] = [], inventory: [String: String] = [:]
+        for url in files {
+            let bytes = try Data(contentsOf: url), digest = sha256Hex(bytes)
+            let rows: [OracleRow], controls: [String: String], format: SourceFormat
+            if url.pathExtension.lowercased() == "xlsx" {
+                let grid = try await workbook(url, bytes)
+                let result = try sourceWorkbook(grid)
+                rows = result.rows; controls = result.controls; format = .xlsx
+            } else {
+                guard let document = PDFDocument(data: bytes), document.isLocked else { throw AuthenticAcceptanceError.sourceUnreadable }
+                guard let password = passwords.first(where: { document.unlock(withPassword: $0) }) else {
+                    throw AuthenticAcceptanceError.oracleUnavailable
+                }
+                let tables = try await tagged(url, bytes, password)
+                let candidates = tables.filter { table in
+                    guard let first = table.rows.first else { return false }
+                    return first.cells.map(sourceTaggedCell) == ["Date", "Transaction Details", "Amount (INR)", "Debit/Credit"]
+                }
+                let pageLines = try (0..<document.pageCount).map { index -> [Int: [SourceGlyph]] in
+                    guard let page = document.page(at: index) else { throw AuthenticAcceptanceError.sourceUnreadable }
+                    return try sourceGlyphLines(page)
+                }
+                guard let top = pageLines.first else { throw AuthenticAcceptanceError.sourceUnreadable }
+                if !candidates.isEmpty {
+                    guard candidates.count == 1, let table = candidates.first,
+                          table.rows.first!.cells.allSatisfy({ $0.role == .header }) else { throw AuthenticAcceptanceError.oracleMismatch }
+                    rows = try table.rows.dropFirst().map { row in
+                        guard row.cells.count == 4, row.cells.allSatisfy({ $0.role == .data }) else { throw AuthenticAcceptanceError.oracleMismatch }
+                        let cells = row.cells.map(sourceTaggedCell)
+                        return try sourceOracleRow(date: cells[0], narration: cells[1], amount: cells[2], direction: cells[3], retainsOriginalMoney: false)
+                    }
+                    controls = try sourceAppControls(top)
+                    format = .appPDF
+                } else {
+                    var output: [OracleRow] = []
+                    for lines in pageLines {
+                        for y in lines.keys.sorted(by: >) {
+                            let glyphs = lines[y]!, date = sourceColumn(glyphs, 0, 85)
+                            if date.range(of: #"^\d{2}/\d{2}/\d{4}$"#, options: .regularExpression) == nil { continue }
+                            let parts = try sourceCapture(#"^([0-9,.]+)\s*(Dr|Cr)$"#, sourceColumn(glyphs, 505, 650))
+                            output.append(try sourceOracleRow(date: date, narration: sourceColumn(glyphs, 85, 505), amount: parts[0], direction: parts[1], retainsOriginalMoney: true))
+                        }
+                    }
+                    rows = output
+                    controls = try sourceTraditionalControls(top)
+                    format = .traditionalPDF
+                }
+            }
+            guard let cycle = controls["selected_statement_month"] ?? controls["statement_period_end"].map({ String($0.prefix(7)) }),
+                  rows.count == expectedMonthlyCounts[cycle],
+                  inventory.updateValue("\(bytes.count)|\(format.rawValue)", forKey: digest) == nil else {
+                throw AuthenticAcceptanceError.oracleMismatch
+            }
+            records.append(OracleRecord(sourceSHA256: digest, format: format, cycle: cycle, rowCount: rows.count, rows: rows, controls: controls))
+        }
+        try sourceVerifyInventory(inventory)
+        let grouped = Dictionary(grouping: records, by: \.cycle)
+        guard grouped.count == 18 else { throw AuthenticAcceptanceError.oracleMismatch }
+        for group in grouped.values {
+            guard let app = group.first(where: { $0.format == .appPDF }), group.filter({ $0.format == .appPDF }).count == 1 else {
+                throw AuthenticAcceptanceError.oracleMismatch
+            }
+            let expected = sourceFinancialMultiset(app.rows)
+            for record in group {
+                guard sourceFinancialMultiset(record.rows) == expected else { throw AuthenticAcceptanceError.oracleMismatch }
+                if record.format == .xlsx {
+                    guard record.controls == app.controls, record.rows.count == app.rows.count else { throw AuthenticAcceptanceError.oracleMismatch }
+                    for (left, right) in zip(record.rows, app.rows) {
+                        guard left.date == right.date, left.amount == right.amount, left.effect == right.effect,
+                              left.reference == right.reference,
+                              sourceNarrationGlyphs(left.narration) == sourceNarrationGlyphs(right.narration) else { throw AuthenticAcceptanceError.oracleMismatch }
+                    }
+                }
+            }
+        }
+        let oracle = SourceOracle(
+            schema: "ledgerforge.axis.source-oracle.v5",
+            authority: "authentic-originals-independent-in-memory-projection",
+            sourceInventorySHA256: sourceInventoryDigest(inventory),
+            corpus: OracleCorpus(carrierCount: records.count, logicalStatementCount: grouped.count,
+                transactionRowCount: records.filter { $0.format == .appPDF }.reduce(0) { $0 + $1.rows.count },
+                formatCounts: Dictionary(grouping: records, by: { $0.format.rawValue }).mapValues(\.count), cycles: grouped.keys.sorted()),
+            records: records.sorted { ($0.cycle, $0.format.rawValue, $0.sourceSHA256) < ($1.cycle, $1.format.rawValue, $1.sourceSHA256) }
+        )
+        guard oracle.records.reduce(0, { $0 + $1.rowCount }) == 2969,
+              oracle.records.flatMap(\.rows).compactMap(\.reference).count == 164,
+              oracle.records.filter({ $0.format == .appPDF }).flatMap(\.rows).compactMap(\.reference).count == 66 else { throw AuthenticAcceptanceError.oracleMismatch }
+        return oracle
+    }
+
+    private struct SourceGlyph { let x: CGFloat; let text: String }
+    private static func sourceGlyphLines(_ page: PDFPage) throws -> [Int: [SourceGlyph]] {
+        guard let text = page.string else { throw AuthenticAcceptanceError.sourceUnreadable }
+        let ns = text as NSString
+        var lines: [Int: [SourceGlyph]] = [:]
+        for i in 0..<ns.length {
+            let character = ns.substring(with: NSRange(location: i, length: 1))
+            if character == "\n" || character == "\r" { continue }
+            guard let selection = page.selection(for: NSRange(location: i, length: 1)) else { throw AuthenticAcceptanceError.sourceUnreadable }
+            let bounds = selection.bounds(for: page)
+            lines[Int((bounds.minY * 10).rounded()), default: []].append(SourceGlyph(x: bounds.minX, text: character))
+        }
+        return lines.mapValues { $0.sorted { $0.x < $1.x } }
+    }
+    private static func sourceColumn(_ glyphs: [SourceGlyph], _ start: CGFloat, _ end: CGFloat) -> String {
+        glyphs.filter { $0.x >= start && $0.x < end }.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private static func sourceTaggedCell(_ cell: RawPDFTaggedCellEvidence) -> String {
+        cell.children.flatMap { child -> [String] in
+            switch child {
+            case .markedContent(let value): value.textBlocks
+            case .structure(let value): value.markedContent.flatMap(\.textBlocks)
+            }
+        }.joined()
+    }
+    private static func sourceCapture(_ pattern: String, _ text: String) throws -> [String] {
+        let regex = try NSRegularExpression(pattern: pattern)
+        let range = NSRange(text.startIndex..., in: text)
+        let matches = regex.matches(in: text, range: range)
+        guard matches.count == 1, let match = matches.first else { throw AuthenticAcceptanceError.oracleMismatch }
+        return try (1..<match.numberOfRanges).map { i in
+            guard let range = Range(match.range(at: i), in: text) else { throw AuthenticAcceptanceError.oracleMismatch }
+            return String(text[range])
+        }
+    }
+    private static func sourceClean(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{2019}", with: "'").replacingOccurrences(of: "\u{2018}", with: "'")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    private static func sourceDate(_ text: String) throws -> String {
+        let source = sourceClean(text)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.isLenient = false
+        for format in ["dd MMM ''yy", "dd/MM/yyyy", "dd-MM-yyyy", "dd MMM yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: source) {
+                formatter.dateFormat = "yyyy-MM-dd"
+                return formatter.string(from: date)
+            }
+        }
+        throw AuthenticAcceptanceError.oracleMismatch
+    }
+    private static func sourceMonth(_ text: String) throws -> String {
+        let parts = try sourceCapture(#"^([A-Za-z]{3}) ([0-9]{4})$"#, sourceClean(text))
+        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        guard let month = months.firstIndex(of: parts[0]) else { throw AuthenticAcceptanceError.oracleMismatch }
+        return String(format: "%@-%02d", parts[1], month + 1)
+    }
+    private static func sourceMoney(_ text: String) throws -> String {
+        let source = sourceClean(text).replacingOccurrences(of: "₹", with: "").trimmingCharacters(in: .whitespaces)
+        let regex = try NSRegularExpression(pattern: #"^([0-9][0-9,]*\.[0-9]{1,2})\s*(Dr|Cr)?$"#)
+        guard let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+              let r = Range(match.range(at: 1), in: source) else { throw AuthenticAcceptanceError.oracleMismatch }
+        let digits = source[r].replacingOccurrences(of: ",", with: "")
+        guard let amount = Decimal(string: digits, locale: Locale(identifier: "en_US_POSIX")), amount >= 0 else { throw AuthenticAcceptanceError.oracleMismatch }
+        let canonical = NSDecimalNumber(decimal: amount).stringValue.split(separator: ".", omittingEmptySubsequences: false)
+        let fraction = canonical.count == 2 ? String(canonical[1]) : ""
+        guard fraction.count <= 2 else { throw AuthenticAcceptanceError.oracleMismatch }
+        let credit = Range(match.range(at: 2), in: source).map { source[$0] == "Cr" } ?? false
+        return (credit && amount != 0 ? "-" : "") + canonical[0] + "." + fraction + String(repeating: "0", count: 2 - fraction.count)
+    }
+    private static func sourceOracleRow(date: String, narration: String, amount: String, direction: String, retainsOriginalMoney: Bool) throws -> OracleRow {
+        let details = sourceClean(narration), normalizedDirection = sourceClean(direction).lowercased()
+        guard !details.isEmpty, ["debit", "credit", "dr", "cr"].contains(normalizedDirection) else { throw AuthenticAcceptanceError.oracleMismatch }
+        var references: [String] = []
+        for (pattern, prefix) in [(#"(?i)\bPAYMENT\s*#\s*([A-Z0-9]{14})\b"#, "PAYMENT #"), (#"(?i)\bRef\s*#\s*([0-9]{8})\b"#, "Ref# ")] {
+            let regex = try NSRegularExpression(pattern: pattern)
+            for m in regex.matches(in: details, range: NSRange(details.startIndex..., in: details)) {
+                guard let r = Range(m.range(at: 1), in: details) else { throw AuthenticAcceptanceError.oracleMismatch }
+                references.append(prefix + details[r])
+            }
+        }
+        guard references.count <= 1 else { throw AuthenticAcceptanceError.oracleMismatch }
+        var original: OracleMoney?
+        let pattern = try NSRegularExpression(pattern: #"\(\s*([A-Z]{3})\s+([0-9][0-9,]*\.[0-9]{1,2})\s*\)"#)
+        let matches = pattern.matches(in: details, range: NSRange(details.startIndex..., in: details))
+        guard matches.count <= 1, retainsOriginalMoney || matches.isEmpty else { throw AuthenticAcceptanceError.oracleMismatch }
+        if retainsOriginalMoney, let m = matches.first,
+           let currency = Range(m.range(at: 1), in: details), let value = Range(m.range(at: 2), in: details) {
+            original = OracleMoney(currency: String(details[currency]), amount: try sourceMoney(String(details[value])))
+        }
+        return OracleRow(date: try sourceDate(date), amount: try sourceMoney(amount),
+            effect: ["credit", "cr"].contains(normalizedDirection) ? "card_decrease_owed" : "card_increase_owed",
+            reference: references.first, narration: details, originalMerchantMoney: original)
+    }
+    private static func sourceAppControls(_ lines: [Int: [SourceGlyph]]) throws -> [String: String] {
+        guard let paymentHeader = lines[6570], let accountHeader = lines[6105], let payment = lines[6405], let account = lines[5940],
+              sourceColumn(paymentHeader, 0, 210) == "Total Payment Due",
+              sourceColumn(paymentHeader, 210, 380) == "Minimum Payment Due",
+              sourceColumn(paymentHeader, 380, 600) == "Payment Due Date",
+              sourceColumn(accountHeader, 0, 210) == "Selected Statement Month",
+              sourceColumn(accountHeader, 210, 380) == "Credit Limit",
+              sourceColumn(accountHeader, 380, 600) == "Opening Balance" else { throw AuthenticAcceptanceError.oracleMismatch }
+        _ = try sourceMoney(sourceColumn(payment, 210, 380))
+        _ = try sourceMoney(sourceColumn(account, 210, 380))
+        return try ["selected_statement_month": sourceMonth(sourceColumn(account, 0, 210)),
+            "opening_balance": sourceMoney(sourceColumn(account, 380, 600)),
+            "total_payment_due": sourceMoney(sourceColumn(payment, 0, 210)),
+            "payment_due_date": sourceDate(sourceColumn(payment, 380, 600))]
+    }
+    private static func sourceTraditionalControls(_ lines: [Int: [SourceGlyph]]) throws -> [String: String] {
+        guard let header = lines[8540], let balanceHeader = lines[7960], let dates = lines[8415], let payment = lines[8405], let balances = lines[7830],
+              sourceColumn(header, 0, 140) == "Total Payment Due",
+              sourceColumn(header, 255, 375) == "Statement Period",
+              sourceColumn(balanceHeader, 60, 130).contains("Previous Balance") else { throw AuthenticAcceptanceError.oracleMismatch }
+        let period = try sourceCapture(#"^(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})$"#, sourceColumn(dates, 255, 375))
+        return try ["statement_period_start": sourceDate(period[0]), "statement_period_end": sourceDate(period[1]),
+            "opening_balance": sourceMoney(sourceColumn(balances, 0, 110)),
+            "total_payment_due": sourceMoney(sourceColumn(payment, 0, 140)),
+            "payment_due_date": sourceDate(sourceColumn(dates, 375, 465)),
+            "statement_generation_date": sourceDate(sourceColumn(dates, 465, 600))]
+    }
+    private static func sourceWorkbook(_ grid: [[String]]) throws -> (rows: [OracleRow], controls: [String: String]) {
+        guard grid.count > 8, grid.allSatisfy({ $0.count >= 5 }),
+              grid[6][0] == "Date", grid[6][1] == "Transaction Details", grid[6][3] == "Amount (INR)", grid[6][4] == "Debit/Credit" else { throw AuthenticAcceptanceError.oracleMismatch }
+        var controls: [String: String] = [:]
+        for row in grid.prefix(7) {
+            for cell in row {
+                let pieces = cell.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+                guard pieces.count == 2 else { continue }
+                let label = String(pieces[0]).trimmingCharacters(in: .whitespaces), value = String(pieces[1])
+                let key: String, result: String
+                switch label {
+                case "Selected Statement Month": key = "selected_statement_month"; result = try sourceMonth(value)
+                case "Opening Balance": key = "opening_balance"; result = try sourceMoney(value)
+                case "Total Payment Due": key = "total_payment_due"; result = try sourceMoney(value)
+                case "Payment Due Date": key = "payment_due_date"; result = try sourceDate(value)
+                default: continue
+                }
+                guard controls.updateValue(result, forKey: key) == nil else { throw AuthenticAcceptanceError.oracleMismatch }
+            }
+        }
+        guard controls.count == 4 else { throw AuthenticAcceptanceError.oracleMismatch }
+        var rows: [OracleRow] = [], endSeen = false
+        for cells in grid.dropFirst(7) {
+            if cells.allSatisfy({ $0.isEmpty }) { continue }
+            if sourceClean(cells[0]).lowercased() == "** end of statement **" {
+                guard !endSeen, cells.dropFirst().allSatisfy({ $0.isEmpty }) else { throw AuthenticAcceptanceError.oracleMismatch }
+                endSeen = true; continue
+            }
+            guard !endSeen else { throw AuthenticAcceptanceError.oracleMismatch }
+            rows.append(try sourceOracleRow(date: cells[0], narration: cells[1], amount: cells[3], direction: cells[4], retainsOriginalMoney: false))
+        }
+        guard endSeen else { throw AuthenticAcceptanceError.oracleMismatch }
+        return (rows, controls)
+    }
+    private static func sourceFinancialMultiset(_ rows: [OracleRow]) -> [String: Int] {
+        rows.reduce(into: [:]) { result, row in result[[row.date, row.amount, row.effect].joined(separator: "|") , default: 0] += 1 }
+    }
+    private static func sourceInventoryDigest(_ inventory: [String: String]) -> String {
+        // UTF-8 version header plus sorted digest|byte-count|format records, all LF-terminated.
+        let text = "ledgerforge.axis-card.authentic-source-inventory.v1\n" + inventory.keys.sorted().map { "\($0)|\(inventory[$0]!)\n" }.joined()
+        return sha256Hex(Data(text.utf8))
+    }
+
+    private static func sourceVerifyInventory(_ actual: [String: String]) throws {
+        let expected: [String: String] = [
+            "013a3ed9925670382b33b0d62a4ef8b11ad77d5b10b2ef714f7482a015ab1937": "140489|app_pdf",
+            "098aad1b2370333c69c5f9f36a9059e0f0015a21bb388e35c95a833adf5802b5": "27460|xlsx",
+            "0eef6ffd3e64e09c70ae02c4df70e1e36cb0b7129abf0f454f8d368ea3891bcd": "208382|traditional_pdf",
+            "1928df08d7924eb61b0e730c3179e98536ed3fb5b48085f690c1172d60a502dc": "220802|traditional_pdf",
+            "1eb676f218dd0b6301e1931423902f7d3c94c241fbc68c10639f4df1f008e8bd": "133989|app_pdf",
+            "20d0891b20c2e370cb3716c47cb4faac3cd6add355863422cc004dc478770f1d": "158997|app_pdf",
+            "25e1fd1310684261d7801c67e04622a2b3c71870ee1ac29386c7328275166813": "293925|app_pdf",
+            "2e4b2534bf01dc3f855b4e6e4eaaf3af0d1ae17e1078cd86c6cef05ebf98510f": "22916|xlsx",
+            "2e88ba806f0336ebc15a21dc62c0962f692322220b3919e2029f0d627e32363f": "312133|traditional_pdf",
+            "305082faa93f28d32875044845f7666b0bcb620ce068c1715028c4088a5912d3": "24133|xlsx",
+            "35e8b95fe4c590107313dcfd77f9e256129c8ae2e4d2705b45d18d96e433d3bc": "176015|app_pdf",
+            "409c6a4d2ad57e54e787b336ae990ded0c102101b421bf60a38f0660eaf94be9": "353471|app_pdf",
+            "51825aca2ace4feafe1a2def5b2ca04451efbd6df9225f58a7549024c9848785": "153550|app_pdf",
+            "6ac9ae28b9fb3ef288b7370b5d91a0c72f7e96f6c55d769168f31a23f68c2ec2": "198084|traditional_pdf",
+            "74f2e38ec1775cbd0b99b30f1e08e3ba415daf29678695c1e4e3a7f930762f08": "313171|traditional_pdf",
+            "86dd24d2cc464beb63d715837178f4ca835603f92234eae05f3781dacc6c1def": "138022|app_pdf",
+            "b18e7a63c5f2b460bc87d1530a19ae43624126663fdf6f243e2a1f3c086def9e": "334463|app_pdf",
+            "b2713c803870c361cc3a8ddccea20123bb6644b25fb33b6fa4f54e4a63287e0c": "202412|app_pdf",
+            "b27d1b0ebd9681ee75b6f163a75c2716341125fa11627ffc9501c09ab1dd55ca": "141110|app_pdf",
+            "b9dd39b143cf88cd1dbbb122318d70ea8616b07cbfa3591a48f4121fa551a2de": "236550|app_pdf",
+            "bc6ea94f21d7c608e95fc646b7ed040ebbcdb6b5d6a21b5f3c47637599f35b44": "320878|traditional_pdf",
+            "cbf19468a119f0d0d42c46a386061a03d1bce35e020491c2574ef3d64efcc653": "247482|app_pdf",
+            "ccfcc8ed86eee48fd30c69382849c7731618e4e78027733089b1b1e7360ac082": "27033|xlsx",
+            "d777aec229a70a830e6830b3b0df6db65f6ea731e5a7d76f079fd6e223319221": "28676|xlsx",
+            "de3bf6d3fdd7a90005ff783474e88319192f67c3230e2b94b38da8c369f60ab0": "24537|xlsx",
+            "e876b186ca152e6655fea80dd2fd753969847b4e4f3c0686cd630a501c532063": "220593|app_pdf",
+            "eadba710e691a48b7768015a5ea88ef52fe2ba80e0fbebdd46052fe806500cf1": "214083|traditional_pdf",
+            "ec38e3a12476a2e1fc737b1fe05fc1e774821421479909884afe01ea708e761a": "24838|xlsx",
+            "f3e59d78badd40cd09b7f6311becaa12cd9ae2b9ff128b221130e22a78550067": "158552|app_pdf",
+            "f4b5070daf1bcffab33d6cb30a7c0fcd80adec4c19942af979873589199d24f5": "399335|app_pdf",
+            "f5c487124dc76246ac3b4a2f825690a44efb94537f194769f24f158ffef30074": "127479|app_pdf",
+            "fa0694dfb436ff52d011c4b5bbcd0b7d205a7d3497e039b42fb7db9509fc037b": "221792|app_pdf"
         ]
-        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
-        try data.write(to: URL(fileURLWithPath: resultPath), options: [.atomic])
+        guard actual == expected,
+              sourceInventoryDigest(actual) == "db2414293ca3cb04a661f56638bde6e592ab39d66468aa18534b8ff8d383f92e" else { throw AuthenticAcceptanceError.oracleMismatch }
+    }
+
+    /// Deterministic digest of the independently constructed oracle in memory.
+    /// This is not a file digest and is never written to a result artifact.
+    private static func sourceOracleProjectionDigest(_ oracle: SourceOracle) -> String {
+        func field(_ value: String) -> String { "\(value.utf8.count):\(value)" }
+        var values = ["ledgerforge.axis-card.in-memory-oracle-digest.v1", oracle.schema, oracle.authority, oracle.sourceInventorySHA256]
+        for record in oracle.records.sorted(by: { $0.sourceSHA256 < $1.sourceSHA256 }) {
+            values += [record.sourceSHA256, record.format.rawValue, record.cycle, String(record.rowCount)]
+            for key in record.controls.keys.sorted() { values += [key, record.controls[key]!] }
+            values.append("rows")
+            for row in record.rows {
+                values += [row.date, row.amount, row.effect, row.narration,
+                    row.reference == nil ? "absent-reference" : "present-reference", row.reference ?? "",
+                    row.originalMerchantMoney == nil ? "absent-original-money" : "present-original-money",
+                    row.originalMerchantMoney?.currency ?? "", row.originalMerchantMoney?.amount ?? ""]
+            }
+        }
+        return sha256Hex(Data(values.map(field).joined().utf8))
     }
 
     private static func sha256Hex(_ data: Data) -> String {

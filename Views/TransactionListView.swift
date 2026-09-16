@@ -167,10 +167,40 @@ enum TransactionPeriodChoice: String, CaseIterable {
     }
 }
 
+/// One scalar measurement for the current row revision and actual native font.
+/// Query/selection changes do not cause another full amount-measurement pass.
+@MainActor
+final class TransactionAmountWidthMeasurement {
+    private var revision: UInt64?
+    private var font: NSFont?
+    private var width: CGFloat = 160
+
+    func value(revision: UInt64, font: NSFont, measure: () -> CGFloat) -> CGFloat {
+        if self.revision == revision, self.font == font { return width }
+        width = measure()
+        self.revision = revision
+        self.font = font
+        return width
+    }
+}
+
+/// Session-only input state stays aligned with the retained query; no preference
+/// or financial source is persisted by these controls.
+struct TransactionPresentationControls {
+    var period: TransactionPeriodChoice = .all
+    var customStart = ""
+    var customEnd = ""
+    var minimumAmount = ""
+    var maximumAmount = ""
+    var amountInputError: String?
+    var dateInputError: String?
+}
+
 struct TransactionListView: View {
     @Environment(\.lfTheme) private var theme
     @Environment(\.appearsActive) private var appearsActive
-    @StateObject private var viewModel = TransactionListViewModel()
+    @StateObject private var viewModel: TransactionListViewModel
+    @State private var amountMeasurement: TransactionAmountWidthMeasurement
     @ObservedObject private var categoryStore: CategoryStore
     private let categoryCoordinator: CategoryManaging
     private let generation: ProviderGenerationToken?
@@ -181,13 +211,48 @@ struct TransactionListView: View {
     @State private var detailsVisible = true
     @State private var narrowDetailsVisible = false
     @State private var moreFiltersVisible = false
-    @State private var period: TransactionPeriodChoice = .all
-    @State private var customStart = ""
-    @State private var customEnd = ""
-    @State private var minimumAmount = ""
-    @State private var maximumAmount = ""
-    @State private var amountInputError: String?
-    @State private var dateInputError: String?
+    private var period: TransactionPeriodChoice {
+        get { viewModel.presentationControls.period }
+        nonmutating set {
+            if viewModel.presentationControls.period != newValue { viewModel.presentationControls.period = newValue }
+        }
+    }
+    private var customStart: String {
+        get { viewModel.presentationControls.customStart }
+        nonmutating set {
+            if viewModel.presentationControls.customStart != newValue { viewModel.presentationControls.customStart = newValue }
+        }
+    }
+    private var customEnd: String {
+        get { viewModel.presentationControls.customEnd }
+        nonmutating set {
+            if viewModel.presentationControls.customEnd != newValue { viewModel.presentationControls.customEnd = newValue }
+        }
+    }
+    private var minimumAmount: String {
+        get { viewModel.presentationControls.minimumAmount }
+        nonmutating set {
+            if viewModel.presentationControls.minimumAmount != newValue { viewModel.presentationControls.minimumAmount = newValue }
+        }
+    }
+    private var maximumAmount: String {
+        get { viewModel.presentationControls.maximumAmount }
+        nonmutating set {
+            if viewModel.presentationControls.maximumAmount != newValue { viewModel.presentationControls.maximumAmount = newValue }
+        }
+    }
+    private var amountInputError: String? {
+        get { viewModel.presentationControls.amountInputError }
+        nonmutating set {
+            if viewModel.presentationControls.amountInputError != newValue { viewModel.presentationControls.amountInputError = newValue }
+        }
+    }
+    private var dateInputError: String? {
+        get { viewModel.presentationControls.dateInputError }
+        nonmutating set {
+            if viewModel.presentationControls.dateInputError != newValue { viewModel.presentationControls.dateInputError = newValue }
+        }
+    }
     @State private var categoryMessage: String?
     @State private var categoryReconciliationRequired = false
     @FocusState private var searchFocused: Bool
@@ -205,6 +270,8 @@ struct TransactionListView: View {
 #if DEBUG
     @MainActor
     init(
+        viewModel: TransactionListViewModel? = nil,
+        amountMeasurement: TransactionAmountWidthMeasurement? = nil,
         generation: ProviderGenerationToken? = nil,
         availabilityState: ApplicationDataState = .loading,
         categoryStore: CategoryStore? = nil,
@@ -212,6 +279,8 @@ struct TransactionListView: View {
         acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
     ) {
         let resolvedStore = categoryStore ?? .shared
+        self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
+        self._amountMeasurement = State(initialValue: amountMeasurement ?? TransactionAmountWidthMeasurement())
         self.categoryStore = resolvedStore
         self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
         self.acknowledgementGate = acknowledgementGate ?? .shared
@@ -221,12 +290,16 @@ struct TransactionListView: View {
 #else
     @MainActor
     init(
+        viewModel: TransactionListViewModel? = nil,
+        amountMeasurement: TransactionAmountWidthMeasurement? = nil,
         generation: ProviderGenerationToken? = nil,
         availabilityState: ApplicationDataState = .loading,
         categoryStore: CategoryStore? = nil,
         categoryCoordinator: CategoryManaging? = nil
     ) {
         let resolvedStore = categoryStore ?? .shared
+        self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
+        self._amountMeasurement = State(initialValue: amountMeasurement ?? TransactionAmountWidthMeasurement())
         self.categoryStore = resolvedStore
         self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
         self.generation = generation
@@ -313,6 +386,8 @@ struct TransactionListView: View {
 
     private func synchronizePresentation() {
         viewModel.synchronizePresentation(generation: generation, availabilityState: availabilityState)
+        updatePeriod()
+        updateAmount()
     }
 
     private func searchAndPeriod(narrow: Bool) -> some View {
@@ -338,7 +413,7 @@ struct TransactionListView: View {
             .background(panelColor, in: RoundedRectangle(cornerRadius: theme.radius.control))
             .overlay(RoundedRectangle(cornerRadius: theme.radius.control).stroke(searchFocused ? focusColor : controlBorder, lineWidth: searchFocused ? 2 : 1))
 
-            Picker("Period", selection: $period) {
+            Picker("Period", selection: $viewModel.presentationControls.period) {
                 ForEach(TransactionPeriodChoice.allCases, id: \.self) { choice in
                     Text(choice.rawValue).tag(choice)
                 }
@@ -502,10 +577,10 @@ struct TransactionListView: View {
                         .font(theme.typography.caption).foregroundStyle(secondary)
                     currencyMenu
                     HStack {
-                        TextField("Minimum", text: $minimumAmount)
+                        TextField("Minimum", text: $viewModel.presentationControls.minimumAmount)
                             .lfTextField()
                             .accessibilityLabel("Minimum native amount")
-                        TextField("Maximum", text: $maximumAmount)
+                        TextField("Maximum", text: $viewModel.presentationControls.maximumAmount)
                             .lfTextField()
                             .accessibilityLabel("Maximum native amount")
                     }
@@ -564,11 +639,11 @@ struct TransactionListView: View {
     private var customDateControls: some View {
         HStack(spacing: 12) {
             Text("Source date").foregroundStyle(secondary)
-            TextField("From YYYY-MM-DD", text: $customStart)
+            TextField("From YYYY-MM-DD", text: $viewModel.presentationControls.customStart)
                 .lfTextField()
                 .accessibilityLabel("Source date from, year month day")
             Text("to").foregroundStyle(secondary)
-            TextField("Through YYYY-MM-DD", text: $customEnd)
+            TextField("Through YYYY-MM-DD", text: $viewModel.presentationControls.customEnd)
                 .lfTextField()
                 .accessibilityLabel("Source date through, year month day")
             Text("Inclusive").font(theme.typography.caption).foregroundStyle(secondary)
@@ -694,9 +769,11 @@ struct TransactionListView: View {
     /// This measurement owns no AppKit view, window, or application lifecycle.
     private var amountColumnWidth: CGFloat {
         let font = theme.typography.nativeFont(.tableMoney)
-        return max(160, viewModel.allPresentationRows.reduce(CGFloat.zero) { width, row in
-            max(width, (MoneyFormatting.display(row.transaction.money) as NSString).size(withAttributes: [.font: font]).width + 24)
-        })
+        return amountMeasurement.value(revision: viewModel.canonicalContentRevision, font: font) {
+            max(160, viewModel.allPresentationRows.reduce(CGFloat.zero) { width, row in
+                max(width, (MoneyFormatting.display(row.transaction.money) as NSString).size(withAttributes: [.font: font]).width + 24)
+            })
+        }
     }
 
     private var transactionTable: some View {

@@ -225,6 +225,11 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         case .useExistingAccount(let accountID):
             guard let existing = try loadAccount(id: accountID) else { return .selectedAccountUnavailable }
             guard existing.workspaceId == plan.workspace.id else { return .selectedAccountWorkspaceMismatch }
+            guard existing.accountType == plan.proposedAccount.accountType,
+                  existing.nativeCurrency == plan.proposedAccount.nativeCurrency,
+                  existing.institutionId == plan.proposedAccount.institutionId else {
+                return .selectedAccountIneligible
+            }
             if let currentOwner {
                 guard currentOwner == accountID else { return .identifierOwnershipConflict }
             } else if try count("SELECT COUNT(*) FROM account_identifiers WHERE account_id = ? AND workspace_id = ?;", [accountID, plan.workspace.id]) > 0 {

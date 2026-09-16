@@ -198,12 +198,22 @@ enum ImportCardInstrumentChoice: Equatable {
         relationship: CardInstrumentRelationshipKind? = nil,
         relatedInstrumentId: String? = nil
     )
+
+    var isComplete: Bool {
+        switch self {
+        case .reuseExistingInstrument(let id):
+            return !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .createNewInstrument(let relationship, let relatedID):
+            if relationship == nil { return relatedID == nil }
+            return relatedID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        }
+    }
 }
 
 enum ImportAccountChoice: Equatable {
     case useExistingAccount(accountId: String)
-    case createNewAccount
-    case createNewCardLiabilityAccountAndInstrument
+    case createNewAccount(displayName: String)
+    case createNewCardLiabilityAccountAndInstrument(displayName: String)
     case useExistingCardLiabilityAccount(
         accountId: String,
         instrumentChoice: ImportCardInstrumentChoice
@@ -212,6 +222,15 @@ enum ImportAccountChoice: Equatable {
         accountId: String,
         sectionChoices: [String: ImportCardInstrumentChoice]
     )
+
+    var proposedAccountDisplayName: String? {
+        switch self {
+        case .createNewAccount(let name), .createNewCardLiabilityAccountAndInstrument(let name):
+            return name
+        default:
+            return nil
+        }
+    }
 }
 
 enum ImportIdentityReview: Equatable, Sendable {
@@ -997,7 +1016,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 providerGeneration: providerGeneration,
                 advisoryIdentity: advisoryIdentity,
                 accountChoice: confirmedChoice,
-                selectedAccountId: selectedAccountId
+                selectedAccountId: selectedAccountId,
+                proposedAccountDisplayName: accountChoice?.proposedAccountDisplayName
             )
             try validate(confirmedPlan: plan)
             return plan
@@ -1055,7 +1075,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             providerGeneration: providerGeneration,
             advisoryIdentity: advisoryIdentity,
             accountChoice: confirmedChoice,
-            selectedAccountId: selectedAccountId
+            selectedAccountId: selectedAccountId,
+            proposedAccountDisplayName: accountChoice?.proposedAccountDisplayName
         )
         try validate(confirmedPlan: plan)
         return plan
@@ -1115,6 +1136,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 advisoryIdentity: .noMatch,
                 accountChoice: confirmedAccountChoice,
                 selectedAccountId: selectedAccountID,
+                proposedAccountDisplayName: accountChoice?.proposedAccountDisplayName,
                 cardAssociationAuthority: "user_confirmed",
                 cardSectionChoices: [:],
                 cardSectionAuthorities: [:],
@@ -1148,6 +1170,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         let accountObservation = evidence.accountSourceIdentityObservations[0]
         let accountCandidates = Set(snapshot.sourceObservations.filter {
             $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
+            $0.associationAuthority == "user_confirmed" &&
             $0.observationKind == accountObservation.kind.rawValue &&
             $0.sourceValue == accountObservation.value
         }.map(\.subjectId))
@@ -1159,7 +1182,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             for section in evidence.instrumentSections {
                 let incoming = section.sourceIdentityObservations[0]
                 let instruments = Set(snapshot.sectionObservations.compactMap { observation -> String? in
-                    guard observation.observationKind == incoming.kind.rawValue,
+                    guard observation.associationAuthority == "user_confirmed",
+                          observation.observationKind == incoming.kind.rawValue,
                           observation.sourceValue == incoming.value,
                           let durableSection = snapshot.sections.first(where: {
                               $0.id == observation.cardStatementSectionId
@@ -1189,7 +1213,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 sectionAuthorities[section.documentScopedSectionID] = "user_confirmed"
             }
         case .useExistingCardLiabilityAccount(let accountID, let choice):
-            guard evidence.instrumentSections.count == 1 else {
+            guard evidence.instrumentSections.count == 1, choice.isComplete else {
                 throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
             }
             selectedAccountID = accountID
@@ -1206,7 +1230,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 }
             }
         case .useExistingCardLiabilityAccountSections(let accountID, let choices):
-            guard Set(choices.keys) == Set(evidence.instrumentSections.map(\.documentScopedSectionID)) else {
+            guard Set(choices.keys) == Set(evidence.instrumentSections.map(\.documentScopedSectionID)),
+                  choices.values.allSatisfy(\.isComplete) else {
                 throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
             }
             selectedAccountID = accountID
@@ -1279,6 +1304,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             advisoryIdentity: advisoryIdentity,
             accountChoice: confirmedAccountChoice,
             selectedAccountId: selectedAccountID,
+            proposedAccountDisplayName: accountChoice?.proposedAccountDisplayName,
             cardAssociationAuthority: accountAssociationAuthority,
             cardSectionChoices: sectionChoices,
             cardSectionAuthorities: sectionAuthorities,
@@ -1403,6 +1429,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             }
             let accountIDs = Set(snapshot.sourceObservations.filter {
                 $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
+                $0.associationAuthority == "user_confirmed" &&
                 $0.observationKind == accountObservation.kind.rawValue &&
                 $0.sourceValue == accountObservation.value
             }.map(\.subjectId))
@@ -1410,7 +1437,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 let resolvedInstruments = evidence.instrumentSections.compactMap { incomingSection -> String? in
                     let incoming = incomingSection.sourceIdentityObservations[0]
                     let mapped = Set(snapshot.sectionObservations.compactMap { observation -> String? in
-                        guard observation.observationKind == incoming.kind.rawValue,
+                        guard observation.associationAuthority == "user_confirmed",
+                              observation.observationKind == incoming.kind.rawValue,
                               observation.sourceValue == incoming.value,
                               let section = snapshot.sections.first(where: {
                                   $0.id == observation.cardStatementSectionId
@@ -1429,7 +1457,11 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 return .matchedExisting(accountId: accountID)
             }
             let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
-                .filter { $0.accountType == "credit_card" && $0.nativeCurrency == evidence.nativeCurrency.code }
+                .filter {
+                    $0.accountType == "credit_card" &&
+                        $0.nativeCurrency == evidence.nativeCurrency.code &&
+                        $0.institutionId == financialDocument.metadata.institution.rawValue
+                }
                 .map(\.id).sorted()
             return .cardChoiceRequired(eligibleLiabilityAccountIds: eligible)
         }
@@ -1453,8 +1485,23 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             return .unavailable
         }
 
+        let sourceAccountType: String?
+        switch financialDocument.metadata.documentType {
+        case .bankAccount: sourceAccountType = "bank"
+        case .creditCard: sourceAccountType = "credit_card"
+        default: sourceAccountType = nil
+        }
+        guard let sourceAccountType, let sourceCurrency = financialDocument.bookedCurrency?.code else {
+            return .unavailable
+        }
+        let sourceInstitution = financialDocument.metadata.institution == .unknown
+            ? nil : financialDocument.metadata.institution.rawValue
         let eligibleAccountIds = try provider.accountRepo.accounts(workspaceId: workspaceId)
-            .filter { try provider.accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId).isEmpty }
+            .filter {
+                guard $0.accountType == sourceAccountType, $0.nativeCurrency == sourceCurrency,
+                      $0.institutionId == sourceInstitution else { return false }
+                return try provider.accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId).isEmpty
+            }
             .map(\.id)
             .sorted()
         developerConsole?.info(.import, "Identity review available", metadata: ["eligibleAccounts": "\(eligibleAccountIds.count)"])

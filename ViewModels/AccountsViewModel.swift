@@ -8,16 +8,21 @@ import Combine
 final class ImportHistoryViewModel: ObservableObject {
     @Published private(set) var attempts: [RepositoryImportAttempt] = []
     @Published private(set) var selectedAttempt: RepositoryImportAttempt?
+    @Published private(set) var latestDurableAttempt: RepositoryImportAttempt?
     private var cancellable: AnyCancellable?
 
     convenience init() { self.init(store: .shared) }
 
     init(store: ImportAttemptStore) {
-        attempts = store.attempts
-        cancellable = store.$attempts.receive(on: RunLoop.main).sink { [weak self] attempts in
-            self?.attempts = attempts
-            if let selected = self?.selectedAttempt { self?.selectedAttempt = attempts.first { $0.id == selected.id } }
+        installAttempts(store.attempts)
+        cancellable = store.$attempts.dropFirst().receive(on: RunLoop.main).sink { [weak self] in
+            self?.installAttempts($0)
         }
+    }
+    private func installAttempts(_ attempts: [RepositoryImportAttempt]) {
+        latestDurableAttempt = ImportActivityPresentation.latestDurableAttempt(from: attempts)
+        self.attempts = attempts
+        if let selectedAttempt { self.selectedAttempt = attempts.first { $0.id == selectedAttempt.id } }
     }
     func select(id: String) { selectedAttempt = attempts.first { $0.id == id } }
     func clearSelection() { selectedAttempt = nil }
@@ -27,6 +32,7 @@ struct AccountsAccountPresentation: Identifiable, Equatable {
     let id: String
     let displayName: String
     let institution: String
+    let accountType: AccountType
     let accountTypeLabel: String
     let currencyCode: String
     let currentBalance: Decimal
@@ -417,6 +423,7 @@ final class AccountsViewModel: ObservableObject {
                 id: repositoryAccountID,
                 displayName: account.nickname ?? account.name,
                 institution: account.institution,
+                accountType: account.type,
                 accountTypeLabel: Self.accountTypeLabel(account.type),
                 currencyCode: account.currencyCode,
                 currentBalance: account.currentBalance,

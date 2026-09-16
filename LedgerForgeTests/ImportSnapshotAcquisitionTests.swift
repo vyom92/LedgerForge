@@ -261,7 +261,8 @@ private final class FailingSnapshotCoordinator: ImportFramework.ImportCoordinato
     }
 }
 
-private actor CancellationSnapshotCoordinator: ImportFramework.ImportCoordinator {
+@MainActor
+private final class CancellationSnapshotCoordinator: ImportFramework.ImportCoordinator {
     private var invoked = false
     private var invocationContinuation: CheckedContinuation<Void, Never>?
 
@@ -275,9 +276,9 @@ private actor CancellationSnapshotCoordinator: ImportFramework.ImportCoordinator
 
         do {
             try await Task.sleep(for: .seconds(60))
-            return await .failure(request: request, error: .readerFailure(message: "Unexpected completion."))
+            return .failure(request: request, error: .readerFailure(message: "Unexpected completion."))
         } catch {
-            return await .failure(request: request, error: .cancelled)
+            return .failure(request: request, error: .cancelled)
         }
     }
 

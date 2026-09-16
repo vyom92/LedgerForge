@@ -200,10 +200,10 @@ static const char *encoding_for_codepage(WORD codepage) {
 static char* unicode_decode_iconv(const char *s, size_t len, iconv_t ic) {
     char* outbuf = 0;
 
-    if(s && len && ic)
+    if(s && len && len < SIZE_MAX && ic && ic != (iconv_t)-1)
     {
         size_t outlenleft = len;
-        int outlen = len;
+        size_t outlen = len;
         size_t inlenleft = len;
         const char* src_ptr = s;
         char* out_ptr = 0;
@@ -222,13 +222,19 @@ static char* unicode_decode_iconv(const char *s, size_t len, iconv_t ic) {
                     if(errno == E2BIG)
                     {
                         size_t diff = out_ptr - outbuf;
+                        if (inlenleft > SIZE_MAX - outlen - 1) {
+                            free(outbuf);
+                            return NULL;
+                        }
                         outlen += inlenleft;
                         outlenleft += inlenleft;
-                        outbuf = realloc(outbuf, outlen + 1);
-                        if(!outbuf)
+                        char *grown = realloc(outbuf, outlen + 1);
+                        if(!grown)
                         {
-                            break;
+                            free(outbuf);
+                            return NULL;
                         }
+                        outbuf = grown;
                         out_ptr = outbuf + diff;
                     }
                     else
@@ -255,11 +261,15 @@ static char* unicode_decode_iconv(const char *s, size_t len, iconv_t ic) {
 static char *unicode_decode_wcstombs(const char *s, size_t len, xls_locale_t locale) {
 	// Do wcstombs conversion
     char *converted = NULL;
-    int count, count2;
+    size_t count, count2;
     size_t i;
     wchar_t *w = NULL;
 
+    if (s == NULL || len / 2 > SIZE_MAX / sizeof(wchar_t) - 1)
+        return NULL;
     w = malloc((len/2+1)*sizeof(wchar_t));
+    if (w == NULL)
+        return NULL;
 
     for(i=0; i<len/2; i++)
     {
@@ -269,14 +279,18 @@ static char *unicode_decode_wcstombs(const char *s, size_t len, xls_locale_t loc
 
     count = xls_wcstombs_l(NULL, w, INT_MAX, locale);
 
-    if (count <= 0) {
+    if (count == 0 || count == (size_t)-1) {
         goto cleanup;
     }
 
     converted = calloc(count+1, sizeof(char));
+    if (converted == NULL)
+        goto cleanup;
     count2 = xls_wcstombs_l(converted, w, count, locale);
-    if (count2 <= 0) {
+    if (count2 == 0 || count2 == (size_t)-1) {
         printf("wcstombs failed (%lu)\n", (unsigned long)len/2);
+        free(converted);
+        converted = NULL;
         goto cleanup;
     }
 
@@ -286,11 +300,14 @@ cleanup:
 }
 
 // Converts Latin-1 to UTF-8 the old-fashioned way
-static char *transcode_latin1_to_utf8(const char *str, DWORD len)
+static char *transcode_latin1_to_utf8(const char *str, size_t len)
 {
-	int utf8_chars = 0;
+	size_t utf8_chars = 0;
 	char *ret = NULL;
-    DWORD i;
+    size_t i;
+
+    if (str == NULL || len > (SIZE_MAX - 1) / 2)
+        return NULL;
 	
     for(i=0; i<len; ++i) {
         if(str[i] & (BYTE)0x80) {
@@ -299,6 +316,8 @@ static char *transcode_latin1_to_utf8(const char *str, DWORD len)
     }
 	
     char *out = ret = malloc(len+utf8_chars+1);
+    if (ret == NULL)
+        return NULL;
     // UTF-8 encoding inline
     for(i=0; i<len; ++i) {
         BYTE c = str[i];

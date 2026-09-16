@@ -4,7 +4,7 @@ import Testing
 @testable import LedgerForge
 
 /// Mixed-format queue acceptance over unchanged registered originals and their
-/// independent external oracles. This test creates no statement or financial DTO.
+/// independent in-memory source oracles. This test creates no statement or financial DTO.
 @Suite(.serialized)
 @MainActor
 struct ImportCentreAuthenticBatchTests {
@@ -20,42 +20,6 @@ struct ImportCentreAuthenticBatchTests {
         case queueRejected
         case timedOut
     }
-
-    private struct AxisOracle: Decodable {
-        let carriers: [AxisCarrier]
-    }
-
-    private struct AxisCarrier: Decodable {
-        let sourceSha256: String
-        let sourceSize: Int
-        let format: String
-        let logicalStatementId: String
-        let rowCount: Int
-    }
-
-    private struct HDFCOracle: Decodable {
-        let carriers: HDFCCarriers
-    }
-
-    private struct HDFCCarriers: Decodable {
-        let xls: [HDFCCarrier]
-    }
-
-    private struct HDFCCarrier: Decodable {
-        let carrier: String
-        let sha256: String
-        let account: String
-        let periodStart: String
-        let periodEnd: String
-        let currency: String
-        let rows: [HDFCRow]
-
-        var logicalStatementID: String {
-            ["hdfc", account, periodStart, periodEnd, currency].joined(separator: "|")
-        }
-    }
-
-    private struct HDFCRow: Decodable {}
 
     private struct SourceExpectation {
         let url: URL
@@ -83,7 +47,7 @@ struct ImportCentreAuthenticBatchTests {
 
     @Test(.globalRuntimeStateIsolation)
     func mixedOriginalCSVAndXLSQueuePersistsSeriallyAndRejectsExactReplay() async throws {
-        let expectations = try loadSourceExpectations()
+        let expectations = try await loadSourceExpectations()
         #expect(expectations.count == 2)
         #expect(Set(expectations.map(\.logicalStatementID)).count == 2)
         let originalDigests = try expectations.map { try sourceDigest($0.url) }
@@ -119,9 +83,8 @@ struct ImportCentreAuthenticBatchTests {
         let workspace = "import-centre-batch-\(providerKind.rawValue)-\(UUID().uuidString.lowercased())"
         let stores = BatchRuntimeStores()
         let hydrator = makeHydrator(provider: provider, workspace: workspace, stores: stores)
-        let password = try #require(
-            ProcessInfo.processInfo.environment["LEDGERFORGE_PRIVATE_HDFC_PASSWORD"]
-        )
+        let password = try await HDFCBankAccountAuthenticAcceptanceTests()
+            .sourceOraclePassword(ProcessInfo.processInfo.environment)
         let credentialStore = InMemoryStatementPasswordCredentialStore(
             passwords: [Institution.hdfc.statementPasswordCredentialScope: password]
         )
@@ -304,7 +267,7 @@ struct ImportCentreAuthenticBatchTests {
         case .matchedExisting(let accountID):
             return .useExistingAccount(accountId: accountID)
         case .choiceRequired:
-            return .createNewAccount
+            return .createNewAccount(displayName: "Imported review account")
         case .unavailable, .liabilityAccountChoiceRequired, .ambiguous, .conflict,
                 .cardChoiceRequired:
             throw TestError.unexpectedIdentityReview
@@ -353,7 +316,7 @@ struct ImportCentreAuthenticBatchTests {
         )
     }
 
-    private func loadSourceExpectations() throws -> [SourceExpectation] {
+    private func loadSourceExpectations() async throws -> [SourceExpectation] {
         let environment = ProcessInfo.processInfo.environment
         let approvedRoot = URL(
             fileURLWithPath: "/Users/vyom/Documents/Ledger Forge",
@@ -361,61 +324,34 @@ struct ImportCentreAuthenticBatchTests {
         )
         let axisURL = try AuthenticSourceTestSupport.axisBankCSV()
         try requireApprovedOriginal(axisURL, root: approvedRoot)
-        let axisData = try Data(contentsOf: axisURL, options: .mappedIfSafe)
-        let axisDigest = sourceDigest(axisData)
-        let axisDecoder = JSONDecoder()
-        axisDecoder.keyDecodingStrategy = .convertFromSnakeCase
-        let axisOracle = try axisDecoder.decode(
-            AxisOracle.self,
-            from: Data(contentsOf: URL(fileURLWithPath: try #require(
-                environment["LEDGERFORGE_AXIS_BANK_ORACLE"]
-            )))
-        )
-        let axisMatches = axisOracle.carriers.filter { $0.sourceSha256 == axisDigest }
-        guard axisMatches.count == 1,
-              let axisCarrier = axisMatches.first,
-              axisCarrier.sourceSize == axisData.count,
-              axisCarrier.format.lowercased() == "csv" else {
-            throw TestError.invalidOracle
-        }
+        let axisCarrier = try AxisBankAuthenticAcceptanceTests.sourceMetadataForMixedBatch(csvURL: axisURL)
 
         let hdfcRoot = URL(
             fileURLWithPath: try #require(resolveHDFCOriginalsRoot(environment)),
             isDirectory: true
         )
-        let hdfcOracle = try JSONDecoder().decode(
-            HDFCOracle.self,
-            from: Data(contentsOf: URL(fileURLWithPath: try #require(
-                environment["LEDGERFORGE_PRIVATE_HDFC_ORACLE_FILE"]
-            )))
-        )
-        let hdfcCarrier = try #require(
-            hdfcOracle.carriers.xls.sorted { $0.sha256 < $1.sha256 }.first
-        )
-        let hdfcURL = hdfcRoot.appendingPathComponent(hdfcCarrier.carrier)
+        let hdfcCarrier = try await HDFCBankAccountAuthenticAcceptanceTests()
+            .sourceMetadataForMixedBatch(root: hdfcRoot, environment: environment)
+        let hdfcURL = hdfcCarrier.url
         try requireApprovedOriginal(hdfcURL, root: approvedRoot)
-        let hdfcData = try Data(contentsOf: hdfcURL, options: .mappedIfSafe)
-        guard sourceDigest(hdfcData) == hdfcCarrier.sha256 else {
-            throw TestError.invalidOracle
-        }
 
         return [
             SourceExpectation(
                 url: axisURL,
-                sha256: axisCarrier.sourceSha256,
-                byteCount: axisCarrier.sourceSize,
+                sha256: axisCarrier.sha256,
+                byteCount: axisCarrier.byteCount,
                 format: .csv,
-                logicalStatementID: "axis|\(axisCarrier.logicalStatementId)",
+                logicalStatementID: axisCarrier.logicalStatementID,
                 rowCount: axisCarrier.rowCount,
                 institution: .axis
             ),
             SourceExpectation(
                 url: hdfcURL,
                 sha256: hdfcCarrier.sha256,
-                byteCount: hdfcData.count,
+                byteCount: hdfcCarrier.byteCount,
                 format: .xls,
                 logicalStatementID: hdfcCarrier.logicalStatementID,
-                rowCount: hdfcCarrier.rows.count,
+                rowCount: hdfcCarrier.rowCount,
                 institution: .hdfc
             )
         ]

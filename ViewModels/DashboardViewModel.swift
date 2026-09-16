@@ -348,6 +348,7 @@ final class DashboardViewModel: ObservableObject {
     private let now: () -> Date
     private let workspaceID: String
     private var cancellables = Set<AnyCancellable>()
+    private var pendingRefreshID: UUID?
     // Retains the existing bounded Dashboard display size; it is not a financial rule.
     private let recentActivityLimit = 3
 
@@ -372,29 +373,39 @@ final class DashboardViewModel: ObservableObject {
         // Every notification reads the complete already-installed canonical stores,
         // instead of combining captured values from different publication moments.
         Publishers.MergeMany([
-            accountStore.$accounts.map { _ in () }.eraseToAnyPublisher(),
-            transactionStore.$transactions.map { _ in () }.eraseToAnyPublisher(),
-            cardStore.$snapshot.map { _ in () }.eraseToAnyPublisher(),
-            categoryStore.$snapshot.map { _ in () }.eraseToAnyPublisher(),
-            fundingPlanStore.$plans.map { _ in () }.eraseToAnyPublisher(),
-            availability.$state.map { _ in () }.eraseToAnyPublisher(),
-            NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
-                .receive(on: RunLoop.main)
-                .map { _ in () }
-                .eraseToAnyPublisher()
+            accountStore.$accounts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            transactionStore.$transactions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            cardStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            fundingPlanStore.$plans.dropFirst().map { _ in () }.eraseToAnyPublisher()
         ])
-        .receive(on: RunLoop.main)
-        .sink { [weak self] in self?.refreshPresentation() }
+        .sink { [weak self] in self?.requestPresentationRefresh() }
+        .store(in: &cancellables)
+
+        // These stores publish on the main actor after installing their backing
+        // values. One queued refresh reads that whole snapshot. Availability
+        // withdrawal is synchronous, so stale financial content is never kept
+        // current while waiting for the queued work.
+        availability.$state.dropFirst()
+            .sink { [weak self] state in
+                guard let self else { return }
+                if state == .current || state == .empty {
+                    self.requestPresentationRefresh()
+                } else {
+                    self.invalidatePresentation(for: state)
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.requestPresentationRefresh() }
         .store(in: &cancellables)
         refreshPresentation()
     }
 
     func markHydrationStarted() {
-        presentationState = .loading("Loading persisted dashboard...")
-        positionState = .loading
-        recentActivityState = .loading
-        activityComparison = nil
-        fundingState = .loading
+        invalidatePresentation(for: .loading)
     }
 
     func markHydrationCompleted(_ result: RepositoryStoreHydrationResult) {
@@ -407,19 +418,38 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func markHydrationFailed(_ error: Error) {
-        presentationState = .failed("Dashboard load failed")
+        invalidatePresentation(for: .unavailable)
+    }
+
+    private func requestPresentationRefresh() {
+        guard pendingRefreshID == nil else { return }
+        let requestID = UUID()
+        pendingRefreshID = requestID
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.pendingRefreshID == requestID else { return }
+            self.refreshPresentation()
+        }
+    }
+
+    private func invalidatePresentation(for state: ApplicationDataState) {
+        pendingRefreshID = nil
+        let loading = state == .loading
+        presentationState = loading
+            ? .loading("Loading persisted dashboard...")
+            : .failed("Dashboard load failed")
         positions = []
         recentActivity = []
         activityComparison = nil
         fundingCalculation = nil
-        positionState = .unavailable
-        recentActivityState = .unavailable
-        fundingState = .unavailable
+        positionState = loading ? .loading : .unavailable
+        recentActivityState = loading ? .loading : .unavailable
+        fundingState = loading ? .loading : .unavailable
     }
 
     /// Observation only: never selects an account, seeds a plan, edits a draft,
     /// requests hydration, or calls a repository mutation.
     func refreshPresentation() {
+        pendingRefreshID = nil
         let state = availability.state
         let isCurrent = state == .current || state == .empty
         accounts = accountStore.accounts

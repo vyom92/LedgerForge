@@ -1,6 +1,7 @@
 // LedgerForgeTests/TransactionListViewModelTests.swift
 
 import Foundation
+import AppKit
 import Testing
 @testable import LedgerForge
 
@@ -764,6 +765,84 @@ struct TransactionListViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func currentProjectionIsReusedAcrossReadsAndQueryChanges() async throws {
+        let context = try await authenticTransactionListContext()
+        let model = TransactionListViewModel(
+            transactionStore: context.transactionStore, importSessionStore: context.importSessionStore,
+            accountStore: context.accountStore, categoryStore: context.categoryStore
+        )
+        model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let original = model.transactionPresentationResult
+        let ids = original.rows.map(\.stableID)
+        let money = original.rows.map { $0.transaction.money }
+        for _ in 0..<12 {
+            #expect(model.transactionPresentationResult.rows.map(\.stableID) == ids)
+            #expect(model.transactionPresentationResult.rows.map { $0.transaction.money } == money)
+            #expect(model.transactionPresentationResult.totals == original.totals)
+            #expect(model.allPresentationRows.count == context.transactionStore.transactions.count)
+        }
+        #expect(model.canonicalProjectionBuildCount == 1)
+        #expect(model.queryEvaluationCount == 1)
+        model.presentationFilter.searchText = "post94-no-displayed-match-85746"
+        #expect(model.transactionPresentationResult.state == .validEmpty)
+        #expect(model.allPresentationRows.count == ids.count)
+        #expect(model.canonicalProjectionBuildCount == 1)
+        #expect(model.queryEvaluationCount == 2)
+        model.presentationFilter = .empty
+        #expect(model.transactionPresentationResult.rows.map(\.stableID) == ids)
+        #expect(model.transactionPresentationResult.totals == original.totals)
+        #expect(model.canonicalProjectionBuildCount == 1)
+        model.synchronizePresentation(generation: nil, availabilityState: .unavailable)
+        #expect(model.transactionPresentationResult.state == .unavailable)
+        #expect(model.allPresentationRows.isEmpty)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func sameCountAccountMetadataPublicationInvalidatesRowsAndSearch() async throws {
+        let context = try await authenticTransactionListContext()
+        let accounts = AccountStore()
+        accounts.replaceAccounts(context.accountStore.accounts)
+        let model = TransactionListViewModel(
+            transactionStore: context.transactionStore, importSessionStore: context.importSessionStore,
+            accountStore: accounts, categoryStore: context.categoryStore
+        )
+        model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let original = model.transactionPresentationResult
+        let revision = model.canonicalContentRevision
+        let accountID = try #require(original.rows.first?.accountID)
+        var renamed = accounts.accounts
+        let index = try #require(renamed.firstIndex { $0.repositoryAccountId == accountID })
+        renamed[index].name = "Post94 review label"
+        accounts.replaceAccounts(renamed)
+        for _ in 0..<100 where model.canonicalContentRevision == revision {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.canonicalContentRevision > revision)
+        #expect(model.transactionPresentationResult.rows.count == original.rows.count)
+        #expect(model.transactionPresentationResult.totals == original.totals)
+        #expect(model.allPresentationRows.filter { $0.accountID == accountID }.allSatisfy { $0.accountDisplayName == "Post94 review label" })
+        model.presentationFilter.searchText = "Post94 review label"
+        #expect(!model.transactionPresentationResult.rows.isEmpty)
+        #expect(model.transactionPresentationResult.rows.allSatisfy { $0.accountID == accountID })
+        #expect(model.allPresentationRows.count == original.rows.count)
+    }
+
+    @Test
+    func amountMeasurementChangesOnlyForRowRevisionOrNativeFont() {
+        let measurement = TransactionAmountWidthMeasurement()
+        let font = NSFont.systemFont(ofSize: 14)
+        var calls = 0
+        for _ in 0..<8 {
+            #expect(measurement.value(revision: 1, font: font) { calls += 1; return 240 } == 240)
+        }
+        #expect(calls == 1)
+        #expect(measurement.value(revision: 2, font: font) { calls += 1; return 260 } == 260)
+        #expect(calls == 2)
+        #expect(measurement.value(revision: 2, font: .systemFont(ofSize: 18)) { calls += 1; return 290 } == 290)
+        #expect(calls == 3)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func presentationAvailabilityRequiresCurrentOrEmptyStateAndGeneration() async throws {
         let context = try await authenticTransactionListContext()
         let viewModel = TransactionListViewModel(
@@ -875,6 +954,10 @@ private func authenticTransactionListContext() async throws -> AuthenticTransact
     // presentation check cannot create a database, apply migrations, or write rows.
     let provider = try SQLiteRepositoryProvider(path: databaseURL.absoluteString + "?mode=ro")
     try provider.database.execute(sql: "PRAGMA query_only = ON;")
+    // Keep the same committed source snapshot across every hydration query,
+    // including when the separate app process accepts another original.
+    try provider.database.execute(sql: "BEGIN DEFERRED TRANSACTION;")
+    defer { try? provider.database.execute(sql: "ROLLBACK;") }
     let workspaces = try provider.database.query(sql: "SELECT id FROM workspaces ORDER BY id", params: []) {
         $0.string(at: 0)
     }.compactMap { $0 }

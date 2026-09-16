@@ -83,8 +83,8 @@ struct ImportCentreCoordinatorTests {
 
         #expect(probe.prepareCallCount == 1)
         #expect(coordinator.items[1].phase == .pending)
-        coordinator.updateAccountChoice(.createNewAccount)
-        #expect(coordinator.currentItem?.accountChoice == .createNewAccount)
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "Imported review account"))
+        #expect(coordinator.currentItem?.accountChoice == .createNewAccount(displayName: "Imported review account"))
         await coordinator.confirmCurrent(expectedPreparationID: firstPreparationID)
         await waitUntil {
             coordinator.currentItem?.id == secondItemID
@@ -720,7 +720,9 @@ struct ImportCentreCoordinatorTests {
         let prepared = try #require(coordinator.currentItem?.preparation)
         #expect(try prepared.sourceSnapshot.withBytes { !$0.isEmpty })
 
-        coordinator.updateAccountChoice(.createNewAccount)
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "First draft name"))
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "  Personal banking  "))
+        #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
         await coordinator.confirmCurrent(expectedPreparationID: prepared.id)
 
         let outcome = try #require(coordinator.items.first?.outcome)
@@ -738,9 +740,11 @@ struct ImportCentreCoordinatorTests {
         )
         #expect(!persistedTransactions.isEmpty)
         #expect(!persistedAccounts.isEmpty)
+        #expect(persistedAccounts.allSatisfy { $0.name == "Personal banking" && $0.accountType == "bank" && $0.nativeCurrency == prepared.detectedCurrency })
         #expect(!persistedAttempts.isEmpty)
         #expect(!TransactionStore.shared.transactions.isEmpty)
         #expect(!AccountStore.shared.accounts.isEmpty)
+        #expect(AccountStore.shared.accounts.allSatisfy { $0.name == "Personal banking" })
         #expect(throws: SourceContentSnapshotError.invalidated) {
             try prepared.sourceSnapshot.withBytes { $0 }
         }
@@ -760,6 +764,7 @@ struct ImportCentreCoordinatorTests {
         }
         let prepared = try #require(coordinator.currentItem?.preparation)
 
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "Discard this pending name"))
         coordinator.cancelCurrent()
 
         #expect(coordinator.items.first?.phase == .cancelled)
@@ -768,6 +773,7 @@ struct ImportCentreCoordinatorTests {
         #expect(try DatabaseProvider.shared.importSessionRepo.importAttempts(workspaceId: "default-workspace").isEmpty)
         #expect(TransactionStore.shared.transactions.isEmpty)
         #expect(AccountStore.shared.accounts.isEmpty)
+        #expect(coordinator.items.first?.accountChoice == nil)
         #expect(throws: SourceContentSnapshotError.invalidated) {
             try prepared.sourceSnapshot.withBytes { $0 }
         }
@@ -828,13 +834,15 @@ struct ImportCentreCoordinatorTests {
     }
 }
 
-private struct OpaqueImportCentrePreparation: ImportCentrePreparation {
+private struct OpaqueImportCentrePreparation {
     let id: UUID
 
     init(id: UUID = UUID()) {
         self.id = id
     }
 }
+
+extension OpaqueImportCentrePreparation: @MainActor ImportCentrePreparation {}
 
 @MainActor
 private final class ImportCentreWorkflowProbe {

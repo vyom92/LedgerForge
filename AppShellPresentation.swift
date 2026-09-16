@@ -33,6 +33,48 @@ enum AppShellSizing {
 #endif
 }
 
+#if DEBUG
+/// Opt-in observation of one sidebar action through the next destination draw.
+/// It has no provider, preference, or financial-data access.
+@MainActor
+private enum NavigationPerformanceProbe {
+    static let enabled = ProcessInfo.processInfo.environment["LEDGERFORGE_NAVIGATION_PROBE"] == "1"
+    private static let logger = Logger(subsystem: "com.vyom.LedgerForge", category: "NavigationPerformance")
+    private static var pending: (from: AppShellSection, to: AppShellSection, started: TimeInterval)?
+
+    static func begin(from: AppShellSection, to: AppShellSection) {
+        guard enabled, from != to else { return }
+        pending = (from, to, ProcessInfo.processInfo.systemUptime)
+    }
+
+    static func didDraw(_ section: AppShellSection) {
+        guard let measurement = pending, measurement.to == section else { return }
+        pending = nil
+        let milliseconds = (ProcessInfo.processInfo.systemUptime - measurement.started) * 1_000
+        logger.notice("Navigation \(measurement.from.rawValue, privacy: .public) -> \(section.rawValue, privacy: .public) first_draw_ms=\(milliseconds, privacy: .public)")
+    }
+}
+
+private struct NavigationDrawProbe: NSViewRepresentable {
+    let section: AppShellSection
+
+    func makeNSView(context: Context) -> DrawView { DrawView() }
+
+    func updateNSView(_ view: DrawView, context: Context) {
+        view.section = section
+        view.needsDisplay = true
+    }
+
+    final class DrawView: NSView {
+        var section = AppShellSection.dashboard
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func draw(_ dirtyRect: NSRect) {
+            NavigationPerformanceProbe.didDraw(section)
+        }
+    }
+}
+#endif
+
 /// Structural presentation only. ContentView retains every workflow owner and root lifecycle modifier.
 struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, AvailabilityBanner: View, Destination: View>: View {
     @Environment(\.lfTheme) private var theme
@@ -72,6 +114,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
             Rectangle()
                 .fill(theme.palette.divider)
                 .frame(width: 1)
+                .ignoresSafeArea(.container, edges: .top)
 
             VStack(spacing: 0) {
                 toolbar()
@@ -115,6 +158,16 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
         }
         .foregroundStyle(theme.palette.primaryText)
         .preferredColorScheme(.dark)
+#if DEBUG
+        .overlay(alignment: .topLeading) {
+            if NavigationPerformanceProbe.enabled {
+                NavigationDrawProbe(section: selectedSection)
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+#endif
     }
 
     private var permitsDestinationPresentation: Bool {
@@ -244,6 +297,9 @@ struct AppShellSidebar: View {
 
     private func sidebarButton(_ section: AppShellSection) -> some View {
         Button {
+#if DEBUG
+            NavigationPerformanceProbe.begin(from: selectedSection, to: section)
+#endif
             selectSection(section)
         } label: {
             HStack(spacing: 12) {

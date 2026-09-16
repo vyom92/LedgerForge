@@ -278,9 +278,11 @@ struct StatementDropIntakeAdapterTests {
     }
 }
 
-private struct DropOpaquePreparation: ImportCentrePreparation {
+private struct DropOpaquePreparation {
     let id = UUID()
 }
+
+extension DropOpaquePreparation: @MainActor ImportCentrePreparation {}
 
 @MainActor
 private final class DropCoordinatorProbe {

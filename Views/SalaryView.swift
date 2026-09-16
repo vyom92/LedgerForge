@@ -40,6 +40,7 @@ struct SalaryView: View {
             Button("Discard and reload", role: .destructive) { viewModel.discardAndReload() }
             Button("Keep draft", role: .cancel) {}
         }
+        .onAppear { viewModel.refreshCapturedAccountBalances() }
         .onDisappear { viewModel.cancelAlDarRefresh() }
     }
 
@@ -233,8 +234,18 @@ struct SalaryView: View {
                         HStack {
                             input("Planning balance", key: key, placeholder: "0", binding: Binding(get: { viewModel.amountInputText(key) }, set: { viewModel.setManualBalance(account, text: $0) }))
                             Button("Capture current") { viewModel.captureAccountBalance(account) }
+                                .lfSecondaryAction()
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         Text(balance.map { viewModel.provenanceText($0.provenance) } ?? "No planning balance").font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
+                        if viewModel.unavailableCurrentBalanceAccountIDs.contains(account.repositoryAccountId ?? "") {
+                            Text(balance?.money == nil
+                                 ? "Current balance unavailable. Enter a planning balance manually."
+                                 : "Could not refresh the current balance. Keeping your existing planning value.")
+                                .font(theme.typography.formCaption)
+                                .foregroundStyle(LFTheme.warning)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
                 ForEach(viewModel.plan.balances.filter { balance in balance.nativeCurrency.code == currency && !accounts.contains(where: { $0.repositoryAccountId == balance.accountID }) }) { balance in

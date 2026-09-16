@@ -63,7 +63,7 @@ struct ImportRepositoryIntegrationTests {
         )
         let firstPrepared = try await firstEngine.prepareImport(from: originalURL)
         #expect(firstPrepared.transactionCount > 0)
-        let first = await firstEngine.commitPreparedImport(firstPrepared, accountChoice: .createNewAccount)
+        let first = await firstEngine.commitPreparedImport(firstPrepared, accountChoice: .createNewAccount(displayName: "Imported review account"))
         #expect(first.persisted)
         #expect(first.transactionCount == firstPrepared.transactionCount)
         #expect(!first.requiresHydration)

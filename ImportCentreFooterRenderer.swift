@@ -19,16 +19,8 @@ struct ImportCentreFooterRenderer: View {
                 } label: {
                     Label(confirmationLabel, systemImage: "checkmark.circle")
                         .labelStyle(.titleAndIcon)
-                        .font(theme.typography.formBody.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(theme.palette.primaryAction)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
-                        .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .buttonStyle(ImportFooterButtonStyle())
                 .disabled(confirmationIsDisabled(preparedImport))
             case .importing:
                 Label("Importing", systemImage: "hourglass")
@@ -43,32 +35,37 @@ struct ImportCentreFooterRenderer: View {
                 Button(action: retryPreparation) {
                     Label("Retry Preparation", systemImage: "arrow.clockwise")
                         .labelStyle(.titleAndIcon)
-                        .font(theme.typography.formBody.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(theme.palette.primaryAction)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .buttonStyle(ImportFooterButtonStyle())
             case .viewTransactions:
                 Button(action: viewTransactions) {
                     Label("View Transactions", systemImage: "arrow.right")
                         .labelStyle(.titleAndIcon)
-                        .font(theme.typography.formBody.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(theme.palette.primaryAction)
-                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
-                        .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .buttonStyle(ImportFooterButtonStyle())
             case .none:
                 EmptyView()
             }
         }
+    }
+}
+
+/// Every footer action uses the same treatment; command ownership and enablement
+/// remain with the existing coordinator and confirmation gate.
+struct ImportFooterButtonStyle: ButtonStyle {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(theme.typography.formBody.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 13)
+            .frame(minWidth: 180)
+            .background(theme.palette.primaryAction)
+            .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
+            .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
     }
 }
