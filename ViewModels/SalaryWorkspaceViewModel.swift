@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 final class SalaryWorkspaceViewModel: ObservableObject {
-    enum MoneyField: String, CaseIterable { case fixed, variable, deductions, fee, investment }
+    enum MoneyField: String, CaseIterable { case fixed, variable, deductions, fee, investment, reserve }
 
     @Published private(set) var plan: FundingPlan
     @Published private(set) var calculation: FundingPlanCalculation
@@ -14,13 +14,6 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     @Published private var untouchedZeroFields: Set<String> = []
     @Published private(set) var isDirty = false
     @Published private(set) var saveState: SaveState = .ready
-    @Published private(set) var pendingAlDarReference: AlDarReferenceQuote?
-    @Published private(set) var previousAlDarContext: AlDarReferenceEvidence?
-    @Published private(set) var isRefreshingAlDar = false
-    @Published private(set) var alDarMessage: String?
-    private let fetchAlDar: @Sendable (Money) async throws -> AlDarReferenceQuote
-    private var alDarTask: Task<Void, Never>?
-    private var alDarRequestID: UUID?
     enum SaveState: Equatable { case ready, saving, saved, failed, committedNeedsRefresh, committedToPreviousProvider, providerChanged, canonicalChanged }
     private let locale: Locale
     private var baseGeneration: ProviderGenerationToken
@@ -30,15 +23,183 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private var baseRawText: [String: String] = [:]
     private var baseDraftPlan: FundingPlan?
     private var subscription: AnyCancellable?
+    private var calendarSubscription: AnyCancellable?
+    private let now: () -> Date
     private let refresh: (DatabaseProvider) throws -> Void
     private let requiresApplicationAvailability: Bool
+    private var sharedINRReference: AlDarUnitReference?
+    private var hasOpenedPlanner = false
+    /// Session-only value before a reduction. The one-month exception can be
+    /// selected either before or after editing the remaining bill.
+    private var preReductionBasis: [String: Money] = [:]
+    private struct MonthDraftState {
+        let plan: FundingPlan
+        let raw: [String: String]
+        let errors: [String: String]
+        let untouched: Set<String>
+        let unavailable: Set<String>
+        let generation: ProviderGenerationToken
+        let canonical: FundingPlan?
+        let baseRaw: [String: String]
+        let basePlan: FundingPlan?
+        let dirty: Bool
+        var saveState: SaveState
+        let error: String?
+        let committed: FundingPlan?
+        let preReductionBasis: [String: Money]
+    }
+    private var monthDrafts: [SelectedStatementMonth: MonthDraftState] = [:]
+    static let firstPlanningMonth = try! SelectedStatementMonth(year: 2026, month: 9)
+    static let planningMonths = firstPlanningMonth...(try! SelectedStatementMonth(year: 2099, month: 12))
+    private static var zeroQAR: Money { try! Money(canonicalDecimal: "0.00", currency: "QAR") }
+    var visibleMoneyFields: [MoneyField] { plan.calculationVersion == .budgetV1 ? [.fixed, .variable, .reserve, .fee] : [.fixed, .variable, .deductions, .fee, .investment] }
+    @Published private(set) var currentPlanningMonth: SelectedStatementMonth
+    var nextPlanningMonth: SelectedStatementMonth { Self.nextMonth(after: currentPlanningMonth) }
+    var availableMonths: [SelectedStatementMonth] {
+        let current = currentPlanningMonth
+        return Set([current, Self.nextMonth(after: current), month] + Array(monthDrafts.keys) + fundingPlanStore.plans.filter { $0.workspaceID == workspaceID }.map(\.month)).sorted()
+    }
+    private static func nextMonth(after month: SelectedStatementMonth) -> SelectedStatementMonth {
+        try! SelectedStatementMonth(year: month.month == 12 ? month.year + 1 : month.year, month: month.month == 12 ? 1 : month.month + 1)
+    }
+
+    func switchMonth(to target: SelectedStatementMonth) {
+        guard target != month, Self.planningMonths.contains(target) || fundingPlanStore.plan(for: target, workspaceID: workspaceID) != nil,
+              saveState != .saving, saveState != .committedNeedsRefresh else { return }
+        hasOpenedPlanner = true
+        monthDrafts[month] = MonthDraftState(plan: plan, raw: rawText, errors: fieldErrors, untouched: untouchedZeroFields,
+            unavailable: unavailableCurrentBalanceAccountIDs, generation: baseGeneration, canonical: baseCanonical,
+            baseRaw: baseRawText, basePlan: baseDraftPlan, dirty: isDirty, saveState: saveState, error: errorMessage, committed: committedCandidate,
+            preReductionBasis: preReductionBasis)
+        month = target
+        if let state = monthDrafts.removeValue(forKey: target) {
+            plan = state.plan; rawText = state.raw; fieldErrors = state.errors; untouchedZeroFields = state.untouched
+            unavailableCurrentBalanceAccountIDs = state.unavailable; baseGeneration = state.generation; baseCanonical = state.canonical
+            baseRawText = state.baseRaw; baseDraftPlan = state.basePlan; isDirty = state.dirty; saveState = state.saveState
+            errorMessage = state.error; committedCandidate = state.committed
+            preReductionBasis = state.preReductionBasis
+            canonicalDidPublish(); recalculate()
+        } else {
+            rebaseFromPublishedPlan(generation: provider().generationToken)
+        }
+        refreshCapturedAccountBalances()
+    }
+
+    /// One explicit draft adoption; the saved legacy record remains unchanged until Save.
+    func adoptBudgetPlanning() {
+        guard canEdit, plan.calculationVersion == .legacy else { return }
+        let oldDeduction = plan.expectedDeductions
+        guard oldDeduction.amount >= 0 else { errorMessage = "Review the prior deduction before adopting Budget Planning."; return }
+        plan.calculationVersion = .budgetV1; plan.keepInCBQ = Self.zeroQAR
+        if oldDeduction.amount > 0 {
+            plan.deductions = [.init(id: UUID().uuidString, label: "Prior deduction total · unitemized", money: oldDeduction, recurs: false)]
+        }
+        plan.expectedDeductions = Self.zeroQAR; plan.plannedInvestment = Self.zeroQAR
+        plan.referenceMode = plan.planningFX == nil ? .alDar : .manual
+        plan.alDarReference = nil
+        syncDraft(); markEdited(); recalculate()
+    }
+
+    func receiveSharedReference(_ reference: AlDarUnitReference?) {
+        sharedINRReference = reference
+        recalculate()
+    }
+
+    func useSharedAlDar() {
+        guard canEdit, plan.calculationVersion == .budgetV1 else { return }
+        plan.referenceMode = .alDar; plan.planningFX = nil; plan.alDarReference = nil
+        plan.effectiveAlDarReference = sharedINRReference.flatMap { try? $0.planningQuote() }
+        rawText["fx.rate"] = ""; rawText["fx.date"] = ""; fieldErrors["fx.rate"] = nil; fieldErrors["fx.date"] = nil
+        markEdited(); recalculate()
+    }
+
+    func addDeduction() {
+        guard canEdit, plan.calculationVersion == .budgetV1 else { return }
+        let row = FundingPlanDeduction(id: UUID().uuidString, label: "", money: Self.zeroQAR, recurs: true)
+        plan.deductions.append(row); rawText["deduction.label.\(row.id)"] = ""; rawText["deduction.amount.\(row.id)"] = "0"
+        untouchedZeroFields.insert("deduction.amount.\(row.id)"); fieldErrors["deduction.label.\(row.id)"] = "Enter a name"
+        markEdited(); recalculate()
+    }
+
+    func editDeduction(id: String, label: String? = nil, amount: String? = nil, recurs: Bool? = nil) {
+        guard canEdit, let index = plan.deductions.firstIndex(where: { $0.id == id }) else { return }
+        if let label {
+            rawText["deduction.label.\(id)"] = label
+            fieldErrors["deduction.label.\(id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a name of 1–240 characters" : nil
+            plan.deductions[index].label = label
+        }
+        if let amount {
+            let key = "deduction.amount.\(id)"; rawText[key] = amount; untouchedZeroFields.remove(key)
+            if let money = try? PlannerInputCodec.money(amount, currency: "QAR", locale: locale), money.amount >= 0 {
+                plan.deductions[index].money = money; fieldErrors[key] = nil
+            } else { fieldErrors[key] = "Enter a deduction of zero or greater" }
+        }
+        if let recurs { plan.deductions[index].recurs = recurs }
+        markEdited(); recalculate()
+    }
+
+    func removeDeduction(id: String) {
+        guard canEdit else { return }
+        plan.deductions.removeAll { $0.id == id }
+        for key in ["deduction.label.\(id)", "deduction.amount.\(id)"] { rawText[key] = nil; fieldErrors[key] = nil; untouchedZeroFields.remove(key) }
+        markEdited(); recalculate()
+    }
+
+    func setCommitmentDetails(region: String, id: String, recurs: Bool? = nil, temporary: Bool? = nil, remark: String? = nil) {
+        guard canEdit else { return }
+        var rows = region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments
+        guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
+        if let recurs { rows[index].recurs = recurs; if !recurs { rows[index].temporaryCarryBasis = nil; preReductionBasis[id] = nil } }
+        if let temporary {
+            if temporary && rows[index].recurs && rows[index].temporaryCarryBasis == nil {
+                rows[index].temporaryCarryBasis = preReductionBasis.removeValue(forKey: id) ?? rows[index].money
+            }
+            if !temporary {
+                if let basis = rows[index].temporaryCarryBasis {
+                    rows[index].money = basis
+                    rawText["amount.\(id)"] = (try? basis.canonicalDecimalString()).map(localized) ?? ""
+                    fieldErrors["amount.\(id)"] = nil
+                }
+                rows[index].temporaryCarryBasis = nil
+            }
+        }
+        if let remark { rows[index].remark = String(remark.prefix(240)) }
+        if region == "qatar" { plan.qatarCommitments = rows } else { plan.indiaCommitments = rows }
+        markEdited(); recalculate()
+    }
+
+    private static func seed(_ previous: FundingPlan, for month: SelectedStatementMonth) -> FundingPlan {
+        var result = emptyPlan(month: month, workspaceID: previous.workspaceID)
+        let source = previous.id
+        result.rolloverSourcePlanID = source
+        result.expectedFixedEarnings = previous.expectedFixedEarnings; result.expectedFixedProvenance = .carried(sourcePlanID: source)
+        result.expectedVariableEarnings = previous.expectedVariableEarnings; result.expectedVariableProvenance = .carried(sourcePlanID: source)
+        result.configuredTransferFee = previous.configuredTransferFee; result.configuredTransferFeeProvenance = .carried(sourcePlanID: source)
+        result.keepInCBQ = previous.keepInCBQ ?? zeroQAR
+        result.balances = previous.balances.map { .init(id: UUID().uuidString, accountID: $0.accountID, nativeCurrency: $0.nativeCurrency, included: $0.included, money: $0.money, provenance: .carried(sourcePlanID: source)) }
+        func rows(_ values: [FundingPlanCommitment]) -> [FundingPlanCommitment] {
+            values.filter(\.recurs).map { .init(id: UUID().uuidString, label: $0.label, money: $0.temporaryCarryBasis ?? $0.money,
+                included: $0.included, fundingAccountID: $0.fundingAccountID, provenance: .carried(sourcePlanID: source),
+                carriedSourceRowID: $0.id, remark: $0.remark,
+                dueDate: $0.dueDate) }
+        }
+        result.qatarCommitments = rows(previous.qatarCommitments); result.indiaCommitments = rows(previous.indiaCommitments)
+        result.deductions = previous.deductions.filter(\.recurs).map { .init(id: UUID().uuidString, label: $0.label, money: $0.money, recurs: true, carriedSourceRowID: $0.id) }
+        if previous.calculationVersion == .legacy, previous.expectedDeductions.amount > 0 {
+            // Preserve the known prior total without inventing component names
+            // or declaring that every item inside it recurs indefinitely.
+            result.deductions = [.init(id: UUID().uuidString, label: "Prior deduction total · unitemized", money: previous.expectedDeductions, recurs: false)]
+        }
+        // No previous manual override or applied external reference is current authority.
+        return result
+    }
 
     var canEdit: Bool {
-        ![.saving, .failed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(saveState) &&
+        Self.planningMonths.contains(month) && ![.saving, .failed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(saveState) &&
         (!requiresApplicationAvailability || ApplicationAvailability.shared.permitsMutation)
     }
     var canSave: Bool {
-        provider().persistenceState.isUsable && provider().generationToken == baseGeneration && fundingPlanStore.generation == baseGeneration &&
+        canEdit && provider().persistenceState.isUsable && provider().generationToken == baseGeneration && fundingPlanStore.generation == baseGeneration &&
         (!requiresApplicationAvailability || ApplicationAvailability.shared.permitsMutation) &&
         ![.saving, .failed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(saveState) && fieldErrors.isEmpty
     }
@@ -55,10 +216,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
     }
     var hasValidCalculation: Bool { fieldErrors.isEmpty }
+    var hasUnsavedDrafts: Bool { isDirty || monthDrafts.values.contains(where: { $0.dirty }) }
     var canRollover: Bool { fundingPlanStore.plan(for: month, workspaceID: workspaceID) == nil && fundingPlanStore.plans.contains { $0.workspaceID == workspaceID && $0.month < month } }
 
 
-    private let month: SelectedStatementMonth
+    @Published private(set) var month: SelectedStatementMonth
     private let workspaceID: String
     private let provider: () -> DatabaseProvider
     private let accountStore: AccountStore
@@ -75,10 +237,13 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         salaryStore: SalaryStore? = nil,
         fundingPlanStore: FundingPlanStore? = nil,
         locale: Locale = .current,
-        refresh: ((DatabaseProvider) throws -> Void)? = nil,
-        fetchAlDar: @escaping @Sendable (Money) async throws -> AlDarReferenceQuote = { try await AlDarCurrentReferenceProvider().fetch(submittedQAR: $0) }
+        now: @escaping () -> Date = { Date() },
+        refresh: ((DatabaseProvider) throws -> Void)? = nil
     ) {
-        let resolvedMonth = month ?? Self.currentMonth()
+        let current = Self.currentMonth(now: now())
+        let resolvedMonth = month ?? current
+        self.now = now
+        self.currentPlanningMonth = current
         let resolvedAccountStore = accountStore ?? .shared
         let resolvedSalaryStore = salaryStore ?? .shared
         let resolvedFundingPlanStore = fundingPlanStore ?? .shared
@@ -89,7 +254,6 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         self.locale = locale
         self.baseGeneration = (provider?() ?? DatabaseProvider.shared).generationToken
         self.refresh = refresh ?? { active in _ = try RepositoryStoreHydrator(databaseProvider: active).hydrateIfNeeded(forceRefresh: true) }
-        self.fetchAlDar = fetchAlDar
         self.accountStore = resolvedAccountStore
         self.transactionStore = transactionStore ?? .shared
         self.salaryStore = resolvedSalaryStore
@@ -103,6 +267,25 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         syncDraft()
         captureDraftBase()
         self.subscription = resolvedFundingPlanStore.$plans.sink { [weak self] _ in self?.canonicalDidPublish() }
+        // Reuse the accepted Dashboard delivery boundary. Only the available
+        // month controls advance; an active draft never switches automatically.
+        self.calendarSubscription = NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshCalendarMonth() }
+    }
+
+    /// Opening Dashboard must not create an invisible unsaved planning draft.
+    func plannerOpened() {
+        refreshCalendarMonth()
+        hasOpenedPlanner = true
+        canonicalDidPublish()
+        if baseCanonical == nil && !isDirty && canRollover { rolloverFromPreviousPlan() }
+        refreshCapturedAccountBalances()
+    }
+
+    private func refreshCalendarMonth() {
+        let current = Self.currentMonth(now: now())
+        if current != currentPlanningMonth { currentPlanningMonth = current }
     }
 
     var statements: [SalaryStatement] { salaryStore.statements }
@@ -145,6 +328,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         case .deductions: money = plan.expectedDeductions
         case .fee: money = plan.configuredTransferFee
         case .investment: money = plan.plannedInvestment
+        case .reserve: money = plan.keepInCBQ ?? Self.zeroQAR
         }
         return (try? money.canonicalDecimalString()) ?? ""
     }
@@ -159,6 +343,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     @discardableResult
     func updateMoney(_ field: MoneyField, text: String) -> Bool {
         guard canEdit else { return false }
+        guard plan.calculationVersion == .legacy || ![MoneyField.deductions, .investment].contains(field) else { return false }
         untouchedZeroFields.remove(field.rawValue)
         rawText[field.rawValue] = text
         markEdited()
@@ -169,6 +354,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         case .deductions: plan.expectedDeductions = value; plan.expectedDeductionsProvenance = .manual
         case .fee: plan.configuredTransferFee = value; plan.configuredTransferFeeProvenance = .manual
         case .investment: plan.plannedInvestment = value; plan.plannedInvestmentProvenance = .manual
+        case .reserve: plan.keepInCBQ = value
         }
         recalculate()
         return true
@@ -176,13 +362,17 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func setFX(rateText: String, dateText: String) {
         guard canEdit else { return }
-        previousAlDarContext = plan.alDarReference ?? previousAlDarContext
+        plan.referenceMode = .manual; plan.effectiveAlDarReference = nil
         plan.alDarReference = nil
         plan.planningFX = nil
         rawText["fx.rate"] = rateText; rawText["fx.date"] = dateText
         markEdited()
         fieldErrors["fx.rate"] = nil; fieldErrors["fx.date"] = nil
-        if rateText.isEmpty && dateText.isEmpty { plan.planningFX = nil; recalculate(); return }
+        if rateText.isEmpty && dateText.isEmpty {
+            plan.planningFX = nil
+            if plan.calculationVersion == .budgetV1 { fieldErrors["fx.rate"] = "Enter a positive rate or choose Use Al Dar" }
+            recalculate(); return
+        }
         let rate = try? PlannerInputCodec.rate(rateText, locale: locale)
         let date = try? StatementDate(canonical: dateText)
         if rate == nil { fieldErrors["fx.rate"] = "Enter a complete positive INR-per-QAR rate" }
@@ -213,84 +403,6 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         guard let year = parts.year, let month = parts.month, let day = parts.day,
               let date = try? StatementDate(year: year, month: month, day: day) else { return }
         setFX(rateText: rawText["fx.rate"] ?? "", dateText: date.canonical)
-    }
-
-    /// Lookup is independent of the draft. Only explicit application binds the
-    /// fetched unit reference to the current positive INR funding shortfall.
-    private static let alDarLookupAmount = try! Money(canonicalDecimal: "1.00", currency: "QAR")
-
-    private var pendingAlDarEvidence: AlDarReferenceEvidence? {
-        guard let quote = pendingAlDarReference, let shortfall = calculation.indiaFundingShortfall else { return nil }
-        return try? AlDarReferenceEvidence(quote: quote, boundShortfallINR: shortfall)
-    }
-
-    var canRefreshAlDar: Bool {
-        canEdit && !isRefreshingAlDar && provider().persistenceState.isUsable &&
-        provider().generationToken == baseGeneration && fundingPlanStore.generation == baseGeneration
-    }
-    var canUseAlDarReference: Bool {
-        canEdit && fieldErrors.isEmpty && !isRefreshingAlDar &&
-        pendingAlDarEvidence != nil &&
-        provider().generationToken == baseGeneration && fundingPlanStore.generation == baseGeneration
-    }
-    var alDarGuidance: String {
-        if let alDarMessage { return alDarMessage }
-        return "QAR 1 → INR reference · Refresh does not change your plan."
-    }
-    var alDarApplicationGuidance: String {
-        if !canEdit { return statusText }
-        if !fieldErrors.isEmpty { return "Correct the marked fields before using this reference." }
-        if calculation.indiaFundingShortfall == nil { return "Complete the included INR balances and commitments to use this reference." }
-        if calculation.indiaFundingShortfall?.amount == 0 { return "No transfer is needed. You can still refresh the rate." }
-        return "This reference cannot calculate the current transfer amount."
-    }
-
-    func startAlDarRefresh() {
-        guard canRefreshAlDar, alDarTask == nil else { return }
-        alDarTask = Task { [weak self] in await self?.refreshAlDarReference() }
-    }
-
-    func cancelAlDarRefresh() {
-        alDarTask?.cancel(); alDarTask = nil; alDarRequestID = nil
-        isRefreshingAlDar = false
-    }
-
-    func refreshAlDarReference() async {
-        canonicalDidPublish()
-        guard canRefreshAlDar else { return }
-        let amount = Self.alDarLookupAmount
-        let requestID = UUID(), generation = baseGeneration, planID = plan.id
-        alDarRequestID = requestID; isRefreshingAlDar = true; alDarMessage = nil
-        pendingAlDarReference = nil
-        defer { if alDarRequestID == requestID { isRefreshingAlDar = false; alDarRequestID = nil; alDarTask = nil } }
-        do {
-            let quote = try await fetchAlDar(amount)
-            try Task.checkCancellation()
-            guard alDarRequestID == requestID else { return }
-            guard canEdit, plan.id == planID,
-                  provider().generationToken == generation, fundingPlanStore.generation == generation else {
-                alDarMessage = "The draft or database changed. Refresh again when it is ready."
-                return
-            }
-            guard quote.submittedQAR == amount else { throw AlDarReferenceError.invalidBinding }
-            pendingAlDarReference = quote
-            alDarMessage = "Reference fetched · not applied."
-        } catch {
-            guard alDarRequestID == requestID else { return }
-            alDarMessage = error is CancellationError ? "Refresh cancelled." : "Al Dar is unavailable or returned an unusable reference. Your plan is unchanged."
-        }
-    }
-
-    func useAlDarReference() {
-        canonicalDidPublish()
-        guard canUseAlDarReference, let reference = pendingAlDarEvidence else { return }
-        plan.planningFX = nil; plan.alDarReference = reference
-        rawText["fx.rate"] = ""; rawText["fx.date"] = ""
-        fieldErrors["fx.rate"] = nil; fieldErrors["fx.date"] = nil
-        pendingAlDarReference = nil; previousAlDarContext = nil
-        alDarMessage = "Reference applied to this draft. Save to keep it."
-        markEdited()
-        recalculate()
     }
 
     func setAccountIncluded(_ account: Account, included: Bool) {
@@ -419,7 +531,20 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         fieldErrors["amount.\(id)"] = money == nil ? "Enter an exact \(currency) amount" : nil
         var values = region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments
         guard let index = values.firstIndex(where: { $0.id == id }) else { return }
+        if plan.calculationVersion == .budgetV1, let money,
+           money.amount < 0 || (values[index].temporaryCarryBasis.map { money.amount > $0.amount } ?? false) {
+            fieldErrors["amount.\(id)"] = "Enter a nonnegative remaining amount no greater than the recurring estimate"
+            recalculate(); return
+        }
         let changedValue = values[index].label != label || (money != nil && values[index].money != money)
+        if amountWasEdited, let money, plan.calculationVersion == .budgetV1,
+           values[index].recurs, values[index].temporaryCarryBasis == nil {
+            if money.amount < values[index].money.amount, preReductionBasis[id] == nil {
+                preReductionBasis[id] = values[index].money
+            } else if let basis = preReductionBasis[id], money.amount >= basis.amount {
+                preReductionBasis[id] = nil
+            }
+        }
         values[index].label = label
         if let money { values[index].money = money }
         values[index].included = included
@@ -441,11 +566,37 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func removeCommitment(region: String, id: String) {
         guard canEdit else { return }
+        preReductionBasis[id] = nil
         markEdited()
         for key in ["label.\(id)", "amount.\(id)"] { rawText[key] = nil; fieldErrors[key] = nil; untouchedZeroFields.remove(key) }
         if region == "qatar" { plan.qatarCommitments.removeAll { $0.id == id } }
         else { plan.indiaCommitments.removeAll { $0.id == id } }
         recalculate()
+    }
+
+    func billDatePickerValue(for row: FundingPlanCommitment, timeZone: TimeZone = .current) -> Date {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        let selected = row.dueDate(in: month) ?? row.dueDate
+        return calendar.date(from: DateComponents(year: selected?.year ?? month.year, month: selected?.month ?? month.month, day: selected?.day ?? 1, hour: 12))!
+    }
+
+    func setBillDate(region: String, id: String, date: Date?, timeZone: TimeZone = .current) {
+        guard canEdit, plan.calculationVersion == .budgetV1 else { return }
+        var rows = region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments
+        guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
+        var due: StatementDate?
+        if let date {
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+            let parts = calendar.dateComponents([.year, .month, .day], from: date)
+            guard let year = parts.year, let selectedMonth = parts.month, let day = parts.day,
+                  let valid = try? StatementDate(year: year, month: selectedMonth, day: day) else {
+                errorMessage = "Choose a valid bill date."; return
+            }
+            due = valid
+        }
+        rows[index].dueDate = due
+        if region == "qatar" { plan.qatarCommitments = rows } else { plan.indiaCommitments = rows }
+        markEdited(); recalculate()
     }
 
     func rolloverFromPreviousPlan(discardingDraft: Bool = false) {
@@ -456,29 +607,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             errorMessage = "No earlier editable plan is available to roll forward, or this month already exists."
             return
         }
-        let source = previous.id
-        cancelAlDarRefresh(); pendingAlDarReference = nil; previousAlDarContext = nil; alDarMessage = nil
-        plan = FundingPlan(
-            id: UUID().uuidString,
-            workspaceID: workspaceID,
-            month: month,
-            rolloverSourcePlanID: source,
-            expectedFixedEarnings: previous.expectedFixedEarnings,
-            expectedFixedProvenance: .carried(sourcePlanID: source),
-            expectedVariableEarnings: previous.expectedVariableEarnings,
-            expectedVariableProvenance: .carried(sourcePlanID: source),
-            expectedDeductions: previous.expectedDeductions,
-            expectedDeductionsProvenance: .carried(sourcePlanID: source),
-            balances: previous.balances.map { FundingPlanBalance(id: UUID().uuidString, accountID: $0.accountID, nativeCurrency: $0.nativeCurrency, included: $0.included, money: $0.money, provenance: .carried(sourcePlanID: source)) },
-            qatarCommitments: previous.qatarCommitments.map { FundingPlanCommitment(id: UUID().uuidString, label: $0.label, money: $0.money, included: $0.included, fundingAccountID: $0.fundingAccountID, provenance: .carried(sourcePlanID: source)) },
-            indiaCommitments: previous.indiaCommitments.map { FundingPlanCommitment(id: UUID().uuidString, label: $0.label, money: $0.money, included: $0.included, fundingAccountID: $0.fundingAccountID, provenance: .carried(sourcePlanID: source)) },
-            configuredTransferFee: previous.configuredTransferFee,
-            configuredTransferFeeProvenance: .carried(sourcePlanID: source),
-            planningFX: previous.planningFX,
-            plannedInvestment: previous.plannedInvestment,
-            plannedInvestmentProvenance: .carried(sourcePlanID: source),
-            updatedAtISO: ISO8601DateFormatter().string(from: Date())
-        )
+        plan = Self.seed(previous, for: month)
         syncDraft()
         markEdited()
         recalculate()
@@ -526,7 +655,6 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             guard let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID), canonical == committedCandidate, provider().generationToken == baseGeneration, fundingPlanStore.generation == baseGeneration else { throw RepositoryStoreHydrationError.invalidFundingPlanState("saved plan missing") }
             plan = canonical; baseCanonical = canonical
             syncDraft(); captureDraftBase(); saveState = .saved; errorMessage = nil
-            if plan.alDarReference != nil { alDarMessage = nil }
             DeveloperConsole.shared.info(.database, "Funding plan saved and reloaded", metadata: ["code": "plan.saved", "effect": "committed and canonical data current"])
         } catch {
             saveState = .committedNeedsRefresh
@@ -551,16 +679,31 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     private func rebaseFromPublishedPlan(generation: ProviderGenerationToken) {
-        cancelAlDarRefresh(); pendingAlDarReference = nil; previousAlDarContext = nil; alDarMessage = nil
+        preReductionBasis = [:]
         baseGeneration = generation
         baseCanonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
         plan = baseCanonical ?? Self.emptyPlan(month: month, workspaceID: workspaceID)
         isDirty = false; saveState = .ready; errorMessage = nil
-        syncDraft(); captureDraftBase(); recalculate()
+        syncDraft(); captureDraftBase()
+        // Seed a new month before attaching shared FX evidence. The reference
+        // itself changes the draft and would otherwise block carry-forward.
+        if hasOpenedPlanner, baseCanonical == nil, canRollover {
+            rolloverFromPreviousPlan()
+        } else {
+            recalculate()
+        }
     }
 
     private func canonicalDidPublish() {
         guard !isRebasing && saveState != .saving else { return }
+        for key in Array(monthDrafts.keys) {
+            guard var state = monthDrafts[key] else { continue }
+            let changed = state.generation != provider().generationToken || fundingPlanStore.generation != state.generation
+            if changed || fundingPlanStore.plan(for: key, workspaceID: workspaceID) != state.canonical {
+                if state.dirty { state.saveState = changed ? .providerChanged : .canonicalChanged; monthDrafts[key] = state }
+                else { monthDrafts[key] = nil }
+            }
+        }
         let changedProvider = provider().generationToken != baseGeneration
         if saveState == .committedNeedsRefresh {
             if changedProvider { saveState = .committedToPreviousProvider }
@@ -572,14 +715,13 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
         let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
         guard changedProvider || canonical != baseCanonical || fundingPlanStore.generation != baseGeneration else { return }
-        cancelAlDarRefresh(); pendingAlDarReference = nil
         if isDirty { saveState = changedProvider ? .providerChanged : .canonicalChanged }
         else if fundingPlanStore.generation == provider().generationToken {
             rebaseFromPublishedPlan(generation: provider().generationToken)
         } else { saveState = .providerChanged }
     }
 
-    private func captureDraftBase() { baseRawText = rawText; baseDraftPlan = plan; isDirty = false }
+    private func captureDraftBase() { baseRawText = rawText; baseDraftPlan = plan; isDirty = false; preReductionBasis = [:] }
 
     private func markEdited() {
         isDirty = rawText != baseRawText || plan != baseDraftPlan
@@ -602,6 +744,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         rawText["fx.rate"] = plan.planningFX.map { localized(NSDecimalNumber(decimal: $0.inrPerQAR).stringValue) } ?? ""
         rawText["fx.date"] = plan.planningFX?.observationDate.canonical ?? ""
         for balance in plan.balances { rawText["balance.\(balance.accountID)"] = (try? balance.money?.canonicalDecimalString()).map(localized) ?? "" }
+        for value in plan.deductions {
+            rawText["deduction.label.\(value.id)"] = value.label
+            rawText["deduction.amount.\(value.id)"] = (try? value.money.canonicalDecimalString()).map(localized) ?? ""
+        }
         for value in plan.qatarCommitments + plan.indiaCommitments {
             rawText["label.\(value.id)"] = value.label
             rawText["amount.\(value.id)"] = (try? value.money.canonicalDecimalString()).map(localized) ?? ""
@@ -614,8 +760,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             fieldErrors[field.rawValue] = "Enter an exact QAR amount with up to two decimals"
             return nil
         }
-        guard field != .fee || value.amount >= 0 else {
-            fieldErrors[field.rawValue] = "Transfer fee must be zero or greater"
+        guard ![MoneyField.fee, .reserve].contains(field) || value.amount >= 0 else {
+            fieldErrors[field.rawValue] = field == .fee ? "Transfer fee must be zero or greater" : "Reserve must be zero or greater"
             return nil
         }
         fieldErrors[field.rawValue] = nil
@@ -623,8 +769,14 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     private func validateVisibleDraft() {
-        for field in MoneyField.allCases {
+        for field in visibleMoneyFields {
             _ = validatedMoney(field, text: moneyText(field))
+        }
+        for row in plan.deductions {
+            let label = rawText["deduction.label.\(row.id)"] ?? ""
+            fieldErrors["deduction.label.\(row.id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a deduction name" : nil
+            let value = try? PlannerInputCodec.money(rawText["deduction.amount.\(row.id)"] ?? "", currency: "QAR", locale: locale)
+            fieldErrors["deduction.amount.\(row.id)"] = value.map { $0.amount >= 0 } == true ? nil : "Enter a nonnegative deduction"
         }
         // FX has no separate commit state; both fields were parsed together on every edit.
         for account in eligibleAccounts {
@@ -638,7 +790,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 let label = rawText["label.\(value.id)"] ?? ""
                 fieldErrors["label.\(value.id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a label of 1–240 characters" : nil
                 let amount = rawText["amount.\(value.id)"] ?? ""
-                fieldErrors["amount.\(value.id)"] = (try? PlannerInputCodec.money(amount, currency: region == "qatar" ? "QAR" : "INR", locale: locale)) == nil ? "Enter an exact amount" : nil
+                let parsed = try? PlannerInputCodec.money(amount, currency: region == "qatar" ? "QAR" : "INR", locale: locale)
+                let valid = parsed.map { money in
+                    plan.calculationVersion == .legacy || (money.amount >= 0 && (value.temporaryCarryBasis.map { money.amount <= $0.amount } ?? true))
+                } ?? false
+                fieldErrors["amount.\(value.id)"] = valid ? nil : "Enter a nonnegative amount within the remaining-payment basis"
             }
         }
     }
@@ -654,12 +810,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     func dismissError() { errorMessage = nil }
 
     private func recalculate() {
-        calculation = FundingPlanCalculator.calculate(plan)
-        if let reference = plan.alDarReference, reference.boundShortfallINR != calculation.indiaFundingShortfall {
-            previousAlDarContext = reference; plan.alDarReference = nil
-            alDarMessage = "India shortfall changed. The previous reference is no longer applied."
-            calculation = FundingPlanCalculator.calculate(plan)
+        if hasOpenedPlanner, canEdit, fieldErrors.isEmpty, plan.calculationVersion == .budgetV1, plan.referenceMode == .alDar,
+           provider().generationToken == baseGeneration, fundingPlanStore.generation == baseGeneration {
+            plan.effectiveAlDarReference = sharedINRReference.flatMap { try? $0.planningQuote() }
         }
+        calculation = FundingPlanCalculator.calculate(plan)
         if saveState != .committedNeedsRefresh { isDirty = rawText != baseRawText || plan != baseDraftPlan }
     }
 
@@ -670,7 +825,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     private static func emptyPlan(month: SelectedStatementMonth, workspaceID: String) -> FundingPlan {
         let zero = try! Money(canonicalDecimal: "0.00", currency: "QAR")
-        let fee = try! Money(canonicalDecimal: "25.00", currency: "QAR")
+        let fee = zero
         return FundingPlan(id: UUID().uuidString, workspaceID: workspaceID, month: month, rolloverSourcePlanID: nil,
                            expectedFixedEarnings: zero, expectedFixedProvenance: .manual,
                            expectedVariableEarnings: zero, expectedVariableProvenance: .manual,
@@ -678,7 +833,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                            balances: [], qatarCommitments: [], indiaCommitments: [],
                            configuredTransferFee: fee, configuredTransferFeeProvenance: .manual,
                            planningFX: nil, plannedInvestment: zero, plannedInvestmentProvenance: .manual,
-                           updatedAtISO: ISO8601DateFormatter().string(from: Date()))
+                           updatedAtISO: ISO8601DateFormatter().string(from: Date()),
+                           calculationVersion: .budgetV1, keepInCBQ: zero)
     }
 
     private func plannerAccounts(type: AccountType) -> [Account] {
@@ -713,7 +869,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 return FundingPlanCommitmentDTO(id: value.id, planId: plan.id, regionCode: region, sourceOrdinal: index + 1, label: value.label,
                                                 amountCurrency: value.money.currency.code, amountMinor: money.0, amountDecimal: money.1,
                                                 included: value.included, fundingAccountId: value.fundingAccountID,
-                                                provenanceCode: p.code, carriedSourcePlanId: p.carried)
+                                                provenanceCode: p.code, carriedSourcePlanId: p.carried,
+                                                recurs: value.recurs, temporaryCarryBasisMinor: try value.temporaryCarryBasis?.minorUnits(),
+                                                temporaryCarryBasisDecimal: try value.temporaryCarryBasis?.canonicalDecimalString(),
+                                                carriedSourceRowId: value.carriedSourceRowID, remark: value.remark, dueDateISO: value.dueDate?.canonical)
             }
         }
         return FundingPlanDTO(
@@ -726,7 +885,19 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             plannedInvestmentMinor: investment.0, plannedInvestmentDecimal: investment.1, plannedInvestmentProvenance: provenance(plan.plannedInvestmentProvenance).code,
             updatedAtISO: plan.updatedAtISO, balances: balances,
             commitments: try commitmentDTOs(plan.qatarCommitments, region: "qatar") + commitmentDTOs(plan.indiaCommitments, region: "india"),
-            alDarReference: try plan.alDarReference.map { try FundingPlanAlDarReferenceDTO(planID: plan.id, evidence: $0) }
+            alDarReference: try plan.alDarReference.map { try FundingPlanAlDarReferenceDTO(planID: plan.id, evidence: $0) },
+            calculationVersion: plan.calculationVersion.rawValue,
+            keepInCBQMinor: try plan.keepInCBQ?.minorUnits(), keepInCBQDecimal: try plan.keepInCBQ?.canonicalDecimalString(),
+            referenceMode: plan.calculationVersion == .budgetV1 ? plan.referenceMode.rawValue : nil,
+            deductions: try plan.deductions.enumerated().map { index, row in
+                FundingPlanDeductionDTO(id: row.id, planId: plan.id, sourceOrdinal: index + 1, label: row.label,
+                    amountMinor: try row.money.minorUnits(), amountDecimal: try row.money.canonicalDecimalString(),
+                    recurs: row.recurs, carriedSourceRowId: row.carriedSourceRowID)
+            },
+            effectiveReference: try plan.effectiveAlDarReference.map {
+                guard $0.submittedQAR.currency.code == "QAR", $0.submittedQAR.amount == 1 else { throw AlDarReferenceError.invalidBinding }
+                return FundingPlanEffectiveReferenceDTO(planId: plan.id, rawINR: $0.returnedINR.rawToken, fetchedAtISO: $0.fetchedAtISO)
+            }
         )
     }
 }

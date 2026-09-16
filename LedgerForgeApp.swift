@@ -30,6 +30,14 @@ private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDeleg
 @main
 struct LedgerForgeApp: App {
     @NSApplicationDelegateAdaptor(LedgerForgeTerminationDelegate.self) private var terminationDelegate
+    @StateObject private var alDarReferenceSession = AlDarReferenceSession(enabled: {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["LEDGERFORGE_TEST_HOST"] == "1" { return false }
+#if DEBUG
+        if environment["LEDGERFORGE_AL_DAR_NETWORK_DISABLED"] == "1" { return false }
+#endif
+        return true
+    }())
     @StateObject private var transactionViewModel = TransactionListViewModel()
     @State private var transactionAmountMeasurement = TransactionAmountWidthMeasurement()
 #if !DEBUG
@@ -46,7 +54,7 @@ struct LedgerForgeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement)
+            ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement, alDarReferenceSession: alDarReferenceSession)
         }
         .windowStyle(.hiddenTitleBar)
     }
@@ -150,13 +158,13 @@ struct LedgerForgeApp: App {
         guard exists || (path != nil && usesIsolatedTestPersistence()) else { throw BackupError.recoveryUnavailable }
         if !parentExisted { try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true) }
         // Resolve receipt ownership first, then permit only the explicitly
-        // approved V17→V18 existing-ledger bridge under the recovery gate.
+        // approved exact V17/V18/V19→current existing-ledger bridge under the recovery gate.
         let isRecoveryOpen = try recovery.layout?.readReceipt() != nil
         if isRecoveryOpen {
             let database = SQLiteDatabase(path: target.path)
             try database.open(access: .existing)
             do {
-                try BackupCompatibility.upgradeV17IfNeeded(database)
+                try BackupCompatibility.upgradeSupportedCandidateIfNeeded(database)
                 try database.checkpointAndClose()
             } catch { try? database.closeChecked(); throw error }
         }

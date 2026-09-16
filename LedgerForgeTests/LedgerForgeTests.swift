@@ -23,17 +23,17 @@ struct LedgerForgeTests {
         #expect(AppShellSection.ordinaryNavigation == [
             .dashboard,
             .accounts,
+            .salary,
             .transactions,
             .imports,
-            .salary,
             .settings
         ])
         #expect(AppShellSection.ordinaryNavigation.map(\.rawValue) == [
             "Dashboard",
             "Accounts",
+            "Budget Planning",
             "Transactions",
             "Import",
-            "Salary",
             "Settings"
         ])
         #expect(!AppShellSection.ordinaryNavigation.contains(.developer))

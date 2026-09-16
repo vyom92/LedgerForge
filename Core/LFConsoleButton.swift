@@ -23,7 +23,7 @@ struct LFConsoleButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
-                .font(theme.typography.formCaption.weight(.semibold))
+                .font(theme.typography.button)
                 .frame(minWidth: minWidth)
                 .frame(maxWidth: isFullWidth ? .infinity : nil)
                 .padding(.horizontal, 14)
@@ -37,7 +37,7 @@ struct LFConsoleButton: View {
                 .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LFPlainActionStyle())
         .focused($isFocused)
         .focusable(!isDisabled)
         .onHover { isHovered = $0 }

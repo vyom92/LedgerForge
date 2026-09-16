@@ -211,6 +211,7 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try SalaryPersistenceDTOValidator.validateRowLineage(plan: plan, existing: Array(state.fundingPlans.values))
         guard state.workspaces[plan.workspaceId] != nil || plan.workspaceId == "default-workspace",
               state.fundingPlans.values.first(where: { $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO && $0.id != plan.id }) == nil,
               state.fundingPlans[plan.id].map({ $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO }) ?? true,

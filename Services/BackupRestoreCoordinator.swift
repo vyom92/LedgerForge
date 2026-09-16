@@ -74,6 +74,8 @@ final class BackupRestoreCoordinator: ObservableObject {
         let result: [String: String] = ["mode": mode, "phase": receipt?.phase.rawValue ?? "none",
             "hydration": ApplicationAvailability.shared.permitsMutation ? "current" : "unavailable",
             "canonical": "isolated-current", "operation": receipt?.operationID.uuidString ?? "none",
+            // The first line is a fixed product status; omit a published backup's path.
+            "status": message.components(separatedBy: .newlines).first ?? "",
             "backupCreated": lastBackupURL == nil ? "false" : "true"]
         if let bytes = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) {
             print("SPRINT93_RECOVERY_PROBE " + text); fflush(stdout)

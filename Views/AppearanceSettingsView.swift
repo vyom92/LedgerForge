@@ -31,10 +31,8 @@ struct LFAppearanceIntroduction: View {
     private var restoreButton: some View {
         Button("Restore approved defaults", action: appearance.restoreApprovedDefaults)
             // Recovery stays legible even after an unhelpful custom text color.
-            .font(.system(size: 13, weight: .medium))
-            .buttonStyle(.bordered)
-            .tint(nil)
-            .foregroundStyle(.primary)
+            .lfSecondaryAction()
+            .environment(\.lfTheme, LFTheme.dark)
             .help("Reset appearance only. All financial data and other settings stay unchanged.")
     }
 }

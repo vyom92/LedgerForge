@@ -4,6 +4,8 @@ import Testing
 
 /// Independently recorded from accepted ab17d4b8dacd35f428b54fc7bb28ffb26df0829e:
 /// Database/Migrations.swift and Database/IdentifierOwnershipMigrationV5.swift.
+/// V18 was independently recorded from the retained accepted format-1 V18
+/// product package (created 2026-09-15) and checked against cdfb756.
 /// Never regenerate these expectations from candidate migrations. Changes to
 /// accepted history require a separately approved compatibility decision.
 struct MigrationIdentityLockTests {
@@ -31,11 +33,12 @@ struct MigrationIdentityLockTests {
         .init(14, "generalized card reconciliation and structural section evidence", "b3de565507ec2ac1f9cc0f550024d987c5d17c5f3375805bcb75e84811bd5369"),
         .init(15, "Axis card observations and representation-neutral semantic events", "52a7d4715c09ebc361721cccaf3bc7983fa4ac0eebd167f4859bbab8deb8b35d"),
         .init(16, "Qatar Airways salary actuals and current-month funding plans", "8b64c97024d2ac0992a15505d2022a4b8ed8bbd4f4134c9bfbbe50b18cbe0fc8"),
-        .init(17, "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence", "f7250835a4446507ab77b7f1a9eeb65ed8a1568ccbc538fc8b777c4a54a98836")
+        .init(17, "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence", "f7250835a4446507ab77b7f1a9eeb65ed8a1568ccbc538fc8b777c4a54a98836"),
+        .init(18, "funding_plan_al_dar_reference_v18", "0fb20df64484d70d0dc880f7cedaf2814574ba25067e5b64aefb6b4a32b413b7")
     ]
 
     @Test func acceptedHistoryRemainsPinned() {
-        #expect(allMigrations.prefix(17).map(Identity.init) == accepted)
+        #expect(allMigrations.prefix(18).map(Identity.init) == accepted)
     }
 
     @Test func lockDetectsNameSQLPreflightAndExecutionModeDrift() {

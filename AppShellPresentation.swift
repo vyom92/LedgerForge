@@ -12,6 +12,7 @@ enum AppShellSizing {
         case .dashboard: CGSize(width: 640, height: 608)
         case .transactions: CGSize(width: 1024, height: 736)
         case .settings: CGSize(width: 760, height: 608)
+        case .salary: CGSize(width: 760, height: 608)
         default: CGSize(width: 1180, height: 760)
         }
     }
@@ -146,7 +147,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                     Spacer()
                 }
             }
-            .frame(minWidth: selectedSection == .transactions || selectedSection == .dashboard || selectedSection == .settings ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: [.transactions, .dashboard, .settings, .salary].contains(selectedSection) ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(
             minWidth: AppShellSizing.minimumSize(for: selectedSection).width,
@@ -193,6 +194,14 @@ struct AppShellSidebar: View {
     @State private var hoveredSection: AppShellSection?
     @FocusState private var focusedSection: AppShellSection?
 
+    private var expandedWidth: CGFloat {
+        let font = NSFontManager.shared.convert(theme.typography.nativeFont(.body), toHaveTrait: .boldFontMask)
+        let label = AppShellSection.ordinaryNavigation.map {
+            ($0.rawValue as NSString).size(withAttributes: [.font: font]).width
+        }.max() ?? 0
+        return max(theme.spacing.expandedSidebarWidth, ceil(label) + 22 + 12 + 4 * theme.spacing.expandedSidebarPadding)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
@@ -219,7 +228,7 @@ struct AppShellSidebar: View {
         }
         .padding(.horizontal, isCollapsed ? theme.spacing.railPadding : theme.spacing.expandedSidebarPadding)
         .padding(.vertical, 18)
-        .frame(width: isCollapsed ? theme.spacing.railWidth : theme.spacing.expandedSidebarWidth)
+        .frame(width: isCollapsed ? theme.spacing.railWidth : expandedWidth)
         .frame(maxHeight: .infinity)
         .background {
             ZStack {
@@ -309,8 +318,8 @@ struct AppShellSidebar: View {
                 if !isCollapsed {
                     Text(section.rawValue)
                         .font(theme.typography.body.weight(selectedSection == section ? .semibold : .regular))
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
                 }
             }
@@ -329,7 +338,7 @@ struct AppShellSidebar: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LFPlainActionStyle())
         .foregroundStyle(theme.palette.primaryText)
         .accessibilityLabel(section.rawValue)
         .accessibilityAddTraits(selectedSection == section ? .isSelected : [])

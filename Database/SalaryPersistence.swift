@@ -92,6 +92,34 @@ public struct FundingPlanCommitmentDTO: nonisolated Equatable, Sendable {
     public let fundingAccountId: String?
     public let provenanceCode: String
     public let carriedSourcePlanId: String?
+    public var recurs: Bool = true
+    public var temporaryCarryBasisMinor: Int64? = nil
+    public var temporaryCarryBasisDecimal: String? = nil
+    public var carriedSourceRowId: String? = nil
+    public var remark: String = ""
+    public var dueDateISO: String? = nil
+}
+
+public struct FundingPlanDeductionDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let planId: String
+    public let sourceOrdinal: Int
+    public let label: String
+    public let amountMinor: Int64
+    public let amountDecimal: String
+    public let recurs: Bool
+    public let carriedSourceRowId: String?
+}
+
+public struct FundingPlanEffectiveReferenceDTO: nonisolated Equatable, Sendable {
+    public let planId: String
+    public let rawINR: String
+    public let fetchedAtISO: String
+
+    nonisolated func quote() throws -> AlDarReferenceQuote {
+        try AlDarReferenceQuote(submittedQAR: Money(canonicalDecimal: "1.00", currency: "QAR"),
+            returnedINR: AlDarReturnedINRDecimal(rawToken: rawINR), fetchedAtISO: fetchedAtISO)
+    }
 }
 
 nonisolated public struct FundingPlanAlDarReferenceDTO: Equatable, Sendable {
@@ -171,6 +199,12 @@ public struct FundingPlanDTO: nonisolated Equatable, Sendable {
     public let balances: [FundingPlanBalanceDTO]
     public let commitments: [FundingPlanCommitmentDTO]
     public var alDarReference: FundingPlanAlDarReferenceDTO? = nil
+    public var calculationVersion: String = "legacy"
+    public var keepInCBQMinor: Int64? = nil
+    public var keepInCBQDecimal: String? = nil
+    public var referenceMode: String? = nil
+    public var deductions: [FundingPlanDeductionDTO] = []
+    public var effectiveReference: FundingPlanEffectiveReferenceDTO? = nil
 }
 
 public protocol FundingPlanRepository {
@@ -225,6 +259,45 @@ nonisolated enum SalaryPersistenceDTOValidator {
 
     static func validate(plan: FundingPlanDTO) throws {
         _ = try month(plan.planMonthISO)
+        guard ["legacy", "budgetV1"].contains(plan.calculationVersion) else {
+            throw RepositoryError.relationshipViolation("Unknown planning calculation version.")
+        }
+        if plan.calculationVersion == "budgetV1" {
+            guard let minor = plan.keepInCBQMinor, let decimal = plan.keepInCBQDecimal, minor >= 0,
+                  ["alDar", "manual"].contains(plan.referenceMode ?? ""),
+                  plan.expectedDeductionsMinor == 0, plan.plannedInvestmentMinor == 0,
+                  plan.alDarReference == nil else {
+                throw RepositoryError.relationshipViolation("Budget Planning inputs are incomplete or conflict with legacy inputs.")
+            }
+            _ = try money(decimal, minor, "QAR")
+            guard plan.deductions.map(\.sourceOrdinal) == (plan.deductions.isEmpty ? [] : Array(1...plan.deductions.count)),
+                  Set(plan.deductions.map(\.id)).count == plan.deductions.count else {
+                throw RepositoryError.relationshipViolation("Deduction identity or order is invalid.")
+            }
+            for row in plan.deductions {
+                guard row.planId == plan.id, !row.id.isEmpty,
+                      !row.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      row.label.count <= 240, row.amountMinor >= 0,
+                      row.carriedSourceRowId == nil || plan.rolloverSourcePlanId != nil else {
+                    throw RepositoryError.relationshipViolation("Deduction rows require a name and nonnegative amount.")
+                }
+                _ = try money(row.amountDecimal, row.amountMinor, "QAR")
+            }
+            if plan.referenceMode == "alDar" {
+                guard plan.fxINRPerQARDecimal == nil, plan.fxObservationDateISO == nil else {
+                    throw RepositoryError.relationshipViolation("Only one planning reference may be selected.")
+                }
+                if let reference = plan.effectiveReference {
+                    guard reference.planId == plan.id else { throw RepositoryError.relationshipViolation("Reference plan mismatch.") }
+                    _ = try reference.quote()
+                }
+            } else {
+                guard plan.effectiveReference == nil, plan.fxINRPerQARDecimal != nil,
+                      plan.fxObservationDateISO != nil else { throw RepositoryError.relationshipViolation("Manual reference is incomplete.") }
+            }
+        } else if plan.keepInCBQMinor != nil || plan.keepInCBQDecimal != nil || plan.referenceMode != nil || !plan.deductions.isEmpty || plan.effectiveReference != nil {
+            throw RepositoryError.relationshipViolation("Legacy plan contains new calculation inputs.")
+        }
         for value in [
             (plan.expectedFixedDecimal, plan.expectedFixedMinor),
             (plan.expectedVariableDecimal, plan.expectedVariableMinor),
@@ -283,6 +356,26 @@ nonisolated enum SalaryPersistenceDTOValidator {
                 throw RepositoryError.relationshipViolation("Funding commitment provenance is invalid.")
             }
             let amount = try money(commitment.amountDecimal, commitment.amountMinor, commitment.amountCurrency)
+            if plan.calculationVersion == "legacy",
+               (!commitment.recurs || commitment.temporaryCarryBasisMinor != nil || commitment.temporaryCarryBasisDecimal != nil || commitment.carriedSourceRowId != nil || !commitment.remark.isEmpty || commitment.dueDateISO != nil) {
+                throw RepositoryError.relationshipViolation("Legacy commitment contains Budget Planning metadata.")
+            }
+            if plan.calculationVersion == "budgetV1" {
+                if let date = commitment.dueDateISO {
+                    _ = try StatementDate(canonical: date)
+                }
+                guard commitment.amountMinor >= 0, commitment.remark.count <= 240,
+                      commitment.carriedSourceRowId == nil || plan.rolloverSourcePlanId != nil else {
+                    throw RepositoryError.relationshipViolation("Commitment amount or lineage is invalid.")
+                }
+                switch (commitment.temporaryCarryBasisMinor, commitment.temporaryCarryBasisDecimal) {
+                case (nil, nil): break
+                case let (minor?, decimal?):
+                    guard commitment.recurs, minor >= commitment.amountMinor else { throw RepositoryError.relationshipViolation("Temporary remaining amount must not exceed its carry basis.") }
+                    _ = try money(decimal, minor, commitment.amountCurrency)
+                default: throw RepositoryError.relationshipViolation("Temporary remaining amount has no complete carry basis.")
+                }
+            }
             guard amount.currency == expectedCurrency else {
                 throw RepositoryError.relationshipViolation("Funding commitment currency is invalid.")
             }
@@ -305,6 +398,34 @@ nonisolated enum SalaryPersistenceDTOValidator {
             let shortfall = try subtract(aggregate([zero] + commitments), aggregate([zero] + balances))
             guard max(0, shortfall.minorUnits) == (try evidence.boundShortfallINR.minorUnits()) else {
                 throw RepositoryError.relationshipViolation("Planning reference no longer matches the INR shortfall.")
+            }
+        }
+    }
+
+    static func validateRowLineage(plan: FundingPlanDTO, existing: [FundingPlanDTO]) throws {
+        let otherPlans = existing.filter { $0.id != plan.id }
+        let balanceIDs = Set(otherPlans.flatMap { $0.balances.map(\.id) })
+        let commitmentIDs = Set(otherPlans.flatMap { $0.commitments.map(\.id) })
+        let deductionIDs = Set(otherPlans.flatMap { $0.deductions.map(\.id) })
+        guard !plan.balances.contains(where: { balanceIDs.contains($0.id) }),
+              !plan.commitments.contains(where: { commitmentIDs.contains($0.id) }),
+              !plan.deductions.contains(where: { deductionIDs.contains($0.id) }) else {
+            throw RepositoryError.relationshipViolation("New months require unique row identities.")
+        }
+        let source = existing.first { $0.id == plan.rolloverSourcePlanId && $0.workspaceId == plan.workspaceId && $0.planMonthISO < plan.planMonthISO }
+        let saved = existing.first { $0.id == plan.id && $0.workspaceId == plan.workspaceId && $0.rolloverSourcePlanId == plan.rolloverSourcePlanId }
+        for row in plan.commitments {
+            if let sourceID = row.carriedSourceRowId {
+                let retained = saved?.commitments.contains { $0.id == row.id && $0.carriedSourceRowId == sourceID && $0.regionCode == row.regionCode && $0.amountCurrency == row.amountCurrency } == true
+                guard retained || source?.commitments.contains(where: { $0.id == sourceID && $0.regionCode == row.regionCode && $0.amountCurrency == row.amountCurrency }) == true else {
+                    throw RepositoryError.relationshipViolation("Recurring bill lineage is invalid.")
+                }
+            }
+        }
+        for row in plan.deductions {
+            if let sourceID = row.carriedSourceRowId {
+                let retained = saved?.deductions.contains { $0.id == row.id && $0.carriedSourceRowId == sourceID } == true
+                guard retained || source?.deductions.contains(where: { $0.id == sourceID }) == true else { throw RepositoryError.relationshipViolation("Deduction lineage is invalid.") }
             }
         }
     }

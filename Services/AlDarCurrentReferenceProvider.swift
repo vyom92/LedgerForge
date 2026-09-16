@@ -1,7 +1,10 @@
 import Foundation
+#if DEBUG
+import OSLog
+#endif
 
-/// The public Home/GetRate forward QAR→INR contract only. Each explicit
-/// refresh owns one ephemeral session and one request; there are no retries.
+/// Public forward QAR→INR/USD only. Scheduling/retries belong to the shared
+/// session; each invocation performs exactly one bounded public request.
 nonisolated struct AlDarCurrentReferenceProvider: Sendable {
     private static let endpoint = URL(string: "https://www.aldarexchange.com/aldarportal/Home/GetRate")!
 
@@ -9,6 +12,15 @@ nonisolated struct AlDarCurrentReferenceProvider: Sendable {
         guard submittedQAR.currency.code == "QAR", submittedQAR.amount > 0 else {
             throw AlDarReferenceError.invalidBinding
         }
+        let reference = try await request(currency: .inr, amount: submittedQAR.canonicalDecimalString())
+        return try AlDarReferenceQuote(submittedQAR: submittedQAR, returnedINR: reference.returned, fetchedAtISO: reference.fetchedAtISO)
+    }
+
+    @concurrent func fetchUnit(currency: AlDarCurrency) async throws -> AlDarUnitReference {
+        try await request(currency: currency, amount: "1")
+    }
+
+    @concurrent private func request(currency: AlDarCurrency, amount: String) async throws -> AlDarUnitReference {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
@@ -27,9 +39,13 @@ nonisolated struct AlDarCurrentReferenceProvider: Sendable {
         request.setValue("https://www.aldarexchange.com", forHTTPHeaderField: "Origin")
         request.setValue("https://www.aldarexchange.com/aldarportal/Home", forHTTPHeaderField: "Referer")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "currency": "INR", "amount": try submittedQAR.canonicalDecimalString(), "isFCY": false
+            "currency": currency.rawValue, "amount": amount, "isFCY": false
         ])
         try Task.checkCancellation()
+#if DEBUG
+        Logger(subsystem: "com.vyom.LedgerForge", category: "AlDarReference")
+            .notice("Public reference request receiving \(currency.rawValue, privacy: .public)")
+#endif
         let (bytes, response) = try await session.bytes(for: request)
         guard let response = response as? HTTPURLResponse, response.statusCode == 200,
               response.url == Self.endpoint, response.mimeType?.lowercased() == "application/json" else {
@@ -41,9 +57,13 @@ nonisolated struct AlDarCurrentReferenceProvider: Sendable {
             guard body.count < 128 else { throw AlDarReferenceError.invalidResponse }
             body.append(byte)
         }
-        return try AlDarReferenceQuote(submittedQAR: submittedQAR,
-                                      returnedINR: .parseResponse(body),
-                                      fetchedAtISO: ISO8601DateFormatter().string(from: Date()))
+        let result = try AlDarUnitReference(currency: currency, rawToken: AlDarReturnedINRDecimal.parseResponse(body).rawToken,
+                                          fetchedAtISO: ISO8601DateFormatter().string(from: Date()))
+#if DEBUG
+        Logger(subsystem: "com.vyom.LedgerForge", category: "AlDarReference")
+            .notice("Public reference fetched \(currency.rawValue, privacy: .public)")
+#endif
+        return result
     }
 
     private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {

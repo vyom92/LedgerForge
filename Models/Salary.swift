@@ -207,6 +207,34 @@ struct FundingPlanCommitment: Identifiable, Equatable, Sendable {
     var included: Bool
     var fundingAccountID: String?
     var provenance: FundingPlanValueProvenance
+    var recurs = true
+    /// Present only for an explicit, temporary remaining-payment adjustment.
+    var temporaryCarryBasis: Money? = nil
+    var carriedSourceRowID: String? = nil
+    var remark = ""
+    var dueDate: StatementDate? = nil
+
+    /// Retain the selected recurring day; shorter months use their last day.
+    /// Dates never change the row's explicit Include choice.
+    func dueDate(in month: SelectedStatementMonth) -> StatementDate? {
+        guard let dueDate else { return nil }
+        guard recurs, (dueDate.year, dueDate.month) <= (month.year, month.month) else { return dueDate }
+        for day in stride(from: dueDate.day, through: 1, by: -1) {
+            if let valid = try? StatementDate(year: month.year, month: month.month, day: day) { return valid }
+        }
+        return nil
+    }
+}
+
+nonisolated enum FundingPlanCalculationVersion: String, Codable, Sendable { case legacy, budgetV1 }
+nonisolated enum FundingPlanReferenceMode: String, Codable, Sendable { case alDar, manual }
+
+struct FundingPlanDeduction: Identifiable, Equatable, Sendable {
+    let id: String
+    var label: String
+    var money: Money
+    var recurs: Bool
+    var carriedSourceRowID: String? = nil
 }
 
 struct FundingPlanFX: Equatable, Sendable {
@@ -250,6 +278,11 @@ struct FundingPlan: Identifiable, Equatable, Sendable {
     var plannedInvestment: Money
     var plannedInvestmentProvenance: FundingPlanValueProvenance
     var updatedAtISO: String
+    var calculationVersion: FundingPlanCalculationVersion = .legacy
+    var keepInCBQ: Money? = nil
+    var deductions: [FundingPlanDeduction] = []
+    var referenceMode: FundingPlanReferenceMode = .alDar
+    var effectiveAlDarReference: AlDarReferenceQuote? = nil
 }
 
 enum FundingPlanIncompleteReason: String, Equatable, Sendable {
@@ -272,10 +305,17 @@ struct FundingPlanCalculation: Equatable, Sendable {
     let availableForInvestment: Money?
     let finalQARBuffer: Money?
     let incompleteReasons: Set<FundingPlanIncompleteReason>
+    var totalDeductions: Money? = nil
+    var qatarCommitments: Money? = nil
+    var positionBeforeTransfer: Money? = nil
+    var signedPotentialCapacity: Money? = nil
+    var transferablePrincipal: Money? = nil
+    var estimatedINR: Money? = nil
 }
 
 enum FundingPlanCalculator {
     static func calculate(_ plan: FundingPlan) -> FundingPlanCalculation {
+        if plan.calculationVersion == .budgetV1 { return calculateBudget(plan) }
         var reasons = Set<FundingPlanIncompleteReason>()
         guard plan.planningFX == nil || plan.alDarReference == nil else {
             return unavailable(.invalidPlanningReference)
@@ -361,6 +401,56 @@ enum FundingPlanCalculator {
             finalQARBuffer: finalBuffer,
             incompleteReasons: reasons
         )
+    }
+
+    private static func calculateBudget(_ plan: FundingPlan) -> FundingPlanCalculation {
+        guard let qar = try? CurrencyCode("QAR"), let inr = try? CurrencyCode("INR"),
+              let reserve = plan.keepInCBQ,
+              [plan.expectedFixedEarnings, plan.expectedVariableEarnings, plan.configuredTransferFee, reserve].allSatisfy({ $0.currency == qar }),
+              reserve.amount >= 0, plan.configuredTransferFee.amount >= 0,
+              plan.deductions.allSatisfy({ $0.money.currency == qar && $0.money.amount >= 0 }),
+              plan.qatarCommitments.allSatisfy({ $0.money.currency == qar && $0.money.amount >= 0 }),
+              plan.indiaCommitments.allSatisfy({ $0.money.currency == inr && $0.money.amount >= 0 }) else { return unavailable(.invalidCurrency) }
+        var reasons = Set<FundingPlanIncompleteReason>()
+        func liquidity(_ currency: CurrencyCode, missing: FundingPlanIncompleteReason) -> Money? {
+            let rows = plan.balances.filter { $0.included && $0.nativeCurrency == currency }
+            guard rows.allSatisfy({ $0.money?.currency == currency }) else { reasons.insert(missing); return nil }
+            return sum(rows.compactMap(\.money), currency: currency)
+        }
+        let b = liquidity(qar, missing: .includedQARBalanceMissing)
+        let e = liquidity(inr, missing: .includedINRBalanceMissing)
+        let deductions = sum(plan.deductions.map(\.money), currency: qar)
+        let net = deductions.flatMap { try? plan.expectedFixedEarnings + plan.expectedVariableEarnings - $0 }
+        let cq = sum(plan.qatarCommitments.filter(\.included).map(\.money), currency: qar)
+        let ci = sum(plan.indiaCommitments.filter(\.included).map(\.money), currency: inr)
+        let p: Money? = if let b, let net, let cq { try? b + net - cq - reserve } else { nil }
+        let a = p.flatMap { try? $0 - plan.configuredTransferFee }
+        let t = a.flatMap { try? Money(amount: max(0, $0.amount), currency: qar) }
+        let h: Money? = if let ci, let e, let difference = try? ci - e {
+            try? Money(amount: max(0, difference.amount), currency: inr)
+        } else { nil }
+        let rate: AlDarReturnedINRDecimal?
+        switch plan.referenceMode {
+        case .alDar:
+            rate = plan.effectiveAlDarReference.flatMap { $0.submittedQAR.amount == 1 ? $0.returnedINR : nil }
+        case .manual:
+            rate = plan.planningFX.flatMap { try? AlDarReturnedINRDecimal.planningRate($0.inrPerQAR) }
+        }
+        let principal: Money?
+        if let h, h.amount == 0 { principal = try? Money(amount: 0, currency: qar) }
+        else if let h, let rate {
+            principal = try? rate.principal(for: h, submittedQAR: Money(amount: 1, currency: qar))
+        } else { principal = nil }
+        if rate == nil, let h, h.amount > 0 { reasons.insert(.missingPlanningFX) }
+        let fee = principal.flatMap { try? Money(amount: $0.amount > 0 ? plan.configuredTransferFee.amount : 0, currency: qar) }
+        let margin: Money? = if let p, let principal, let fee { try? p - principal - fee } else { nil }
+        let estimate: Money? = if let t, let rate { try? rate.receiveEstimate(forQAR: t) } else { nil }
+        return FundingPlanCalculation(expectedNet: net, selectedQARLiquidity: b, selectedINRLiquidity: e,
+            indiaCommitments: ci, indiaFundingShortfall: h, requiredQARPrincipal: principal,
+            effectiveTransferFee: fee, qarBeforeInvestment: margin, availableForInvestment: nil,
+            finalQARBuffer: margin, incompleteReasons: reasons, totalDeductions: deductions,
+            qatarCommitments: cq, positionBeforeTransfer: p, signedPotentialCapacity: a,
+            transferablePrincipal: t, estimatedINR: estimate)
     }
 
     private static func sum(_ values: [Money], currency: CurrencyCode) -> Money? {

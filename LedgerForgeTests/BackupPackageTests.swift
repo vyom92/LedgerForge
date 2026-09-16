@@ -78,9 +78,24 @@ final class BackupPackageTests: XCTestCase {
         let db = SQLiteDatabase(path: candidate.path)
         try db.open(access: .readOnlySnapshot); defer { db.close() }
         try BackupCompatibility.verifyDatabase(db)
-        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 18)
+        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 20)
         XCTAssertEqual(try db.queryInt("SELECT count(*) FROM funding_plan_al_dar_references;"), 0)
     }
+    func testV18AndV19PackagesUpgradeOnlyTheirMissingTail() throws {
+        for version in [18, 19] {
+            let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
+            let source = try package(at: directory, version: version)
+            let manifest = try BackupFiles.verifyPackage(source)
+            let candidate = directory.appendingPathComponent("candidate.sqlite")
+            _ = try BackupCompatibility.prepareCandidate(package: source, manifest: manifest, destination: candidate)
+            XCTAssertEqual(try BackupFiles.verifyPackage(source), manifest)
+            let db = SQLiteDatabase(path: candidate.path)
+            try db.open(access: .readOnlySnapshot); defer { db.close() }
+            try BackupCompatibility.verifyDatabase(db)
+            XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 20)
+        }
+    }
+
     func testRetainedV17ReceiptCanonicalCanUpgradeButMissingCannotCreate() throws {
         let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
         let source = try package(at: directory, version: 17)
@@ -93,7 +108,7 @@ final class BackupPackageTests: XCTestCase {
         try layout.write(record)
         let db = SQLiteDatabase(path: layout.current.path)
         try db.open(access: .existing)
-        try BackupCompatibility.upgradeV17IfNeeded(db)
+        try BackupCompatibility.upgradeSupportedCandidateIfNeeded(db)
         try db.checkpointAndClose()
         XCTAssertEqual(try layout.readReceipt(), record)
         XCTAssertNotEqual(try BackupFiles.hash(layout.current).sha256, record.payloadSHA256)

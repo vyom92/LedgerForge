@@ -75,16 +75,16 @@ enum AppShellSection: String, CaseIterable {
     case accounts = "Accounts"
     case transactions = "Transactions"
     case imports = "Import"
-    case salary = "Salary"
+    case salary = "Budget Planning"
     case settings = "Settings"
     case developer = "Developer Console"
 
     static let ordinaryNavigation: [AppShellSection] = [
         .dashboard,
         .accounts,
+        .salary,
         .transactions,
         .imports,
-        .salary,
         .settings
     ]
 
@@ -1355,6 +1355,7 @@ struct ContentView: View {
     @State private var importCentrePresentationOwnerID = UUID()
     @State private var importValidationContentHeight: CGFloat = 0
     @ObservedObject private var availability = ApplicationAvailability.shared
+    @ObservedObject private var alDarReferenceSession: AlDarReferenceSession
     @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @ObservedObject private var transactionViewModel: TransactionListViewModel
@@ -1470,7 +1471,9 @@ struct ContentView: View {
     }
 
     init(transactionViewModel: TransactionListViewModel? = nil,
-         transactionAmountMeasurement: TransactionAmountWidthMeasurement? = nil) {
+         transactionAmountMeasurement: TransactionAmountWidthMeasurement? = nil,
+         alDarReferenceSession: AlDarReferenceSession? = nil) {
+        self.alDarReferenceSession = alDarReferenceSession ?? AlDarReferenceSession(enabled: false)
         self.transactionViewModel = transactionViewModel ?? TransactionListViewModel()
         self.transactionAmountMeasurement = transactionAmountMeasurement ?? TransactionAmountWidthMeasurement()
     }
@@ -1551,7 +1554,7 @@ struct ContentView: View {
         .onAppear {
             importCentre.attachPresentationOwner(importCentrePresentationOwnerID)
             DatabaseActivityGate.shared.registerDraftOwner(salaryViewModel) { [weak model = salaryViewModel] in
-                model?.isDirty == true
+                model?.hasUnsavedDrafts == true
             }
             DatabaseActivityGate.shared.registerDraftOwner(accountsViewModel) { [weak model = accountsViewModel] in
                 model?.isEditingDisplayName == true
@@ -1639,7 +1642,7 @@ struct ContentView: View {
                                     generation: availability.generation, availabilityState: availability.state)
             },
             imports: { importWizardContent },
-            salary: { SalaryView(viewModel: salaryViewModel) },
+            salary: { SalaryView(viewModel: salaryViewModel, referenceSession: alDarReferenceSession) },
             settings: { settingsContent },
             developer: {
 #if DEBUG
@@ -1671,6 +1674,7 @@ struct ContentView: View {
                             .frame(minWidth: usesColumns ? 640 : 0, maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
                             salaryDashboardSummary
+                            AlDarFXCard(session: alDarReferenceSession, showsRefresh: false)
                             importActivityCard
                         }
                         .frame(width: usesColumns ? dashboardSupportingColumnWidth : nil, alignment: .leading)
@@ -1908,14 +1912,15 @@ struct ContentView: View {
     }
 
     private var dashboardSupportingColumnWidth: CGFloat {
-        guard dashboardViewModel.fundingState != .empty else { return 336 }
+        let minimumWidth = AlDarFXCard.minimumWidth(theme: theme, legs: alDarReferenceSession.legs)
+        guard dashboardViewModel.fundingState != .empty else { return minimumWidth }
         let valueWidth = DashboardFundingMetric.allCases.map {
             dashboardTextWidth(dashboardFundingText($0), role: .body, tabular: true)
         }.max() ?? 0
         let labelWidth = DashboardFundingMetric.allCases.map {
             dashboardTextWidth($0.rawValue, role: .secondary)
         }.max() ?? 0
-        return max(336, labelWidth + theme.spacing.valueGutter + valueWidth + 2 * theme.spacing.panelPadding)
+        return max(minimumWidth, labelWidth + theme.spacing.valueGutter + valueWidth + 2 * theme.spacing.panelPadding)
     }
 
     private var salaryDashboardSummary: some View {
@@ -1933,7 +1938,7 @@ struct ContentView: View {
                     }
                 }
             } else {
-                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.body.weight(.medium))
+                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Budget Planning", icon: "calendar", font: theme.typography.body.weight(.medium))
                 if dashboardViewModel.fundingState == .loading {
                     dashboardState("Loading Salary / Funding…", loading: true)
                 } else {
@@ -1965,7 +1970,7 @@ struct ContentView: View {
 
     private var dashboardMissingPlanMessage: some View {
         VStack(alignment: .leading, spacing: theme.spacing.small) {
-            dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
+            dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Budget Planning", icon: "calendar", font: theme.typography.secondary.weight(.medium))
             Text("No saved plan for \(dashboardViewModel.fundingMonthTitle).")
                 .font(theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
@@ -2129,7 +2134,7 @@ struct ContentView: View {
                                         )
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(LFPlainActionStyle())
                             .disabled(importSelectionDisabled || statementDropRequestGate.isActive)
                             .onDrop(
                                 of: [.fileURL],
@@ -2447,7 +2452,7 @@ struct ContentView: View {
                             Button("Save") {
                                 accountsViewModel.saveDisplayName()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .lfPrimaryAction()
                             Button("Cancel") {
                                 accountsViewModel.cancelDisplayNameEdit()
                             }
@@ -2556,7 +2561,7 @@ struct ContentView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(LFPlainActionStyle())
                         }
                     }
 
@@ -2742,7 +2747,7 @@ struct ContentView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LFPlainActionStyle())
     }
 
     private func accountIcon(_ institution: String) -> some View {
@@ -2822,11 +2827,12 @@ struct ContentView: View {
                                     statementPassword = ""
                                     statementPasswordChallenges.cancel(challengeID: challenge.id)
                                 }
+                                .lfSecondaryAction()
                                 Spacer()
                                 Button("Unlock") {
                                     submitStatementPassword(challenge)
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .lfPrimaryAction()
                                 .disabled(statementPassword.isEmpty)
                             }
                         }
@@ -2884,15 +2890,9 @@ struct ContentView: View {
                                     performConfirmedImportRecoveryAction(action, for: outcome)
                                 } label: {
                                     Label(action.label, systemImage: "arrow.clockwise")
-                                        .font(theme.typography.formBody.weight(.semibold))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
                                         .frame(maxWidth: .infinity)
-                                        .background(theme.palette.controlSurface)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(theme.palette.primaryText)
+                                .lfSecondaryAction()
                                 .disabled(
                                     confirmedImportRecoveryActionRequestID != nil
                                         || importCentre.isPreparationDraining
@@ -2973,31 +2973,18 @@ struct ContentView: View {
                                 selectedSection = .accounts
                             } label: {
                                 Label("View Account", systemImage: "person.crop.circle")
-                                    .font(theme.typography.formBody.weight(.semibold))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity)
-                                    .background(theme.palette.controlSurface)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(theme.palette.primaryText)
+                            .lfSecondaryAction()
                         }
                         if outcome.allowsViewingTransactions {
                             Button {
                                 selectedSection = .transactions
                             } label: {
                                 Label("View Transactions", systemImage: "list.bullet")
-                                    .font(theme.typography.formBody.weight(.semibold))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity)
-                                    .background(theme.palette.primaryAction)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.white)
-                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                            .lfPrimaryAction()
                         }
                     }
                 }
@@ -3060,14 +3047,14 @@ struct ContentView: View {
                         }
                         .padding(9).background(theme.palette.contentSurface).clipShape(RoundedRectangle(cornerRadius: 7))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(LFPlainActionStyle())
                     .accessibilityLabel("\(presentation.outcome.label). \(presentation.outcome.explanation)")
                 }
             }
             if let attempt = importHistoryViewModel.selectedAttempt {
                 let presentation = DurableImportAttemptPresentation(attempt: attempt)
                 Divider()
-                HStack { Text("Attempt Detail").font(theme.typography.formBody.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.font(theme.typography.formCaption) }
+                HStack { Text("Attempt Detail").font(theme.typography.formBody.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.lfSecondaryAction() }
                 LFInfoRow(title: "Outcome", value: presentation.outcome.label)
                 LFInfoRow(title: "Coverage", value: presentation.coverage)
                 LFInfoRow(title: "Guidance", value: presentation.guidance)
@@ -3091,7 +3078,7 @@ struct ContentView: View {
                 }
                 if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
                     Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
-                        .font(theme.typography.formCaption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(theme.palette.accentHover)
+                        .font(theme.typography.formCaption.weight(.semibold)).buttonStyle(LFPlainActionStyle()).foregroundStyle(theme.palette.accentHover)
                 }
             }
         }
@@ -3227,7 +3214,7 @@ struct ContentView: View {
                             .background(theme.palette.controlSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(LFPlainActionStyle())
                         .foregroundStyle(theme.palette.primaryText)
                         .disabled(!eligible)
                     }
@@ -3254,7 +3241,7 @@ struct ContentView: View {
                             .background(theme.palette.controlSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(LFPlainActionStyle())
                         .foregroundStyle(theme.palette.primaryText)
                     }
                     newAccountCreationChoice(preparedImport, instrumentAware: false)
@@ -3280,7 +3267,7 @@ struct ContentView: View {
                                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(LFPlainActionStyle())
                             if selected {
                                 let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
                                 ForEach(sections, id: \.documentScopedSectionID) { section in
@@ -3361,7 +3348,7 @@ struct ContentView: View {
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LFPlainActionStyle())
             if selected {
                 LabeledContent("Display name") {
                     TextField("Account display name", text: Binding(
@@ -3877,7 +3864,7 @@ struct ContentView: View {
 
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .buttonStyle(.plain)
+            .buttonStyle(LFPlainActionStyle())
             .font(theme.typography.formCaption)
             .foregroundStyle(theme.palette.accentHover)
     }
@@ -3975,7 +3962,7 @@ struct ContentView: View {
         case .imports:
             return "Import statements in a few simple steps"
         case .salary:
-            return "Imported salary actuals and \(salaryViewModel.planMonthTitle) funding plan"
+            return "Monthly estimates · \(salaryViewModel.planMonthTitle)"
         case .settings:
             return "Configure LedgerForge to work the way you do"
         case .developer:
@@ -3994,8 +3981,10 @@ struct ContentView: View {
             Spacer()
             if availability.state != .loading {
                 Button("Diagnostics") { selectedSection = .developer }
+                    .lfSecondaryAction()
                 if DatabaseProvider.shared.persistenceState.isUsable {
                     Button("Reload data") { Task { await hydrateDashboard(force: true) } }
+                        .lfSecondaryAction()
                 }
             }
         }.padding().background(LFTheme.warning.opacity(0.12))

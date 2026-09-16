@@ -404,7 +404,7 @@ struct TransactionListView: View {
                         viewModel.presentationFilter.searchText = ""
                         searchFocused = true
                     } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain)
+                    .buttonStyle(LFPlainActionStyle())
                     .help("Clear search")
                     .accessibilityLabel("Clear search")
                 }
@@ -509,6 +509,7 @@ struct TransactionListView: View {
                 Toggle(option.name, isOn: membership(\.accountIDs, option.id))
             }
         } label: { filterLabel("Account", count: viewModel.presentationFilter.accountIDs.count) }
+        .lfMenuAction()
         .help("Choose one or more accounts. Accounts keep their durable identity.")
     }
     private var currencyMenu: some View {
@@ -519,6 +520,7 @@ struct TransactionListView: View {
                 Toggle(currency.code, isOn: membership(\.currencies, currency))
             }
         } label: { filterLabel("Currency", count: viewModel.presentationFilter.currencies.count) }
+        .lfMenuAction()
     }
     private var categoryMenu: some View {
         Menu {
@@ -530,6 +532,7 @@ struct TransactionListView: View {
                        isOn: membership(\.categories, .categoryID(category.id)))
             }
         } label: { filterLabel("Category", count: viewModel.presentationFilter.categories.count) }
+        .lfMenuAction()
     }
     private var familyMenu: some View {
         Menu {
@@ -538,6 +541,7 @@ struct TransactionListView: View {
             Toggle("Bank", isOn: membership(\.domains, .bank))
             Toggle("Card", isOn: membership(\.domains, .card))
         } label: { filterLabel("Family", count: viewModel.presentationFilter.domains.count) }
+        .lfMenuAction()
     }
     private var effectMenu: some View {
         Menu {
@@ -550,6 +554,7 @@ struct TransactionListView: View {
                 Toggle("Decrease owed", isOn: membership(\.effects, .decreasesAmountOwed))
             }
         } label: { filterLabel("Effect", count: viewModel.presentationFilter.effects.count) }
+        .lfMenuAction()
     }
     private var institutionMenu: some View {
         Menu {
@@ -559,6 +564,7 @@ struct TransactionListView: View {
                 Toggle(institution, isOn: membership(\.institutionDisplayNames, institution))
             }
         } label: { filterLabel("Institution", count: viewModel.presentationFilter.institutionDisplayNames.count) }
+        .lfMenuAction()
     }
     private var moreFiltersButton: some View {
         Button {
@@ -595,9 +601,10 @@ struct TransactionListView: View {
                     }
                     HStack {
                         Button("Clear amount") { minimumAmount = ""; maximumAmount = ""; updateAmount() }
+                            .lfSecondaryAction()
                         Spacer()
                         Button("Done") { moreFiltersVisible = false }
-                            .keyboardShortcut(.defaultAction)
+                            .lfPrimaryAction().keyboardShortcut(.defaultAction)
                     }
                 }
                 .padding(20)

@@ -7,6 +7,21 @@ import Testing
 struct PlannerEditorTests {
     private let locale = Locale(identifier: "en_US_POSIX")
 
+    @Test func liveAmountWordsUseExactIndianGroupingAndHideUnfinishedInput() {
+        let examples = ["7000": "Seven thousand", "250072": "Two lakh fifty thousand seventy-two",
+                        "12000000": "One crore twenty lakh", "0": "Zero",
+                        "-1250": "Minus one thousand two hundred fifty", "7.05": "Seven point zero five"]
+        for (input, expected) in examples {
+            #expect(PlannerInputCodec.amountInWords(input, currency: "INR", locale: locale) == expected)
+        }
+        for invalid in ["", "-", "7.", "7.001", "1e3"] {
+            #expect(PlannerInputCodec.amountInWords(invalid, currency: "QAR", locale: locale) == nil)
+        }
+        #expect(PlannerInputCodec.amountInWords("90071992547409.91", currency: "INR", locale: locale)?.hasSuffix("point nine one") == true)
+        #expect(PlannerInputCodec.amountInWords("90071992547409.92", currency: "INR", locale: locale)?.hasSuffix("point nine two") == true)
+        #expect(PlannerInputCodec.amountInWords("7,05", currency: "INR", locale: Locale(identifier: "de_DE")) == "Seven point zero five")
+    }
+
     @Test func exactEditingSpellingsAndLocales() throws {
         for currency in ["QAR", "INR"] {
             for (input, expected) in [("5000", "5000.00"), ("5000.5", "5000.50"), ("5000.55", "5000.55"), ("-5.5", "-5.50")] {
@@ -156,7 +171,7 @@ struct PlannerEditorTests {
             #expect(setup.vm.amountInputText(field.rawValue) == "")
             #expect(setup.vm.moneyText(field) == "0")
         }
-        #expect(setup.vm.amountInputText("fee") == "25")
+        #expect(setup.vm.amountInputText("fee") == "")
         #expect(!setup.vm.isDirty)
         #expect(setup.vm.updateMoney(.fixed, text: "0"))
         #expect(setup.vm.amountInputText("fixed") == "0")
@@ -238,16 +253,27 @@ struct PlannerEditorTests {
         }
     }
 
-    @Test func investmentAvailabilityStopsAtZeroWithoutHidingTheFundingDeficit() throws {
+    @Test func budgetCapacityRetainsDeficitsAndLegacyInvestmentInterpretationStaysDistinct() throws {
         for deductions in ["0", "10", "20"] {
             let setup = try editor()
             _ = setup.vm.updateMoney(.fixed, text: "10")
-            _ = setup.vm.updateMoney(.deductions, text: deductions)
-            _ = setup.vm.updateMoney(.investment, text: "5")
+            setup.vm.addDeduction()
+            let row = try #require(setup.vm.plan.deductions.first)
+            setup.vm.editDeduction(id: row.id, label: "My deduction", amount: deductions)
+            #expect(!setup.vm.updateMoney(.investment, text: "5"))
             let expectedBefore = Decimal(10) - (try #require(Decimal(string: deductions)))
-            #expect(setup.vm.calculation.qarBeforeInvestment?.amount == expectedBefore)
-            #expect(setup.vm.calculation.availableForInvestment?.amount == max(0, expectedBefore))
-            #expect(setup.vm.calculation.finalQARBuffer?.amount == expectedBefore - 5)
+            #expect(setup.vm.calculation.signedPotentialCapacity?.amount == expectedBefore)
+            #expect(setup.vm.calculation.transferablePrincipal?.amount == max(0, expectedBefore))
+            #expect(setup.vm.calculation.finalQARBuffer?.amount == expectedBefore)
+            #expect(setup.vm.calculation.availableForInvestment == nil)
+            var legacy = setup.vm.plan
+            legacy.calculationVersion = .legacy
+            legacy.expectedDeductions = try Money(amount: Decimal(string: deductions)!, currency: "QAR")
+            legacy.plannedInvestment = try Money(amount: 5, currency: "QAR")
+            let historical = FundingPlanCalculator.calculate(legacy)
+            #expect(historical.qarBeforeInvestment?.amount == expectedBefore)
+            #expect(historical.availableForInvestment?.amount == max(0, expectedBefore))
+            #expect(historical.finalQARBuffer?.amount == expectedBefore - 5)
         }
         let incomplete = try editor()
         incomplete.vm.addCommitment(region: "india")

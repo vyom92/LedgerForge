@@ -168,11 +168,12 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                    expected_deductions_minor, expected_deductions_decimal, expected_deductions_provenance,
                    configured_fee_minor, configured_fee_decimal, configured_fee_provenance,
                    fx_inr_per_qar_decimal, fx_observation_date,
-                   planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at
+                   planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at,
+                   calculation_version, keep_in_cbq_minor, keep_in_cbq_decimal, reference_mode
             FROM funding_plans WHERE workspace_id = ? ORDER BY plan_month;
             """, params: [workspaceId]) { row in
                 let id = row.string(at: 0) ?? ""
-                return FundingPlanDTO(
+                var plan = FundingPlanDTO(
                     id: id, workspaceId: row.string(at: 1) ?? "", planMonthISO: row.string(at: 2) ?? "",
                     rolloverSourcePlanId: row.string(at: 3), expectedFixedMinor: row.int64(at: 4) ?? 0,
                     expectedFixedDecimal: row.string(at: 5) ?? "", expectedFixedProvenance: row.string(at: 6) ?? "",
@@ -187,6 +188,13 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                     commitments: try self.commitments(planID: id),
                     alDarReference: try self.alDarReference(planID: id)
                 )
+                plan.calculationVersion = row.string(at: 22) ?? ""
+                plan.keepInCBQMinor = row.int64(at: 23)
+                plan.keepInCBQDecimal = row.string(at: 24)
+                plan.referenceMode = row.string(at: 25)
+                plan.deductions = try self.deductions(planID: id)
+                plan.effectiveReference = try self.effectiveReference(planID: id)
+                return plan
             }
     }
 
@@ -204,6 +212,7 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 // Clear the old authority inside this transaction before the
                 // parent upsert; a rollback restores the complete prior plan.
                 try db.executePrepared(sql: "DELETE FROM funding_plan_al_dar_references WHERE funding_plan_id = ?;", params: [plan.id])
+                try db.executePrepared(sql: "DELETE FROM funding_plan_effective_al_dar_references WHERE funding_plan_id=?;", params: [plan.id])
                 try db.executePrepared(sql: """
                     INSERT INTO funding_plans (
                       id, workspace_id, plan_month, rollover_source_plan_id,
@@ -232,6 +241,14 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                         plan.fxINRPerQARDecimal ?? NSNull(), plan.fxObservationDateISO ?? NSNull(), plan.fxINRPerQARDecimal == nil ? NSNull() : "user_entered",
                         plan.plannedInvestmentMinor, plan.plannedInvestmentDecimal, plan.plannedInvestmentProvenance, plan.updatedAtISO
                     ])
+                try db.executePrepared(sql: "UPDATE funding_plans SET calculation_version=?, keep_in_cbq_minor=?, keep_in_cbq_decimal=?, reference_mode=? WHERE id=?;", params: [plan.calculationVersion, plan.keepInCBQMinor ?? NSNull(), plan.keepInCBQDecimal ?? NSNull(), plan.referenceMode ?? NSNull(), plan.id])
+                try db.executePrepared(sql: "DELETE FROM funding_plan_deduction_components WHERE funding_plan_id=?;", params: [plan.id])
+                for row in plan.deductions {
+                    try db.executePrepared(sql: "INSERT INTO funding_plan_deduction_components (id,funding_plan_id,source_ordinal,label,amount_minor,amount_decimal,recurs,carried_source_row_id) VALUES (?,?,?,?,?,?,?,?);", params: [row.id,row.planId,row.sourceOrdinal,row.label,row.amountMinor,row.amountDecimal,row.recurs ? 1 : 0,row.carriedSourceRowId ?? NSNull()])
+                }
+                if let reference = plan.effectiveReference {
+                    try db.executePrepared(sql: "INSERT INTO funding_plan_effective_al_dar_references (funding_plan_id,returned_inr_raw_decimal,fetched_at) VALUES (?,?,?);", params: [reference.planId,reference.rawINR,reference.fetchedAtISO])
+                }
                 try db.executePrepared(sql: "DELETE FROM funding_plan_balances WHERE funding_plan_id = ?;", params: [plan.id])
                 try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
                 for balance in plan.balances {
@@ -239,6 +256,7 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 }
                 for commitment in plan.commitments {
                     try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
+                    try db.executePrepared(sql: "UPDATE funding_plan_commitments SET recurs=?, temporary_carry_basis_minor=?, temporary_carry_basis_decimal=?, carried_source_row_id=?, remark=?, due_date=? WHERE id=?;", params: [commitment.recurs ? 1 : 0, commitment.temporaryCarryBasisMinor ?? NSNull(), commitment.temporaryCarryBasisDecimal ?? NSNull(), commitment.carriedSourceRowId ?? NSNull(), commitment.remark, commitment.dueDateISO ?? NSNull(), commitment.id])
                 }
                 if let reference = plan.alDarReference {
                     try db.executePrepared(sql: """
@@ -277,7 +295,21 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
             }.first
     }
 
+    private func deductions(planID: String) throws -> [FundingPlanDeductionDTO] {
+        try db.query(sql: "SELECT id,funding_plan_id,source_ordinal,label,amount_minor,amount_decimal,recurs,carried_source_row_id FROM funding_plan_deduction_components WHERE funding_plan_id=? ORDER BY source_ordinal;", params: [planID]) { row in
+            FundingPlanDeductionDTO(id: row.string(at: 0) ?? "", planId: row.string(at: 1) ?? "", sourceOrdinal: Int(row.int64(at: 2) ?? 0), label: row.string(at: 3) ?? "", amountMinor: row.int64(at: 4) ?? -1, amountDecimal: row.string(at: 5) ?? "", recurs: row.int64(at: 6) == 1, carriedSourceRowId: row.string(at: 7))
+        }
+    }
+
+    private func effectiveReference(planID: String) throws -> FundingPlanEffectiveReferenceDTO? {
+        try db.query(sql: "SELECT returned_inr_raw_decimal,fetched_at,provider_code,source_contract_code,direction_code,submitted_qar_decimal FROM funding_plan_effective_al_dar_references WHERE funding_plan_id=?;", params: [planID]) { row in
+            guard row.string(at: 2) == "al_dar", row.string(at: 3) == "public_home_get_rate_v1", row.string(at: 4) == "qar_to_inr", row.string(at: 5) == "1.00" else { throw RepositoryError.relationshipViolation("Unknown Al Dar reference contract.") }
+            return FundingPlanEffectiveReferenceDTO(planId: planID, rawINR: row.string(at: 0) ?? "", fetchedAtISO: row.string(at: 1) ?? "")
+        }.first
+    }
+
     private func validateRelationships(_ plan: FundingPlanDTO) throws {
+        try SalaryPersistenceDTOValidator.validateRowLineage(plan: plan, existing: plans(workspaceId: plan.workspaceId))
         let workspaceExists = try db.query(sql: "SELECT id FROM workspaces WHERE id = ? LIMIT 1;", params: [plan.workspaceId]) { $0.string(at: 0) }.first != nil
         guard workspaceExists else { throw RepositoryError.relationshipViolation("Funding plan workspace is invalid.") }
         if let existing = try db.query(sql: "SELECT workspace_id, plan_month FROM funding_plans WHERE id = ? LIMIT 1;", params: [plan.id], map: { (workspace: $0.string(at: 0) ?? "", month: $0.string(at: 1) ?? "") }).first { guard existing.workspace == plan.workspaceId, existing.month == plan.planMonthISO else { throw RepositoryError.relationshipViolation("Funding plan identity is immutable.") } }
@@ -296,8 +328,8 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     private func commitments(planID: String) throws -> [FundingPlanCommitmentDTO] {
-        try db.query(sql: "SELECT id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id FROM funding_plan_commitments WHERE funding_plan_id = ? ORDER BY CASE region WHEN 'qatar' THEN 0 ELSE 1 END, source_ordinal;", params: [planID]) { row in
-            FundingPlanCommitmentDTO(id: row.string(at: 0) ?? "", planId: row.string(at: 1) ?? "", regionCode: row.string(at: 2) ?? "", sourceOrdinal: Int(row.int64(at: 3) ?? 0), label: row.string(at: 4) ?? "", amountCurrency: row.string(at: 5) ?? "", amountMinor: row.int64(at: 6) ?? 0, amountDecimal: row.string(at: 7) ?? "", included: row.int64(at: 8) == 1, fundingAccountId: row.string(at: 9), provenanceCode: row.string(at: 10) ?? "", carriedSourcePlanId: row.string(at: 11))
+        try db.query(sql: "SELECT id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id, recurs, temporary_carry_basis_minor, temporary_carry_basis_decimal, carried_source_row_id, remark, due_date FROM funding_plan_commitments WHERE funding_plan_id = ? ORDER BY CASE region WHEN 'qatar' THEN 0 ELSE 1 END, source_ordinal;", params: [planID]) { row in
+            FundingPlanCommitmentDTO(id: row.string(at: 0) ?? "", planId: row.string(at: 1) ?? "", regionCode: row.string(at: 2) ?? "", sourceOrdinal: Int(row.int64(at: 3) ?? 0), label: row.string(at: 4) ?? "", amountCurrency: row.string(at: 5) ?? "", amountMinor: row.int64(at: 6) ?? 0, amountDecimal: row.string(at: 7) ?? "", included: row.int64(at: 8) == 1, fundingAccountId: row.string(at: 9), provenanceCode: row.string(at: 10) ?? "", carriedSourcePlanId: row.string(at: 11), recurs: row.int64(at: 12) == 1, temporaryCarryBasisMinor: row.int64(at: 13), temporaryCarryBasisDecimal: row.string(at: 14), carriedSourceRowId: row.string(at: 15), remark: row.string(at: 16) ?? "", dueDateISO: row.string(at: 17))
         }
     }
 }

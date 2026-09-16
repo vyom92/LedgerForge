@@ -53,19 +53,7 @@ struct ImportCentreFooterRenderer: View {
 /// Every footer action uses the same treatment; command ownership and enablement
 /// remain with the existing coordinator and confirmation gate.
 struct ImportFooterButtonStyle: ButtonStyle {
-    @Environment(\.lfTheme) private var theme
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(theme.typography.formBody.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 13)
-            .frame(minWidth: 180)
-            .background(theme.palette.primaryAction)
-            .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
-            .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
+        LFActionButtonStyle(kind: .primary, wide: true).makeBody(configuration: configuration)
     }
 }

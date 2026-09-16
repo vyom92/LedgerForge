@@ -102,7 +102,7 @@ struct DashboardViewModelTests {
             case .expected: expectedMoney = expected.expectedNet
             case .indiaShortfall: expectedMoney = expected.indiaFundingShortfall
             case .principal: expectedMoney = expected.requiredQARPrincipal
-            case .investment: expectedMoney = expected.availableForInvestment
+            case .investment: expectedMoney = expected.finalQARBuffer
             }
             check(
                 sameMoney(metric.money(in: actual), expectedMoney),

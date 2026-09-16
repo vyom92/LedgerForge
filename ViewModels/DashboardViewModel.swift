@@ -232,7 +232,7 @@ enum DashboardFundingMetric: String, CaseIterable, Identifiable {
     case expected = "Expected this month"
     case indiaShortfall = "India funding shortfall"
     case principal = "Required QAR principal"
-    case investment = "Available for investment"
+    case investment = "Funding margin"
 
     var id: String { rawValue }
     var currencyCode: String { self == .indiaShortfall ? "INR" : "QAR" }
@@ -242,7 +242,7 @@ enum DashboardFundingMetric: String, CaseIterable, Identifiable {
         case .expected: calculation?.expectedNet
         case .indiaShortfall: calculation?.indiaFundingShortfall
         case .principal: calculation?.requiredQARPrincipal
-        case .investment: calculation?.availableForInvestment
+        case .investment: calculation?.finalQARBuffer
         }
     }
 }
@@ -250,7 +250,7 @@ enum DashboardFundingMetric: String, CaseIterable, Identifiable {
 enum DashboardRoute: String, CaseIterable {
     case transactions = "View Transactions"
     case imports = "Open Import"
-    case salary = "Open Salary"
+    case salary = "Open Budget Planning"
 
     var destination: AppShellSection {
         switch self {

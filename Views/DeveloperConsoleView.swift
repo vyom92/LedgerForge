@@ -388,7 +388,7 @@ struct DeveloperConsoleView: View {
                     title: "Activate",
                     systemImage: "arrow.triangle.2.circlepath",
                     fill: theme.palette.accent,
-                    foreground: .white,
+                    foreground: theme.palette.primaryText,
                     isFullWidth: true,
                     showsBorder: false,
                     isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
@@ -401,7 +401,7 @@ struct DeveloperConsoleView: View {
                         title: resetActionLabel,
                         systemImage: "exclamationmark.triangle",
                         fill: LFTheme.danger,
-                        foreground: .white,
+                        foreground: theme.palette.primaryText,
                         isFullWidth: true,
                         showsBorder: false,
                         isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress

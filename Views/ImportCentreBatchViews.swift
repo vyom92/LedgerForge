@@ -189,7 +189,7 @@ struct ImportBatchQueueView: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LFPlainActionStyle())
                 .disabled(!item.isOutcomeNavigable)
                 .accessibilityLabel("Statement \(item.position) of \(item.total), \(item.fileName), \(item.status)")
                 .accessibilityHint(item.isOutcomeNavigable ? "Shows this completed outcome" : "")

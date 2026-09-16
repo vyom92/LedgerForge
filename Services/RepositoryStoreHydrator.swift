@@ -600,7 +600,9 @@ final class RepositoryStoreHydrator {
         return try dtos.map { dto in
             // Applied external evidence must still bind the durable plan at
             // readback/restore, before any canonical stores are published.
-            if dto.alDarReference != nil { try SalaryPersistenceDTOValidator.validate(plan: dto) }
+            try SalaryPersistenceDTOValidator.validate(plan: dto)
+            // Carried rows are saved planning snapshots. A later edit/removal
+            // in the predecessor must not invalidate the already-saved month.
             guard let month = try? SelectedStatementMonth(canonical: dto.planMonthISO),
                   dto.rolloverSourcePlanId.map(planIDs.contains) ?? true else {
                 throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid month or rollover")
@@ -678,7 +680,10 @@ final class RepositoryStoreHydrator {
                         money: try persistedMoney(currency: currency, minor: value.amountMinor, decimal: value.amountDecimal),
                         included: value.included,
                         fundingAccountID: value.fundingAccountId,
-                        provenance: provenance
+                        provenance: provenance, recurs: value.recurs,
+                        temporaryCarryBasis: try value.temporaryCarryBasisDecimal.map { try persistedMoney(currency: currency, minor: value.temporaryCarryBasisMinor!, decimal: $0) },
+                        carriedSourceRowID: value.carriedSourceRowId, remark: value.remark,
+                        dueDate: try value.dueDateISO.map { try StatementDate(canonical: $0) }
                     )
                 }
             }
@@ -713,7 +718,13 @@ final class RepositoryStoreHydrator {
                 alDarReference: try dto.alDarReference?.evidence(),
                 plannedInvestment: try persistedMoney(currency: "QAR", minor: dto.plannedInvestmentMinor, decimal: dto.plannedInvestmentDecimal),
                 plannedInvestmentProvenance: try inputProvenance(dto.plannedInvestmentProvenance),
-                updatedAtISO: dto.updatedAtISO
+                updatedAtISO: dto.updatedAtISO,
+                calculationVersion: FundingPlanCalculationVersion(rawValue: dto.calculationVersion)!,
+                keepInCBQ: try dto.keepInCBQDecimal.map { try persistedMoney(currency: "QAR", minor: dto.keepInCBQMinor!, decimal: $0) },
+                deductions: try dto.deductions.map { FundingPlanDeduction(id: $0.id, label: $0.label,
+                    money: try persistedMoney(currency: "QAR", minor: $0.amountMinor, decimal: $0.amountDecimal), recurs: $0.recurs, carriedSourceRowID: $0.carriedSourceRowId) },
+                referenceMode: FundingPlanReferenceMode(rawValue: dto.referenceMode ?? "alDar")!,
+                effectiveAlDarReference: try dto.effectiveReference?.quote()
             )
         }
     }

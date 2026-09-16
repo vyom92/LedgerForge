@@ -1,3 +1,4 @@
+import CoreGraphics
 import CryptoKit
 import Foundation
 import PDFKit
@@ -1321,9 +1322,6 @@ private enum IndependentAmexOracleBuilder {
     private static let membershipPattern =
         #"Membership Number\s+Statement date\s+Statement Period\s+([0-9X-]+)\s+(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2}) to (\d{2}/\d{2}/\d{2})"#
 
-    private static let summaryPattern =
-        #"Previous Balance\s+New Credits\s+New Debits\s+New Balance\s+Due Date\s+- \(QAR\) \+ \(QAR\) = \(QAR\)\s+(?:\(QAR\)\s+)?([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+(\d{2}/\d{2}/\d{2})"#
-
     private static let sectionPattern =
         #"^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"#
 
@@ -1389,17 +1387,10 @@ private enum IndependentAmexOracleBuilder {
             throw PrivateAcceptanceError.sourceOracleFailure("builder line 91")
         }
 
-        let summaryMatches = pageTexts.flatMap {
-            captures(summaryPattern, in: $0)
-        }
-        guard summaryMatches.count == 1,
-              let summaryValues = summaryMatches.first,
-              summaryValues.count == 5 else {
-            throw PrivateAcceptanceError.sourceOracleFailure("builder line 100")
-        }
-
+        let sourceSummary = try readPrintedSummary(pdf, pageTexts: pageTexts)
+        let summaryValues = sourceSummary.values
         let summary = try makeSummary(summaryValues)
-        let parsed = try parsePages(pageTexts)
+        let parsed = try parsePages(pageTexts, summary: sourceSummary)
 
         let statementDate = try canonicalShortDate(membership[1])
         let periodStart = try canonicalShortDate(membership[2])
@@ -1434,7 +1425,7 @@ private enum IndependentAmexOracleBuilder {
     }
 
     private static func parsePages(
-        _ pageTexts: [String]
+        _ pageTexts: [String], summary: PrintedSummary
     ) throws -> (
         pages: [OraclePage],
         sections: [OracleSection],
@@ -1450,13 +1441,12 @@ private enum IndependentAmexOracleBuilder {
 
         for (pageIndex, pageText) in pageTexts.enumerated() {
             let page = pageIndex + 1
-            let lines = pageText
-                .components(separatedBy: .newlines)
-                .map {
-                    $0.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                }
+            let lines = pageText.components(separatedBy: .newlines).enumerated().map { index, line in
+                // Remove only the independently owned source-table words.
+                // Preserve other words and physical section/row line numbers.
+                if pageIndex == summary.pageIndex, let remainder = summary.remainingTextByLine[index] { return remainder }
+                return line.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
 
             var headers = [OracleSectionHeaderOccurrence]()
             var lineIndex = 0
@@ -1903,21 +1893,126 @@ private enum IndependentAmexOracleBuilder {
     }
 
     private static func isPreamble(_ line: String) -> Bool {
-        if [
-            "Transaction Date Posting Date Details Non QAR Spending Amount in QAR",
-            "Previous Balance",
-            "New Credits",
-            "New Debits",
-            "New Balance",
-            "Due Date"
-        ].contains(line) {
-            return true
-        }
+        line == "Transaction Date Posting Date Details Non QAR Spending Amount in QAR"
+    }
 
-        return line.range(
-            of: #"^- \(QAR\) \+ \(QAR\) = \(QAR\)(?: \(QAR\))? [0-9]+(?:,[0-9]{3})*\.\d{2}(?: [0-9]+(?:,[0-9]{3})*\.\d{2}){0,3}(?: \d{2}/\d{2}/\d{2})?$"#,
-            options: .regularExpression
-        ) != nil
+    private struct PrintedSummary {
+        let pageIndex: Int
+        let values: [String]
+        let remainingTextByLine: [Int: String]
+    }
+
+    /// Independent source interpreter: query the original PDFPage's selections
+    /// for the printed labels and their cells. No production fragments,
+    /// normalizer helpers, or production-derived financial expectations enter it.
+    private static func readPrintedSummary(
+        _ pdf: PDFDocument, pageTexts: [String]
+    ) throws -> PrintedSummary {
+        struct Word {
+            let id: Int
+            let text: String
+            let rectangle: CGRect
+            let line: Int
+        }
+        let labelNames = ["Previous Balance", "New Credits", "New Debits", "New Balance", "Due Date"]
+        var result: PrintedSummary?
+        for (pageIndex, text) in pageTexts.enumerated() {
+            guard text.contains("New Credits") || text.contains("New Debits") else { continue }
+            guard result == nil, let page = pdf.page(at: pageIndex) else {
+                throw PrivateAcceptanceError.sourceOracleFailure("competing summary pages")
+            }
+            let entireRange = NSRange(text.startIndex..., in: text)
+            let labels = try labelNames.map { name -> CGRect in
+                let expression = try NSRegularExpression(pattern: name.replacingOccurrences(of: " ", with: #"\s+"#))
+                let matches = expression.matches(in: text, range: entireRange)
+                guard matches.count == 1,
+                      let selection = page.selection(for: matches[0].range) else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("summary label ownership")
+                }
+                let bounds = selection.bounds(for: page)
+                guard !bounds.isEmpty, !bounds.isInfinite, !bounds.isNull else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("summary label rectangle")
+                }
+                return bounds
+            }
+            let height = labels.map(\.height).min()!
+            guard labels.allSatisfy({ abs($0.midY - labels[0].midY) < height / 3 }),
+                  zip(labels, labels.dropFirst()).allSatisfy({ $0.maxX < $1.minX }) else {
+                throw PrivateAcceptanceError.sourceOracleFailure("summary label row")
+            }
+            let wordExpression = try NSRegularExpression(pattern: #"\S+"#)
+            let words = try wordExpression.matches(in: text, range: entireRange).enumerated().map { index, match -> Word in
+                guard let range = Range(match.range, in: text),
+                      let selection = page.selection(for: match.range) else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("source word selection")
+                }
+                return Word(id: index, text: String(text[range]), rectangle: selection.bounds(for: page),
+                            line: text[..<range.lowerBound].components(separatedBy: .newlines).count - 1)
+            }
+            let centers = labels.map(\.midX)
+            let edges = [centers[0] - (centers[1] - centers[0]) / 2] +
+                (1..<centers.count).map { (centers[$0 - 1] + centers[$0]) / 2 } +
+                [centers[4] + (centers[4] - centers[3]) / 2]
+            let belowLabels = words.filter {
+                $0.rectangle.midY < labels.map(\.minY).min()! &&
+                $0.rectangle.midX > edges[0] && $0.rectangle.midX < edges[5]
+            }
+            guard let firstValueWord = belowLabels.max(by: { $0.rectangle.midY < $1.rectangle.midY }) else {
+                throw PrivateAcceptanceError.sourceOracleFailure("summary value row missing")
+            }
+            let row = belowLabels.filter {
+                abs($0.rectangle.midY - firstValueWord.rectangle.midY) < firstValueWord.rectangle.height / 3
+            }
+            guard row.count == 12 else {
+                throw PrivateAcceptanceError.sourceOracleFailure("summary value inventory")
+            }
+            var values = [Word]()
+            for column in labelNames.indices {
+                let pattern = column == 4 ? #"^\d{2}/\d{2}/\d{2}$"# : #"^[0-9]+(?:,[0-9]{3})*\.\d{2}$"#
+                let cell = row.filter {
+                    $0.rectangle.minX >= edges[column] && $0.rectangle.maxX <= edges[column + 1] &&
+                    $0.text.range(of: pattern, options: .regularExpression) != nil
+                }
+                guard cell.count == 1 else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("summary labeled cell")
+                }
+                values.append(cell[0])
+            }
+            let firstColumnWidth = labels[1].maxX - labels[0].maxX
+            let prefix = row.filter { $0.rectangle.maxX <= values[0].rectangle.minX }
+            guard firstColumnWidth > 0, prefix.count == 1, prefix[0].text == "(QAR)",
+                  prefix[0].rectangle.minX >= labels[0].maxX - firstColumnWidth else {
+                throw PrivateAcceptanceError.sourceOracleFailure("previous balance QAR context")
+            }
+            for (index, symbol) in ["-", "+", "="].enumerated() {
+                let relation = row.filter {
+                    $0.rectangle.minX >= values[index].rectangle.maxX &&
+                    $0.rectangle.maxX <= values[index + 1].rectangle.minX
+                }.sorted { $0.rectangle.minX < $1.rectangle.minX }
+                guard relation.map(\.text) == [symbol, "(QAR)"] else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("summary QAR relation")
+                }
+            }
+            let headerWords = words.filter { word in
+                labels.contains { label in
+                    word.rectangle.minX >= label.minX && word.rectangle.maxX <= label.maxX &&
+                    abs(word.rectangle.midY - label.midY) < height / 3
+                }
+            }
+            guard headerWords.count == 10 else {
+                throw PrivateAcceptanceError.sourceOracleFailure("summary header inventory")
+            }
+            let owned = headerWords + row
+            let wordIDs = Set(owned.map(\.id))
+            let remaining = Dictionary(uniqueKeysWithValues: Set(owned.map(\.line)).map { line in
+                (line, words.filter { $0.line == line && !wordIDs.contains($0.id) }.map(\.text).joined(separator: " "))
+            })
+            result = PrintedSummary(pageIndex: pageIndex, values: values.map(\.text), remainingTextByLine: remaining)
+        }
+        guard let result else {
+            throw PrivateAcceptanceError.sourceOracleFailure("summary not found")
+        }
+        return result
     }
 
     private static func captures(

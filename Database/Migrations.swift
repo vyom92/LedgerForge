@@ -2771,7 +2771,54 @@ WHEN (NEW.fx_inr_per_qar_decimal IS NOT NULL OR NEW.fx_observation_date IS NOT N
 BEGIN SELECT RAISE(ABORT, 'planning_reference_conflict'); END;
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18]
+/// Sprint 95 keeps legacy plans intact and adds only the monthly worksheet state.
+nonisolated public let migrationV19 = Migration(version: 19, name: "budget_planning_worksheet", sql: """
+ALTER TABLE funding_plans ADD COLUMN calculation_version TEXT NOT NULL DEFAULT 'legacy' CHECK(calculation_version IN ('legacy','budgetV1'));
+ALTER TABLE funding_plans ADD COLUMN keep_in_cbq_minor INTEGER CHECK(keep_in_cbq_minor >= 0);
+ALTER TABLE funding_plans ADD COLUMN keep_in_cbq_decimal TEXT;
+ALTER TABLE funding_plans ADD COLUMN reference_mode TEXT CHECK(reference_mode IN ('alDar','manual'));
+ALTER TABLE funding_plan_commitments ADD COLUMN recurs INTEGER NOT NULL DEFAULT 1 CHECK(recurs IN (0,1));
+ALTER TABLE funding_plan_commitments ADD COLUMN temporary_carry_basis_minor INTEGER CHECK(temporary_carry_basis_minor >= 0);
+ALTER TABLE funding_plan_commitments ADD COLUMN temporary_carry_basis_decimal TEXT;
+ALTER TABLE funding_plan_commitments ADD COLUMN carried_source_row_id TEXT;
+ALTER TABLE funding_plan_commitments ADD COLUMN remark TEXT NOT NULL DEFAULT '';
+CREATE TABLE funding_plan_deduction_components (
+ id TEXT PRIMARY KEY NOT NULL,
+ funding_plan_id TEXT NOT NULL REFERENCES funding_plans(id) ON DELETE CASCADE,
+ source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+ label TEXT NOT NULL CHECK(length(trim(label)) > 0),
+ amount_minor INTEGER NOT NULL CHECK(amount_minor >= 0), amount_decimal TEXT NOT NULL,
+ recurs INTEGER NOT NULL CHECK(recurs IN (0,1)), carried_source_row_id TEXT,
+ UNIQUE(funding_plan_id, source_ordinal)
+);
+CREATE TABLE funding_plan_effective_al_dar_references (
+ funding_plan_id TEXT PRIMARY KEY NOT NULL REFERENCES funding_plans(id) ON DELETE CASCADE,
+ returned_inr_raw_decimal TEXT NOT NULL, fetched_at TEXT NOT NULL,
+ provider_code TEXT NOT NULL DEFAULT 'al_dar' CHECK(provider_code = 'al_dar'),
+ source_contract_code TEXT NOT NULL DEFAULT 'public_home_get_rate_v1' CHECK(source_contract_code = 'public_home_get_rate_v1'),
+ direction_code TEXT NOT NULL DEFAULT 'qar_to_inr' CHECK(direction_code = 'qar_to_inr'),
+ submitted_qar_decimal TEXT NOT NULL DEFAULT '1.00' CHECK(submitted_qar_decimal = '1.00')
+);
+CREATE TRIGGER funding_effective_reference_insert BEFORE INSERT ON funding_plan_effective_al_dar_references
+WHEN NOT EXISTS (SELECT 1 FROM funding_plans WHERE id=NEW.funding_plan_id AND calculation_version='budgetV1' AND reference_mode='alDar' AND fx_inr_per_qar_decimal IS NULL AND fx_observation_date IS NULL)
+BEGIN SELECT RAISE(ABORT, 'budget_reference_conflict'); END;
+CREATE TRIGGER funding_effective_reference_update BEFORE UPDATE ON funding_plan_effective_al_dar_references
+WHEN NOT EXISTS (SELECT 1 FROM funding_plans WHERE id=NEW.funding_plan_id AND calculation_version='budgetV1' AND reference_mode='alDar' AND fx_inr_per_qar_decimal IS NULL AND fx_observation_date IS NULL)
+BEGIN SELECT RAISE(ABORT, 'budget_reference_conflict'); END;
+CREATE TRIGGER funding_budget_reference_parent_update BEFORE UPDATE ON funding_plans
+WHEN EXISTS (SELECT 1 FROM funding_plan_effective_al_dar_references WHERE funding_plan_id=NEW.id)
+ AND (NEW.calculation_version<>'budgetV1' OR NEW.reference_mode IS NULL OR NEW.reference_mode<>'alDar' OR NEW.fx_inr_per_qar_decimal IS NOT NULL OR NEW.fx_observation_date IS NOT NULL)
+BEGIN SELECT RAISE(ABORT, 'budget_reference_conflict'); END;
+
+""")
+
+/// The owner requested bill dates after V19 had already been opened by Xcode.
+/// Keep that history immutable and add only the optional first-due date.
+nonisolated public let migrationV20 = Migration(version: 20, name: "budget_planning_bill_dates", sql: """
+ALTER TABLE funding_plan_commitments ADD COLUMN due_date TEXT;
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

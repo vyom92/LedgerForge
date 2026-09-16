@@ -27,6 +27,6 @@ struct LFActionRow: View {
             .foregroundStyle(color ?? theme.palette.primaryText)
             .padding(.vertical, 9)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LFPlainActionStyle())
     }
 }

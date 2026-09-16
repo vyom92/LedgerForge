@@ -76,7 +76,7 @@ struct CategoryManagementView: View {
                         .lfTextField()
                         .onSubmit(create)
                     Button("Create", action: create)
-                        .buttonStyle(.borderedProminent)
+                        .lfPrimaryAction()
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
@@ -186,9 +186,9 @@ struct CategoryManagementView: View {
                     .lfTextField()
                     .onSubmit { saveRename(category) }
                 Button("Save") { saveRename(category) }
-                    .lfSecondaryAction()
+                    .lfPrimaryAction()
                 Button("Cancel") { editingCategoryID = nil }
-                    .buttonStyle(.plain)
+                    .lfSecondaryAction()
             } else {
                 Text(category.name)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -203,7 +203,8 @@ struct CategoryManagementView: View {
                 } label: {
                     Image(systemName: "pencil")
                 }
-                .buttonStyle(.plain)
+                .lfIconAction()
+                .accessibilityLabel("Rename category")
                 .help("Rename")
 
                 Button {
@@ -214,16 +215,17 @@ struct CategoryManagementView: View {
                 } label: {
                     Image(systemName: category.isArchived ? "arrow.uturn.backward" : "archivebox")
                 }
-                .buttonStyle(.plain)
+                .lfIconAction()
+                .accessibilityLabel(category.isArchived ? "Restore category" : "Archive category")
                 .help(category.isArchived ? "Restore" : "Archive")
 
-                Button {
+                Button(role: .destructive) {
                     categoryPendingDeletion = category
                 } label: {
                     Image(systemName: "trash")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isInUse(category) ? theme.palette.secondaryText : LFTheme.danger)
+                .lfIconAction()
+                .accessibilityLabel("Delete category")
                 .disabled(isInUse(category))
                 .help(isInUse(category) ? "Assigned categories cannot be deleted." : "Delete")
             }

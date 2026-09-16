@@ -100,9 +100,73 @@ extension View {
     }
 }
 
-/// Native action rendering shared by compact navigation actions. All state and
-/// callbacks remain with the existing buttons.
-private struct LFSecondaryAction: ViewModifier {
+/// A single theme owner for in-app actions. Native menus and confirmation
+/// dialogs keep their platform interaction; commands and enablement stay local.
+enum LFActionKind: Equatable { case primary, secondary, icon }
+
+/// Row/selection buttons already own their themed surface. Add a consistent
+/// press response without turning each selectable row into a filled action.
+struct LFPlainActionStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.78 : 1)
+    }
+}
+
+struct LFActionButtonStyle: ButtonStyle {
+    var kind: LFActionKind = .secondary
+    var wide = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        LFActionButtonBody(configuration: configuration, kind: kind, wide: wide)
+    }
+}
+
+private struct LFActionButtonBody: View {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.isFocused) private var isFocused
+    @State private var isHovered = false
+    let configuration: ButtonStyleConfiguration
+    let kind: LFActionKind
+    let wide: Bool
+
+    private var destructive: Bool { configuration.role == .destructive }
+    private var surface: AnyShapeStyle {
+        if destructive { return AnyShapeStyle(LFTheme.danger.opacity(0.14)) }
+        switch kind {
+        case .primary: return AnyShapeStyle(theme.palette.primaryAction)
+        case .secondary: return AnyShapeStyle(theme.palette.secondaryAction)
+        case .icon: return AnyShapeStyle(theme.palette.controlSurface)
+        }
+    }
+
+    var body: some View {
+        configuration.label
+            .font(theme.typography.button)
+            .foregroundStyle(destructive ? LFTheme.danger : theme.palette.primaryText)
+            .padding(.horizontal, wide ? 32 : kind == .icon ? 8 : 12)
+            .padding(.vertical, wide ? 13 : kind == .icon ? 6 : 8)
+            .frame(minWidth: wide ? 180 : kind == .icon ? theme.typography.compactControlMinimum : nil,
+                   minHeight: theme.typography.compactControlMinimum)
+            .background(surface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.control)
+                    .fill(theme.palette.primaryText.opacity(isEnabled ? (configuration.isPressed ? 0.10 : isHovered ? 0.05 : 0) : 0))
+                    .allowsHitTesting(false)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.control)
+                    .strokeBorder(isFocused ? theme.interaction.focusRing : theme.palette.border, lineWidth: isFocused ? 2 : 1)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
+            .opacity(isEnabled ? 1 : 0.5)
+            .onHover { isHovered = $0 }
+    }
+}
+
+/// Owner-preferred native dropdown appearance, shared by all menu triggers.
+private struct LFMenuAction: ViewModifier {
     @Environment(\.lfTheme) private var theme
 
     func body(content: Content) -> some View {
@@ -116,7 +180,10 @@ private struct LFSecondaryAction: ViewModifier {
 }
 
 extension View {
-    func lfSecondaryAction() -> some View { modifier(LFSecondaryAction()) }
+    func lfPrimaryAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .primary)) }
+    func lfSecondaryAction() -> some View { buttonStyle(LFActionButtonStyle()) }
+    func lfIconAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .icon)) }
+    func lfMenuAction() -> some View { modifier(LFMenuAction()) }
 }
 
 /// Native editable controls keep their bindings and responder behavior. Only

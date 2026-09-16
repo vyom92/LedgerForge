@@ -40,11 +40,7 @@ struct LFEmptyState: View {
                 .multilineTextAlignment(.center)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .background(theme.palette.primaryAction)
-                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
+                    .lfPrimaryAction()
             }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
