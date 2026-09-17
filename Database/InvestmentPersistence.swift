@@ -5,17 +5,54 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
     public let holdings: [InvestmentHolding]
     public static let empty = InvestmentSnapshot(containers: [], holdings: [])
 
+    var latestZioAccount: ZurichISPAccountSnapshot? {
+        if let receipt = containers.compactMap(\.lastZioAccount).first { return receipt }
+        let sources = containers.compactMap(\.zioSource)
+        // Compatibility with an earlier local Sprint-97 prototype. Complete
+        // original observations can supply the receipt; partial ones cannot.
+        return sources.count == 3 ? .init(policies: sources.sorted { $0.policyID < $1.policyID }) : nil
+    }
+
+    /// Attached public price-routing metadata does not change a reviewed source import.
+    /// Every financial, ownership, alias, date and provenance field remains exact.
+    func hasSameSource(as other: Self) -> Bool {
+        func sourceHoldings(_ snapshot: Self) -> [InvestmentHolding] {
+            snapshot.holdings.map { holding in var source = holding; source.priceMapping = nil; return source }
+        }
+        return containers == other.containers && sourceHoldings(self) == sourceHoldings(other)
+    }
+
     func validated(workspaceID: String) throws -> Self {
         guard Set(containers.map(\.id)).count == containers.count,
               Set(holdings.map(\.id)).count == holdings.count else { throw InvestmentError.invalidPersistedState }
+        let directSources = containers.compactMap(\.zioSource)
+        guard containers.compactMap(\.lastZioAccount).count <= 1 else { throw InvestmentError.invalidPersistedState }
+        if let account = latestZioAccount {
+            let policies = containers.filter { $0.institution == "Zurich ISP" }
+            try account.validate(expectedPolicyIDs: Set(policies.map(\.identity)), now: Date())
+            guard directSources.allSatisfy({ source in account.policies.contains(source) }) else {
+                throw InvestmentError.invalidPersistedState
+            }
+        } else if !directSources.isEmpty { throw InvestmentError.invalidPersistedState }
         var identities = Set<String>()
         for container in containers {
             _ = try StatementDate(canonical: container.holdingsDate)
             guard container.workspaceID == workspaceID, !container.id.isEmpty,
                   !container.institution.isEmpty, !container.identityKind.isEmpty, !container.identity.isEmpty,
-                  !container.displayName.isEmpty, !container.documentID.isEmpty, !container.importSessionID.isEmpty,
+                  !container.displayName.isEmpty,
                   container.aliases.contains(container.identity), Set(container.aliases).count == container.aliases.count else {
                 throw InvestmentError.invalidPersistedState
+            }
+            if let source = container.zioSource {
+                try source.validate()
+                guard container.institution == "Zurich ISP", container.identity == source.policyID,
+                      container.documentID == nil, container.importSessionID == nil,
+                      container.holdingsDate == source.valuationDay, container.completeAtHoldingsDate,
+                      !source.observationID.isEmpty else { throw InvestmentError.invalidPersistedState }
+            } else {
+                guard container.documentID?.isEmpty == false, container.importSessionID?.isEmpty == false else {
+                    throw InvestmentError.invalidPersistedState
+                }
             }
             for alias in container.aliases {
                 guard !alias.isEmpty, identities.insert([container.institution, container.identityKind, alias].joined(separator: "\u{1F}")).inserted else {
@@ -28,10 +65,23 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
             guard let container = containers.first(where: { $0.id == holding.containerID }),
                   !holding.id.isEmpty, holding.units.value > 0,
                   holding.holdingsDate <= container.holdingsDate,
-                  !holding.documentID.isEmpty, !holding.importSessionID.isEmpty,
-                  !holding.normalizedDocumentID.isEmpty,
                   positionKeys.insert([holding.containerID, holding.instrumentIdentity, holding.currency].joined(separator: "\u{1F}")).inserted else {
                 throw InvestmentError.invalidPersistedState
+            }
+            if let sourceID = holding.zioObservationID {
+                guard let source = container.zioSource, source.observationID == sourceID,
+                      let fund = source.funds.first(where: { $0.code == holding.zioFundCode }),
+                      holding.documentID == nil, holding.importSessionID == nil, holding.normalizedDocumentID == nil,
+                      holding.parserProfile == "zurich.isp.zio", holding.units == fund.units,
+                      holding.currency == fund.currency, holding.holdingsDate == source.valuationDay,
+                      holding.valuationDate == source.valuationDay, holding.sourceOrdinal == fund.ordinal,
+                      holding.averageCost == nil, holding.totalCost == nil, holding.costCurrency == nil,
+                      holding.averageCostLabel == nil, holding.totalCostLabel == nil else { throw InvestmentError.invalidPersistedState }
+            } else {
+                guard holding.documentID?.isEmpty == false, holding.importSessionID?.isEmpty == false,
+                      holding.normalizedDocumentID?.isEmpty == false, holding.zioFundCode == nil else {
+                    throw InvestmentError.invalidPersistedState
+                }
             }
             let evidence = InvestmentPositionEvidence(
                 instrumentIdentity: holding.instrumentIdentity, sourceAliases: holding.sourceAliases,
@@ -39,16 +89,27 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
                 averageCost: holding.averageCost, totalCost: holding.totalCost,
                 averageCostLabel: holding.averageCostLabel, totalCostLabel: holding.totalCostLabel,
                 costCurrency: holding.costCurrency, sourceOrdinal: holding.sourceOrdinal, valuationDate: holding.valuationDate)
-            try InvestmentStatementEvidence(parserProfile: holding.parserProfile, issueDate: holding.issueDate,
+            if holding.zioObservationID == nil { try InvestmentStatementEvidence(parserProfile: holding.parserProfile, issueDate: holding.issueDate,
                 scopes: [.init(institution: container.institution, identityKind: container.identityKind,
                     identity: container.identity, aliases: container.aliases, displayName: container.displayName,
                     holdingsDate: holding.holdingsDate, isComplete: false, positions: [evidence])],
-                excludedSectionDescription: "").validate()
+                excludedSectionDescription: "").validate() }
             if let mapping = holding.priceMapping {
                 guard !mapping.provider.isEmpty, !mapping.code.isEmpty, mapping.currency == holding.currency else {
                     throw InvestmentError.invalidPersistedState
                 }
             }
+        }
+        for container in containers where container.zioSource != nil {
+            let expected = Set(container.zioSource!.funds.filter { $0.units.value > 0 }.map(\.code))
+            let actual = holdings.filter { $0.containerID == container.id }
+            guard actual.allSatisfy({ $0.zioObservationID == container.zioSource!.observationID }),
+                  Set(actual.compactMap(\.zioFundCode)) == expected else { throw InvestmentError.invalidPersistedState }
+        }
+        if let receipt = latestZioAccount, containers.allSatisfy({ $0.lastZioAccount == nil }),
+           let anchor = containers.firstIndex(where: { $0.institution == "Zurich ISP" && $0.identity == receipt.policyIDs.sorted().first }) {
+            var normalized = containers; normalized[anchor].lastZioAccount = receipt
+            return .init(containers: normalized, holdings: holdings)
         }
         return self
     }
@@ -134,23 +195,60 @@ nonisolated public enum InvestmentImportRepositoryResult: Equatable {
 public protocol InvestmentRepository {
     func snapshot(workspaceID: String) throws -> InvestmentSnapshot
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult
+}
+
+/// A mapping-only change. The exact reviewed source snapshot must still be current.
+nonisolated public struct InvestmentPriceMappingPlan: Sendable {
+    let providerGeneration: ProviderGenerationToken
+    let workspaceID: String
+    let baseline: InvestmentSnapshot
+    let assignments: [String: InvestmentPriceMapping]
+
+    func applying(to current: InvestmentSnapshot) throws -> InvestmentSnapshot {
+        guard current == baseline else { throw InvestmentError.staleReview }
+        _ = try current.validated(workspaceID: workspaceID)
+        guard Set(assignments.keys).isSubset(of: Set(current.holdings.map(\.id))) else {
+            throw InvestmentError.invalidPersistedState
+        }
+        let holdings = try current.holdings.map { source in
+            var holding = source
+            if let mapping = assignments[source.id] {
+                guard mapping.currency == source.currency, !mapping.provider.isEmpty, !mapping.code.isEmpty,
+                      mapping.priceKind?.isEmpty == false, mapping.instrumentReference?.isEmpty == false,
+                      mapping.evidence?.isEmpty == false else { throw InvestmentError.invalidPersistedState }
+                holding.priceMapping = mapping
+            }
+            return holding
+        }
+        return try InvestmentSnapshot(containers: current.containers, holdings: holdings).validated(workspaceID: workspaceID)
+    }
+}
+
+nonisolated public enum InvestmentPriceMappingResult: Equatable, Sendable {
+    case saved, staleProviderGeneration, staleSnapshot, retryableContention, unavailable
 }
 
 struct EmptyInvestmentRepository: InvestmentRepository {
     func snapshot(workspaceID: String) throws -> InvestmentSnapshot { .empty }
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult { .persistenceUnavailable }
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult { .unavailable }
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult { .unavailable }
 }
 
 struct UnavailableInvestmentRepository: InvestmentRepository {
     func snapshot(workspaceID: String) throws -> InvestmentSnapshot { throw RepositoryError.persistenceUnavailable }
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult { .persistenceUnavailable }
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult { .unavailable }
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult { .unavailable }
 }
 
 /// Pure current-state replacement. Both providers re-run this under their transaction lock.
 enum InvestmentUpdatePlanner {
     static func review(_ plan: InvestmentImportPlan, current: InvestmentSnapshot) throws -> InvestmentUpdateReview {
         try plan.validate()
-        guard current == plan.baseline else { throw InvestmentError.staleReview }
+        guard current.hasSameSource(as: plan.baseline) else { throw InvestmentError.staleReview }
         var containers = current.containers
         var holdings = current.holdings
         var changes: [InvestmentChange] = []
@@ -210,6 +308,7 @@ enum InvestmentUpdatePlanner {
             container.completeAtHoldingsDate = scope.isComplete || (prior?.holdingsDate == scope.holdingsDate && prior?.completeAtHoldingsDate == true)
             container.documentID = plan.history.document.id
             container.importSessionID = plan.history.importSession.id
+            container.zioSource = nil
             var mentionedIDs = Set<String>()
             for (row, position) in scope.positions.enumerated() {
                 let aliasKey = scope.key + "\u{1F}" + position.instrumentIdentity + "\u{1F}" + position.currency
@@ -264,7 +363,7 @@ enum InvestmentUpdatePlanner {
                 // Retain a same-date source only when its exact printed values and
                 // evidence dates agree. Different precision or dates require the
                 // same explicit source choice in either import order.
-                var result = same && sameDate && !plan.choices.replaceSameDateScopes.contains(scope.key) ? old! : replacement
+                var result = same && sameDate && old?.zioObservationID == nil && !plan.choices.replaceSameDateScopes.contains(scope.key) ? old! : replacement
                 result.sourceAliases = replacement.sourceAliases
                 holdings.removeAll { $0.id == id }
                 holdings.append(result)

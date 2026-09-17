@@ -67,13 +67,13 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
 /// This is the one backup compatibility policy. A future schema requires an
 /// explicit policy decision here; the migration registry alone does not grant it.
 nonisolated enum BackupCompatibility {
-    static let supportedSchemaVersion = 21
+    static let supportedSchemaVersion = 22
     static var migrationIdentities: [BackupManifest.MigrationIdentity] {
         allMigrations.map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
     }
     static func migrations(for version: Int) throws -> [Migration] {
-        guard [17, 18, 19, 20, 21].contains(version), allMigrations.last?.version == 21,
-              allMigrations.map(\.version) == Array(1...21) else { throw BackupError.incompatible }
+        guard [17, 18, 19, 20, 21, 22].contains(version), allMigrations.last?.version == 22,
+              allMigrations.map(\.version) == Array(1...22) else { throw BackupError.incompatible }
         return allMigrations.filter { $0.version <= version }
     }
     static func identities(for version: Int) throws -> [BackupManifest.MigrationIdentity] {
@@ -90,6 +90,7 @@ nonisolated enum BackupCompatibility {
     private static let v19Inventory = Result { try expectedInventory(version: 19) }
     private static let v20Inventory = Result { try expectedInventory(version: 20) }
     private static let v21Inventory = Result { try expectedInventory(version: 21) }
+    private static let v22Inventory = Result { try expectedInventory(version: 22) }
     private static func expectedInventory(version: Int) throws -> [SchemaObject] {
         // Empty, source-independent schema authority; no financial fixture/data.
         let schema = SQLiteDatabase(path: ":memory:")
@@ -116,7 +117,7 @@ nonisolated enum BackupCompatibility {
         let chain = try migrations(for: schemaVersion)
         do { _ = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: true) }
         catch { throw BackupError.incompatible }
-        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : v21Inventory).get()
+        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : v22Inventory).get()
         guard try schemaInventory(db) == inventory else { throw BackupError.incompatible }
         let integrity = try db.query(sql: "PRAGMA integrity_check;") { $0.string(at: 0) }
         guard integrity == ["ok"], try db.query(sql: "PRAGMA foreign_key_check;", map: { _ in true }).isEmpty else {
@@ -125,16 +126,16 @@ nonisolated enum BackupCompatibility {
         try checkContents(db)
     }
 
-    /// Receipt-owned startup and isolated V17/V18/V19/V20 candidates share this exact
+    /// Receipt-owned startup and isolated V17/V18/V19/V20/V21 candidates share this exact
     /// bridge. The caller must already own an existing open database.
     static func upgradeSupportedCandidateIfNeeded(_ db: SQLiteDatabase) throws {
-        let chain = try migrations(for: 21)
+        let chain = try migrations(for: 22)
         let history = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: false)
-        guard [17, 18, 19, 20, 21].contains(history.count) else { throw BackupError.incompatible }
-        if history.count < 21 {
+        guard [17, 18, 19, 20, 21, 22].contains(history.count) else { throw BackupError.incompatible }
+        if history.count < 22 {
             try verifyDatabase(db, schemaVersion: history.count)
             // runMigrations validates the immutable prefix and applies only
-            // its exact missing V18/V19/V20/V21 tail inside SQLite migration ownership.
+            // its exact missing V18/V19/V20/V21/V22 tail inside SQLite migration ownership.
             try db.runMigrations(chain)
         }
         try verifyDatabase(db)
@@ -148,7 +149,7 @@ nonisolated enum BackupCompatibility {
         try db.open(access: .existing)
         do {
             try verifyDatabase(db, schemaVersion: manifest.schemaVersion)
-            if manifest.schemaVersion < 21 { try upgradeSupportedCandidateIfNeeded(db) }
+            if manifest.schemaVersion < 22 { try upgradeSupportedCandidateIfNeeded(db) }
             try db.checkpointAndClose()
         } catch { try? db.closeChecked(); throw error }
         return try BackupFiles.hash(destination).sha256

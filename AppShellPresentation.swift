@@ -357,20 +357,40 @@ struct AppShellToolbar: View {
     @Environment(\.lfTheme) private var theme
     let section: AppShellSection
     let subtitle: String
+    var accessory: AnyView? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(section.rawValue)
-                    .font(theme.typography.pageTitle)
-                Text(subtitle)
-                    .font(theme.typography.secondary)
-                    .foregroundStyle(theme.palette.secondaryText)
+        Group {
+            if let accessory {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: theme.spacing.pagePadding) {
+                        titleBlock.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: theme.spacing.pagePadding)
+                        accessory.fixedSize(horizontal: true, vertical: false)
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                        titleBlock
+                        accessory
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    titleBlock
+                    Spacer(minLength: 24)
+                }
             }
-
-            Spacer(minLength: 24)
         }
         .padding(.horizontal, theme.spacing.pagePadding)
         .padding(.vertical, theme.spacing.pagePadding)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(section.rawValue).font(theme.typography.pageTitle)
+            Text(subtitle)
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+        }
     }
 }

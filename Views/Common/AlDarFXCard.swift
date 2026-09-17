@@ -1,11 +1,112 @@
 import AppKit
 import SwiftUI
 
+/// Dashboard-title accessory for the already-running shared Al Dar session.
+/// It is presentation-only: no refresh action, source request, or rate calculation is introduced here.
+struct DashboardLiveFXHeaderAccessory: View {
+    @Environment(\.lfTheme) private var theme
+    @ObservedObject var session: AlDarReferenceSession
+
+    @State private var reversed: Set<Int> = []
+    private let pairs: [AlDarPair] = [.qarINR, .qarUSD, .usdINR]
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                HStack(spacing: theme.spacing.small) {
+                    Label("Live FX · Al Dar", systemImage: "arrow.left.arrow.right.circle")
+                        .font(theme.typography.caption.weight(.semibold))
+                        .foregroundStyle(theme.palette.primaryText)
+                    freshness(at: context.date)
+                }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: theme.spacing.small) {
+                        ForEach(pairs.indices, id: \.self) { rateRow(index: $0) }
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                        ForEach(pairs.indices, id: \.self) { rateRow(index: $0) }
+                    }
+                }
+
+                if !session.failures.isEmpty {
+                    Label(
+                        session.legs.isEmpty
+                            ? "Rates unavailable"
+                            : "Update failed; cached rates shown",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(theme.typography.caption)
+                    .foregroundStyle(session.legs.isEmpty ? LFTheme.warning : theme.palette.secondaryText)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .help("Al Dar reference rates for estimates. Cross and reversed pairs are calculated from the QAR references. Freshness is the older successful fetch; Al Dar supplies no market timestamp.")
+        }
+    }
+
+    private func rateRow(index: Int) -> some View {
+        let pair = reversed.contains(index) ? pairs[index].inverse : pairs[index]
+        let (from, to) = pair.currencies
+        let rate = pair.displayedRate(session.legs)
+        return HStack(spacing: theme.spacing.micro) {
+            Text("1 \(from)")
+                .font(theme.typography.caption)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(theme.palette.secondaryText)
+            Image(systemName: "arrow.right")
+                .font(theme.typography.caption)
+                .foregroundStyle(theme.palette.secondaryText)
+                .accessibilityHidden(true)
+            Text(rate.map { "\($0) \(to)" } ?? "Unavailable")
+                .font(theme.typography.font(.secondary, tabularDigits: true).weight(.semibold))
+                .foregroundStyle(rate == nil ? theme.palette.secondaryText : theme.palette.primaryText)
+                .fixedSize(horizontal: true, vertical: false)
+            Button {
+                if reversed.contains(index) { reversed.remove(index) }
+                else { reversed.insert(index) }
+            } label: {
+                Image(systemName: "arrow.left.arrow.right")
+            }
+            .lfIconAction()
+            .help("Reverse \(from) to \(to)")
+            .accessibilityLabel("Reverse \(from) to \(to)")
+        }
+    }
+
+    @ViewBuilder
+    private func freshness(at now: Date) -> some View {
+        if let oldest = session.legs.values.map(\.fetchedAt).min() {
+            let age = AlDarReferenceAge(fetchedAt: oldest, now: now)
+            let partial = session.legs.count < AlDarCurrency.allCases.count
+            Label((partial ? "Partial · " : "") + age.caption, systemImage: "clock")
+                .font(theme.typography.caption)
+                .foregroundStyle(freshnessColor(age))
+        } else {
+            Text(session.refreshing.isEmpty ? "No cached rates" : "Fetching rates…")
+                .font(theme.typography.caption)
+                .foregroundStyle(theme.palette.secondaryText)
+        }
+    }
+
+    private func freshnessColor(_ age: AlDarReferenceAge) -> Color {
+        let position = age.colorPosition
+        let first = (position <= 1 ? NSColor.systemGreen : NSColor.systemYellow).usingColorSpace(.deviceRGB)!
+        let second = (position <= 1 ? NSColor.systemYellow : NSColor.systemRed).usingColorSpace(.deviceRGB)!
+        let progress = CGFloat(position <= 1 ? position : position - 1)
+        return Color(
+            red: Double(first.redComponent + (second.redComponent - first.redComponent) * progress),
+            green: Double(first.greenComponent + (second.greenComponent - first.greenComponent) * progress),
+            blue: Double(first.blueComponent + (second.blueComponent - first.blueComponent) * progress)
+        )
+    }
+}
+
+
 /// The same public observations and local direction controls in both destinations.
 struct AlDarFXCard: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject var session: AlDarReferenceSession
-    var showsRefresh = true
     @State private var reversed: Set<Int> = []
     private let pairs: [AlDarPair] = [.qarINR, .qarUSD, .usdINR]
 
@@ -37,23 +138,6 @@ struct AlDarFXCard: View {
                 Label("Couldn’t update \(session.failures.map(\.rawValue).sorted().joined(separator: " and ")). \(session.legs.isEmpty ? "No previous rates are available." : "Last fetched rates are still shown.")", systemImage: "exclamationmark.circle")
                     .font(theme.typography.caption).foregroundStyle(LFTheme.warning)
             }
-            if showsRefresh {
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-                    if let feedback = session.refreshFeedback {
-                        Text(feedback.message)
-                            .font(theme.typography.caption)
-                            .foregroundStyle(feedback.isWarning ? LFTheme.warning : theme.palette.secondaryText)
-                            .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Button { session.refreshManually() } label: {
-                        Label(session.refreshing.isEmpty ? "Refresh" : "Refreshing…", systemImage: "arrow.clockwise")
-                            .fixedSize()
-                    }
-                    .lfSecondaryAction().disabled(!session.refreshing.isEmpty)
-                    .accessibilityLabel("Refresh Al Dar reference rates")
-                }
-            }
             DisclosureGroup("About these rates") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("For estimates. Al Dar returns INR and USD for QAR 1. Cross and reversed pairs are calculated from those references; they are not separate transfer quotes. Al Dar does not supply a market timestamp.")
@@ -65,7 +149,6 @@ struct AlDarFXCard: View {
                 }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText).textSelection(.enabled)
             }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
         }
-        .onAppear { session.opened() }
     }
 
     private func rateRow(index: Int) -> some View {

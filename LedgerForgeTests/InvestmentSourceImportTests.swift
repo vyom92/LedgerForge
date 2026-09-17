@@ -128,7 +128,7 @@ struct InvestmentSourceImportTests {
         await coordinator.createBackup(to: destination)
         guard let package = coordinator.lastBackupURL else { throw EnvironmentError.missingCurrentSources }
         let manifest = try BackupFiles.verifyPackage(package)
-        #expect(manifest.formatVersion == 1 && manifest.schemaVersion == 21)
+        #expect(manifest.formatVersion == 1 && manifest.schemaVersion == 22)
         let originalPackageHash = try BackupFiles.hash(package.appendingPathComponent("ledger.sqlite")).sha256
         await coordinator.verifyRestore(from: package)
         #expect(coordinator.candidateManifest == manifest)
@@ -330,6 +330,61 @@ struct InvestmentSourceImportTests {
             let olderHeld = older.investmentConfirmationBlocked && older.investmentReview == nil
             #expect(olderHeld)
             freshEngine.cancelPreparedImport(older)
+        }
+    }
+
+    @Test func publicPriceMappingWriteDoesNotInvalidateTheNextAuthenticBatchReview() async throws {
+        let sources = try currentSources()
+        let funds = sources.filter { $0.deletingLastPathComponent().lastPathComponent == "IndianMutualFunds" }
+        let inspection = engine(DatabaseProvider(inMemory: true))
+        var dated: [(URL, String)] = []
+        for source in funds {
+            let prepared = try await inspection.prepareImport(from: source)
+            guard let date = prepared.investmentPlan?.evidence.scopes.first?.holdingsDate else { throw EnvironmentError.missingCurrentSources }
+            dated.append((source, date)); inspection.cancelPreparedImport(prepared)
+        }
+        dated.sort { $0.1 < $1.1 }
+        guard dated.count == 2, dated[0].1 < dated[1].1,
+              let ibkr = sources.first(where: { $0.deletingLastPathComponent().lastPathComponent == "IBKR" && $0.pathExtension == "csv" }),
+              let isp = sources.first(where: { $0.deletingLastPathComponent().lastPathComponent == "ZurichISP" }) else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-s97-batch-review-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let sqlite = try SQLiteRepositoryProvider(path: directory.appendingPathComponent("ledger.sqlite").path)
+        defer { sqlite.database.close() }
+        for provider in [DatabaseProvider(inMemory: true), DatabaseProvider.verifiedSQLite(sqlite)] {
+            let importer = engine(provider)
+            let first = try await importer.prepareImport(from: dated[0].0)
+            let firstResult = await importer.commitPreparedImport(first)
+            #expect(firstResult.succeeded)
+            let next = try await importer.prepareImport(from: dated[1].0)
+            guard next.investmentPlan != nil, !next.investmentConfirmationBlocked else { throw EnvironmentError.missingCurrentSources }
+            let before = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+            let assignments = Dictionary(uniqueKeysWithValues: before.holdings.compactMap { holding in
+                InvestmentPriceRegistry.confirmedMapping(for: holding).map { (holding.id, $0) }
+            })
+            #expect(!assignments.isEmpty)
+            let saved = provider.investmentRepo.savePriceMappings(.init(providerGeneration: provider.generationToken,
+                workspaceID: "default-workspace", baseline: before, assignments: assignments))
+            #expect(saved == .saved)
+            let mapped = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+            #expect(mapped.hasSameSource(as: before))
+            let nextResult = await importer.commitPreparedImport(next)
+            #expect(nextResult.succeeded, "A public mapping-only update must not require Prepare Again")
+            let after = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+            let latestMappingsRetained = after.holdings.filter { assignments[$0.id] != nil }.allSatisfy { $0.priceMapping == assignments[$0.id] }
+            #expect(latestMappingsRetained)
+
+            // A genuine intervening source update still invalidates the reviewed snapshot.
+            let pending = try await importer.prepareImport(from: ibkr)
+            guard let plan = pending.investmentPlan else { throw EnvironmentError.missingCurrentSources }
+            let intervening = try await importer.prepareImport(from: isp)
+            let interveningResult = await importer.commitPreparedImport(intervening)
+            #expect(interveningResult.succeeded)
+            #expect(provider.investmentRepo.commitCurrentHoldings(plan) == .rejected(.staleReview))
+            importer.cancelPreparedImport(pending)
         }
     }
 

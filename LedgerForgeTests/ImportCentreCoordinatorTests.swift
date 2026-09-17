@@ -779,6 +779,127 @@ struct ImportCentreCoordinatorTests {
         }
     }
 
+    @Test func manualQueueRetainsPerItemConfirmation() async {
+        let probe = ImportCentreWorkflowProbe()
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/tmp/opaque-manual")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+
+        #expect(probe.commitCallCount == 0)
+        coordinator.cancelBatch()
+    }
+
+    @Test func confirmedBatchAutomaticallyCommitsReadyItemsInSourceOrder() async {
+        let probe = ImportCentreWorkflowProbe()
+        let coordinator = makeCoordinator(probe)
+        let sources = [
+            URL(fileURLWithPath: "/tmp/opaque-confirmed-first"),
+            URL(fileURLWithPath: "/tmp/opaque-confirmed-second")
+        ]
+
+        #expect(coordinator.startConfirmedBatch(sources))
+        await waitUntil { coordinator.batchSummary.isComplete }
+
+        #expect(probe.prepareCallCount == 2)
+        #expect(probe.commitCallCount == 2)
+        #expect(probe.maximumConcurrentPreparationCount == 1)
+        #expect(coordinator.items.map(\.completionDisposition) == [.committed, .committed])
+        #expect(!coordinator.showsAutomaticBatchProgress)
+    }
+
+    @Test func automaticBatchKeepsProgressVisibleAcrossPreparationAndCommit() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        probe.suspendsCommit = true
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/tmp/opaque-steady-progress")]))
+        await waitUntil { probe.prepareCallCount == 1 }
+        #expect(coordinator.showsAutomaticBatchProgress)
+        probe.resumeNextPreparation(with: OpaqueImportCentrePreparation())
+        await waitUntil { probe.commitCallCount == 1 }
+        #expect(coordinator.showsAutomaticBatchProgress)
+        probe.resumeCommit()
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(!coordinator.showsAutomaticBatchProgress)
+    }
+
+    @Test func confirmedBatchPausesUntilARequiredChoiceResolvesThenResumesAutomatically() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.automaticCommitEligible = false
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/tmp/opaque-blocked")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        #expect(probe.commitCallCount == 0)
+        #expect(!coordinator.showsAutomaticBatchProgress)
+
+        probe.automaticCommitEligible = true
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "Opaque selected account"))
+        await waitUntil { coordinator.batchSummary.isComplete }
+
+        #expect(probe.commitCallCount == 1)
+        #expect(coordinator.items.first?.completionDisposition == .committed)
+    }
+
+    @Test func cancellationWithdrawsConsentAfterReviewBeforeQueuedAutomaticCommit() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.automaticCommitEligible = false
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/tmp/opaque-cancel-before-commit")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+
+        // The choice update makes the prepared item ready and queues its automatic
+        // commit task. Cancelling synchronously in the same actor turn must revoke
+        // consent before that task can enter the commit dependency.
+        probe.automaticCommitEligible = true
+        coordinator.updateAccountChoice(.createNewAccount(displayName: "Opaque selected account"))
+        coordinator.cancelBatch()
+        await waitUntil { coordinator.batchSummary.isComplete }
+
+        #expect(probe.commitCallCount == 0)
+        #expect(coordinator.items.first?.phase == .cancelled)
+    }
+
+    @Test func confirmedBatchCancellationDuringCommitFinishesOnlyCurrentCommit() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsCommit = true
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.startConfirmedBatch([
+            URL(fileURLWithPath: "/tmp/opaque-confirmed-cancel-a"),
+            URL(fileURLWithPath: "/tmp/opaque-confirmed-cancel-b")
+        ]))
+        await waitUntil { probe.commitCallCount == 1 }
+        #expect(coordinator.showsAutomaticBatchProgress)
+
+        coordinator.cancelBatch()
+        probe.resumeCommit()
+        await waitUntil { coordinator.batchSummary.isComplete }
+
+        #expect(probe.commitCallCount == 1)
+        #expect(coordinator.items.map(\.phase) == [.completed, .cancelled])
+        #expect(coordinator.items.first?.completionDisposition == .committed)
+    }
+
+    @Test func resetAndNewManualQueueDoNotInheritConfirmedBatchConsentOrAppendSources() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.automaticCommitEligible = false
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/tmp/opaque-consent-isolation-a")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        #expect(!coordinator.enqueueSources([URL(fileURLWithPath: "/tmp/opaque-unselected-append")]))
+        #expect(coordinator.reset())
+
+        probe.automaticCommitEligible = true
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/tmp/opaque-consent-isolation-b")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        #expect(probe.commitCallCount == 0)
+        coordinator.cancelBatch()
+    }
+
     private func makeCoordinator(
         _ probe: ImportCentreWorkflowProbe
     ) -> ImportCentreCoordinator<OpaqueImportCentrePreparation> {
@@ -806,7 +927,11 @@ struct ImportCentreCoordinatorTests {
                         guidance: "Retry the isolated mechanics operation."
                     )
                 },
-                isRetryablePreparationFailure: { $0 is ImportError }
+                isRetryablePreparationFailure: { $0 is ImportError },
+                isAutomaticallyCommittable: { preparation, review in
+                    probe.automaticCommitEligible && review.validationPassed
+                        && preparation.id != probe.blockedPreparationID
+                }
             )
         )
     }
@@ -850,6 +975,8 @@ private final class ImportCentreWorkflowProbe {
     var suspendsCommit = false
     var nextPreparationError: Error?
     var nextCommitResult: ImportEngineResult?
+    var automaticCommitEligible = true
+    var blockedPreparationID: UUID?
     private(set) var prepareCallCount = 0
     private(set) var commitCallCount = 0
     private(set) var activePreparationCount = 0

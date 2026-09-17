@@ -4,6 +4,7 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 97 — Current Valuation, Live FX and Zurich Holdings Sync — 2026-09-17](#sprint-97)
 - [Accepted Sprint 96 — Investment Identity and Current Holdings — 2026-09-17](#sprint-96)
 - [Accepted Sprint 95 — Budget Planning and Shared Al Dar FX — 2026-09-16](#sprint-95)
 - [Accepted Sprint 94 — Current Al Dar and This Month Planning — 2026-09-15](#sprint-94)
@@ -12,7 +13,134 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-17:** the owner/Chat accepts Sprint 96 and authorizes exact publication of its already-qualified implementation, retained owner Xcode changes and reconciled benchmark documentation handoff. Current remained V20 throughout qualification, and bounded V20→V21 activation passed after the implementation was published. Earlier records retain their original evidence, then-current schema and limits. Sprint 97 is **NEXT / NOT STARTED**; **PERSONAL-V1 remains NOT YET ADOPTED**.
+**Current alignment — 2026-09-17:** the owner accepts Sprint 97 as-is under `SPRINT_97_CURRENT_VALUATION_AND_LIVE_FX_ACCEPTED_FOR_PUBLICATION` and authorizes publication of the reviewed candidate plus necessary closure documentation. Product/test bytes remain unchanged during closure. Earlier records retain their original evidence, then-current schema and limits. **Sprint 98 is NEXT / NOT STARTED; PERSONAL-V1 remains NOT YET ADOPTED.**
+
+---
+
+<a id="sprint-97"></a>
+## Accepted Sprint 97 — Current Valuation, Live FX and Zurich Holdings Sync — 2026-09-17
+
+**OWNER-ACCEPTED** under `SPRINT_97_CURRENT_VALUATION_AND_LIVE_FX_ACCEPTED_FOR_PUBLICATION`. Published predecessor and publication parent: `main@0cc372abdf5a9aa41391e5ac9437a47dc3e602ee` (Sprint 96 / V21). The owner reviewed the final native application and accepts it **AS-IS**, superseding `SPRINT_97_CURRENT_VALUATION_AND_LIVE_FX_READY_FOR_OWNER_REVIEW`. The commit introducing this record publishes the accumulated reviewed implementation and necessary closure documentation. Closure adds no product, test, migration, credential or UI change and reruns no completed executable/source campaign.
+
+### Accepted implementation and financial boundary
+
+- **Current prices and valuation:** 38 independently qualified public quote identities cover 41 current holdings through AMFI, Nasdaq, Zurich/FE, Fidelity, BlackRock and Franklin. Exact units/prices, original source identity and price/date qualification remain intact. Cost-dependent gain/return/shares use supported holdings only; missing price, FX or cost remains partial/unavailable, never zero. Nasdaq last-sale evidence is not an official-close or real-time guarantee. FE's prior-weekday UTC end-of-day rule is owner-specified; its null native date fields are not converted into provider timestamp evidence. Weekend price behavior remains distinct from fetch cadence.
+- **Shared refresh and Settings:** real launch plus 00:00/06:00/12:00/18:00 UTC, one missed-slot wake catch-up, one 60-second failed-work retry, shared in-flight ownership and last-success cache. Settings > Live FX owns one Refresh all for configured public sources; consuming screens retain values/dates/freshness. Settings has Appearance, Live FX, ISP Account, Backup & Restore and Categories cards, with Status / Application & Data on the landing page. Budget Planning's selected-month manual override and explicit Save remain local.
+- **Direct Zurich ownership:** the proven native ZIO mechanism supplies three policy scopes, seven actual positions and seven Regular strategy entries, with FE supplying public policy-fund prices. The current foreground account check is the first active opportunity on/after the **5th of each UTC month**, plus catch-up/manual fetch. The active LedgerForge credential is saved alongside statement credentials; the exact obsolete pilot item was removed under separate owner authorization. Authenticated failures or cancellation retain verified holdings. Reported policy contributions/growth/vested value retain their portal date and never become fund acquisition cost or investment return. The 70/20/10 employee and 100% employer figures are contribution strategies only.
+- **Persistence and recovery:** additive V22 distinguishes authenticated source provenance in the current investment model, preserves V1–V21 identities and all accepted statement history, and uses existing provider/hydration ownership. Format 1 and exact predecessor-tail verification remain; populated V22 restore/reopen is qualified. Public cache and credentials remain separate from the financial backup. No fabricated statement import, duplicate holdings ledger or background financial writer is introduced.
+- **Presentation:** one investment overview, four portfolio cards, per-portfolio View holdings overlays, collapsed full holdings table, compact Dashboard investment snapshot and bank/card-first Dashboard with Live FX header summary. Indian MF leads with INR; other portfolios lead with USD, with USD/QAR only for CBQ and USD/INR elsewhere. All selected percentages remain visible. App-wide money uses symbols and whole displayed amounts, Indian lakh/crore grouping for INR and three-digit grouping for USD/QAR. Stored/editable money and exact units/NAV/rates are unchanged by display rounding.
+- **Import flow:** one bottom-bar Prepare and import batch authorization followed by steady ordered progress for valid/resolved items, with genuine blockers held for owner input or skip. Validation, commit-time ownership and independent atomic commits remain mandatory. Cancellation/reset clears batch consent. Price-mapping metadata alone no longer causes a false stale-review rejection; genuine financial/source changes still require fresh preparation.
+
+The [owning note](../../Work%20notes/Holdings_and_valuation.md#sprint-97-refresh-contract) retains the exact provider/mapping/date/timing contracts. Sprint 95/96 financial and provenance semantics remain accepted. Investment history, tax lots, realised P/L, dividends, corporate-action reconstruction, general net worth and future Financial Intelligence remain outside this outcome.
+
+### Retained verification and byte boundaries
+
+| Evidence | Accepted result and exact limit |
+| --- | --- |
+| Ordinary regression | **639 definitions / 707 executions / 0 failures / 0 skips**, `Full4-639-definitions-707-executions-passed.xcresult`. This run followed the steady batch UI, Dashboard hierarchy and complete-conversion guard, but **preceded the final layout-only corrections**. It is not claimed as a run on those later presentation bytes. |
+| Separate authentic-source gate | **20 selected definitions/executions PASS**, nine suites, zero failures/skips, `Sources-20-definitions-passed.xcresult`. Six adopted bank/card families, 20 salary originals and 12 locally available investment originals were exercised. This does not claim the historical 36-investment-carrier packet's email-only members were replayed. |
+| Current-price qualification | Independent RAM-only source readers compared exact quotes/units/value/gain/return, both reporting currencies, portfolio scope and missing-FX behavior. Mapping reopen, same-value/failure cache retention, populated backup/restore and relaunch passed on the qualified isolated ledger. |
+| Zurich qualification | Saved product credential; three policies/seven positions/seven Regular entries; independent comparison of retained portal fields and summary totals; SQLite/In-Memory parity, exact replay/stale-baseline rejection, closing-CSV quantity agreement, populated V22 backup/reopen and failed/cancelled client/session retention PASS. `ZIO-live1-passed.xcresult` has two source/persistence definitions; `ZIO-live2-summary-session-batch-passed.xcresult` has 42 definitions/executions including Money/batch checks. |
+| Final layout builds | Fresh **Debug PASS and optimized Release PASS** after the final presentation corrections, in `LedgerForge-s97-wide-final-debug.log` and `LedgerForge-s97-wide-final-release.log`. Existing App Intents metadata notice remains. Xcode ContentView diagnostics returned zero issues; unavailable per-file bridge coverage is not generalized. |
+| Final native review | Wide **1708 × 1074**, constrained Investments **1025 × 1074**, preceding Dashboard/Settings **856 × 1074**. Holdings keyboard selection/Details, distinct holdings/quote dates, collapse/Escape, portfolio navigation and Refresh all continuing through navigation were observed. The owner accepts the final native candidate as-is. This is not certification of every font/size/state combination. |
+| Bounded performance | Earlier populated first draws: 279 ms Dashboard→Settings and 423 ms Settings→Investments during refresh; final sampled idle 0% CPU / approximately 176 MB RSS. These are bounded observations, not controlled benchmarks or universal guarantees. |
+
+Artifacts remain in the task-owned external `LedgerForge-s97-zio-core` directory. [Detailed evidence](../../Work%20notes/Holdings_and_valuation.md#sprint-97-implementation-evidence) preserves earlier passing checkpoints, the corrected initial V21-backup expectation failure, failed/non-run checks and source limits. No unresolved Sprint-97 financial defect was reported.
+
+The **110-file batch** is completely reconciled: **11 new imports + 9 equivalent-source records + 85 exact duplicates + 4 unsupported/preparation-failed older Zurich reports + 1 skipped older IBKR CSV = 110**. The skipped IBKR source was older; all 15 current positions matched the newer July original. This is not a claim of 110 new imports. The owner repeated the batch and called the steady progress “much better”; only 105 import-attempt rows were added in the isolated repeat, with all financial tables unchanged and integrity/FK checks clean.
+
+### Exact reviewed candidate and publication boundary
+
+All **52 changed product/project/test inputs** match `final-wide-source-build-manifest.json`; SHA-256 of its sorted path/hash records is **`bb35cdc3ec664ca8605399c4c1dc795aaafa06a1513131c8fb2bb008bf4c704b`**. Final Debug identity: **2026-09-17T11:24:21Z**, executable `325a0ef8188a28a6150d4135cfe361cb3539815a64f7ebc4185d95fe17527ff5`, debug dylib `4590efb57356fdc4f43196c6d30d9fe2f144c1f649e492cedb5427fadcca8974`. Final Release identity: **2026-09-17T11:26:17Z**, executable `483643fd7c0645052e256372b7069b1d4fa152f7b583db7b4ecda7a6f8062455`. Both were built from the dirty predecessor checkout; publication does not retroactively relabel them as clean builds of the resulting commit.
+
+Closure confirmed the exact predecessor at local HEAD/main, fresh origin/main and remote main, the sole writer window, empty starting index and unchanged reviewed inputs. Read-only product and test/project inspections found no privacy or accepted-scope blocker. Publication uses explicit paths, full staged-diff inspection, whitespace/conflict/path/link/privacy checks, a normal commit and normal push; final Git refs and residue are reported mechanically after push. No private original, financial payload, credential value, database/backup, cache, log, generated bundle, build output or external prototype code is included. The already-integrated future documentation delta is preserved; new external patches remain outside this closure.
+
+**Current is not activated or mutated by publication.** Root app/database qualification used isolated namespaces. Separately, the owner had already opened candidate code and imported into ordinary Current; the retained read-only checkpoint found V22, 3,327 transactions and 41 holdings/15 containers. That activity is not recast as a publication operation. No Current open/reset/replace, original access, credential creation/change or Keychain ACL change is required to commit/push.
+
+### Disposition and next stage
+
+Selected **FW-P3-21/27/29** are complete; their source/valuation limitations are retained. Manual custom valuation, allocation beyond the selected comparisons, historical performance and whole-app net worth remain separate open scope. The already-merged background/Gmail documentation remains future scope: its configurable default ISP **1st-of-month UTC** does not replace Sprint 97's current **5th-of-month UTC** rule. External prototype evidence is not product integration or adoption acceptance.
+
+The owner explicitly defers View holdings / portfolio-overlay refinements, clearer partial-cost labels, Accounts currency/account-count captions, Transactions filter contrast, timestamp consistency, conditional bottom-bar/table scroll-clearance and other already-classified minor visual findings to **Sprint 99 or 100**, without choosing either. They are **non-blocking owner-approved polish**, not a Sprint-97 acceptance gate; [scope authority](../../SCOPE_DECISIONS.md#sprint-97-deferred-polish).
+
+**Sprint 98: NEXT / NOT STARTED. PERSONAL-V1: NOT YET ADOPTED.** Closure authorizes no replacement sprint, further design pass, provider discovery, Current activation or background-product implementation.
+
+<a id="sprint-97-publication-paths"></a>
+### Exact publication path inventory
+
+The commit introducing this record contains **66 paths: 52 product/project/test inputs and 14 documentation paths** (including `script/README.md`). Product/test inputs are unchanged during closure; only existing authority documentation is reconciled and this cycle's accepted record is added below its existing index.
+
+<details>
+<summary>Exact repository-relative paths (66)</summary>
+
+- `AppShellPresentation.swift`
+- `ContentView.swift`
+- `Core/InvestmentStore.swift`
+- `Database/BackupPackage.swift`
+- `Database/InMemoryRepositoryProvider.swift`
+- `Database/InvestmentPersistence.swift`
+- `Database/Migrations.swift`
+- `Database/Repository.swift`
+- `Database/SQLiteInvestmentRepository.swift`
+- `Database/ZurichISPHoldingsPersistence.swift`
+- `Import/Coordinator/ImportCentreCoordinator.swift`
+- `LedgerForge-Info.plist`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `LedgerForgeApp.swift`
+- `LedgerForgeTests/AlDarReferenceSessionTests.swift`
+- `LedgerForgeTests/AlDarReferenceTests.swift`
+- `LedgerForgeTests/BackupPackageTests.swift`
+- `LedgerForgeTests/ImportCentreCoordinatorTests.swift`
+- `LedgerForgeTests/InvestmentPriceQualificationTests.swift`
+- `LedgerForgeTests/InvestmentSourceImportTests.swift`
+- `LedgerForgeTests/InvestmentValuationMechanicsTests.swift`
+- `LedgerForgeTests/MigrationChainIntegrityTests.swift`
+- `LedgerForgeTests/MigrationIdentityLockTests.swift`
+- `LedgerForgeTests/MoneyTests.swift`
+- `LedgerForgeTests/OnlineRefreshCoordinatorTests.swift`
+- `LedgerForgeTests/StatementDropIntakeAdapterTests.swift`
+- `LedgerForgeTests/ZurichISPMonthlyScheduleTests.swift`
+- `LedgerForgeTests/ZurichISPQualificationTests.swift`
+- `Models/Investment.swift`
+- `Models/InvestmentOverview.swift`
+- `Models/InvestmentValuation.swift`
+- `Models/ZurichISP.swift`
+- `Project documents/ADR.md`
+- `Project documents/Architecture_v1.0_Frozen.md`
+- `Project documents/Archive/Accepted outcomes/Sprints_90-99.md`
+- `Project documents/FUTURE_WORK.MD`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/SCOPE_DECISIONS.md`
+- `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md`
+- `Project documents/Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md`
+- `Project documents/Work notes/Account_and_document_lifecycle.md`
+- `Project documents/Work notes/Backup_and_export.md`
+- `Project documents/Work notes/Current_FX_and_net_worth.md`
+- `Project documents/Work notes/Holdings_and_valuation.md`
+- `Project documents/Work notes/Salary_and_current_AlDar.md`
+- `Services/AlDarReferenceSession.swift`
+- `Services/DatabaseActivityGate.swift`
+- `Services/InvestmentPriceClient.swift`
+- `Services/InvestmentPriceRegistry.swift`
+- `Services/InvestmentPriceSession.swift`
+- `Services/OnlineRefreshCoordinator.swift`
+- `Services/RepositoryStoreHydrator.swift`
+- `Services/ZurichISPClient.swift`
+- `Services/ZurichISPCredentialStore.swift`
+- `Services/ZurichISPSyncSession.swift`
+- `TestPlan.xctestplan`
+- `Utilities/MoneyFormatting.swift`
+- `Views/AppearanceSettingsView.swift`
+- `Views/Common/AlDarFXCard.swift`
+- `Views/DashboardInvestmentSnapshotCard.swift`
+- `Views/ImportBatchRunView.swift`
+- `Views/InvestmentListView.swift`
+- `Views/InvestmentOverviewView.swift`
+- `Views/LiveFXSettingsView.swift`
+- `Views/ZurichISPSettingsView.swift`
+- `script/README.md`
+
+</details>
 
 ---
 

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum DatabaseActivity: String, Equatable {
     case importPreparation
@@ -64,6 +65,8 @@ enum DevelopmentDatabaseProfileSwitchBarrierResult: Equatable {
 @MainActor
 final class DatabaseActivityGate {
     static let shared = DatabaseActivityGate()
+    /// Pending app-owned work resumes after recovery/profile transitions release their gate.
+    let didBecomeAvailable = PassthroughSubject<Void, Never>()
 
     private var leases: [UUID: DatabaseActivity] = [:]
     private(set) var generation = 1
@@ -140,6 +143,7 @@ final class DatabaseActivityGate {
         if providerChanged { generation += 1 }
         hasExclusiveOperation = false
         isProfileSwitchPending = false
+        didBecomeAvailable.send()
     }
 
     func enterUnavailable() {

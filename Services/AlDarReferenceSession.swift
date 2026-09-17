@@ -53,9 +53,7 @@ final class AlDarReferenceSession: ObservableObject {
     private let enabled: Bool
     private var requests: [AlDarCurrency: Task<Void, Never>] = [:]
     private var tokens: [AlDarCurrency: UUID] = [:]
-    private var lastAttempt: [AlDarCurrency: Date] = [:]
-    private var periodic: Task<Void, Never>?
-    private var wakeObserver: AnyCancellable?
+    private var hasOpened = false
     private var feedbackExpiry: Task<Void, Never>?
     private var manualRefreshBaseline: [AlDarCurrency: AlDarUnitReference]?
     private var failureReasons: [AlDarCurrency: String] = [:]
@@ -66,35 +64,19 @@ final class AlDarReferenceSession: ObservableObject {
          fetch: @escaping Fetch = { try await AlDarCurrentReferenceProvider().fetchUnit(currency: $0) }) {
         cache = .init(defaults: defaults); legs = cache.load(now: now())
         self.enabled = enabled; self.now = now; self.sleep = sleep; self.fetch = fetch
-        wakeObserver = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
-            .receive(on: DispatchQueue.main).sink { [weak self] _ in
-                Task { @MainActor [weak self] in self?.refresh() }
-            }
     }
 
     func opened() {
-        refresh()
-        guard enabled, periodic == nil else { return }
-        let sleep = sleep
-        periodic = Task { @concurrent [weak self] in
-            while !Task.isCancelled {
-                do { try await sleep(6 * 60 * 60) } catch { return }
-                guard !Task.isCancelled else { return }
-                // The six-hour periodic trigger is independent of recent manual refreshes.
-                // Existing requests are still joined by refresh's per-leg ownership guard.
-                await self?.refresh(force: true)
-            }
-        }
+        guard !hasOpened else { return }
+        hasOpened = true
+        refresh(force: true)
     }
 
     func refresh(force: Bool = false) {
-        guard enabled else { return }
+        guard enabled, requests.isEmpty else { return }
         for currency in AlDarCurrency.allCases {
             guard requests[currency] == nil else { continue }
-            if !force, let recent = lastAttempt[currency] ?? legs[currency]?.fetchedAt,
-               now().timeIntervalSince(recent) < Self.refreshInterval { continue }
             let token = UUID(); tokens[currency] = token
-            lastAttempt[currency] = now()
             let fetch = fetch, sleep = sleep, now = now
             refreshing.insert(currency)
             requests[currency] = Task { @concurrent [weak self] in
@@ -136,7 +118,7 @@ final class AlDarReferenceSession: ObservableObject {
     }
 
     func stop() {
-        periodic?.cancel(); periodic = nil
+        hasOpened = false
         requests.values.forEach { $0.cancel() }; requests = [:]; tokens = [:]; refreshing = []
         feedbackExpiry?.cancel(); feedbackExpiry = nil
         manualRefreshBaseline = nil; refreshFeedback = nil
@@ -219,7 +201,6 @@ final class AlDarReferenceSession: ObservableObject {
         return "Al Dar is unavailable right now."
     }
     deinit {
-        periodic?.cancel()
         feedbackExpiry?.cancel()
         requests.values.forEach { $0.cancel() }
     }

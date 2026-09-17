@@ -250,6 +250,8 @@ Development priorities should favour insights, automation and confidence over im
 - **Implementation:** Applies to future rules, suggestions and financial intelligence.
 - **Current qualification:** Explanation does not itself authorize persistence or mutation. Trusted writes remain governed by validation, explicit control and provider-owned boundaries.
 
+**Future requirement cross-reference, 2026-09-17:** the owner-selected [salary-credit-linked ISP review](Work%20notes/Holdings_and_valuation.md#salary-linked-isp-sync), tracked by [FW-P3-06](FUTURE_WORK.MD#fw-p3-06), must explain its bank-credit date, contribution-update evidence and ten-calendar-day review threshold independently of import time. This is a queued application of the standing principle, not acceptance or implementation of Financial Intelligence.
+
 
 
 ## Original accepted decision
@@ -5853,6 +5855,11 @@ not generic card equivalence.
 <a id="adr-045"></a>
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
+
+## Accepted Sprint-97 alignment — 2026-09-17
+
+[Owner-accepted Sprint 97](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-97) retains the shared Al Dar authority and month-local manual planning override while moving manual provider refresh to Settings > Live FX. The app-owned coordinator now refreshes on real launch and at 00:00/06:00/12:00/18:00 UTC, with one missed-slot wake catch-up, shared in-flight work and one 60-second failed-work retry. Provider/valuation date and actual successful fetch time remain distinct. Exact current-FX investment presentation is accepted; whole-app reporting/net worth and future background scheduling remain separate. The [owning contract](Work%20notes/Holdings_and_valuation.md#sprint-97-refresh-contract) supersedes only the earlier cadence/control placement, not stored plan evidence, financial calculation or explicit Save ownership.
+
 ## Historical accepted alignment — Sprint 95, 2026-09-16
 
 **Architecture and Sprint-95 implementation accepted** under `SPRINT_95_BUDGET_PLANNING_AND_SHARED_AL_DAR_ACCEPTED`; [accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-95). The [Sprint-95 owner decisions](SCOPE_DECISIONS.md#sprint-95-owner-decisions) supersede the Sprint-94 pending/Use Reference ceremony and planner-only provider ownership for the selected QAR/INR/USD scope. Salary actuals/import provenance remain unchanged. Budget Planning is a monthly worksheet with one pure versioned calculator; no financial formula belongs in a view.
@@ -6309,6 +6316,10 @@ ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-
 <a id="adr-047"></a>
 
 # ADR-047 — Verified User Backup and Receipt-Owned Restore
+
+## Accepted Sprint-97 alignment — 2026-09-17
+
+[Owner-accepted Sprint 97](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-97) adds V22 for distinct authenticated ZIO provenance in the current investment tables, retaining every V1–V21 migration identity and format 1. Exact V17–V21 packages verify their original history/schema/manifest before an isolated candidate applies only its missing registered tail; V22 verifies directly. Populated V22 backup/restore and reopen preserve the complete account receipt, current holdings and source distinction. Original package and receipt identity, atomic replacement and canonical hydration rules remain unchanged. Root qualification used isolated namespaces; the owner independently opened V22 Current before acceptance, and publication performs no Current mutation. [The owning note](Work%20notes/Holdings_and_valuation.md#sprint-97-implementation-evidence) records the retained evidence and limits.
 
 ## Accepted Sprint-96 alignment — 2026-09-17
 

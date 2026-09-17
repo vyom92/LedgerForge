@@ -56,7 +56,8 @@ struct MigrationChainIntegrityTests {
         #expect(migrationV18.version == 18)
         #expect(migrationV19.version == 19)
         #expect(migrationV20.version == 20)
-        #expect(migrationV21.version == allMigrations.count)
+        #expect(migrationV21.version == 21)
+        #expect(migrationV22.version == allMigrations.count)
     }
 
     @Test

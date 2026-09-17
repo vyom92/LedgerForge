@@ -390,7 +390,7 @@ final class RepositoryStoreHydrator {
             from: transactionDTOs,
             statementProjections: statementProjections,
             salaryStatements: salaryDTOs.statements,
-            investmentSessionIDs: Set(investments.containers.map(\.importSessionID) + investments.holdings.map(\.importSessionID)),
+            investmentSessionIDs: Set(investments.containers.compactMap(\.importSessionID) + investments.holdings.compactMap(\.importSessionID)),
             zeroActivityControls: zeroActivityControls,
             cardStatements: cardDTOs.statements
         )

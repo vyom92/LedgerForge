@@ -64,6 +64,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         let cancelPasswordChallenge: @MainActor () -> Void
         let failureSummary: @MainActor (_ error: Error) -> ImportFailureSummary
         let isRetryablePreparationFailure: @MainActor (_ error: Error) -> Bool
+        /// A process-local, batch-scoped UI decision only. The production closure
+        /// must mirror ordinary confirmation readiness; it cannot waive engine or
+        /// provider confirmation-time validation.
+        let isAutomaticallyCommittable: @MainActor (
+            _ preparation: Preparation,
+            _ review: ImportCentreReviewState
+        ) -> Bool
     }
 
     struct Item: Identifiable {
@@ -93,6 +100,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         fileprivate(set) var cardSectionDraftAccountID: String?
         fileprivate(set) var cardSectionDraftChoices: [String: ImportCardInstrumentChoice]
         fileprivate(set) var partialReview: PartialImportReviewResult
+        fileprivate(set) var validationPassed: Bool
         fileprivate(set) var outcome: ImportOutcomePresentation?
         fileprivate(set) var completionDisposition: CompletionDisposition?
         fileprivate(set) var failureMessage: String?
@@ -112,6 +120,12 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     private let dependencies: Dependencies
     private var preparationTask: Task<Void, Never>?
     private var activePreparation: (itemID: UUID, operationID: UUID)?
+    /// Exists only for one coordinator queue and is cleared by every batch drain.
+    /// It is deliberately not durable and does not replace PreparedImport's
+    /// exact-source, generation, or provider-owned commit checks.
+    private var confirmedBatchID: UUID?
+    private var automaticCommitTask: Task<Void, Never>?
+    private var automaticCommitRequestID: UUID?
     private var presentationOwnerIDs: Set<UUID> = []
     private var hasAttachedPresentationOwner = false
 
@@ -241,19 +255,67 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         !items.isEmpty && batchLifecycle != .completed
     }
 
+    /// Presentation-only indicator for suppressing the obsolete per-item action
+    /// while an explicitly confirmed batch is about to commit a ready item.
+    var currentItemWillAutomaticallyCommit: Bool {
+        guard let item = currentItem, let preparation = item.preparation else { return false }
+        return isAutomaticCommitEligible(item, preparation: preparation)
+    }
+
+    /// Keep one progress surface mounted across automatic preparation, the
+    /// transient ready state, commit and next-item handoff. Only a real owner
+    /// decision or a terminal batch replaces it with review/results.
+    var showsAutomaticBatchProgress: Bool {
+        guard confirmedBatchID != nil, confirmedBatchID == batchID,
+              !batchCancellationRequested, let item = currentItem else { return false }
+        switch item.phase {
+        case .pending, .preparing, .awaitingReview, .committing:
+            return true
+        case .awaitingConfirmation:
+            guard let preparation = item.preparation else { return preparationIsActive }
+            return preparationIsActive || dependencies.isAutomaticallyCommittable(preparation, automaticReviewState(for: item))
+        case .completed:
+            return item.completionDisposition == .committed || item.completionDisposition == .exactDuplicate
+        case .validationFailed, .failed, .skipped, .cancelled:
+            return false
+        }
+    }
+
     @discardableResult
     func selectSource(_ sourceURL: URL) -> Bool {
         enqueueSources([sourceURL])
     }
 
+    /// Existing/manual queue entry. It deliberately retains per-item confirmation.
     @discardableResult
     func enqueueSources(_ sourceURLs: [URL]) -> Bool {
+        startBatch(sourceURLs, confirmedForAutomaticCommit: false)
+    }
+
+    /// The sole entry point for the owner-approved one-confirmation workflow.
+    /// The caller invokes this only after displaying the selected source count and
+    /// the explicit “Prepare and import batch” action.
+    @discardableResult
+    func startConfirmedBatch(_ sourceURLs: [URL]) -> Bool {
+        startBatch(sourceURLs, confirmedForAutomaticCommit: true)
+    }
+
+    @discardableResult
+    private func startBatch(
+        _ sourceURLs: [URL],
+        confirmedForAutomaticCommit: Bool
+    ) -> Bool {
         guard !sourceURLs.isEmpty, permitsSourceSelection else { return false }
 
         selectionFailureMessage = nil
         recoveryActionRequestID = nil
         batchCancellationRequested = false
-        batchID = UUID()
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
+        let newBatchID = UUID()
+        batchID = newBatchID
+        confirmedBatchID = confirmedForAutomaticCommit ? newBatchID : nil
         items = sourceURLs.enumerated().map { queuePosition, sourceURL in
             Item(
                 id: UUID(),
@@ -269,6 +331,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 cardSectionDraftAccountID: nil,
                 cardSectionDraftChoices: [:],
                 partialReview: .ordinaryFullImport,
+                validationPassed: false,
                 outcome: nil,
                 completionDisposition: nil,
                 failureMessage: nil,
@@ -290,6 +353,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     func detachPresentationOwner(_ ownerID: UUID) {
         guard presentationOwnerIDs.remove(ownerID) != nil,
               presentationOwnerIDs.isEmpty else { return }
+        confirmedBatchID = nil
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
         if currentItem?.phase == .committing {
             batchCancellationRequested = true
         } else {
@@ -310,6 +377,11 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
 
     func cancelCurrent() {
         guard let item = currentItem, permitsCancellation else { return }
+        // Cancelling is a withdrawal of the batch-scoped automatic consent.
+        confirmedBatchID = nil
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
         selectionFailureMessage = nil
         switch item.phase {
         case .preparing, .awaitingReview:
@@ -419,6 +491,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
 
     func cancelBatch() {
         guard permitsBatchCancellation else { return }
+        confirmedBatchID = nil
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
         batchCancellationRequested = true
         selectionFailureMessage = nil
 
@@ -474,6 +550,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         } else {
             disposeAllPreparations()
         }
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
+        confirmedBatchID = nil
         items = []
         activeItemID = nil
         presentedItemID = nil
@@ -498,6 +578,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 $0.partialReview = .unsupportedEvidence
             }
         }
+        scheduleAutomaticCommitIfEligible(for: item.id)
     }
 
     func selectCardLiabilityAccount(accountID: String, requiredSectionIDs: [String]) {
@@ -511,6 +592,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 )
             }
         }
+        scheduleAutomaticCommitIfEligible(for: item.id)
     }
 
     func updateCardSectionChoice(
@@ -543,13 +625,18 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 item.partialReview = .unsupportedEvidence
             }
         }
+        scheduleAutomaticCommitIfEligible(for: item.id)
     }
 
-    func confirmCurrent(expectedPreparationID: UUID? = nil) async {
+    func confirmCurrent(
+        expectedPreparationID: UUID? = nil,
+        automaticallyConfirmed: Bool = false
+    ) async {
         guard let item = currentItem,
               item.phase == .awaitingConfirmation,
               let preparation = item.preparation,
-              expectedPreparationID == nil || preparation.id == expectedPreparationID else { return }
+              expectedPreparationID == nil || preparation.id == expectedPreparationID,
+              !automaticallyConfirmed || isAutomaticCommitEligible(item, preparation: preparation) else { return }
 
         let itemID = item.id
         let preparationID = preparation.id
@@ -599,7 +686,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             completeBatchCancellation()
             return
         }
-        if disposition == .committed {
+        if disposition == .committed
+            || (automaticallyConfirmed && disposition == .exactDuplicate) {
             advanceToNextPending(after: itemID)
         }
     }
@@ -683,6 +771,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 $0.identityReview = review.identityReview
                 $0.accountChoice = review.initialAccountChoice
                 $0.partialReview = review.partialReview
+                $0.validationPassed = review.validationPassed
                 $0.phase = review.validationPassed ? .awaitingConfirmation : .validationFailed
             }
         } catch is CancellationError {
@@ -752,6 +841,62 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         guard let item = item(withID: itemID), activeItemID == itemID else { return }
         if item.phase == .cancelled || item.phase == .skipped {
             advanceToNextPending(after: itemID)
+            return
+        }
+        // This runs only after the serial preparation slot has been released.
+        // Starting a commit earlier would leave preparationIsActive true and make
+        // the next queue item unable to acquire the serial slot.
+        scheduleAutomaticCommitIfEligible(for: itemID)
+    }
+
+    private func automaticReviewState(for item: Item) -> ImportCentreReviewState {
+        ImportCentreReviewState(
+            identityReview: item.identityReview,
+            initialAccountChoice: item.accountChoice,
+            partialReview: item.partialReview,
+            validationPassed: item.validationPassed
+        )
+    }
+
+    private func isAutomaticCommitEligible(
+        _ item: Item,
+        preparation: Preparation
+    ) -> Bool {
+        guard confirmedBatchID != nil,
+              confirmedBatchID == batchID,
+              !batchCancellationRequested,
+              !preparationIsActive,
+              activeItemID == item.id,
+              item.phase == .awaitingConfirmation,
+              item.preparation?.id == preparation.id else { return false }
+        return dependencies.isAutomaticallyCommittable(
+            preparation,
+            automaticReviewState(for: item)
+        )
+    }
+
+    private func scheduleAutomaticCommitIfEligible(for itemID: UUID) {
+        guard automaticCommitTask == nil,
+              let item = item(withID: itemID),
+              let preparation = item.preparation,
+              isAutomaticCommitEligible(item, preparation: preparation) else { return }
+        let preparationID = preparation.id
+        let requestID = UUID()
+        automaticCommitRequestID = requestID
+        automaticCommitTask = Task { [weak self] in
+            // Give synchronous cancellation/reset actions an opportunity to
+            // withdraw consent before this begins provider work.
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            guard let self, self.automaticCommitRequestID == requestID else { return }
+            // Release the queued-action slot before awaiting the provider. The
+            // next preparation may finish before this task is resumed.
+            self.automaticCommitTask = nil
+            self.automaticCommitRequestID = nil
+            await self.confirmCurrent(
+                expectedPreparationID: preparationID,
+                automaticallyConfirmed: true
+            )
         }
     }
 
@@ -775,6 +920,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
             $0.partialReview = .ordinaryFullImport
+            $0.validationPassed = false
             $0.outcome = nil
             $0.completionDisposition = nil
             $0.failureMessage = nil
@@ -797,6 +943,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         guard activeItemID == itemID else { return }
         activeItemID = nil
         guard let nextItemID = items.first(where: { $0.phase == .pending })?.id else {
+            // The explicit consent cannot outlive the completed source list.
+            confirmedBatchID = nil
             presentedItemID = itemID
             return
         }
@@ -844,6 +992,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     private func clearBatchState() {
+        automaticCommitTask?.cancel()
+        automaticCommitTask = nil
+        automaticCommitRequestID = nil
+        confirmedBatchID = nil
         items = []
         activeItemID = nil
         presentedItemID = nil
@@ -911,6 +1063,7 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
               var preparation = item.preparation, preparation.investmentPlan != nil else { return }
         preparation.updateInvestmentChoices(choices)
         mutateItem(item.id) { $0.preparation = preparation }
+        scheduleAutomaticCommitIfEligible(for: item.id)
     }
 
     static func production() -> ImportCentreCoordinator<PreparedImport> {
@@ -928,12 +1081,18 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                     )
                 },
                 review: { preparation in
-                    let mayReview = preparation.validation.passed
+                    // A known duplicate still receives identity review so a
+                    // bank/card duplicate can reach the repository's truthful
+                    // duplicate result without inventing an account choice. Its
+                    // partial review remains unnecessary and may itself require
+                    // current mutable account state.
+                    let mayReviewIdentity = preparation.validation.passed
+                    let mayReviewPartial = preparation.validation.passed
                         && preparation.advisoryPreviousImport == nil
-                    let identityReview = mayReview
+                    let identityReview = mayReviewIdentity
                         ? try engine.reviewPreparedImport(preparation)
                         : .unavailable
-                    let partialReview = mayReview
+                    let partialReview = mayReviewPartial
                         ? try engine.reviewPreparedPartialImport(preparation)
                         : .ordinaryFullImport
                     return ImportCentreReviewState(
@@ -973,6 +1132,40 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                     case .unsupportedFile, .passwordRequired, .incorrectPassword,
                             .readerUnavailable, .invalidDocument, .unsupportedStatement,
                             .cancelled:
+                        return false
+                    }
+                },
+                isAutomaticallyCommittable: { preparation, review in
+                    guard review.validationPassed else { return false }
+                    let isSalaryOrInvestment = preparation.financialDocument.salaryStatementEvidence != nil
+                        || preparation.financialDocument.investmentStatementEvidence != nil
+                    let hasResolvedAccountPath = ImportAccountConfirmationPolicy.allowsConfirmation(
+                        review: review.identityReview,
+                        choice: review.initialAccountChoice,
+                        requiredCardSectionIDs: preparation.financialDocument.cardStatementEvidence?.instrumentSections.map(\.documentScopedSectionID),
+                        requiresNamedCreation: preparation.detectedDocumentType == .bankAccount
+                    )
+                    // A known exact source duplicate is submitted only through the
+                    // normal engine path. Salary/investment repositories detect it
+                    // before normal mutation review; bank/card duplicates additionally
+                    // need an existing resolved account path because the generic plan
+                    // builder runs before its repository duplicate check.
+                    if preparation.advisoryPreviousImport != nil {
+                        return isSalaryOrInvestment || hasResolvedAccountPath
+                    }
+                    if !isSalaryOrInvestment, !hasResolvedAccountPath { return false }
+                    guard !preparation.investmentConfirmationBlocked else { return false }
+                    switch preparation.statementEquivalenceReview {
+                    case .conflict, .evidenceUnavailable, .formatAlreadyRecorded:
+                        return false
+                    case .notApplicable, .firstAcceptedSource, .equivalent:
+                        break
+                    }
+                    switch review.partialReview {
+                    case .ordinaryFullImport, .eligible, .unsupportedEvidence:
+                        return true
+                    case .fullSupportedOverlap, .repeatedIncomingEvidence,
+                            .ownershipConflict, .repositoryIntegrityConflict:
                         return false
                     }
                 }

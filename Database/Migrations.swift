@@ -2839,7 +2839,41 @@ CREATE TABLE investment_holdings (
 CREATE INDEX investment_holdings_container ON investment_holdings(container_id);
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21]
+nonisolated public let migrationV22 = Migration(version: 22, name: "authenticated_investment_source", sql: """
+CREATE TABLE investment_containers_v22 (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+    document_id TEXT REFERENCES documents(id),
+    import_session_id TEXT REFERENCES import_sessions(id),
+    source_kind TEXT NOT NULL DEFAULT 'statement' CHECK(source_kind IN ('statement','zurich-zio')),
+    record_json TEXT NOT NULL CHECK(json_valid(record_json)),
+    CHECK((source_kind='statement' AND document_id IS NOT NULL AND import_session_id IS NOT NULL)
+       OR (source_kind='zurich-zio' AND document_id IS NULL AND import_session_id IS NULL))
+);
+INSERT INTO investment_containers_v22 (id,workspace_id,document_id,import_session_id,record_json)
+SELECT id,workspace_id,document_id,import_session_id,record_json FROM investment_containers;
+CREATE TABLE investment_holdings_v22 (
+    id TEXT PRIMARY KEY NOT NULL,
+    container_id TEXT NOT NULL REFERENCES investment_containers_v22(id),
+    document_id TEXT REFERENCES documents(id),
+    import_session_id TEXT REFERENCES import_sessions(id),
+    normalized_document_id TEXT REFERENCES normalized_documents(id),
+    source_kind TEXT NOT NULL DEFAULT 'statement' CHECK(source_kind IN ('statement','zurich-zio')),
+    record_json TEXT NOT NULL CHECK(json_valid(record_json)),
+    CHECK((source_kind='statement' AND document_id IS NOT NULL AND import_session_id IS NOT NULL AND normalized_document_id IS NOT NULL)
+       OR (source_kind='zurich-zio' AND document_id IS NULL AND import_session_id IS NULL AND normalized_document_id IS NULL))
+);
+INSERT INTO investment_holdings_v22 (id,container_id,document_id,import_session_id,normalized_document_id,record_json)
+SELECT id,container_id,document_id,import_session_id,normalized_document_id,record_json FROM investment_holdings;
+DROP TABLE investment_holdings;
+DROP TABLE investment_containers;
+ALTER TABLE investment_containers_v22 RENAME TO investment_containers;
+ALTER TABLE investment_holdings_v22 RENAME TO investment_holdings;
+CREATE INDEX investment_containers_workspace ON investment_containers(workspace_id);
+CREATE INDEX investment_holdings_container ON investment_holdings(container_id);
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

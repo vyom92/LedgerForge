@@ -3,17 +3,20 @@ import Foundation
 final class SQLiteInvestmentRepository: InvestmentRepository {
     private let db: SQLiteDatabase
     private let generationToken: ProviderGenerationToken
+    private let supportsDirectSources: Bool
 
     init(db: SQLiteDatabase, generationToken: ProviderGenerationToken) {
         self.db = db
         self.generationToken = generationToken
+        self.supportsDirectSources = ((try? db.query(sql: "PRAGMA table_info(investment_containers);") { $0.string(at: 1) }) ?? []).contains("source_kind")
     }
 
     func snapshot(workspaceID: String) throws -> InvestmentSnapshot {
         try db.withExclusiveAccess {
             let containers = try db.query(sql: """
                 SELECT c.id, c.record_json, c.document_id, c.import_session_id,
-                       d.workspace_id, d.import_session_id, s.workspace_id, s.validation_status
+                       d.workspace_id, d.import_session_id, s.workspace_id, s.validation_status,
+                       \(supportsDirectSources ? "c.source_kind" : "'statement'")
                 FROM investment_containers c
                 LEFT JOIN documents d ON d.id = c.document_id
                 LEFT JOIN import_sessions s ON s.id = c.import_session_id
@@ -21,10 +24,17 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 """, params: [workspaceID]) { row -> InvestmentContainer in
                     let value = try self.decode(InvestmentContainer.self, row.string(at: 1))
                     guard value.id == row.string(at: 0), value.workspaceID == workspaceID,
-                          value.documentID == row.string(at: 2), value.importSessionID == row.string(at: 3),
-                          row.string(at: 4) == workspaceID, row.string(at: 5) == value.importSessionID,
-                          row.string(at: 6) == workspaceID, row.string(at: 7) == "passed" else {
+                          value.documentID == row.string(at: 2), value.importSessionID == row.string(at: 3) else {
                         throw InvestmentError.invalidPersistedState
+                    }
+                    if value.zioSource != nil {
+                        guard row.string(at: 8) == "zurich-zio", value.documentID == nil, value.importSessionID == nil else {
+                            throw InvestmentError.invalidPersistedState
+                        }
+                    } else {
+                        guard row.string(at: 8) == "statement", row.string(at: 4) == workspaceID,
+                              row.string(at: 5) == value.importSessionID, row.string(at: 6) == workspaceID,
+                              row.string(at: 7) == "passed" else { throw InvestmentError.invalidPersistedState }
                     }
                     return value
                 }
@@ -32,7 +42,7 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 SELECT h.id, h.record_json, h.container_id, h.document_id, h.import_session_id,
                        h.normalized_document_id, d.workspace_id, d.import_session_id,
                        s.workspace_id, s.validation_status, n.document_id, n.import_session_id,
-                       n.profile_id, n.profile_version
+                       n.profile_id, n.profile_version, \(supportsDirectSources ? "h.source_kind" : "'statement'")
                 FROM investment_holdings h
                 JOIN investment_containers c ON c.id = h.container_id
                 LEFT JOIN documents d ON d.id = h.document_id
@@ -43,11 +53,19 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                     let value = try self.decode(InvestmentHolding.self, row.string(at: 1))
                     guard value.id == row.string(at: 0), value.containerID == row.string(at: 2),
                           value.documentID == row.string(at: 3), value.importSessionID == row.string(at: 4),
-                          value.normalizedDocumentID == row.string(at: 5), row.string(at: 6) == workspaceID,
-                          row.string(at: 7) == value.importSessionID, row.string(at: 8) == workspaceID,
-                          row.string(at: 9) == "passed", row.string(at: 10) == value.documentID,
-                          row.string(at: 11) == value.importSessionID, row.string(at: 12) == value.parserProfile,
-                          row.string(at: 13) == "1" else { throw InvestmentError.invalidPersistedState }
+                          value.normalizedDocumentID == row.string(at: 5) else { throw InvestmentError.invalidPersistedState }
+                    if value.zioObservationID != nil {
+                        guard row.string(at: 14) == "zurich-zio", value.documentID == nil,
+                              value.importSessionID == nil, value.normalizedDocumentID == nil else {
+                            throw InvestmentError.invalidPersistedState
+                        }
+                    } else {
+                        guard row.string(at: 14) == "statement", row.string(at: 6) == workspaceID,
+                              row.string(at: 7) == value.importSessionID, row.string(at: 8) == workspaceID,
+                              row.string(at: 9) == "passed", row.string(at: 10) == value.documentID,
+                              row.string(at: 11) == value.importSessionID, row.string(at: 12) == value.parserProfile,
+                              row.string(at: 13) == "1" else { throw InvestmentError.invalidPersistedState }
+                    }
                     return value
                 }
             return try InvestmentSnapshot(containers: containers, holdings: holdings).validated(workspaceID: workspaceID)
@@ -70,19 +88,7 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 guard !review.requiresChoice else { throw InvestmentError.sameDateConflict }
                 try insertHistory(plan)
                 for container in review.snapshot.containers where review.affectedContainerIDs.contains(container.id) {
-                    try db.executePrepared(sql: """
-                        INSERT INTO investment_containers (id,workspace_id,document_id,import_session_id,record_json)
-                        VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                        document_id=excluded.document_id, import_session_id=excluded.import_session_id, record_json=excluded.record_json;
-                        """, params: [container.id, container.workspaceID, container.documentID, container.importSessionID, try encode(container)])
-                    try db.executePrepared(sql: "DELETE FROM investment_holdings WHERE container_id = ?;", params: [container.id])
-                    for holding in review.snapshot.holdings where holding.containerID == container.id {
-                        try db.executePrepared(sql: """
-                            INSERT INTO investment_holdings (id,container_id,document_id,import_session_id,normalized_document_id,record_json)
-                            VALUES (?,?,?,?,?,?);
-                            """, params: [holding.id, holding.containerID, holding.documentID, holding.importSessionID,
-                                           holding.normalizedDocumentID, try encode(holding)])
-                    }
+                    try replace(container, holdings: review.snapshot.holdings.filter { $0.containerID == container.id })
                 }
                 // Read-back validates exact decoding and relationships before commit.
                 guard try snapshot(workspaceID: plan.workspace.id) == review.snapshot else { throw InvestmentError.invalidPersistedState }
@@ -100,6 +106,77 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
             } catch {
                 try? db.execute(sql: "ROLLBACK;")
                 return .repositoryIntegrityConflict
+            }
+        }
+    }
+
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult {
+        db.withExclusiveAccess {
+            guard supportsDirectSources else { return .unavailable }
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                let updated = try plan.applying(to: snapshot(workspaceID: plan.workspace.id), now: Date())
+                try db.executePrepared(sql: "INSERT INTO workspaces (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING;",
+                    params: [plan.workspace.id, plan.workspace.name, plan.workspace.createdAtISO, plan.workspace.updatedAtISO])
+                for container in updated.containers where plan.source.policyIDs.contains(container.identity) && container.institution == "Zurich ISP" {
+                    try replace(container, holdings: updated.holdings.filter { $0.containerID == container.id })
+                }
+                guard try snapshot(workspaceID: plan.workspace.id) == updated else { throw InvestmentError.invalidPersistedState }
+                try db.execute(sql: "COMMIT;")
+                return .saved
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                if let error = error as? InvestmentError { return .rejected(error) }
+                if let error = error as? SQLiteExecutionError, error.isRetryableContention { return .retryableContention }
+                if case SQLiteDatabaseError.execution(let execution) = error, execution.isRetryableContention { return .retryableContention }
+                return .unavailable
+            }
+        }
+    }
+
+    private func replace(_ container: InvestmentContainer, holdings: [InvestmentHolding]) throws {
+        let kindColumn = supportsDirectSources ? ",source_kind" : ""
+        let kindValue = supportsDirectSources ? ",?" : ""
+        let kindUpdate = supportsDirectSources ? ",source_kind=excluded.source_kind" : ""
+        var containerValues: [Any?] = [container.id, container.workspaceID, container.documentID, container.importSessionID, try encode(container)]
+        if supportsDirectSources { containerValues.append(container.zioSource == nil ? "statement" : "zurich-zio") }
+        try db.executePrepared(sql: """
+            INSERT INTO investment_containers (id,workspace_id,document_id,import_session_id,record_json\(kindColumn))
+            VALUES (?,?,?,?,?\(kindValue)) ON CONFLICT(id) DO UPDATE SET
+            document_id=excluded.document_id,import_session_id=excluded.import_session_id,record_json=excluded.record_json\(kindUpdate);
+            """, params: containerValues)
+        try db.executePrepared(sql: "DELETE FROM investment_holdings WHERE container_id=?;", params: [container.id])
+        for holding in holdings {
+            var values: [Any?] = [holding.id, holding.containerID, holding.documentID, holding.importSessionID,
+                                  holding.normalizedDocumentID, try encode(holding)]
+            if supportsDirectSources { values.append(holding.zioObservationID == nil ? "statement" : "zurich-zio") }
+            try db.executePrepared(sql: """
+                INSERT INTO investment_holdings (id,container_id,document_id,import_session_id,normalized_document_id,record_json\(kindColumn))
+                VALUES (?,?,?,?,?,?\(kindValue));
+                """, params: values)
+        }
+    }
+
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult {
+        db.withExclusiveAccess {
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                let updated = try plan.applying(to: snapshot(workspaceID: plan.workspaceID))
+                for holding in updated.holdings where plan.assignments[holding.id] != nil {
+                    try db.executePrepared(sql: "UPDATE investment_holdings SET record_json=? WHERE id=? AND container_id=?;",
+                        params: [try encode(holding), holding.id, holding.containerID])
+                }
+                guard try snapshot(workspaceID: plan.workspaceID) == updated else { throw InvestmentError.invalidPersistedState }
+                try db.execute(sql: "COMMIT;")
+                return .saved
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                if let error = error as? InvestmentError, error == .staleReview { return .staleSnapshot }
+                if let error = error as? SQLiteExecutionError, error.isRetryableContention { return .retryableContention }
+                if case SQLiteDatabaseError.execution(let execution) = error, execution.isRetryableContention { return .retryableContention }
+                return .unavailable
             }
         }
     }

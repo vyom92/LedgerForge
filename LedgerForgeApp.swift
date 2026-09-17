@@ -39,6 +39,9 @@ struct LedgerForgeApp: App {
         return true
     }())
     @StateObject private var transactionViewModel = TransactionListViewModel()
+    @StateObject private var investmentPriceSession = InvestmentPriceSession(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
+    @StateObject private var onlineRefresh = OnlineRefreshCoordinator(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
+    @StateObject private var ispSyncSession = ZurichISPSyncSession(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
     @State private var transactionAmountMeasurement = TransactionAmountWidthMeasurement()
 #if !DEBUG
     private static var sqliteProvider: SQLiteRepositoryProvider?
@@ -54,7 +57,14 @@ struct LedgerForgeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement, alDarReferenceSession: alDarReferenceSession)
+            ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement,
+                alDarReferenceSession: alDarReferenceSession, investmentPriceSession: investmentPriceSession, ispSyncSession: ispSyncSession)
+                .task {
+                    investmentPriceSession.activate()
+                    investmentPriceSession.observeRates(alDarReferenceSession)
+                    onlineRefresh.start(rates: alDarReferenceSession, prices: investmentPriceSession)
+                    ispSyncSession.start()
+                }
         }
         .windowStyle(.hiddenTitleBar)
     }

@@ -73,10 +73,19 @@ nonisolated public enum InvestmentError: Error, LocalizedError, Equatable, Senda
     }
 }
 
-nonisolated public struct InvestmentPriceMapping: Equatable, Codable, Sendable {
+nonisolated public struct InvestmentPriceMapping: Equatable, Hashable, Codable, Sendable {
     public let provider: String
     public let code: String
     public let currency: String
+    // Optional additions preserve decoding of the original V21 JSON records.
+    public var priceKind: String? = nil
+    public var instrumentReference: String? = nil
+    public var listing: String? = nil
+    public var evidence: String? = nil
+
+    var identity: String {
+        [provider, code, currency, priceKind ?? "", instrumentReference ?? "", listing ?? ""].joined(separator: "|")
+    }
 }
 
 nonisolated public struct InvestmentContainer: Identifiable, Equatable, Codable, Sendable {
@@ -89,8 +98,12 @@ nonisolated public struct InvestmentContainer: Identifiable, Equatable, Codable,
     public var displayName: String
     public var holdingsDate: String
     public var completeAtHoldingsDate: Bool
-    public var documentID: String
-    public var importSessionID: String
+    public var documentID: String?
+    public var importSessionID: String?
+    public var zioSource: ZurichISPPolicyObservation? = nil
+    /// One complete latest account receipt, anchored to the first policy. CSV
+    /// fallback changes current positions without erasing the successful sync.
+    public var lastZioAccount: ZurichISPAccountSnapshot? = nil
 }
 
 nonisolated public struct InvestmentHolding: Identifiable, Equatable, Codable, Sendable {
@@ -107,14 +120,18 @@ nonisolated public struct InvestmentHolding: Identifiable, Equatable, Codable, S
     public var totalCostLabel: String?
     public var costCurrency: String?
     public var holdingsDate: String
-    public var documentID: String
-    public var importSessionID: String
-    public var normalizedDocumentID: String
+    public var documentID: String?
+    public var importSessionID: String?
+    public var normalizedDocumentID: String?
     public var sourceOrdinal: Int
     public var parserProfile: String
     public var issueDate: String?
     public var valuationDate: String?
     public var priceMapping: InvestmentPriceMapping?
+    public var zioObservationID: String? = nil
+    public var zioFundCode: String? = nil
+
+    var sourceDateLabel: String { zioObservationID == nil ? "Holdings as of" : "Portal valuation date" }
 }
 
 /// Ephemeral parser evidence. Zero rows are meaningful for removal, never durable holdings.

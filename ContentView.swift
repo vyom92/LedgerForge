@@ -70,6 +70,24 @@ enum SettingsPresentation {
 }
 import UniformTypeIdentifiers
 
+private enum SettingsSubsection: String {
+    case appearance = "Appearance"
+    case liveFX = "Live FX"
+    case ispAccount = "ISP Account"
+    case backup = "Backup & Restore"
+    case categories = "Categories"
+
+    var systemImage: String {
+        switch self {
+        case .appearance: "paintpalette"
+        case .liveFX: "arrow.triangle.2.circlepath"
+        case .ispAccount: "link"
+        case .backup: "externaldrive"
+        case .categories: "tag"
+        }
+    }
+}
+
 enum AppShellSection: String, CaseIterable {
     case dashboard = "Dashboard"
     case accounts = "Accounts"
@@ -1354,6 +1372,7 @@ struct ContentView: View {
     @Environment(\.appearsActive) private var appearsActive
 
     @State private var showingImporter = false
+    @State private var pendingBatchSourceURLs: [URL] = []
     @State private var statementPassword = ""
     @State private var statementDropIsTargeted = false
     @State private var statementDropRequestGate = StatementDropRequestGate()
@@ -1364,6 +1383,9 @@ struct ContentView: View {
     @State private var importValidationContentHeight: CGFloat = 0
     @ObservedObject private var availability = ApplicationAvailability.shared
     @ObservedObject private var alDarReferenceSession: AlDarReferenceSession
+    @ObservedObject private var investmentPriceSession: InvestmentPriceSession
+    @ObservedObject private var ispSyncSession: ZurichISPSyncSession
+    @State private var settingsSubsection: SettingsSubsection?
     @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @ObservedObject private var transactionViewModel: TransactionListViewModel
@@ -1374,6 +1396,7 @@ struct ContentView: View {
     @ObservedObject private var cardStore: CardStore = .shared
     @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
     @ObservedObject private var investmentStore: InvestmentStore = .shared
+    @ObservedObject private var categoryStore: CategoryStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var sidebarRailOverride: Bool?
     @State private var shellPresentationWidth: CGFloat = 1440
@@ -1481,8 +1504,12 @@ struct ContentView: View {
 
     init(transactionViewModel: TransactionListViewModel? = nil,
          transactionAmountMeasurement: TransactionAmountWidthMeasurement? = nil,
-         alDarReferenceSession: AlDarReferenceSession? = nil) {
+         alDarReferenceSession: AlDarReferenceSession? = nil,
+         investmentPriceSession: InvestmentPriceSession? = nil,
+         ispSyncSession: ZurichISPSyncSession? = nil) {
         self.alDarReferenceSession = alDarReferenceSession ?? AlDarReferenceSession(enabled: false)
+        self.investmentPriceSession = investmentPriceSession ?? InvestmentPriceSession(enabled: false)
+        self.ispSyncSession = ispSyncSession ?? ZurichISPSyncSession(enabled: false)
         self.transactionViewModel = transactionViewModel ?? TransactionListViewModel()
         self.transactionAmountMeasurement = transactionAmountMeasurement ?? TransactionAmountWidthMeasurement()
     }
@@ -1511,7 +1538,10 @@ struct ContentView: View {
             toolbar: {
                 AppShellToolbar(
                     section: selectedSection,
-                    subtitle: toolbarSubtitle
+                    subtitle: toolbarSubtitle,
+                    accessory: selectedSection == .dashboard
+                        ? AnyView(DashboardLiveFXHeaderAccessory(session: alDarReferenceSession))
+                        : nil
                 )
             },
             profileWarning: { profileWarning },
@@ -1542,18 +1572,16 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
-#if DEBUG
-                requestProtectedImportAction(.prepareURLs(urls))
-#else
-                beginImportBatch(from: urls)
-#endif
-
+                stageSelectedBatch(urls)
             case .failure(let error):
                 importCentre.recordSelectionFailure(error)
                 selectedSection = .imports
             }
         }
         .disabled(backupRecovery.isReplacing)
+        .onChange(of: selectedSection) { _, section in
+            if section == .settings { settingsSubsection = nil }
+        }
         .task {
             await hydrateDashboardOnce()
 #if DEBUG
@@ -1646,7 +1674,7 @@ struct ContentView: View {
             selectedSection: selectedSection,
             dashboard: { dashboardContent },
             accounts: { accountsContent },
-            investments: { InvestmentListView(store: investmentStore, availabilityState: availability.state) { selectedSection = .imports } },
+            investments: { InvestmentListView(store: investmentStore, prices: investmentPriceSession, availabilityState: availability.state) { selectedSection = .imports } },
             transactions: {
                 TransactionListView(viewModel: transactionViewModel, amountMeasurement: transactionAmountMeasurement,
                                     generation: availability.generation, availabilityState: availability.state)
@@ -1668,23 +1696,24 @@ struct ContentView: View {
         GeometryReader { viewport in
             let contentWidth = min(1320, max(0, viewport.size.width - theme.spacing.pagePadding * 2))
             let usesColumns = contentWidth >= 640 + dashboardSupportingColumnWidth + theme.spacing.majorModuleGap
-            let primaryWidth = usesColumns
-                ? contentWidth - dashboardSupportingColumnWidth - theme.spacing.majorModuleGap
-                : contentWidth
             let layout = usesColumns
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.majorModuleGap))
                 : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.majorModuleGap))
             ScrollView {
                 VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                     dashboardPositionHeading
+                    dashboardPositionPanel(availableWidth: contentWidth)
                     // Select from the viewport instead of measuring two complete
                     // Dashboard trees during AppKit's initial window sizing.
                     layout {
-                        dashboardPrimaryContent(availableWidth: primaryWidth)
+                        dashboardPrimaryContent
                             .frame(minWidth: usesColumns ? 640 : 0, maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
                             salaryDashboardSummary
-                            AlDarFXCard(session: alDarReferenceSession, showsRefresh: false)
+                            DashboardInvestmentSnapshotCard(overview: investmentPriceSession.overview) {
+                                selectedSection = .investments
+                            }
+                            .frame(maxWidth: dashboardSupportingColumnWidth, alignment: .leading)
                             importActivityCard
                         }
                         .frame(width: usesColumns ? dashboardSupportingColumnWidth : nil, alignment: .leading)
@@ -1706,9 +1735,8 @@ struct ContentView: View {
         }
     }
 
-    private func dashboardPrimaryContent(availableWidth: CGFloat) -> some View {
+    private var dashboardPrimaryContent: some View {
         VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
-            dashboardPositionPanel(availableWidth: availableWidth)
             DashboardActivityComparisonView(
                 comparison: dashboardViewModel.activityComparison,
                 state: dashboardViewModel.recentActivityState
@@ -1922,7 +1950,9 @@ struct ContentView: View {
     }
 
     private var dashboardSupportingColumnWidth: CGFloat {
-        let minimumWidth = AlDarFXCard.minimumWidth(theme: theme, legs: alDarReferenceSession.legs)
+        // FX lives in the page header; rate-string changes must not resize the
+        // planning/investment column underneath it.
+        let minimumWidth: CGFloat = 336
         guard dashboardViewModel.fundingState != .empty else { return minimumWidth }
         let valueWidth = DashboardFundingMetric.allCases.map {
             dashboardTextWidth(dashboardFundingText($0), role: .body, tabular: true)
@@ -2070,7 +2100,7 @@ struct ContentView: View {
 
     private var importWizardContent: some View {
         VStack(spacing: 18) {
-            importStepper
+            if !importCentre.showsAutomaticBatchProgress { importStepper }
 
 #if DEBUG
             if let developmentActionMessage {
@@ -2085,6 +2115,19 @@ struct ContentView: View {
             }
 #endif
 
+            if importCentre.showsAutomaticBatchProgress {
+                ImportBatchRunView(
+                    total: importCentre.items.count,
+                    completed: importCentre.terminalItems.count,
+                    currentPosition: importCentre.currentItem.map { $0.queuePosition + 1 },
+                    currentFileName: importCentre.currentItem?.displayFileName ?? "",
+                    statusText: "Preparing and importing validated statements. Review appears only when a decision is needed.",
+                    importedCount: importCentre.batchSummary.committedCount,
+                    duplicateCount: importCentre.batchSummary.exactDuplicateCount
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .transaction { $0.animation = nil }
+            } else {
             GeometryReader { geometry in
                 let prepared = preparedTransactionPreview
                 let columns = prepared.map(previewColumns)
@@ -2100,7 +2143,7 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Import Statements")
                                 .font(theme.typography.formSection.weight(.semibold))
-                            Text("Choose or drop statement files, then review and confirm each item before LedgerForge writes its financial data.")
+                            Text("Choose statements, then start the batch once. LedgerForge imports each validated statement and pauses when it needs your decision.")
                                 .font(theme.typography.formBody)
                                 .foregroundStyle(theme.palette.secondaryText)
 
@@ -2154,6 +2197,10 @@ struct ContentView: View {
                             .accessibilityLabel("Add statements")
                             .accessibilityHint("Opens the file picker. You can also drop supported statement files here.")
 
+                            if !pendingBatchSourceURLs.isEmpty {
+                                selectedBatchReview
+                            }
+
                             if !importCentre.items.isEmpty {
                                 ImportBatchQueueView(items: importBatchQueueItems) { itemID in
                                     importCentre.presentItem(itemID)
@@ -2170,11 +2217,11 @@ struct ContentView: View {
 
                             importAttemptHistoryPanel
 
-                            if importState.showsPreConfirmationNoWriteMessage {
+                            if importCentre.items.isEmpty && importState.showsPreConfirmationNoWriteMessage {
                                 HStack(spacing: 10) {
                                     Image(systemName: "info.circle")
                                         .foregroundStyle(LFTheme.info)
-                                    Text("No data is written until Confirm Import is selected.")
+                                    Text("No data is written until you select Prepare and import batch.")
                                         .font(theme.typography.formCaption)
                                         .foregroundStyle(theme.palette.secondaryText)
                                     Spacer()
@@ -2229,6 +2276,7 @@ struct ContentView: View {
                 }
             }
 
+            }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: theme.spacing.controlGap) { importFooterControls }
                     .fixedSize(horizontal: true, vertical: false)
@@ -2242,6 +2290,14 @@ struct ContentView: View {
 
     @ViewBuilder
     private var importFooterControls: some View {
+        if importCentre.showsAutomaticBatchProgress {
+            Button("Cancel batch") {
+                statementPassword = ""
+                importCentre.cancelBatch()
+            }
+            .lfSecondaryAction()
+            .help("If a statement is being saved, it finishes before the remaining batch is cancelled.")
+        } else {
         if case .committing = importState {
             Label("Current commit cannot be cancelled", systemImage: "lock.fill")
                 .font(theme.typography.formCaption.weight(.semibold))
@@ -2290,7 +2346,9 @@ struct ContentView: View {
                 .buttonStyle(ImportFooterButtonStyle())
         }
 
-        importFooterAction
+        if !pendingBatchSourceURLs.isEmpty { selectedBatchActions }
+        else { importFooterAction }
+        }
     }
 
     private var settingsContent: some View {
@@ -2305,14 +2363,33 @@ struct ContentView: View {
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
                 : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
             VStack(alignment: .leading, spacing: 0) {
-                LFAppearanceIntroduction(appearance: appearance)
-                    .frame(maxWidth: 1320, alignment: .leading)
+                if settingsSubsection != nil {
+                    HStack(spacing: theme.spacing.controlGap) {
+                        Button("Settings", systemImage: "chevron.left") { settingsSubsection = nil }
+                            .lfSecondaryAction()
+                            .accessibilityHint("Returns to the Settings overview")
+                        Spacer()
+                    }
                     .padding(.horizontal, theme.spacing.pagePadding)
                     .padding(.vertical, theme.spacing.sectionGap)
+                }
                 ScrollView {
                     VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                        LFAppearanceControls(appearance: appearance, availableWidth: width)
-                        LFPanel(title: "Application & data") {
+                        if settingsSubsection == .appearance {
+                            LFAppearanceIntroduction(appearance: appearance)
+                            LFAppearanceControls(appearance: appearance, availableWidth: width)
+                        } else if settingsSubsection == .liveFX {
+                            LiveFXSettingsView(rates: alDarReferenceSession, prices: investmentPriceSession)
+                        } else if settingsSubsection == .ispAccount {
+                            ZurichISPSettingsView(session: ispSyncSession)
+                        } else if settingsSubsection == .backup {
+                            BackupRestoreSettingsSection()
+                        } else if settingsSubsection == .categories {
+                            CategoryManagementView()
+                        } else {
+                        settingsDestinations
+
+                        LFPanel(title: "Application & data", systemImage: "info.circle") {
                             informationLayout {
 #if DEBUG
                                 VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
@@ -2355,19 +2432,128 @@ struct ContentView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            Divider().overlay(theme.palette.divider)
-                            BackupRestoreSettingsSection()
                         }
-
-                        CategoryManagementView()
+                        }
                     }
                     .frame(maxWidth: 1320, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, theme.spacing.pagePadding)
+                    .padding(.top, settingsSubsection == nil ? theme.spacing.sectionGap : 0)
                     .padding(.bottom, theme.spacing.pagePadding)
                 }
             }
         }
+    }
+
+    private var settingsDestinations: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                    appearanceAndLiveFXCards
+                    backupAndCategoryCards
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    appearanceAndLiveFXCards
+                    backupAndCategoryCards
+                }
+            }
+        }
+    }
+
+    private var appearanceAndLiveFXCards: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            settingsDestinationCard(
+                title: SettingsSubsection.appearance.rawValue,
+                summary: appearance.overrides.isEmpty ? "Dark · Default appearance" : "Dark · Custom appearance",
+                systemImage: SettingsSubsection.appearance.systemImage,
+                destination: .appearance
+            )
+            settingsDestinationCard(
+                title: SettingsSubsection.liveFX.rawValue,
+                summary: liveFXSummary,
+                systemImage: SettingsSubsection.liveFX.systemImage,
+                destination: .liveFX
+            )
+            settingsDestinationCard(
+                title: SettingsSubsection.ispAccount.rawValue,
+                summary: ispSyncSession.connectionSummary,
+                systemImage: SettingsSubsection.ispAccount.systemImage,
+                destination: .ispAccount
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var backupAndCategoryCards: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            settingsDestinationCard(
+                title: SettingsSubsection.backup.rawValue,
+                summary: backupRecovery.isBusy ? "Backup or restore in progress" : "Create or restore a verified ledger backup",
+                systemImage: SettingsSubsection.backup.systemImage,
+                destination: .backup
+            )
+            settingsDestinationCard(
+                title: SettingsSubsection.categories.rawValue,
+                summary: categorySummary,
+                systemImage: SettingsSubsection.categories.systemImage,
+                destination: .categories
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func settingsDestinationCard(
+        title: String,
+        summary: String,
+        systemImage: String,
+        destination: SettingsSubsection
+    ) -> some View {
+        Button { settingsSubsection = destination } label: {
+            LFPanel(contentSpacing: theme.spacing.small) {
+                HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                    Image(systemName: systemImage)
+                        .font(theme.typography.sectionIcon)
+                        .foregroundStyle(theme.palette.accentHover)
+                        .frame(width: 24, alignment: .center)
+                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                        Text(title).font(theme.typography.rowTitle)
+                        Text(summary)
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(theme.palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: theme.spacing.small)
+                    Label("Open", systemImage: "chevron.right")
+                        .font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("Open \(title)")
+        .accessibilityHint(summary)
+    }
+
+    private var categorySummary: String {
+        let active = categoryStore.activeCategories.count
+        let archived = categoryStore.archivedCategories.count
+        if active == 0 && archived == 0 { return "No categories created yet" }
+        if archived == 0 { return "\(active) active \(active == 1 ? "category" : "categories")" }
+        return "\(active) active · \(archived) archived"
+    }
+
+    private var liveFXSummary: String {
+        if !alDarReferenceSession.refreshing.isEmpty || !investmentPriceSession.refreshing.isEmpty {
+            return "Refreshing currency rates and investment prices"
+        }
+        let currencyStatus = alDarReferenceSession.legs.count == AlDarCurrency.allCases.count
+            ? "Currency rates ready"
+            : alDarReferenceSession.legs.isEmpty ? "Currency rates need a refresh" : "Some currency rates available"
+        let investmentStatus = investmentPriceSession.rows.isEmpty
+            ? "No investment holdings"
+            : investmentPriceSession.quotes.isEmpty ? "Investment prices need a refresh" : "Investment prices available"
+        return "\(currencyStatus) · \(investmentStatus)"
     }
 
     private var importActivityCard: some View {
@@ -2607,13 +2793,13 @@ struct ContentView: View {
 
     private var importStepper: some View {
         HStack(spacing: 14) {
-            wizardStep(1, title: "Choose File", subtitle: "Select statement", active: importStep >= 1)
+            wizardStep(1, title: "Choose files", subtitle: "Select statements", active: importStep >= 1)
             stepLine(active: importStep >= 2)
-            wizardStep(2, title: "Prepare", subtitle: "Read and validate", active: importStep >= 2)
+            wizardStep(2, title: "Start batch", subtitle: "Confirm once", active: importStep >= 2)
             stepLine(active: importStep >= 3)
-            wizardStep(3, title: "Preview", subtitle: "Read-only review", active: importStep >= 3)
+            wizardStep(3, title: "Prepare", subtitle: "Read and validate", active: importStep >= 3)
             stepLine(active: importStep >= 4)
-            wizardStep(4, title: "Confirm", subtitle: "Explicit commit", active: importStep >= 4)
+            wizardStep(4, title: "Review", subtitle: "Only if needed", active: importStep >= 4)
             stepLine(active: importStep >= 5)
             wizardStep(5, title: "Import", subtitle: "Complete import", active: importStep >= 5)
         }
@@ -2623,24 +2809,24 @@ struct ContentView: View {
     private var importStep: Int {
         switch importState {
         case .idle:
-            return 1
+            return pendingBatchSourceURLs.isEmpty ? 1 : 2
         case .preparing:
-            return 2
-        case .previewReady, .validationFailed:
             return 3
+        case .previewReady, .validationFailed:
+            return importCentre.currentItemWillAutomaticallyCommit ? 5 : 4
         case .committing:
-            return 4
+            return 5
         case .completed:
             return 5
         case .failed:
-            return 2
+            return 4
         case .skipped, .cancelled:
             return 1
         }
     }
 
     private var importSelectionDisabled: Bool {
-        !importCentre.permitsSourceSelection
+        !pendingBatchSourceURLs.isEmpty || !importCentre.permitsSourceSelection
     }
 
     private var canCancelPreparation: Bool {
@@ -3746,6 +3932,12 @@ struct ContentView: View {
     }
 
     private var importFooterAction: some View {
+        Group {
+        if importCentre.currentItemWillAutomaticallyCommit {
+            Label("Importing validated statement…", systemImage: "arrow.down.doc")
+                .font(theme.typography.formBody)
+                .foregroundStyle(theme.palette.secondaryText)
+        } else {
         ImportCentreFooterRenderer(
             importState: importState,
             confirmationLabel: importConfirmationLabel,
@@ -3780,6 +3972,8 @@ struct ContentView: View {
             },
             viewTransactions: { selectedSection = .transactions }
         )
+        }
+        }
     }
 
     private var validationReviewPanel: some View {
@@ -3980,7 +4174,9 @@ struct ContentView: View {
         case .accounts:
             return "All your financial accounts in one place"
         case .investments:
-            return "Current positions from your statements"
+            return investmentStore.snapshot.latestZioAccount == nil
+                ? "Current positions from your statements"
+                : "Current holdings from statements and connected accounts"
         case .transactions:
             return "All your transactions, in one place"
         case .imports:
@@ -4030,13 +4226,9 @@ struct ContentView: View {
 
     private func requestFileSelection() {
         guard availability.permitsMutation,
-              importCentre.permitsSourceSelection else { return }
+              !importSelectionDisabled else { return }
         selectedSection = .imports
-#if DEBUG
-        requestProtectedImportAction(.presentFileImporter)
-#else
         showingImporter = true
-#endif
     }
 
 #if DEBUG
@@ -4224,14 +4416,58 @@ struct ContentView: View {
     }
 
     private func beginImportBatch(from urls: [URL]) {
-        guard availability.permitsMutation else { return }
-        guard importCentre.enqueueSources(urls) else { return }
+        guard availability.permitsMutation,
+              urls == pendingBatchSourceURLs,
+              importCentre.startConfirmedBatch(urls) else { return }
+        pendingBatchSourceURLs = []
         selectedSection = .imports
+    }
+
+    private func stageSelectedBatch(_ urls: [URL]) {
+        guard availability.permitsMutation, !importSelectionDisabled, !urls.isEmpty else { return }
+        pendingBatchSourceURLs = urls
+        selectedSection = .imports
+    }
+
+    private var selectedBatchReview: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            Text("\(pendingBatchSourceURLs.count) statement\(pendingBatchSourceURLs.count == 1 ? "" : "s") selected")
+                .font(theme.typography.formHeading)
+            ForEach(Array(pendingBatchSourceURLs.enumerated()), id: \.offset) { index, url in
+                HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
+                    Text("\(index + 1).")
+                        .foregroundStyle(theme.palette.secondaryText)
+                    Text(url.lastPathComponent)
+                        .lineLimit(2)
+                        .help(url.lastPathComponent)
+                }
+                .font(theme.typography.formBody)
+            }
+            Text("Import in this order. If an account choice, password or other review is needed, you can resolve it or skip that statement.")
+                .font(theme.typography.formCaption)
+                .foregroundStyle(theme.palette.secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var selectedBatchActions: some View {
+        Button("Clear selection") { pendingBatchSourceURLs = [] }
+            .lfSecondaryAction()
+        Button("Prepare and import batch", systemImage: "square.and.arrow.down") {
+#if DEBUG
+            requestProtectedImportAction(.prepareURLs(pendingBatchSourceURLs))
+#else
+            beginImportBatch(from: pendingBatchSourceURLs)
+#endif
+        }
+        .lfPrimaryAction()
+        .disabled(!availability.permitsMutation)
     }
 
     private func receiveStatementDrop(_ providers: [NSItemProvider]) -> Bool {
         guard availability.permitsMutation,
-              importCentre.permitsSourceSelection,
+              !importSelectionDisabled,
               let requestID = statementDropRequestGate.begin() else { return false }
 
         selectedSection = .imports
@@ -4241,11 +4477,7 @@ struct ContentView: View {
             guard statementDropRequestGate.finish(requestID) else { return }
             switch result {
             case .success(let urls):
-#if DEBUG
-                requestProtectedImportAction(.prepareURLs(urls))
-#else
-                beginImportBatch(from: urls)
-#endif
+                stageSelectedBatch(urls)
             case .failure(let error):
                 importCentre.recordSelectionFailure(error.importError)
             }
@@ -4256,6 +4488,7 @@ struct ContentView: View {
     private func startNewImportBatch() {
         guard importCentre.batchSummary.isComplete,
               importCentre.reset() else { return }
+        pendingBatchSourceURLs = []
         statementDropRequestGate.invalidate()
         statementDropIsTargeted = false
         requestFileSelection()

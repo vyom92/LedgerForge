@@ -138,6 +138,8 @@ Import enters through a separate orchestration path and converges on the same re
 
 Rules, future analytics and financial intelligence consume trusted repository-backed state. They do not bypass repositories by consuming transient parser output as truth.
 
+The owner-selected future [salary-credit-linked ISP requirement](Work%20notes/Holdings_and_valuation.md#salary-linked-isp-sync) follows this boundary: use the actual bank-credit identity/date independently of discovery or import time, with the specified daily checks and day-ten Settings review. [FW-P3-06](FUTURE_WORK.MD#fw-p3-06) owns that queued requirement; this cross-reference introduces no new runtime layer or current Financial Intelligence implementation.
+
 ---
 
 # Import Architecture

@@ -4,6 +4,8 @@
 
 **Owners:** bounded [FW-P3-08](../FUTURE_WORK.MD#fw-p3-08), separate [FW-P3-19](../FUTURE_WORK.MD#fw-p3-19).
 
+**Later Financial Intelligence dependency, owner direction 2026-09-17:** [the canonical salary-linked ISP rule](Holdings_and_valuation.md#salary-linked-isp-sync) uses an actual bank salary-credit date, not payslip import time. Daily-before-deadline checks, the +10-calendar-day Settings flag, baseline limits and retry/dismissal semantics are specified there. FW-P3-19 still owns establishing the payroll-to-bank relationship; this cross-reference changes no accepted Salary planner behavior.
+
 <a id="sprint-95-candidate"></a>
 ## Sprint 95 accepted implementation and working history — 2026-09-16
 

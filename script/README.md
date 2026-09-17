@@ -263,3 +263,9 @@ These scripts do not create an alternate Xcode configuration, choose a custom
 database path, modify signing settings, enable the disabled UI-test target,
 perform UI smoke automation, configure CI or change distribution, notarization
 or deployment behavior.
+
+### Sprint 97 live investment qualification
+
+`InvestmentPriceQualificationTests` is a separately selected live-provider/original-ledger gate, outside the ordinary app plan. Its one definition uses the accepted closed isolated `input.ledgerforgebackup/ledger.sqlite` through `LEDGERFORGE_S97_QUALIFIED_LEDGER`; it never populates Current. Forward `LEDGERFORGE_S97_PYTHON` with the actual Python executable returned by `xcrun --find python3`, not the `/usr/bin/python3` developer shim (the shim invokes xcrun, which is unavailable inside the app sandbox). Full response and independent Decimal/Fraction expectations stay in RAM; only normal isolated databases/backups and minimal public quote cache are written. Existing source/corpus exclusions are unchanged; this adds one explicitly live qualification selector.
+
+`ZurichISPQualificationTests` is a separate authenticated native gate. Set `LEDGERFORGE_S97_ZIO_QUALIFY=1` alongside those path variables; it reads the existing saved LedgerForge ISP credential from Keychain, performs one complete native account read, and replays original responses in RAM. It checks the independent source fields and reported-summary totals, direct/CSV provider parity, atomic persistence, stale/cancel/failure retention and V22 backup/reopen. It never creates or replaces credentials. This adds two gated definitions; ordinary TestPlan does not perform authenticated Zurich requests.

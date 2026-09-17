@@ -151,6 +151,28 @@
 		A96020000000000000000001 /* Models/Investment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000001 /* Models/Investment.swift */; };
 		A96020000000000000000002 /* Database/InvestmentPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000002 /* Database/InvestmentPersistence.swift */; };
 		A96020000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */; };
+		A97010000000000000000001 /* Models/InvestmentValuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000001 /* Models/InvestmentValuation.swift */; };
+		A97010000000000000000002 /* Services/InvestmentPriceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000002 /* Services/InvestmentPriceRegistry.swift */; };
+		A97010000000000000000003 /* Services/InvestmentPriceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000003 /* Services/InvestmentPriceClient.swift */; };
+		A97010000000000000000004 /* Services/InvestmentPriceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000004 /* Services/InvestmentPriceSession.swift */; };
+		A97010000000000000000005 /* Views/LiveFXSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000005 /* Views/LiveFXSettingsView.swift */; };
+		A97010000000000000000006 /* Services/OnlineRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000006 /* Services/OnlineRefreshCoordinator.swift */; };
+		A97010000000000000000007 /* Models/InvestmentOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000007 /* Models/InvestmentOverview.swift */; };
+		A97010000000000000000008 /* Views/InvestmentOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000008 /* Views/InvestmentOverviewView.swift */; };
+		A97010000000000000000009 /* Models/ZurichISP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000009 /* Models/ZurichISP.swift */; };
+		A9701000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift */; };
+		A9701000000000000000000B /* Services/ZurichISPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000B /* Services/ZurichISPClient.swift */; };
+		A9701000000000000000000C /* Services/ZurichISPCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000C /* Services/ZurichISPCredentialStore.swift */; };
+		A9701000000000000000000D /* Services/ZurichISPSyncSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000D /* Services/ZurichISPSyncSession.swift */; };
+		A9701000000000000000000E /* Views/ZurichISPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000E /* Views/ZurichISPSettingsView.swift */; };
+		A97010000000000000000011 /* Views/ImportBatchRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000011 /* Views/ImportBatchRunView.swift */; };
+		A97010000000000000000012 /* Views/DashboardInvestmentSnapshotCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000012 /* Views/DashboardInvestmentSnapshotCard.swift */; };
+		A97020000000000000000001 /* Models/InvestmentValuation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000001 /* Models/InvestmentValuation.swift */; };
+		A97020000000000000000002 /* Services/InvestmentPriceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000002 /* Services/InvestmentPriceRegistry.swift */; };
+		A97020000000000000000003 /* Services/InvestmentPriceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000003 /* Services/InvestmentPriceClient.swift */; };
+		A97020000000000000000009 /* Models/ZurichISP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000009 /* Models/ZurichISP.swift */; };
+		A9702000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift */; };
+		A9702000000000000000000B /* Services/ZurichISPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000B /* Services/ZurichISPClient.swift */; };
 		AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000001 /* RuntimeDiagnostics.swift */; };
 		AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
 		AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000003 /* DurableStartupEvidence.swift */; };
@@ -386,6 +408,22 @@
 		A96000000000000000000008 /* Views/InvestmentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InvestmentListView.swift; sourceTree = SOURCE_ROOT; };
 		A96000000000000000000009 /* Views/InvestmentImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InvestmentImportReviewView.swift; sourceTree = SOURCE_ROOT; };
 		A9600000000000000000000A /* LedgerForgeSubprocessProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = LedgerForgeSubprocessProbe; sourceTree = DERIVED_FILE_DIR; };
+		A97000000000000000000001 /* Models/InvestmentValuation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/InvestmentValuation.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000002 /* Services/InvestmentPriceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/InvestmentPriceRegistry.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000003 /* Services/InvestmentPriceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/InvestmentPriceClient.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000004 /* Services/InvestmentPriceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/InvestmentPriceSession.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000005 /* Views/LiveFXSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/LiveFXSettingsView.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000006 /* Services/OnlineRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OnlineRefreshCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000007 /* Models/InvestmentOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/InvestmentOverview.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000008 /* Views/InvestmentOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InvestmentOverviewView.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000009 /* Models/ZurichISP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ZurichISP.swift; sourceTree = SOURCE_ROOT; };
+		A9700000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database/ZurichISPHoldingsPersistence.swift; sourceTree = SOURCE_ROOT; };
+		A9700000000000000000000B /* Services/ZurichISPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ZurichISPClient.swift; sourceTree = SOURCE_ROOT; };
+		A9700000000000000000000C /* Services/ZurichISPCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ZurichISPCredentialStore.swift; sourceTree = SOURCE_ROOT; };
+		A9700000000000000000000D /* Services/ZurichISPSyncSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ZurichISPSyncSession.swift; sourceTree = SOURCE_ROOT; };
+		A9700000000000000000000E /* Views/ZurichISPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ZurichISPSettingsView.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000011 /* Views/ImportBatchRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ImportBatchRunView.swift; sourceTree = SOURCE_ROOT; };
+		A97000000000000000000012 /* Views/DashboardInvestmentSnapshotCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/DashboardInvestmentSnapshotCard.swift; sourceTree = SOURCE_ROOT; };
 		AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreCoordinator.swift; sourceTree = "<group>"; };
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		AB1700010000000000000002 /* PlannerInputCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputCodec.swift; sourceTree = "<group>"; };
@@ -609,6 +647,22 @@
 				C88000013088000000000001 /* AppShellPresentation.swift */,
 				C88000033088000000000001 /* AppDestinationContainer.swift */,
 				C88000053088000000000001 /* ImportCentreFooterRenderer.swift */,
+				A97000000000000000000001 /* Models/InvestmentValuation.swift */,
+				A97000000000000000000002 /* Services/InvestmentPriceRegistry.swift */,
+				A97000000000000000000003 /* Services/InvestmentPriceClient.swift */,
+				A97000000000000000000004 /* Services/InvestmentPriceSession.swift */,
+				A97000000000000000000005 /* Views/LiveFXSettingsView.swift */,
+				A97000000000000000000006 /* Services/OnlineRefreshCoordinator.swift */,
+				A97000000000000000000007 /* Models/InvestmentOverview.swift */,
+				A97000000000000000000008 /* Views/InvestmentOverviewView.swift */,
+				A97000000000000000000012 /* Views/DashboardInvestmentSnapshotCard.swift */,
+				A97000000000000000000011 /* Views/ImportBatchRunView.swift */,
+				A9700000000000000000000E /* Views/ZurichISPSettingsView.swift */,
+				A9700000000000000000000D /* Services/ZurichISPSyncSession.swift */,
+				A9700000000000000000000C /* Services/ZurichISPCredentialStore.swift */,
+				A9700000000000000000000B /* Services/ZurichISPClient.swift */,
+				A9700000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift */,
+				A97000000000000000000009 /* Models/ZurichISP.swift */,
 				A96000000000000000000001 /* Models/Investment.swift */,
 				A96000000000000000000002 /* Database/InvestmentPersistence.swift */,
 				A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */,
@@ -1100,6 +1154,22 @@
 				A96010000000000000000004 /* Core/InvestmentStore.swift in Sources */,
 				A96010000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */,
 				A96010000000000000000002 /* Database/InvestmentPersistence.swift in Sources */,
+				A97010000000000000000001 /* Models/InvestmentValuation.swift in Sources */,
+				A97010000000000000000002 /* Services/InvestmentPriceRegistry.swift in Sources */,
+				A97010000000000000000003 /* Services/InvestmentPriceClient.swift in Sources */,
+				A97010000000000000000004 /* Services/InvestmentPriceSession.swift in Sources */,
+				A97010000000000000000005 /* Views/LiveFXSettingsView.swift in Sources */,
+				A97010000000000000000006 /* Services/OnlineRefreshCoordinator.swift in Sources */,
+				A97010000000000000000007 /* Models/InvestmentOverview.swift in Sources */,
+				A97010000000000000000008 /* Views/InvestmentOverviewView.swift in Sources */,
+				A97010000000000000000012 /* Views/DashboardInvestmentSnapshotCard.swift in Sources */,
+				A97010000000000000000011 /* Views/ImportBatchRunView.swift in Sources */,
+				A9701000000000000000000E /* Views/ZurichISPSettingsView.swift in Sources */,
+				A9701000000000000000000D /* Services/ZurichISPSyncSession.swift in Sources */,
+				A9701000000000000000000C /* Services/ZurichISPCredentialStore.swift in Sources */,
+				A9701000000000000000000B /* Services/ZurichISPClient.swift in Sources */,
+				A9701000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift in Sources */,
+				A97010000000000000000009 /* Models/ZurichISP.swift in Sources */,
 				A96010000000000000000001 /* Models/Investment.swift in Sources */,
 				91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */,
 				91AA00022026091400000001 /* LFAppearancePreferences.swift in Sources */,
@@ -1277,6 +1347,12 @@
 				A96020000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */,
 				A96020000000000000000002 /* Database/InvestmentPersistence.swift in Sources */,
 				A96020000000000000000001 /* Models/Investment.swift in Sources */,
+				A9702000000000000000000B /* Services/ZurichISPClient.swift in Sources */,
+				A9702000000000000000000A /* Database/ZurichISPHoldingsPersistence.swift in Sources */,
+				A97020000000000000000009 /* Models/ZurichISP.swift in Sources */,
+				A97020000000000000000003 /* Services/InvestmentPriceClient.swift in Sources */,
+				A97020000000000000000002 /* Services/InvestmentPriceRegistry.swift in Sources */,
+				A97020000000000000000001 /* Models/InvestmentValuation.swift in Sources */,
 				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
 				A94000000000000000000003 /* AlDarReference.swift in Sources */,
 				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,

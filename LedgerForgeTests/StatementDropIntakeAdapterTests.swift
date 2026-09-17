@@ -272,7 +272,8 @@ struct StatementDropIntakeAdapterTests {
                         guidance: "Retry the source-independent operation."
                     )
                 },
-                isRetryablePreparationFailure: { _ in false }
+                isRetryablePreparationFailure: { _ in false },
+                isAutomaticallyCommittable: { _, _ in false }
             )
         )
     }

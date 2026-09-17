@@ -139,6 +139,28 @@ struct MoneyTests {
     @Test func signedPresentationUsesNativeMoneyAndDirection() throws {
         let money = try Money(amount: Decimal(string: "-4.125")!, currency: "KWD")
 
-        #expect(MoneyFormatting.signedDisplay(money, isCredit: false) == "-KWD 4.125")
+        #expect(MoneyFormatting.signedDisplay(money, isCredit: false, locale: Locale(identifier: "en_US")) == "-KWD\u{00a0}4")
+        #expect(try money.canonicalDecimalString() == "-4.125")
+    }
+
+    @Test func wholeUnitSymbolsAreDisplayOnlyAndKeepExactMoney() throws {
+        let locale = Locale(identifier: "en_US")
+        for (token, expected) in [("1234.49", "$1,234"), ("1234.50", "$1,235"),
+                                  ("-0.49", "$0"), ("-1234.50", "-$1,235"),
+                                  ("92233720368547758.07", "$92,233,720,368,547,758")] {
+            let value = try Money(canonicalDecimal: token, currency: "USD")
+            #expect(MoneyFormatting.display(value, locale: locale) == expected)
+            #expect(try value.canonicalDecimalString() == token)
+        }
+        let inr = try Money(canonicalDecimal: "123456.50", currency: "INR")
+        #expect(MoneyFormatting.display(inr, locale: Locale(identifier: "en_IN")) == "₹1,23,457")
+        let qar = try Money(canonicalDecimal: "1234.50", currency: "QAR")
+        #expect(MoneyFormatting.display(qar, locale: locale) == "QR\u{00a0}1,235")
+        for localeID in ["en_US", "en_IN"] {
+            let displayLocale = Locale(identifier: localeID)
+            #expect(MoneyFormatting.display(try Money(canonicalDecimal: "1234567.89", currency: "INR"), locale: displayLocale) == "₹12,34,568")
+            #expect(MoneyFormatting.display(try Money(canonicalDecimal: "1234567.89", currency: "USD"), locale: displayLocale) == "$1,234,568")
+            #expect(MoneyFormatting.display(try Money(canonicalDecimal: "1234567.89", currency: "QAR"), locale: displayLocale) == "QR\u{00a0}1,234,568")
+        }
     }
 }

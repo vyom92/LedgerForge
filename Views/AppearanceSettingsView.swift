@@ -150,7 +150,7 @@ struct LFAppearanceControls: View {
                     .padding(.top, theme.spacing.small)
             }
             .font(theme.typography.secondary)
-            Text("Sizes are in points. Below 10 pt may be difficult to read. Existing weights stay in place; Money retains its full currency, sign and decimals.")
+            Text("Sizes are in points. Below 10 pt may be difficult to read. Existing weights stay in place; currency symbols and signs remain visible.")
                 .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }

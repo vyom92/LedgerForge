@@ -32,10 +32,12 @@
         "HDFCBankAccountAuthenticAcceptanceTests",
         "ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()",
         "InvestmentRAMOriginalTests",
+        "InvestmentPriceQualificationTests",
         "InvestmentSourceImportTests",
         "SalaryAuthenticCorpusAcceptanceTests",
         "SourceSnapshotConfirmationTests/preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL()",
-        "Sprint94LiveClientTests"
+        "Sprint94LiveClientTests",
+        "ZurichISPQualificationTests"
       ],
       "target" : {
         "containerPath" : "container:LedgerForge.xcodeproj",

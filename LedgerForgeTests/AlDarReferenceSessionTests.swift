@@ -28,12 +28,12 @@ final class AlDarReferenceSessionTests: XCTestCase {
         await transport.complete(at: clock.now())
         try await until { session.legs.count == 2 && session.refreshing.isEmpty }
         for pair in AlDarPair.allCases { XCTAssertNotNil(pair.displayedRate(session.legs)) }
-        session.opened(); session.refresh()
+        session.opened()
         XCTAssertEqual(session.requestCount, 2)
         session.stop(); await sleep.finish()
     }
 
-    func testSixHourRefreshAndOnlyOneSixtySecondRetry() async throws {
+    func testOnlyOneSixtySecondRetryUntilTheNextExplicitTrigger() async throws {
         let (defaults, name) = preferences(); defer { defaults.removePersistentDomain(forName: name) }
         let clock = ReferenceTestClock(), sleep = ReferenceTestSleep(), transport = ImmediateUnitTransport(failuresPerLeg: 2)
         let session = AlDarReferenceSession(defaults: defaults, now: { clock.now() }, sleep: { try await sleep.wait($0) }, fetch: { try await transport.fetch($0, at: clock.now()) })
@@ -47,8 +47,7 @@ final class AlDarReferenceSessionTests: XCTestCase {
         let retries = await sleep.count(60)
         XCTAssertEqual(retries, 0)
         session.opened(); XCTAssertEqual(session.requestCount, 4)
-        try await until { await sleep.count(21_600) == 1 }
-        clock.advance(21_540); await sleep.release(21_600)
+        session.refresh(force: true)
         try await until { session.legs.count == 2 && session.refreshing.isEmpty }
         XCTAssertEqual(session.requestCount, 6)
         XCTAssertTrue(session.failures.isEmpty)
@@ -66,6 +65,11 @@ final class AlDarReferenceSessionTests: XCTestCase {
         })
         session.opened()
         try await until { session.legs[.inr] != nil && session.failures.contains(.usd) }
+        // Joining after one leg succeeded must not start that successful leg again.
+        let attempts = session.requestCount
+        session.refreshManually(); session.refresh(force: true)
+        XCTAssertEqual(session.requestCount, attempts)
+        XCTAssertEqual(session.refreshing, [.usd])
         XCTAssertEqual(session.legs[.usd], old)
         XCTAssertEqual(session.oldestFetch(for: .usdINR), old.fetchedAt)
         XCTAssertTrue(session.isStale(.usdINR))
@@ -74,31 +78,38 @@ final class AlDarReferenceSessionTests: XCTestCase {
         session.stop(); await sleep.finish()
     }
 
-    func testManualRefreshDoesNotDeferTheNextSixHourPeriodicTrigger() async throws {
+    func testManualRefreshDoesNotDeferTheNextFixedUTCSlot() async throws {
         let (defaults, name) = preferences(); defer { defaults.removePersistentDomain(forName: name) }
         let clock = ReferenceTestClock(), sleep = ReferenceTestSleep(), transport = ImmediateUnitTransport()
         let session = AlDarReferenceSession(defaults: defaults, now: { clock.now() }, sleep: { try await sleep.wait($0) }, fetch: { try await transport.fetch($0, at: clock.now()) })
-        session.opened()
+        let coordinator = OnlineRefreshCoordinator(now: { clock.now() }, sleep: { try await sleep.wait($0) })
+        coordinator.start { session.refresh(force: true) }
         try await until { session.requestCount == 2 && session.refreshing.isEmpty }
-        clock.advance(18_000); session.refresh(force: true)
+        try await until { await sleep.count(14_400) == 1 }
+        let noon = coordinator.nextScheduledAt
+        clock.advance(3_600); session.refreshManually()
         try await until { session.requestCount == 4 && session.refreshing.isEmpty }
-        try await until { await sleep.count(21_600) == 1 }
-        clock.advance(3_600); await sleep.release(21_600)
+        XCTAssertEqual(coordinator.nextScheduledAt, noon)
+        clock.advance(10_800); await sleep.release(14_400)
         try await until { session.requestCount == 6 && session.refreshing.isEmpty }
-        session.stop(); await sleep.finish()
+        XCTAssertEqual(coordinator.nextScheduledAt, noon?.addingTimeInterval(21_600))
+        coordinator.stop(); session.stop(); await sleep.finish()
     }
 
-    func testRelaunchCacheAndWakeReuseRecentThenRefreshDueLegs() async throws {
+    func testLaunchRefreshesRecentCacheImmediatelyAndOnlyOnce() async throws {
         let (defaults, name) = preferences(); defer { defaults.removePersistentDomain(forName: name) }
-        let clock = ReferenceTestClock(), sleep = ReferenceTestSleep(), transport = ImmediateUnitTransport()
+        let clock = ReferenceTestClock(), sleep = ReferenceTestSleep(), transport = DeferredUnitTransport()
         let legs = try Dictionary(uniqueKeysWithValues: AlDarCurrency.allCases.map { ($0, try unit($0, at: clock.now())) })
         AlDarReferenceCachePreferences(defaults: defaults).save(legs)
-        let session = AlDarReferenceSession(defaults: defaults, now: { clock.now() }, sleep: { try await sleep.wait($0) }, fetch: { try await transport.fetch($0, at: clock.now()) })
-        session.opened(); session.refresh()
-        XCTAssertEqual(session.legs, legs); XCTAssertEqual(session.requestCount, 0)
-        clock.advance(21_600); session.refresh(); session.refresh()
-        try await until { session.requestCount == 2 && session.refreshing.isEmpty }
+        let session = AlDarReferenceSession(defaults: defaults, now: { clock.now() }, sleep: { try await sleep.wait($0) }, fetch: { try await transport.fetch($0) })
+        XCTAssertEqual(session.legs, legs)
+        session.opened(); session.opened()
+        try await until { session.requestCount == 2 }
+        XCTAssertEqual(session.legs, legs)
+        clock.advance(1); await transport.complete(at: clock.now())
+        try await until { session.refreshing.isEmpty }
         XCTAssertTrue(session.legs.values.allSatisfy { $0.fetchedAt == clock.now() })
+        session.opened(); XCTAssertEqual(session.requestCount, 2)
         session.stop(); await sleep.finish()
     }
 

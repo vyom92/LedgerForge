@@ -146,13 +146,17 @@ private final class InMemoryInvestmentRepo: InvestmentRepository {
         let ids = Set(containers.map(\.id))
         let holdings = state.investmentHoldings.values.filter { ids.contains($0.containerID) }.sorted { $0.id < $1.id }
         for container in containers {
-            guard let document = state.documents[container.documentID], let session = state.importSessions[container.importSessionID],
+            if container.zioSource != nil { continue }
+            guard let documentID = container.documentID, let sessionID = container.importSessionID,
+                  let document = state.documents[documentID], let session = state.importSessions[sessionID],
                   document.workspaceId == workspaceID, document.importSessionId == session.id,
                   session.workspaceId == workspaceID, session.validationStatus == "passed" else { throw InvestmentError.invalidPersistedState }
         }
         for holding in holdings {
-            guard let document = state.documents[holding.documentID], let session = state.importSessions[holding.importSessionID],
-                  let normalized = state.normalizedDocuments[holding.normalizedDocumentID],
+            if holding.zioObservationID != nil { continue }
+            guard let documentID = holding.documentID, let sessionID = holding.importSessionID, let normalizedID = holding.normalizedDocumentID,
+                  let document = state.documents[documentID], let session = state.importSessions[sessionID],
+                  let normalized = state.normalizedDocuments[normalizedID],
                   document.workspaceId == workspaceID, document.importSessionId == session.id,
                   session.workspaceId == workspaceID, session.validationStatus == "passed",
                   normalized.documentId == document.id, normalized.importSessionId == session.id,
@@ -212,6 +216,37 @@ private final class InMemoryInvestmentRepo: InvestmentRepository {
             return .committed(importSessionID: plan.history.importSession.id)
         } catch let error as InvestmentError { return .rejected(error) }
         catch { return .repositoryIntegrityConflict }
+    }
+
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            let updated = try plan.applying(to: snapshot(workspaceID: plan.workspaceID))
+            var holdings = state.investmentHoldings
+            for holding in updated.holdings { holdings[holding.id] = holding }
+            state.investmentHoldings = holdings
+            return .saved
+        } catch InvestmentError.staleReview { return .staleSnapshot }
+        catch { return .unavailable }
+    }
+
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            let updated = try plan.applying(to: snapshot(workspaceID: plan.workspace.id), now: Date())
+            guard !state.investmentFailureBeforePublish else { return .unavailable }
+            var containers = state.investmentContainers, holdings = state.investmentHoldings
+            let ids = Set(updated.containers.filter { $0.institution == "Zurich ISP" && plan.source.policyIDs.contains($0.identity) }.map(\.id))
+            for container in updated.containers where ids.contains(container.id) { containers[container.id] = container }
+            holdings = holdings.filter { !ids.contains($0.value.containerID) }
+            for holding in updated.holdings where ids.contains(holding.containerID) { holdings[holding.id] = holding }
+            state.workspaces[plan.workspace.id] = state.workspaces[plan.workspace.id] ?? plan.workspace
+            state.investmentContainers = containers; state.investmentHoldings = holdings
+            return .saved
+        } catch let error as InvestmentError { return .rejected(error) }
+        catch { return .unavailable }
     }
 }
 

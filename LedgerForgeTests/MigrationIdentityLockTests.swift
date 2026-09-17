@@ -7,6 +7,7 @@ import Testing
 /// V18 was independently recorded from the retained accepted format-1 V18
 /// product package (created 2026-09-15) and checked against cdfb756.
 /// V19/V20 were recorded from published 2f299b1 before Sprint-96 migration edits.
+/// V21 was independently read from published 0cc372ab before the V22 source change.
 /// Never regenerate these expectations from candidate migrations. Changes to
 /// accepted history require a separately approved compatibility decision.
 struct MigrationIdentityLockTests {
@@ -37,11 +38,12 @@ struct MigrationIdentityLockTests {
         .init(17, "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence", "f7250835a4446507ab77b7f1a9eeb65ed8a1568ccbc538fc8b777c4a54a98836"),
         .init(18, "funding_plan_al_dar_reference_v18", "0fb20df64484d70d0dc880f7cedaf2814574ba25067e5b64aefb6b4a32b413b7"),
         .init(19, "budget_planning_worksheet", "9ff47b44f0347968480748eef0f8a482416cb7c37be57b8747e53f415f675874"),
-        .init(20, "budget_planning_bill_dates", "bf0dcc6ed3628262ca4001e71f6d41b056b5c6b18358e02dc2477a0e23410730")
+        .init(20, "budget_planning_bill_dates", "bf0dcc6ed3628262ca4001e71f6d41b056b5c6b18358e02dc2477a0e23410730"),
+        .init(21, "current_investment_holdings", "1a8cb1f7cddfda18ff04adec1f5230c6fbffa722a3053259c32b990991a533e9")
     ]
 
     @Test func acceptedHistoryRemainsPinned() {
-        #expect(allMigrations.prefix(20).map(Identity.init) == accepted)
+        #expect(allMigrations.prefix(21).map(Identity.init) == accepted)
     }
 
     @Test func lockDetectsNameSQLPreflightAndExecutionModeDrift() {

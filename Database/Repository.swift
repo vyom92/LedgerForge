@@ -642,6 +642,14 @@ private struct GenerationCheckedInvestmentRepository: InvestmentRepository {
         do { return try validity.withValidOperation { base.commitCurrentHoldings(plan) } }
         catch { return .staleProviderGeneration }
     }
+    func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult {
+        do { return try validity.withValidOperation { base.savePriceMappings(plan) } }
+        catch { return .staleProviderGeneration }
+    }
+    func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult {
+        do { return try validity.withValidOperation { base.saveZurichHoldings(plan) } }
+        catch { return .staleProviderGeneration }
+    }
 }
 
 // MARK: - Placeholder repos
