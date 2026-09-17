@@ -78,11 +78,11 @@ final class BackupPackageTests: XCTestCase {
         let db = SQLiteDatabase(path: candidate.path)
         try db.open(access: .readOnlySnapshot); defer { db.close() }
         try BackupCompatibility.verifyDatabase(db)
-        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 20)
+        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 21)
         XCTAssertEqual(try db.queryInt("SELECT count(*) FROM funding_plan_al_dar_references;"), 0)
     }
-    func testV18AndV19PackagesUpgradeOnlyTheirMissingTail() throws {
-        for version in [18, 19] {
+    func testV18V19AndV20PackagesUpgradeOnlyTheirMissingTail() throws {
+        for version in [18, 19, 20] {
             let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
             let source = try package(at: directory, version: version)
             let manifest = try BackupFiles.verifyPackage(source)
@@ -92,7 +92,7 @@ final class BackupPackageTests: XCTestCase {
             let db = SQLiteDatabase(path: candidate.path)
             try db.open(access: .readOnlySnapshot); defer { db.close() }
             try BackupCompatibility.verifyDatabase(db)
-            XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 20)
+            XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 21)
         }
     }
 

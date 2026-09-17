@@ -91,6 +91,7 @@ struct RepositoryRuntimeSnapshot {
     let cardSnapshot: CardStoreSnapshot
     let salaryStatements: [SalaryStatement]
     let fundingPlans: [FundingPlan]
+    let investments: InvestmentSnapshot
     let hydrationResult: RepositoryStoreHydrationResult
     let providerGeneration: ProviderGenerationToken?
 
@@ -103,6 +104,7 @@ struct RepositoryRuntimeSnapshot {
         cardSnapshot: CardStoreSnapshot,
         salaryStatements: [SalaryStatement],
         fundingPlans: [FundingPlan],
+        investments: InvestmentSnapshot = .empty,
         providerGeneration: ProviderGenerationToken?
     ) {
         self.accounts = accounts
@@ -113,6 +115,7 @@ struct RepositoryRuntimeSnapshot {
         self.cardSnapshot = cardSnapshot
         self.salaryStatements = salaryStatements
         self.fundingPlans = fundingPlans
+        self.investments = investments
         self.providerGeneration = providerGeneration
         self.hydrationResult = RepositoryStoreHydrationResult(
             didHydrate: true,
@@ -198,6 +201,7 @@ final class RepositoryStoreHydrator {
     private let cardRepo: CardRepository
     private let salaryRepo: SalaryRepository
     private let fundingPlanRepo: FundingPlanRepository
+    private let investmentRepo: InvestmentRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
@@ -206,6 +210,7 @@ final class RepositoryStoreHydrator {
     private let cardStore: CardStore
     private let salaryStore: SalaryStore
     private let fundingPlanStore: FundingPlanStore
+    private let investmentStore: InvestmentStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private let providerGeneration: ProviderGenerationToken?
@@ -233,6 +238,7 @@ final class RepositoryStoreHydrator {
             cardRepo: databaseProvider.cardRepo,
             salaryRepo: databaseProvider.salaryRepo,
             fundingPlanRepo: databaseProvider.fundingPlanRepo,
+            investmentRepo: databaseProvider.investmentRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
             categoryStore: categoryStore,
@@ -257,12 +263,14 @@ final class RepositoryStoreHydrator {
         cardRepo: CardRepository = EmptyCardRepo(),
         salaryRepo: SalaryRepository = EmptySalaryRepo(),
         fundingPlanRepo: FundingPlanRepository = EmptyFundingPlanRepo(),
+        investmentRepo: InvestmentRepository = EmptyInvestmentRepository(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
         cardStore: CardStore = .shared,
         salaryStore: SalaryStore = .shared,
         fundingPlanStore: FundingPlanStore = .shared,
+        investmentStore: InvestmentStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -278,12 +286,14 @@ final class RepositoryStoreHydrator {
         self.cardRepo = cardRepo
         self.salaryRepo = salaryRepo
         self.fundingPlanRepo = fundingPlanRepo
+        self.investmentRepo = investmentRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.categoryStore = categoryStore
         self.cardStore = cardStore
         self.salaryStore = salaryStore
         self.fundingPlanStore = fundingPlanStore
+        self.investmentStore = investmentStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -348,6 +358,7 @@ final class RepositoryStoreHydrator {
         let zeroActivityControls = try importSessionRepo.statementZeroActivityControls(workspaceId: workspaceId)
         let salaryDTOs = try salaryRepo.snapshot(workspaceId: workspaceId)
         let fundingPlanDTOs = try fundingPlanRepo.plans(workspaceId: workspaceId)
+        let investments = try investmentRepo.snapshot(workspaceID: workspaceId).validated(workspaceID: workspaceId)
         let identitiesByAccountID = Dictionary(
             uniqueKeysWithValues: try accountDTOs.map { accountDTO in
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
@@ -379,6 +390,7 @@ final class RepositoryStoreHydrator {
             from: transactionDTOs,
             statementProjections: statementProjections,
             salaryStatements: salaryDTOs.statements,
+            investmentSessionIDs: Set(investments.containers.map(\.importSessionID) + investments.holdings.map(\.importSessionID)),
             zeroActivityControls: zeroActivityControls,
             cardStatements: cardDTOs.statements
         )
@@ -444,6 +456,7 @@ final class RepositoryStoreHydrator {
             cardSnapshot: cardSnapshot,
             salaryStatements: salaryStatements,
             fundingPlans: fundingPlans,
+            investments: investments,
             providerGeneration: providerGeneration
         )
     }
@@ -473,6 +486,7 @@ final class RepositoryStoreHydrator {
         cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
         salaryStore.installWithoutObservation(snapshot.salaryStatements)
         fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration)
+        investmentStore.installWithoutObservation(snapshot.investments, generation: snapshot.providerGeneration)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -498,6 +512,7 @@ final class RepositoryStoreHydrator {
         cardStore.notifySnapshotOfInstalledValue()
         salaryStore.notifyInstalledValue()
         fundingPlanStore.notifyInstalledValue()
+        investmentStore.notifyInstalledValue()
     }
 
     private static func salaryStatements(
@@ -968,6 +983,7 @@ final class RepositoryStoreHydrator {
         from transactions: [TransactionDTO],
         statementProjections: [StatementFinancialProjectionRecordDTO],
         salaryStatements: [SalaryStatementDTO],
+        investmentSessionIDs: Set<String> = [],
         zeroActivityControls: [StatementZeroActivityControlDTO] = [],
         cardStatements: [CardStatementDTO] = []
     ) throws -> [RepositoryImportSession] {
@@ -981,6 +997,7 @@ final class RepositoryStoreHydrator {
         )
         referencedSessionIDs.formUnion(statementProjections.map(\.importSessionID))
         referencedSessionIDs.formUnion(salaryStatements.map(\.importSessionId))
+        referencedSessionIDs.formUnion(investmentSessionIDs)
         referencedSessionIDs.formUnion(zeroActivityControls.map(\.importSessionId))
         referencedSessionIDs.formUnion(cardStatements.map(\.importSessionId))
 

@@ -10,7 +10,7 @@ enum AppShellSizing {
     static func minimumSize(for section: AppShellSection) -> CGSize {
         switch section {
         case .dashboard: CGSize(width: 640, height: 608)
-        case .transactions: CGSize(width: 1024, height: 736)
+        case .transactions, .investments: CGSize(width: 1024, height: 736)
         case .settings: CGSize(width: 760, height: 608)
         case .salary: CGSize(width: 760, height: 608)
         default: CGSize(width: 1180, height: 760)

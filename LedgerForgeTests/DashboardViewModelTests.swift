@@ -410,7 +410,7 @@ private func dashboardCurrentDatabaseContext() throws -> DashboardReadOnlyContex
         throw RepositoryError.persistenceUnavailable
     }
 
-    let provider = try SQLiteRepositoryProvider(path: databaseURL.absoluteString + "?mode=ro")
+    let provider = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: databaseURL)
     try provider.database.execute(sql: "PRAGMA query_only = ON;")
     // The owner may import in the separate app process during this read-only
     // check. All hydration queries must observe one committed SQLite snapshot.

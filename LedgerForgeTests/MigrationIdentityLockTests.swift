@@ -6,6 +6,7 @@ import Testing
 /// Database/Migrations.swift and Database/IdentifierOwnershipMigrationV5.swift.
 /// V18 was independently recorded from the retained accepted format-1 V18
 /// product package (created 2026-09-15) and checked against cdfb756.
+/// V19/V20 were recorded from published 2f299b1 before Sprint-96 migration edits.
 /// Never regenerate these expectations from candidate migrations. Changes to
 /// accepted history require a separately approved compatibility decision.
 struct MigrationIdentityLockTests {
@@ -34,11 +35,13 @@ struct MigrationIdentityLockTests {
         .init(15, "Axis card observations and representation-neutral semantic events", "52a7d4715c09ebc361721cccaf3bc7983fa4ac0eebd167f4859bbab8deb8b35d"),
         .init(16, "Qatar Airways salary actuals and current-month funding plans", "8b64c97024d2ac0992a15505d2022a4b8ed8bbd4f4134c9bfbbe50b18cbe0fc8"),
         .init(17, "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence", "f7250835a4446507ab77b7f1a9eeb65ed8a1568ccbc538fc8b777c4a54a98836"),
-        .init(18, "funding_plan_al_dar_reference_v18", "0fb20df64484d70d0dc880f7cedaf2814574ba25067e5b64aefb6b4a32b413b7")
+        .init(18, "funding_plan_al_dar_reference_v18", "0fb20df64484d70d0dc880f7cedaf2814574ba25067e5b64aefb6b4a32b413b7"),
+        .init(19, "budget_planning_worksheet", "9ff47b44f0347968480748eef0f8a482416cb7c37be57b8747e53f415f675874"),
+        .init(20, "budget_planning_bill_dates", "bf0dcc6ed3628262ca4001e71f6d41b056b5c6b18358e02dc2477a0e23410730")
     ]
 
     @Test func acceptedHistoryRemainsPinned() {
-        #expect(allMigrations.prefix(18).map(Identity.init) == accepted)
+        #expect(allMigrations.prefix(20).map(Identity.init) == accepted)
     }
 
     @Test func lockDetectsNameSQLPreflightAndExecutionModeDrift() {

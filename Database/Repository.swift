@@ -327,6 +327,7 @@ public final class DatabaseProvider {
     public let confirmedImportRepo: ConfirmedImportRepository
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
+    public let investmentRepo: InvestmentRepository
     private let generationValidity: ProviderGenerationValidity?
 
     public init(
@@ -339,6 +340,7 @@ public final class DatabaseProvider {
         confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
         salaryRepo: SalaryRepository? = nil,
         fundingPlanRepo: FundingPlanRepository? = nil,
+        investmentRepo: InvestmentRepository? = nil,
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         protectsGeneration: Bool = false,
@@ -350,6 +352,7 @@ public final class DatabaseProvider {
         let resolvedCategoryRepo = categoryRepo ?? PlaceholderCategoryRepo()
         let resolvedSalaryRepo = salaryRepo ?? EmptySalaryRepo()
         let resolvedFundingPlanRepo = fundingPlanRepo ?? EmptyFundingPlanRepo()
+        let resolvedInvestmentRepo = investmentRepo ?? EmptyInvestmentRepository()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
@@ -362,6 +365,7 @@ public final class DatabaseProvider {
             self.confirmedImportRepo = GenerationCheckedConfirmedImportRepository(base: confirmedImportRepo, validity: validity)
             self.salaryRepo = GenerationCheckedSalaryRepository(base: resolvedSalaryRepo, validity: validity)
             self.fundingPlanRepo = GenerationCheckedFundingPlanRepository(base: resolvedFundingPlanRepo, validity: validity)
+            self.investmentRepo = GenerationCheckedInvestmentRepository(base: resolvedInvestmentRepo, validity: validity)
             return
         }
         self.generationValidity = nil
@@ -374,6 +378,7 @@ public final class DatabaseProvider {
         self.confirmedImportRepo = confirmedImportRepo
         self.salaryRepo = resolvedSalaryRepo
         self.fundingPlanRepo = resolvedFundingPlanRepo
+        self.investmentRepo = resolvedInvestmentRepo
     }
 
     /// Convenience initializer for an isolated in-memory provider. This is
@@ -390,6 +395,7 @@ public final class DatabaseProvider {
             confirmedImportRepo: provider.confirmedImportRepo,
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
+            investmentRepo: provider.investmentRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(.testMemory),
             protectsGeneration: true
@@ -407,6 +413,7 @@ public final class DatabaseProvider {
             confirmedImportRepo: PlaceholderConfirmedImportRepo(),
             salaryRepo: PlaceholderSalaryRepo(),
             fundingPlanRepo: PlaceholderFundingPlanRepo(),
+            investmentRepo: UnavailableInvestmentRepository(),
             persistenceState: .unavailable(reason),
             failureContext: context
         )
@@ -424,6 +431,7 @@ public final class DatabaseProvider {
             confirmedImportRepo: provider.confirmedImportRepo,
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
+            investmentRepo: provider.investmentRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(purpose),
             protectsGeneration: true
@@ -441,6 +449,7 @@ public final class DatabaseProvider {
             confirmedImportRepo: provider.confirmedImportRepo,
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
+            investmentRepo: provider.investmentRepo,
             generationToken: provider.generationToken,
             persistenceState: .verifiedSQLite,
             protectsGeneration: protectsGeneration
@@ -620,6 +629,18 @@ private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
         return try validity.withValidOperation { try base.savePlan(plan) }
+    }
+}
+
+private struct GenerationCheckedInvestmentRepository: InvestmentRepository {
+    let base: InvestmentRepository
+    let validity: ProviderGenerationValidity
+    func snapshot(workspaceID: String) throws -> InvestmentSnapshot {
+        try validity.withValidOperation { try base.snapshot(workspaceID: workspaceID) }
+    }
+    func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult {
+        do { return try validity.withValidOperation { base.commitCurrentHoldings(plan) } }
+        catch { return .staleProviderGeneration }
     }
 }
 

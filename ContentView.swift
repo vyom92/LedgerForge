@@ -73,6 +73,7 @@ import UniformTypeIdentifiers
 enum AppShellSection: String, CaseIterable {
     case dashboard = "Dashboard"
     case accounts = "Accounts"
+    case investments = "Investments"
     case transactions = "Transactions"
     case imports = "Import"
     case salary = "Budget Planning"
@@ -82,6 +83,7 @@ enum AppShellSection: String, CaseIterable {
     static let ordinaryNavigation: [AppShellSection] = [
         .dashboard,
         .accounts,
+        .investments,
         .salary,
         .transactions,
         .imports,
@@ -102,6 +104,8 @@ enum AppShellSection: String, CaseIterable {
             return "house"
         case .accounts:
             return "wallet.pass"
+        case .investments:
+            return "chart.pie"
         case .transactions:
             return "arrow.left.arrow.right.square"
         case .imports:
@@ -780,7 +784,7 @@ struct DurableImportAttemptPresentation: Equatable {
         case .successfulImport:
             return DurableImportPresentationValue(
                 label: "Import completed",
-                explanation: "Persisted \(transactionCount) transaction(s)",
+                explanation: transactionCount == 0 ? "Statement data saved" : "Persisted \(transactionCount) transaction(s)",
                 iconName: "checkmark.circle.fill",
                 tone: .success
             )
@@ -1021,6 +1025,7 @@ struct ImportOutcomePresentation: Equatable {
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
     let isSalaryImport: Bool
+    let isInvestmentImport: Bool
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let accountOutcomePresentation: ImportAccountOutcomePresentation?
@@ -1035,6 +1040,7 @@ struct ImportOutcomePresentation: Equatable {
         allowsViewingTransactions = Self.provesCommittedSuccess(result)
             && !result.isEquivalentSupportingSource
             && !result.isSalaryImport
+            && !result.isInvestmentImport
             && (result.recoveryRoute == .none || result.recoveryRoute == .unavailable)
         accountId = result.accountId
         importSessionId = result.importSessionId
@@ -1048,6 +1054,7 @@ struct ImportOutcomePresentation: Equatable {
         isPartialImport = result.isPartialImport
         isEquivalentSupportingSource = result.isEquivalentSupportingSource
         isSalaryImport = result.isSalaryImport
+        isInvestmentImport = result.isInvestmentImport
         sourceRowCount = result.sourceRowCount
         recognizedExistingRowCount = result.recognizedExistingRowCount
         accountOutcomePresentation = result.accountOutcome == .unavailable
@@ -1158,6 +1165,7 @@ struct ImportOutcomePresentation: Equatable {
         if isEquivalentSupportingSource {
             return "Equivalent source evidence recorded — 0 additional transactions"
         }
+        if isInvestmentImport && persisted { return "Current holdings updated — available in Investments" }
         if isSalaryImport && persistenceStatus.hasPrefix("Persistence") {
             return "Imported Salary actual — source truth is available in Salary History"
         }
@@ -1173,7 +1181,7 @@ struct ImportOutcomePresentation: Equatable {
         var copy = self
         copy.recoveryRoute = .none
         copy.recoveryContextID = nil
-        copy.allowsViewingTransactions = true
+        copy.allowsViewingTransactions = !isSalaryImport && !isInvestmentImport
         copy.persistenceStatus = isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded"
         copy.message = nil
         copy.iconName = "checkmark.circle.fill"
@@ -1365,6 +1373,7 @@ struct ContentView: View {
     @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
     @ObservedObject private var cardStore: CardStore = .shared
     @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
+    @ObservedObject private var investmentStore: InvestmentStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var sidebarRailOverride: Bool?
     @State private var shellPresentationWidth: CGFloat = 1440
@@ -1637,6 +1646,7 @@ struct ContentView: View {
             selectedSection: selectedSection,
             dashboard: { dashboardContent },
             accounts: { accountsContent },
+            investments: { InvestmentListView(store: investmentStore, availabilityState: availability.state) { selectedSection = .imports } },
             transactions: {
                 TransactionListView(viewModel: transactionViewModel, amountMeasurement: transactionAmountMeasurement,
                                     generation: availability.generation, availabilityState: availability.state)
@@ -2914,7 +2924,9 @@ struct ContentView: View {
                         )
                     }
 
-                    LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
+                    if !outcome.isInvestmentImport {
+                        LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
+                    }
 
                     if outcome.isEquivalentSupportingSource {
                         Text("LedgerForge recorded this document as a supporting equivalent source. The previously accepted source remains authoritative and no additional financial history was written.")
@@ -3109,6 +3121,9 @@ struct ContentView: View {
                 color: preparedImport.validation.passed ? LFTheme.success : LFTheme.danger
             )
 
+            if preparedImport.financialDocument.investmentStatementEvidence != nil {
+                InvestmentImportReviewView(preparation: preparedImport) { importCentre.updateInvestmentChoices($0) }
+            } else {
             HStack(spacing: 8) {
                 LFStatusBadge(title: preparedImport.detectedInstitution.rawValue, color: theme.palette.accent)
                 LFStatusBadge(title: preparedImport.detectedDocumentType.rawValue, color: LFTheme.info)
@@ -3163,6 +3178,7 @@ struct ContentView: View {
 
             if case .eligible(let plan) = partialImportReview {
                 partialImportReviewPanel(plan, preparedImport: preparedImport)
+            }
             }
 
 
@@ -3595,7 +3611,7 @@ struct ContentView: View {
     private var preparedTransactionPreview: PreparedImport? {
         switch importState {
         case .previewReady(let prepared), .validationFailed(let prepared), .committing(let prepared):
-            return prepared.financialDocument.salaryStatementEvidence == nil ? prepared : nil
+            return prepared.financialDocument.salaryStatementEvidence == nil && prepared.financialDocument.investmentStatementEvidence == nil ? prepared : nil
         default: return nil
         }
     }
@@ -3735,12 +3751,14 @@ struct ContentView: View {
             confirmationLabel: importConfirmationLabel,
             confirmationIsDisabled: { preparedImport in
                 (preparedImport.financialDocument.salaryStatementEvidence == nil &&
+                    preparedImport.financialDocument.investmentStatementEvidence == nil &&
                     !ImportAccountConfirmationPolicy.allowsConfirmation(
                         review: importIdentityReview,
                         choice: importAccountChoice,
                         requiredCardSectionIDs: preparedImport.financialDocument.cardStatementEvidence?.instrumentSections.map(\.documentScopedSectionID),
                         requiresNamedCreation: preparedImport.detectedDocumentType == .bankAccount
                     )) ||
+                    preparedImport.investmentConfirmationBlocked ||
                     partialReviewBlocksConfirmation ||
                     statementEquivalenceBlocksConfirmation(preparedImport)
             },
@@ -3780,7 +3798,11 @@ struct ContentView: View {
                         )
                     }
 
-                    if let salary = preparedImport.financialDocument.salaryStatementEvidence {
+                    if let investment = preparedImport.financialDocument.investmentStatementEvidence {
+                        LFInfoRow(title: "Closing positions read", value: "\(investment.scopes.reduce(0) { $0 + $1.positions.count })")
+                        Text("Quantity and source cost are applied together after confirmation.")
+                            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                    } else if let salary = preparedImport.financialDocument.salaryStatementEvidence {
                         LFStatusBadge(title: "Imported Source Truth", color: LFTheme.info)
                         LFInfoRow(title: "Document Kind", value: salary.kind.displayName)
                         LFInfoRow(title: "Pay Period", value: salary.financialPeriod.canonical)
@@ -3957,6 +3979,8 @@ struct ContentView: View {
             return "Here's your financial overview"
         case .accounts:
             return "All your financial accounts in one place"
+        case .investments:
+            return "Current positions from your statements"
         case .transactions:
             return "All your transactions, in one place"
         case .imports:

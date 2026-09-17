@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 import Testing
 @testable import LedgerForge
@@ -111,12 +112,27 @@ struct SalaryAuthenticCorpusAcceptanceTests {
             fileURLWithPath: try #require(environment["LEDGERFORGE_PRIVATE_SALARY_ORIGINALS_ROOT"]),
             isDirectory: true
         )
-        let oracleURL = URL(
-            fileURLWithPath: try #require(environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_FILE"])
-        )
+        let oracleBytes: Data
+        if let path = environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_PIPE"] {
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFIFO, info.st_uid == getuid() else {
+                throw AcceptanceError.campaign(provider: "oracle", order: "source-only", field: "RAM transport")
+            }
+            let pipe = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+            defer { try? pipe.close() }
+            oracleBytes = try pipe.readToEnd() ?? Data()
+            guard !oracleBytes.isEmpty, oracleBytes.count <= 64 * 1_024 * 1_024 else {
+                throw AcceptanceError.campaign(provider: "oracle", order: "source-only", field: "RAM transport size")
+            }
+        } else {
+            // Historical file-backed campaigns are retained; current source
+            // processing uses the RAM transport above and unchanged originals.
+            let oracleURL = URL(fileURLWithPath: try #require(environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_FILE"]))
+            oracleBytes = try Data(contentsOf: oracleURL)
+        }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let oracle = try decoder.decode(Oracle.self, from: Data(contentsOf: oracleURL))
+        let oracle = try decoder.decode(Oracle.self, from: oracleBytes)
         try verifyOracleContract(oracle, root: root)
 
         let startingDigests = try sourceDigests(oracle.statements, root: root)
@@ -304,7 +320,8 @@ struct SalaryAuthenticCorpusAcceptanceTests {
 
     private func verifyOracleContract(_ oracle: Oracle, root: URL) throws {
         guard oracle.oracleSchema == "ledgerforge.salary.source-only.private.v1",
-              oracle.oracleMethod.contains("Poppler native text and bbox extraction"),
+              (oracle.oracleMethod.contains("Poppler native text and bbox extraction")
+                || oracle.oracleMethod == "Independent pdfplumber character geometry and pypdf native text from unchanged originals (RAM only)"),
               oracle.statements.count == 20,
               Set(oracle.statements.map(\.sourceSha256)).count == 20,
               oracle.statements.reduce(0, { $0 + $1.pageCount }) == 34,
@@ -747,7 +764,7 @@ private let salaryAuthenticAcceptanceContextConfigured: Bool = {
     guard let root = environment["LEDGERFORGE_PRIVATE_SALARY_ORIGINALS_ROOT"],
           !root.isEmpty,
           FileManager.default.fileExists(atPath: root),
-          let oracle = environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_FILE"],
+          let oracle = environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_PIPE"] ?? environment["LEDGERFORGE_PRIVATE_SALARY_ORACLE_FILE"],
           !oracle.isEmpty,
           FileManager.default.fileExists(atPath: oracle) else {
         return false

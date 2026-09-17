@@ -79,6 +79,7 @@ struct ImportEngineResult: Equatable {
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
     let isSalaryImport: Bool
+    let isInvestmentImport: Bool
     let accountOutcome: ImportAccountOutcome
     let recoveryRoute: ConfirmedImportRecoveryRoute
 #if DEBUG
@@ -103,6 +104,7 @@ struct ImportEngineResult: Equatable {
         isPartialImport: Bool = false,
         isEquivalentSupportingSource: Bool = false,
         isSalaryImport: Bool = false,
+        isInvestmentImport: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable,
         recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable
     ) {
@@ -123,6 +125,7 @@ struct ImportEngineResult: Equatable {
         self.isPartialImport = isPartialImport
         self.isEquivalentSupportingSource = isEquivalentSupportingSource
         self.isSalaryImport = isSalaryImport
+        self.isInvestmentImport = isInvestmentImport
         self.accountOutcome = accountOutcome
         self.recoveryRoute = recoveryRoute
 #if DEBUG
@@ -202,6 +205,10 @@ struct PreparedImport: Identifiable {
     /// Transient production-owned structural evidence for exact Axis card PDF
     /// presentation. Never persisted and never inferred from filename/path.
     let axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation?
+    private(set) var investmentPlan: InvestmentImportPlan?
+    private(set) var investmentReview: InvestmentUpdateReview?
+    private(set) var investmentReviewError: String?
+
 
     init(
         id: UUID = UUID(),
@@ -220,7 +227,8 @@ struct PreparedImport: Identifiable {
         advisoryPreviousImport: PreviouslyImportedStatement? = nil,
         statementEquivalenceReview: StatementEquivalenceReviewResult = .notApplicable,
         providerGeneration: ProviderGenerationToken? = nil,
-        axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation? = nil
+        axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation? = nil,
+        investmentPlan: InvestmentImportPlan? = nil
     ) {
         self.id = id
         self.sourceURL = sourceURL
@@ -244,6 +252,31 @@ struct PreparedImport: Identifiable {
         self.statementEquivalenceReview = statementEquivalenceReview
         self.providerGeneration = providerGeneration ?? DatabaseProvider.shared.generationToken
         self.axisCreditCardPDFPresentation = axisCreditCardPDFPresentation
+        self.investmentPlan = investmentPlan
+        self.investmentReview = nil
+        self.investmentReviewError = nil
+        if investmentPlan != nil { updateInvestmentChoices(investmentPlan!.choices) }
+
+    }
+
+    mutating func updateInvestmentChoices(_ choices: InvestmentImportChoices) {
+        guard let original = investmentPlan else { return }
+        let plan = InvestmentImportPlan(providerGeneration: original.providerGeneration,
+            workspace: original.workspace, history: original.history, evidence: original.evidence,
+            baseline: original.baseline, choices: choices)
+        investmentPlan = plan
+        do {
+            investmentReview = try InvestmentUpdatePlanner.review(plan, current: plan.baseline)
+            investmentReviewError = nil
+        } catch {
+            investmentReview = nil
+            investmentReviewError = (error as? InvestmentError)?.localizedDescription ?? InvestmentError.invalidEvidence.localizedDescription
+        }
+    }
+
+    var investmentConfirmationBlocked: Bool {
+        advisoryPreviousImport == nil && financialDocument.investmentStatementEvidence != nil
+            && (investmentReview == nil || investmentReview?.requiresChoice == true)
     }
 
     var transactionCount: Int {
@@ -503,6 +536,33 @@ final class ImportEngine {
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             developerConsole.error(.`import`, "Imported document is empty.")
             throw ImportError.invalidDocument(message: "Imported document is empty.")
+        }
+
+        let investmentParser = InvestmentStatementParser()
+        if investmentParser.canRecognize(rawDocument) {
+            try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
+            let financialDocument = try investmentParser.parse(rawDocument)
+            try Task.checkCancellation()
+            try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
+            let validation = ImportValidator.validate(financialDocument: financialDocument)
+            let importSession = ImportSession(fileName: rawDocument.fileName, institution: nil,
+                documentType: .investment, parserName: InvestmentStatementParser.name, transactionCount: 0, validation: validation)
+            let coordinator = importPersistenceCoordinatorFactory()
+            let previous = validation.passed ? try coordinator.priorImportedStatement(fingerprint: fingerprint) : nil
+            let plan = validation.passed ? try coordinator.prepareInvestmentImport(financialDocument: financialDocument,
+                importSession: importSession, fingerprintSet: fingerprintSet, providerGeneration: preparationGeneration) : nil
+            try Task.checkCancellation()
+            try publishPreparationProgress(.preparingConfirmationPreview, requestId: requestId, progress: progress)
+            let prepared = PreparedImport(sourceURL: url, rawContents: contents, fileName: rawDocument.fileName,
+                detectedInstitution: .unknown, detectedDocumentType: .investment, parserName: InvestmentStatementParser.name,
+                financialDocument: financialDocument, validation: validation, importSession: importSession,
+                fingerprint: fingerprint, sourceSnapshot: snapshot, fingerprintSet: fingerprintSet,
+                advisoryPreviousImport: previous, providerGeneration: preparationGeneration, investmentPlan: plan)
+            await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
+            livePreparedImports[prepared.id] = LivePreparedImport(sourceSnapshot: snapshot, lifecycleLease: lifecycleLease)
+            transfersLifecycleLease = true
+            transfersSnapshot = true
+            return prepared
         }
 
         if sourceFormat == .pdf {
@@ -842,7 +902,7 @@ final class ImportEngine {
             throw PersistenceWorkflowError.unavailable
         }
         guard !reconciliationGate.isBlocked else { return .unavailable }
-        if preparedImport.financialDocument.salaryStatementEvidence != nil {
+        if preparedImport.financialDocument.salaryStatementEvidence != nil || preparedImport.financialDocument.investmentStatementEvidence != nil {
             return .unavailable
         }
         return try importPersistenceCoordinatorFactory().reviewValidatedImport(
@@ -861,7 +921,7 @@ final class ImportEngine {
               !reconciliationGate.isBlocked else {
             return .unsupportedEvidence
         }
-        if preparedImport.financialDocument.salaryStatementEvidence != nil {
+        if preparedImport.financialDocument.salaryStatementEvidence != nil || preparedImport.financialDocument.investmentStatementEvidence != nil {
             return .ordinaryFullImport
         }
         return try importPersistenceCoordinatorFactory().reviewPartialImport(
@@ -1036,7 +1096,16 @@ final class ImportEngine {
         var failureRecoveryRoute: ConfirmedImportRecoveryRoute?
         do {
             let importPersistenceCoordinator = importPersistenceCoordinatorFactory()
-            if preparedImport.financialDocument.salaryStatementEvidence != nil {
+            if let evidence = preparedImport.financialDocument.investmentStatementEvidence {
+                guard let plan = preparedImport.investmentPlan, plan.evidence == evidence,
+                      plan.providerGeneration == preparedImport.providerGeneration,
+                      plan.history.importSession.id == preparedImport.importSession.id.uuidString,
+                      plan.history.duplicateAuthorityFingerprint?.fingerprint == preparedImport.fingerprint.digest,
+                      plan.history.duplicateAuthorityFingerprint?.algorithm == preparedImport.fingerprint.algorithm else {
+                    throw InvestmentError.invalidEvidence
+                }
+                persistenceResult = try importPersistenceCoordinator.persistValidatedInvestmentImport(plan)
+            } else if preparedImport.financialDocument.salaryStatementEvidence != nil {
                 persistenceResult = try importPersistenceCoordinator.persistValidatedSalaryImport(
                     financialDocument: preparedImport.financialDocument,
                     importSession: preparedImport.importSession,
@@ -1083,6 +1152,9 @@ final class ImportEngine {
                     importAttemptId: failure.importAttemptId,
                     accountOutcome: failure.accountOutcome
                 )
+            } else if let investmentError = error as? InvestmentError {
+                persistenceErrorMessage = investmentError.localizedDescription
+                failureRecoveryRoute = .prepareAgain(.reviewedPartialPlanStale)
             } else if let coordinationError = error as? ImportPersistenceCoordinationError {
                 persistenceErrorMessage = Self.boundedPersistenceFailureMessage(for: coordinationError)
                 failureRecoveryRoute = Self.recoveryRoute(for: coordinationError)
@@ -1162,6 +1234,7 @@ final class ImportEngine {
             isPartialImport: persistenceResult.isPartialImport,
             isEquivalentSupportingSource: persistenceResult.isEquivalentSupportingSource,
             isSalaryImport: persistenceResult.isSalaryImport,
+            isInvestmentImport: preparedImport.financialDocument.investmentStatementEvidence != nil,
             accountOutcome: persistenceResult.accountOutcome,
             recoveryRoute: recoveryRoute
         )

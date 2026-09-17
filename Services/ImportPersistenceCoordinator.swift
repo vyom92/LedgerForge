@@ -17,6 +17,7 @@ struct ImportPersistenceResult: Equatable {
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
     let isSalaryImport: Bool
+    let isInvestmentImport: Bool
     let accountOutcome: ImportAccountOutcome
 
     init(
@@ -33,6 +34,7 @@ struct ImportPersistenceResult: Equatable {
         isPartialImport: Bool = false,
         isEquivalentSupportingSource: Bool = false,
         isSalaryImport: Bool = false,
+        isInvestmentImport: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable
     ) {
         self.persisted = persisted
@@ -48,6 +50,7 @@ struct ImportPersistenceResult: Equatable {
         self.isPartialImport = isPartialImport
         self.isEquivalentSupportingSource = isEquivalentSupportingSource
         self.isSalaryImport = isSalaryImport
+        self.isInvestmentImport = isInvestmentImport
         self.accountOutcome = accountOutcome
     }
 
@@ -93,6 +96,9 @@ struct SourceSnapshotRejectionRecord: Equatable, Sendable {
 }
 
 protocol ImportPersistenceCoordinating {
+    func prepareInvestmentImport(financialDocument: FinancialDocument, importSession: ImportSession,
+        fingerprintSet: PreparedDocumentFingerprintSet, providerGeneration: ProviderGenerationToken) throws -> InvestmentImportPlan
+    func persistValidatedInvestmentImport(_ plan: InvestmentImportPlan) throws -> ImportPersistenceResult
     func persistValidatedSalaryImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -181,6 +187,13 @@ protocol ImportPersistenceCoordinating {
 }
 
 extension ImportPersistenceCoordinating {
+    func prepareInvestmentImport(financialDocument: FinancialDocument, importSession: ImportSession,
+        fingerprintSet: PreparedDocumentFingerprintSet, providerGeneration: ProviderGenerationToken) throws -> InvestmentImportPlan {
+        throw ImportPersistenceCoordinationError.unclassified
+    }
+    func persistValidatedInvestmentImport(_ plan: InvestmentImportPlan) throws -> ImportPersistenceResult {
+        throw ImportPersistenceCoordinationError.unclassified
+    }
     func persistValidatedSalaryImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -723,6 +736,77 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     private let databaseProviderProvider: @MainActor () -> DatabaseProvider
     private let mapper: ImportPersistenceMapper
     private let developerConsole: DeveloperConsole?
+
+    func prepareInvestmentImport(financialDocument: FinancialDocument, importSession: ImportSession,
+        fingerprintSet: PreparedDocumentFingerprintSet, providerGeneration: ProviderGenerationToken) throws -> InvestmentImportPlan {
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable, provider.generationToken == providerGeneration,
+              let evidence = financialDocument.investmentStatementEvidence,
+              financialDocument.transactions.isEmpty, fingerprintSet.isValid,
+              let bytes = fingerprintSet.fingerprints.first(where: { $0.algorithm == DocumentFingerprintDTO.sourceBytesSHA256Algorithm }),
+              let raw = fingerprintSet.fingerprints.first(where: { $0.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm }) else {
+            throw InvestmentError.invalidEvidence
+        }
+        let instant = ISO8601DateFormatter().string(from: importSession.importedAt)
+        let sessionID = importSession.id.uuidString
+        let suffix = sessionID.lowercased()
+        let documentID = "document-\(suffix)", normalizedID = "normalized-document-\(suffix)"
+        let fingerprints = fingerprintSet.fingerprints.enumerated().map { index, fingerprint in
+            DocumentFingerprintDTO(id: "fingerprint-\(suffix)-\(index)", documentId: documentID,
+                importSessionId: sessionID, algorithm: fingerprint.algorithm, fingerprint: fingerprint.digest,
+                fingerprintData: nil, isDuplicateAuthority: fingerprint.isDuplicateAuthority, createdAtISO: instant)
+        }
+        let history = ConfirmedImportHistoryTemplateDTO(
+            document: .init(id: documentID, workspaceId: mapper.workspaceId, importSessionId: sessionID,
+                filename: importSession.fileName, mimeType: financialDocument.metadata.fileFormat == .pdf ? "application/pdf" : "text/csv",
+                sizeBytes: bytes.byteCount, legacyRawTextSHA256: raw.digest, createdAtISO: instant),
+            fingerprints: fingerprints,
+            importSession: .init(id: sessionID, workspaceId: mapper.workspaceId, userVisibleName: importSession.fileName,
+                startedAtISO: instant, validationStatus: "pending", readerVersion: nil,
+                parserVersion: evidence.parserProfile + "@1", layoutVersion: nil),
+            completedAtISO: instant,
+            successfulAttempt: .init(workspaceId: mapper.workspaceId, createdAtISO: instant,
+                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+                coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
+                guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+                persistenceCode: ImportAttemptPersistence.committed.rawValue, transactionCount: 0,
+                importSessionId: sessionID, documentId: documentID,
+                sourceRowCount: evidence.scopes.reduce(0) { $0 + $1.positions.count }, importedTransactionCount: 0,
+                recognizedExistingRowCount: 0, blockedRowCount: 0),
+            normalizedDocument: .init(id: normalizedID, importSessionId: sessionID, documentId: documentID,
+                profileId: evidence.parserProfile, profileVersion: "1"))
+        let plan = InvestmentImportPlan(providerGeneration: providerGeneration,
+            workspace: mapper.workspace(createdAt: importSession.importedAt), history: history, evidence: evidence,
+            baseline: try provider.investmentRepo.snapshot(workspaceID: mapper.workspaceId), choices: .init())
+        try plan.validate()
+        return plan
+    }
+
+    func persistValidatedInvestmentImport(_ plan: InvestmentImportPlan) throws -> ImportPersistenceResult {
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable else { throw ImportPersistenceCoordinationError.persistenceUnavailable }
+        switch provider.investmentRepo.commitCurrentHoldings(plan) {
+        case .committed(let sessionID):
+            return .init(persisted: true, workspaceId: mapper.workspaceId, accountId: nil,
+                importSessionId: sessionID, transactionCount: 0,
+                importAttemptId: plan.history.successfulAttempt.id,
+                sourceRowCount: plan.evidence.scopes.reduce(0) { $0 + $1.positions.count }, isInvestmentImport: true)
+        case .exactSourceDuplicate(let previous):
+            let attemptID = recordAttempt(provider: provider, outcome: .exactStatementDuplicate,
+                coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation,
+                guidance: .reviewPriorImport, persistence: .rejectedRecorded,
+                transactionCount: 0, relatedImportSessionId: previous.importSessionId)
+            return .init(persisted: false, workspaceId: mapper.workspaceId, accountId: nil,
+                importSessionId: previous.importSessionId, transactionCount: 0,
+                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID, isInvestmentImport: true)
+        case .rejected(let error): throw error
+        case .staleProviderGeneration: throw ImportPersistenceCoordinationError.staleProviderGeneration
+        case .retryableContention: throw ImportPersistenceCoordinationError.retryableContention
+        case .persistenceUnavailable: throw ImportPersistenceCoordinationError.persistenceUnavailable
+        case .repositoryIntegrityConflict: throw ImportPersistenceCoordinationError.unclassified
+        }
+    }
 
     init(
         databaseProviderProvider: @escaping @MainActor () -> DatabaseProvider = { DatabaseProvider.shared },

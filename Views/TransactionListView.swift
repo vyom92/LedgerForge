@@ -30,7 +30,7 @@ private struct TransactionTableComparator: SortComparator {
 
 /// Paints existing AppKit rows without replacing SwiftUI's Table or its input,
 /// selection, sorting and reuse ownership. The row index is used only for stripes.
-private struct TransactionRowBackdrop: NSViewRepresentable {
+struct LFTableRowBackdrop: NSViewRepresentable {
     @Environment(\.lfTheme) private var theme
     let isSelected: Bool
     let isEmphasized: Bool
@@ -798,7 +798,7 @@ struct TransactionListView: View {
                     .padding(.vertical, theme.spacing.small)
                     .frame(minHeight: theme.typography.tableRowMinimum)
                     .background {
-                        TransactionRowBackdrop(
+                        LFTableRowBackdrop(
                             isSelected: row.id == viewModel.selectedPresentationRowID,
                             isEmphasized: tableFocused && appearsActive
                         )

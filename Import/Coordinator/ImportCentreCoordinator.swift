@@ -906,6 +906,13 @@ enum ProductionImportCentre {
 }
 
 extension ImportCentreCoordinator where Preparation == PreparedImport {
+    func updateInvestmentChoices(_ choices: InvestmentImportChoices) {
+        guard let item = currentItem, item.phase == .awaitingConfirmation,
+              var preparation = item.preparation, preparation.investmentPlan != nil else { return }
+        preparation.updateInvestmentChoices(choices)
+        mutateItem(item.id) { $0.preparation = preparation }
+    }
+
     static func production() -> ImportCentreCoordinator<PreparedImport> {
         production(using: ImportEngine.shared)
     }

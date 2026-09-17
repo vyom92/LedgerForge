@@ -1,10 +1,11 @@
 import SwiftUI
 
 /// Constructs only the selected destination. It does not own destination state or workflows.
-struct AppDestinationContainer<Dashboard: View, Accounts: View, Transactions: View, Imports: View, Salary: View, Settings: View, Developer: View>: View {
+struct AppDestinationContainer<Dashboard: View, Accounts: View, Investments: View, Transactions: View, Imports: View, Salary: View, Settings: View, Developer: View>: View {
     let selectedSection: AppShellSection
     private let dashboard: () -> Dashboard
     private let accounts: () -> Accounts
+    private let investments: () -> Investments
     private let transactions: () -> Transactions
     private let imports: () -> Imports
     private let salary: () -> Salary
@@ -15,6 +16,7 @@ struct AppDestinationContainer<Dashboard: View, Accounts: View, Transactions: Vi
         selectedSection: AppShellSection,
         @ViewBuilder dashboard: @escaping () -> Dashboard,
         @ViewBuilder accounts: @escaping () -> Accounts,
+        @ViewBuilder investments: @escaping () -> Investments,
         @ViewBuilder transactions: @escaping () -> Transactions,
         @ViewBuilder imports: @escaping () -> Imports,
         @ViewBuilder salary: @escaping () -> Salary,
@@ -24,6 +26,7 @@ struct AppDestinationContainer<Dashboard: View, Accounts: View, Transactions: Vi
         self.selectedSection = selectedSection
         self.dashboard = dashboard
         self.accounts = accounts
+        self.investments = investments
         self.transactions = transactions
         self.imports = imports
         self.salary = salary
@@ -38,6 +41,8 @@ struct AppDestinationContainer<Dashboard: View, Accounts: View, Transactions: Vi
             dashboard()
         case .accounts:
             accounts()
+        case .investments:
+            investments()
         case .transactions:
             transactions()
         case .imports:

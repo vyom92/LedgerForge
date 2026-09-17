@@ -11,6 +11,22 @@ import Foundation
 final class ImportValidator {
 
     static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
+        if let investment = financialDocument.investmentStatementEvidence {
+            var issues: [ValidationIssue] = []
+            do {
+                try investment.validate()
+                guard financialDocument.metadata.documentType == .investment,
+                      financialDocument.transactions.isEmpty, financialDocument.financialIdentifiers.isEmpty,
+                      financialDocument.salaryStatementEvidence == nil, financialDocument.cardStatementEvidence == nil,
+                      financialDocument.parserProfileID == investment.parserProfile,
+                      financialDocument.parserProfileVersion == "1" else { throw InvestmentError.invalidEvidence }
+            } catch {
+                issues.append(.init(severity: .error, rowNumber: nil, message: "Current holdings evidence is incomplete or inconsistent."))
+            }
+            return ImportValidationResult(rowsRead: investment.scopes.reduce(0) { $0 + $1.positions.count },
+                transactionsParsed: 0, statementCurrency: nil, debitTotalMoney: nil, creditTotalMoney: nil,
+                openingBalanceMoney: nil, closingBalanceMoney: nil, passed: issues.isEmpty, issues: issues)
+        }
         if let salaryEvidence = financialDocument.salaryStatementEvidence {
             return validateSalaryStatement(financialDocument: financialDocument, evidence: salaryEvidence)
         }

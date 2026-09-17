@@ -5853,7 +5853,7 @@ not generic card equivalence.
 <a id="adr-045"></a>
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
-## Current owner-approved alignment — Sprint 95, 2026-09-16
+## Historical accepted alignment — Sprint 95, 2026-09-16
 
 **Architecture and Sprint-95 implementation accepted** under `SPRINT_95_BUDGET_PLANNING_AND_SHARED_AL_DAR_ACCEPTED`; [accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-95). The [Sprint-95 owner decisions](SCOPE_DECISIONS.md#sprint-95-owner-decisions) supersede the Sprint-94 pending/Use Reference ceremony and planner-only provider ownership for the selected QAR/INR/USD scope. Salary actuals/import provenance remain unchanged. Budget Planning is a monthly worksheet with one pure versioned calculator; no financial formula belongs in a view.
 
@@ -6309,6 +6309,10 @@ ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-
 <a id="adr-047"></a>
 
 # ADR-047 — Verified User Backup and Receipt-Owned Restore
+
+## Accepted Sprint-96 alignment — 2026-09-17
+
+The current-holdings implementation is accepted under `SPRINT_96_INVESTMENT_IDENTITY_AND_CURRENT_HOLDINGS_ACCEPTED`, adds V21 and preserves format 1. Exact V17/V18/V19/V20 packages verify their original history/schema/manifest before an isolated candidate applies only its missing registered tail; V21 verifies directly. Source packages and original receipt identity remain unchanged. Populated investment backup/restore, complete hydration and a real isolated app relaunch passed; [the Sprint-96 work note](Work%20notes/Holdings_and_valuation.md#current-conclusion) owns the evidence and limits. Current remained V20 throughout qualification. The owner authorizes publication first, followed by the established bounded startup activation; the [accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-96) records the actual sequence. No general historical migration bridge or new backup format is introduced.
 
 ## Current owner-approved alignment — Sprint 95, 2026-09-16
 

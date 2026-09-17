@@ -139,6 +139,18 @@
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		A95000000000000000000002 /* AlDarReferenceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A95000000000000000000001 /* AlDarReferenceSession.swift */; };
 		A95000000000000000000004 /* AlDarFXCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A95000000000000000000003 /* AlDarFXCard.swift */; };
+		A96010000000000000000001 /* Models/Investment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000001 /* Models/Investment.swift */; };
+		A96010000000000000000002 /* Database/InvestmentPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000002 /* Database/InvestmentPersistence.swift */; };
+		A96010000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */; };
+		A96010000000000000000004 /* Core/InvestmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000004 /* Core/InvestmentStore.swift */; };
+		A96010000000000000000005 /* Parsers/InvestmentStatementParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000005 /* Parsers/InvestmentStatementParser.swift */; };
+		A96010000000000000000006 /* Parsers/IBKRCurrentHoldingsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000006 /* Parsers/IBKRCurrentHoldingsParser.swift */; };
+		A96010000000000000000007 /* Parsers/FundCurrentHoldingsParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000007 /* Parsers/FundCurrentHoldingsParsers.swift */; };
+		A96010000000000000000008 /* Views/InvestmentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000008 /* Views/InvestmentListView.swift */; };
+		A96010000000000000000009 /* Views/InvestmentImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000009 /* Views/InvestmentImportReviewView.swift */; };
+		A96020000000000000000001 /* Models/Investment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000001 /* Models/Investment.swift */; };
+		A96020000000000000000002 /* Database/InvestmentPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000002 /* Database/InvestmentPersistence.swift */; };
+		A96020000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */; };
 		AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000001 /* RuntimeDiagnostics.swift */; };
 		AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
 		AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000003 /* DurableStartupEvidence.swift */; };
@@ -161,7 +173,7 @@
 		B600000C3050000000000001 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
 		B600000D3050000000000001 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
 		B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000513050000000000001 /* DeveloperConsoleStub.swift */; };
-		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
+		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = A9600000000000000000000A /* LedgerForgeSubprocessProbe */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
 		B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82000013082000000000001 /* ImportCentreCoordinator.swift */; };
 		B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000013083000000000001 /* StatementDropIntakeAdapter.swift */; };
@@ -364,6 +376,16 @@
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		A95000000000000000000001 /* AlDarReferenceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarReferenceSession.swift; sourceTree = "<group>"; };
 		A95000000000000000000003 /* AlDarFXCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarFXCard.swift; sourceTree = "<group>"; };
+		A96000000000000000000001 /* Models/Investment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Investment.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000002 /* Database/InvestmentPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database/InvestmentPersistence.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database/SQLiteInvestmentRepository.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000004 /* Core/InvestmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/InvestmentStore.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000005 /* Parsers/InvestmentStatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parsers/InvestmentStatementParser.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000006 /* Parsers/IBKRCurrentHoldingsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parsers/IBKRCurrentHoldingsParser.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000007 /* Parsers/FundCurrentHoldingsParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parsers/FundCurrentHoldingsParsers.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000008 /* Views/InvestmentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InvestmentListView.swift; sourceTree = SOURCE_ROOT; };
+		A96000000000000000000009 /* Views/InvestmentImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/InvestmentImportReviewView.swift; sourceTree = SOURCE_ROOT; };
+		A9600000000000000000000A /* LedgerForgeSubprocessProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = LedgerForgeSubprocessProbe; sourceTree = DERIVED_FILE_DIR; };
 		AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreCoordinator.swift; sourceTree = "<group>"; };
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		AB1700010000000000000002 /* PlannerInputCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputCodec.swift; sourceTree = "<group>"; };
@@ -536,6 +558,14 @@
 			path = Readers;
 			sourceTree = "<group>";
 		};
+		28632CE2305AEA7C005BB476 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				A9600000000000000000000A /* LedgerForgeSubprocessProbe */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		286D68F12FFFF60E0078AAC5 /* Common */ = {
 			isa = PBXGroup;
 			children = (
@@ -579,10 +609,20 @@
 				C88000013088000000000001 /* AppShellPresentation.swift */,
 				C88000033088000000000001 /* AppDestinationContainer.swift */,
 				C88000053088000000000001 /* ImportCentreFooterRenderer.swift */,
+				A96000000000000000000001 /* Models/Investment.swift */,
+				A96000000000000000000002 /* Database/InvestmentPersistence.swift */,
+				A96000000000000000000003 /* Database/SQLiteInvestmentRepository.swift */,
+				A96000000000000000000004 /* Core/InvestmentStore.swift */,
+				A96000000000000000000005 /* Parsers/InvestmentStatementParser.swift */,
+				A96000000000000000000006 /* Parsers/IBKRCurrentHoldingsParser.swift */,
+				A96000000000000000000007 /* Parsers/FundCurrentHoldingsParsers.swift */,
+				A96000000000000000000008 /* Views/InvestmentListView.swift */,
+				A96000000000000000000009 /* Views/InvestmentImportReviewView.swift */,
 				288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */,
 				288EB0E72FF7AC7100F09BC9 /* Readers */,
 				288EB0EF2FF7B12000F09BC9 /* Analyzers */,
 				281BB1642FFC4C73006E7424 /* Import */,
+				28632CE2305AEA7C005BB476 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -876,8 +916,8 @@
 				288EB0B62FF7955300F09BC9 /* Sources */,
 				288EB0B72FF7955300F09BC9 /* Frameworks */,
 				288EB0B82FF7955300F09BC9 /* Resources */,
+				B60000433050000000000001 /* Prepare signed Subprocess Probe */,
 				B60000163050000000000001 /* Embed Subprocess Probe */,
-				B60000433050000000000001 /* Re-sign Subprocess Probe */,
 			);
 			buildRules = (
 			);
@@ -942,7 +982,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2660;
-				LastUpgradeCheck = 2660;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					288EB0AC2FF7955200F09BC9 = {
 						CreatedOnToolsVersion = 26.6;
@@ -1026,24 +1066,24 @@
 			shellPath = /bin/bash;
 			shellScript = "/bin/cp \"$PROJECT_TEMP_DIR/LedgerForgeBuildIdentity-$CONFIGURATION.json\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LedgerForgeBuildIdentity.json\"";
 		};
-		B60000433050000000000001 /* Re-sign Subprocess Probe */ = {
+		B60000433050000000000001 /* Prepare signed Subprocess Probe */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
 				"$(SRCROOT)/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements",
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeSubprocessProbe",
+				"$(BUILT_PRODUCTS_DIR)/LedgerForgeSubprocessProbe",
 			);
-			name = "Re-sign Subprocess Probe";
+			name = "Prepare signed Subprocess Probe";
 			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeSubprocessProbe",
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeSubprocessProbe.cstemp",
+				"$(DERIVED_FILE_DIR)/LedgerForgeSubprocessProbe",
+				"$(DERIVED_FILE_DIR)/LedgerForgeSubprocessProbe.cstemp",
 				"$(TARGET_TEMP_DIR)/LedgerForgeSubprocessProbe-entitlements.plist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$identity\" ] || [ \"$identity\" = \"-\" ]; then echo \"Stable development signing identity is unavailable for LedgerForgeSubprocessProbe.\" >&2; exit 1; fi\n/usr/bin/codesign --force --sign \"$identity\" --entitlements \"$entitlements\" --options runtime \"$helper\"\n/usr/bin/codesign --verify --strict --verbose=4 \"$helper\"\n/usr/bin/codesign -d --entitlements :- \"$helper\" > \"$entitlements_output\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"$entitlements_output\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"$keys\" != \"$expected\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"$keys\" >&2; exit 1; fi\n";
+			shellScript = "set -eu\nsource_helper=\"${BUILT_PRODUCTS_DIR}/LedgerForgeSubprocessProbe\"\nhelper=\"${DERIVED_FILE_DIR}/LedgerForgeSubprocessProbe\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${TARGET_TEMP_DIR}\"/DerivedSources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess staging path is outside the expected test target directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"$source_helper\" ] || [ ! -f \"$entitlements\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$identity\" ] || [ \"$identity\" = \"-\" ]; then echo \"Stable development signing identity is unavailable for LedgerForgeSubprocessProbe.\" >&2; exit 1; fi\n/bin/cp \"$source_helper\" \"$helper\"\n/usr/bin/codesign --force --sign \"$identity\" --entitlements \"$entitlements\" --options runtime \"$helper\"\n/usr/bin/codesign --verify --strict --verbose=4 \"$helper\"\n/usr/bin/codesign -d --entitlements :- \"$helper\" > \"$entitlements_output\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"$entitlements_output\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"$keys\" != \"$expected\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"$keys\" >&2; exit 1; fi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1052,6 +1092,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A96010000000000000000009 /* Views/InvestmentImportReviewView.swift in Sources */,
+				A96010000000000000000008 /* Views/InvestmentListView.swift in Sources */,
+				A96010000000000000000007 /* Parsers/FundCurrentHoldingsParsers.swift in Sources */,
+				A96010000000000000000006 /* Parsers/IBKRCurrentHoldingsParser.swift in Sources */,
+				A96010000000000000000005 /* Parsers/InvestmentStatementParser.swift in Sources */,
+				A96010000000000000000004 /* Core/InvestmentStore.swift in Sources */,
+				A96010000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */,
+				A96010000000000000000002 /* Database/InvestmentPersistence.swift in Sources */,
+				A96010000000000000000001 /* Models/Investment.swift in Sources */,
 				91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */,
 				91AA00022026091400000001 /* LFAppearancePreferences.swift in Sources */,
 				B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */,
@@ -1225,6 +1274,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A96020000000000000000003 /* Database/SQLiteInvestmentRepository.swift in Sources */,
+				A96020000000000000000002 /* Database/InvestmentPersistence.swift in Sources */,
+				A96020000000000000000001 /* Models/Investment.swift in Sources */,
 				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
 				A94000000000000000000003 /* AlDarReference.swift in Sources */,
 				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
@@ -1302,6 +1354,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1324,6 +1377,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -1363,6 +1417,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1378,6 +1433,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -1390,12 +1446,14 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
 				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
 				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1449,6 +1507,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
@@ -1508,6 +1567,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
@@ -1534,6 +1594,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
@@ -1558,6 +1619,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
@@ -1582,6 +1644,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
@@ -1608,6 +1671,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1627,6 +1691,7 @@
 				CODE_SIGN_ENTITLEMENTS = SubprocessProbe/LedgerForgeSubprocessProbe.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;

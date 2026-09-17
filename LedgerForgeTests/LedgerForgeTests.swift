@@ -23,6 +23,7 @@ struct LedgerForgeTests {
         #expect(AppShellSection.ordinaryNavigation == [
             .dashboard,
             .accounts,
+            .investments,
             .salary,
             .transactions,
             .imports,
@@ -31,6 +32,7 @@ struct LedgerForgeTests {
         #expect(AppShellSection.ordinaryNavigation.map(\.rawValue) == [
             "Dashboard",
             "Accounts",
+            "Investments",
             "Budget Planning",
             "Transactions",
             "Import",
@@ -394,6 +396,7 @@ private typealias EmptyDestinationContainer = AppDestinationContainer<
     EmptyView,
     EmptyView,
     EmptyView,
+    EmptyView,
     EmptyView
 >
 
@@ -406,6 +409,7 @@ private func emptyDestinationContainer(
         selectedSection: selected,
         dashboard: { probe.make(AppShellSection.dashboard.rawValue) },
         accounts: { probe.make(AppShellSection.accounts.rawValue) },
+        investments: { probe.make(AppShellSection.investments.rawValue) },
         transactions: { probe.make(AppShellSection.transactions.rawValue) },
         imports: { probe.make(AppShellSection.imports.rawValue) },
         salary: { probe.make(AppShellSection.salary.rawValue) },

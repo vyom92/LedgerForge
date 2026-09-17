@@ -6,6 +6,20 @@ import Testing
 /// Financial source support is established by the separate complete-corpus
 /// oracle campaigns, never by these single-carrier transport checks.
 enum AuthenticSourceTestSupport {
+    /// Presentation checks read the accepted Current schema without attempting
+    /// a candidate migration. Its complete registered prefix is verified first;
+    /// both connections enforce read-only access before any repository exists.
+    @MainActor
+    static func readOnlyRegisteredProvider(at url: URL) throws -> SQLiteRepositoryProvider {
+        let database = SQLiteDatabase(path: url.path)
+        try database.open(access: .readOnlySnapshot)
+        defer { database.close() }
+        let history = try database.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: false)
+        guard !history.isEmpty else { throw RepositoryError.persistenceUnavailable }
+        return try SQLiteRepositoryProvider(path: url.path,
+            migrations: Array(allMigrations.prefix(history.count)), access: .readOnlySnapshot)
+    }
+
     @MainActor
     struct PreparedImportOwner {
         let preparedImport: PreparedImport

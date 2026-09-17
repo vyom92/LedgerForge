@@ -34,6 +34,10 @@ final class BackupRestoreCoordinator: ObservableObject {
     private var didRunProcessProbe = false
     init(testingAt url: URL) { layout = RestoreLayout(current: url); isIsolatedTest = true }
     func installTestProvider(_ provider: SQLiteRepositoryProvider) { testProvider = provider }
+    func closeTestProvider() throws {
+        try testProvider?.database.checkpointAndClose()
+        testProvider = nil
+    }
 
     /// Bounded executable drill, compiled out of Release. It can run only on
     /// the existing DEBUG namespace mechanism with an operation-owned source.

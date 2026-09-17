@@ -335,6 +335,7 @@ public final class SQLiteRepositoryProvider {
     public let confirmedImportRepo: ConfirmedImportRepository
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
+    public let investmentRepo: InvestmentRepository
 
     private static func executionCause(_ error: Error) -> SQLiteExecutionError? {
         if case SQLiteDatabaseError.execution(let value) = error { return value }
@@ -397,6 +398,8 @@ public final class SQLiteRepositoryProvider {
             sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'salary_statements';",
             params: []
         ) { _ in true }.isEmpty == false) ?? false
+        let supportsInvestments = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'investment_holdings';")) == 1
+        self.investmentRepo = supportsInvestments ? SQLiteInvestmentRepository(db: database, generationToken: generationToken) : EmptyInvestmentRepository()
         self.database = database
         self.generationToken = generationToken
 
@@ -1317,6 +1320,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             confirmedImportRepo: provider.confirmedImportRepo,
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
+            investmentRepo: provider.investmentRepo,
             generationToken: provider.generationToken,
             persistenceState: state,
             protectsGeneration: true

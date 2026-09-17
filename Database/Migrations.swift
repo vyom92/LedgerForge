@@ -2818,7 +2818,28 @@ nonisolated public let migrationV20 = Migration(version: 20, name: "budget_plann
 ALTER TABLE funding_plan_commitments ADD COLUMN due_date TEXT;
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20]
+/// Current investment state only. Source documents and receipts keep their existing ownership.
+nonisolated public let migrationV21 = Migration(version: 21, name: "current_investment_holdings", sql: """
+CREATE TABLE investment_containers (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    import_session_id TEXT NOT NULL REFERENCES import_sessions(id),
+    record_json TEXT NOT NULL CHECK(json_valid(record_json))
+);
+CREATE INDEX investment_containers_workspace ON investment_containers(workspace_id);
+CREATE TABLE investment_holdings (
+    id TEXT PRIMARY KEY NOT NULL,
+    container_id TEXT NOT NULL REFERENCES investment_containers(id),
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    import_session_id TEXT NOT NULL REFERENCES import_sessions(id),
+    normalized_document_id TEXT NOT NULL REFERENCES normalized_documents(id),
+    record_json TEXT NOT NULL CHECK(json_valid(record_json))
+);
+CREATE INDEX investment_holdings_container ON investment_holdings(container_id);
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

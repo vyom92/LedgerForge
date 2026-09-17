@@ -950,9 +950,9 @@ private func authenticTransactionListContext() async throws -> AuthenticTransact
           FileManager.default.fileExists(atPath: databaseURL.path) else {
         throw RepositoryError.persistenceUnavailable
     }
-    // SQLite's URI read-only mode applies before provider initialization, so this
+    // Read-only access applies before provider initialization, so this
     // presentation check cannot create a database, apply migrations, or write rows.
-    let provider = try SQLiteRepositoryProvider(path: databaseURL.absoluteString + "?mode=ro")
+    let provider = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: databaseURL)
     try provider.database.execute(sql: "PRAGMA query_only = ON;")
     // Keep the same committed source snapshot across every hydration query,
     // including when the separate app process accepts another original.

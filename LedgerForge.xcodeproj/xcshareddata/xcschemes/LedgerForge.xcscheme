@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2660"
+   LastUpgradeVersion = "2700"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
       buildArchitectures = "Automatic">
       <PreActions>
-         <ExecutionAction ActionType="Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
-            <ActionContent title="Capture actual build identity" scriptText="/bin/bash &quot;$SRCROOT/script/write_build_identity.sh&quot;&#10;">
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Capture actual build identity"
+               scriptText = "/bin/bash &quot;$SRCROOT/script/write_build_identity.sh&quot;&#10;">
                <EnvironmentBuildable>
-                  <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="288EB0AC2FF7955200F09BC9" BuildableName="LedgerForge.app" BlueprintName="LedgerForge" ReferencedContainer="container:LedgerForge.xcodeproj" />
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "288EB0AC2FF7955200F09BC9"
+                     BuildableName = "LedgerForge.app"
+                     BlueprintName = "LedgerForge"
+                     ReferencedContainer = "container:LedgerForge.xcodeproj">
+                  </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
          </ExecutionAction>

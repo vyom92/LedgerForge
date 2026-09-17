@@ -31,6 +31,8 @@
         "GlobalAuthenticCorpusAcceptanceTests",
         "HDFCBankAccountAuthenticAcceptanceTests",
         "ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()",
+        "InvestmentRAMOriginalTests",
+        "InvestmentSourceImportTests",
         "SalaryAuthenticCorpusAcceptanceTests",
         "SourceSnapshotConfirmationTests/preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL()",
         "Sprint94LiveClientTests"

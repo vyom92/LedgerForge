@@ -4,6 +4,7 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 96 — Investment Identity and Current Holdings — 2026-09-17](#sprint-96)
 - [Accepted Sprint 95 — Budget Planning and Shared Al Dar FX — 2026-09-16](#sprint-95)
 - [Accepted Sprint 94 — Current Al Dar and This Month Planning — 2026-09-15](#sprint-94)
 - [Accepted Sprint 93 — Verified Backup, Restore and Disaster Recovery — 2026-09-15](#sprint-93)
@@ -11,7 +12,59 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-16:** the owner/Chat accepts Sprint 95 and authorizes exact publication of the verified candidate. The post-94 correction remains its published predecessor. Earlier records retain their original evidence, then-current schema and limitations. Sprint 96 is **NEXT / NOT STARTED**; **PERSONAL-V1 remains NOT YET ADOPTED**.
+**Current alignment — 2026-09-17:** the owner/Chat accepts Sprint 96 and authorizes exact publication of its already-qualified implementation, retained owner Xcode changes and reconciled benchmark documentation handoff. Current remained V20 throughout qualification; publication precedes bounded activation. Earlier records retain their original evidence, then-current schema and limits. Sprint 97 is **NEXT / NOT STARTED**; **PERSONAL-V1 remains NOT YET ADOPTED**.
+
+---
+
+<a id="sprint-96"></a>
+## Accepted Sprint 96 — Investment Identity and Current Holdings — 2026-09-17
+
+**OWNER/CHAT-ACCEPTED** under `SPRINT_96_INVESTMENT_IDENTITY_AND_CURRENT_HOLDINGS_ACCEPTED`. Published predecessor and publication parent: `main@2f299b1ced7586fafb390e760dcac56e378e75d3`. The commit introducing this record publishes the complete qualified implementation, retained owner Xcode 27 changes and closure documentation. Closure adds no implementation, source-family correction, test, credential or migration change and reruns no completed source/build/test campaign. Any post-publication Current activation uses only the established bounded startup workflow and is recorded separately below. **Sprint 97: NEXT / NOT STARTED. PERSONAL-V1: NOT YET ADOPTED.**
+
+### Accepted current-portfolio contract
+
+LedgerForge maintains current investment containers/accounts/folios/policies and exact current holdings. It preserves source-reported average acquisition cost and total cost separately where supplied, native/cost currency, printed precision, holdings date and existing source/import provenance. A confirmed complete snapshot atomically adds/updates/removes only established coverage; partial coverage leaves unrelated holdings unchanged. Exact replay is idempotent, older sources cannot roll current holdings backwards and material same-date differences require explicit source choice. No trade history, tax lots, realised-gain engine, corporate-action reconstruction, lending/collateral subsystem or permanent historical zero-position collection is included.
+
+Qualified source rules remain distinct: CAS closing holdings use explicit-only approved folio aliases, without generic suffix stripping; CBQ Report Date controls holdings while issue/cover and NAV dates remain separate, with investment cash excluded; IBKR Open Positions uses full owned quantity and separate Cost Price/Cost Basis, with historical VNQ split/cost evidence unable to block the newer snapshot; ISP retains separate employee mandatory, employee AVC and employer policy scopes. ISP acquisition cost is unavailable where absent, and missing ISIN/ticker says **Not in statement**. Exact Zurich/FE price mapping remains Sprint 97. Unneeded historical legacy mappings remain unresolved.
+
+The owner accepts Investments immediately after Accounts, separate Investment and ISIN/Ticker columns, exact Units, Currency, source Avg Cost/Total Cost and NAV/Price date in `DD MMM YYYY`. Age styling follows the accepted Al Dar treatment; holdings date remains in Details. Headers and values are centered, Zurich is labelled ISP and the accepted LFTheme/saved-appearance behavior is retained. The owner **manually verified native drag column reordering and accepts persisted arrangement**. Earlier automation failures are not substituted for that owner evidence. No Sprint-97 valuation placeholders are added.
+
+### Retained qualification evidence
+
+| Boundary | Accepted result |
+| --- | --- |
+| Qualification portfolio | **41 genuine holdings / 15 containers**: 15 IBKR, 15 Indian mutual funds, seven ISP, four CBQ. These are the isolated qualification/recovery data, not an assertion of newly imported Current data during closure. |
+| Investment originals | **36 distinct nominated authentic originals**, all matched independent source comparison after persistence/hydration and reopen. All seven explicit CAS aliases persisted and were reused in both import orders. |
+| Update/lifecycle | Newer position updates, coupled quantity/cost updates, older protection, explicit same-date choices in both IBKR PDF/CSV orders, exact replay, atomic failure handling, provider-generation protection, canonical hydration and SQLite reopen passed. Final investment-focused run: 11 definitions/executions, zero failures. |
+| Recovery | Populated format-1 V21 backup/restore retained 41 holdings/15 containers and provenance. A real isolated app restore and fresh-process relaunch passed with exact records and original package preserved. Exact predecessor backup compatibility remains as qualified: isolated V17/V18/V19/V20 tails and direct V21 restore. |
+| Ordinary TestPlan | **613 definitions / 679 executions / zero failures / zero skips**. Existing 12 selectors/17 separately gated definitions were retained; two investment selectors separately gate eight original-dependent definitions. |
+| Existing source regressions | Six complete bank/card family suites passed (10 definitions/executions), and all 20 salary originals passed independent comparison, provider/order/persistence/replay/reopen campaigns. Salary controls covered 34 pages, 158 earnings and 100 deductions via RAM-only comparison. |
+| Builds / hygiene | Debug PASS; Xcode build PASS; optimized Release PASS; `git diff --check`, project validation and private-identity scan PASS. Both real SQLite subprocess tests passed. |
+
+The [owning holdings note](../../Work%20notes/Holdings_and_valuation.md#current-conclusion) retains exact qualification artifacts, failed-run history and product hashes. Fresh Sol review identified same-date precision/date loss and missing populated recovery proof; the primary repaired and verified both before acceptance. Independent CAS comparison also exposed and verified the bounded Invesco/version-footer heading correction. No statement, decrypted source or financial oracle file was created. Normal isolated app databases and product backups were permitted; transient passwords and source buffers were released.
+
+### Accepted limitations
+
+Exactly two current authentic-source cases remain **UNOBSERVED**, not failures or invitations to manufacture coverage:
+
+1. A holding exit solely by absence from a later complete statement.
+2. A genuine newer statement clearing a previously known acquisition cost.
+
+The relevant code paths exist and received structural review; authentic financial qualification is not claimed for those cases. Ordinary regression retains 25 LFTheme test-harness warnings and builds retain App Intents metadata notices. Xcode's per-file diagnostics bridge could list files but not resolve them for refresh; the Xcode project build passed. Optimized Release was built, not run against the owner's separate Release database. Existing accepted recovery limitations remain unchanged.
+
+### Benchmark handoff and retained future sequence
+
+The primary writer held the exclusive documentation window and rechecked the latest four-document external handoff (`documentation.patch` SHA-256 `75d25cb09e889d8292e58a03415859724b630850c404b02ec132f5a25b285827`). All four base hashes matched the published predecessor. Its approved hunks were already present in the working tree; closure preserved them, the corrected scoped current-position wording and the actual merge status instead of replacing notes with stale drafts. The immutable V20 benchmark and all private scratch remained outside this publication.
+
+PDFKit remains primary; targeted Vision structural assistance remains research/selective only. No automatic multi-engine fallback is qualified. Axis A2/B2 adjudications remain source-specific and introduce no generic INR 0.01 tolerance. Future Sprint 98 retains exhaustive real-original qualification, independent Codex interpretation, field comparison after persistence/hydration, serial/bounded-parallel equivalence, source-certain corrections with affected-family reruns, parser freeze before clean final adoption-candidate population, and requested/available/held-source reconciliation. The resulting candidate proceeds through Sprint 99 reporting/net worth and Sprint 100 whole-app adoption verification. No future campaign is executed by this closure.
+
+Selected current-holdings scopes under **FW-P3-20/22/23** are complete. The holdings portions of **FW-P3-21/29** are accepted, with current prices/NAV and integrated valuation left in Sprint 97. The retained sequence is **95 accepted → 96 accepted → 97 next → 98 intake/qualification/population → 99 reporting/net worth → 100 personal adoption**.
+
+### Publication and Current activation sequence
+
+At implementation publication, Current remained at its accepted V20 schema and had not been mutated during Sprint-96 qualification or closure preparation. V1–V20 migration identities and the owner's Xcode 27 project/scheme changes are preserved. The owner-authorized implementation is published first; only then may `./script/validate.sh durable-startup` build the published Debug product and perform bounded Current V20→V21 startup, clean quit and same-database relaunch. No speculative repair, new import/population campaign or older binary on migrated Current is authorized. The actual post-publication outcome will be recorded in a documentation follow-up after it occurs.
+
+The [exact publication file inventory](../../Work%20notes/Holdings_and_valuation.md#accepted-publication-file-inventory) includes both owner Xcode files explicitly. The project retains recommended Xcode 27 settings and CodeSignOnCopy; the already-qualified acyclic subprocess signing phase preserves the exact sandbox/inherit entitlements. No unrelated recommended settings are applied during closure. No authentic original, Gmail bytes/locator payload, credential, private database/backup, render, benchmark scratch, model cache, coverage or build output enters Git.
 
 ---
 

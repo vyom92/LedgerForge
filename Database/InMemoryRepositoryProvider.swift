@@ -14,6 +14,7 @@ public final class InMemoryRepositoryProvider {
     public let confirmedImportRepo: ConfirmedImportRepository
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
+    public let investmentRepo: InvestmentRepository
 
     private let state = InMemoryRepositoryState()
 
@@ -29,6 +30,12 @@ public final class InMemoryRepositoryProvider {
         self.confirmedImportRepo = InMemoryConfirmedImportRepo(state: state, generationToken: generationToken)
         self.salaryRepo = InMemorySalaryRepo(state: state, generationToken: generationToken)
         self.fundingPlanRepo = InMemoryFundingPlanRepo(state: state)
+        self.investmentRepo = InMemoryInvestmentRepo(state: state, generationToken: generationToken)
+    }
+
+    func injectInvestmentFailureBeforePublish(_ enabled: Bool) {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        state.investmentFailureBeforePublish = enabled
     }
 
     /// Test-only deterministic failure boundary for proving that an accepted
@@ -116,10 +123,96 @@ private final class InMemoryRepositoryState {
     var cardSemanticProjections: [String: CardStatementSemanticProjectionRecordDTO] = [:]
     var cardSemanticGroups: [String: CardStatementSemanticGroupDTO] = [:]
     var cardSemanticMembers: [String: CardStatementSemanticMemberDTO] = [:]
+    var investmentContainers: [String: InvestmentContainer] = [:]
+    var investmentHoldings: [String: InvestmentHolding] = [:]
+    var investmentFailureBeforePublish = false
     var salaryStatements: [String: SalaryStatementDTO] = [:]
     var fundingPlans: [String: FundingPlanDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
+}
+
+private final class InMemoryInvestmentRepo: InvestmentRepository {
+    private let state: InMemoryRepositoryState
+    private let generationToken: ProviderGenerationToken
+    init(state: InMemoryRepositoryState, generationToken: ProviderGenerationToken) {
+        self.state = state
+        self.generationToken = generationToken
+    }
+
+    func snapshot(workspaceID: String) throws -> InvestmentSnapshot {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let containers = state.investmentContainers.values.filter { $0.workspaceID == workspaceID }.sorted { $0.id < $1.id }
+        let ids = Set(containers.map(\.id))
+        let holdings = state.investmentHoldings.values.filter { ids.contains($0.containerID) }.sorted { $0.id < $1.id }
+        for container in containers {
+            guard let document = state.documents[container.documentID], let session = state.importSessions[container.importSessionID],
+                  document.workspaceId == workspaceID, document.importSessionId == session.id,
+                  session.workspaceId == workspaceID, session.validationStatus == "passed" else { throw InvestmentError.invalidPersistedState }
+        }
+        for holding in holdings {
+            guard let document = state.documents[holding.documentID], let session = state.importSessions[holding.importSessionID],
+                  let normalized = state.normalizedDocuments[holding.normalizedDocumentID],
+                  document.workspaceId == workspaceID, document.importSessionId == session.id,
+                  session.workspaceId == workspaceID, session.validationStatus == "passed",
+                  normalized.documentId == document.id, normalized.importSessionId == session.id,
+                  normalized.profileId == holding.parserProfile, normalized.profileVersion == "1" else { throw InvestmentError.invalidPersistedState }
+        }
+        return try InvestmentSnapshot(containers: containers, holdings: holdings).validated(workspaceID: workspaceID)
+    }
+
+    func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            try plan.validate()
+            guard let authority = plan.history.duplicateAuthorityFingerprint, let normalized = plan.history.normalizedDocument else {
+                throw InvestmentError.invalidEvidence
+            }
+            if let existing = state.documentFingerprints.values.first(where: {
+                $0.isDuplicateAuthority && $0.algorithm == authority.algorithm && $0.fingerprint == authority.fingerprint
+            }) {
+                guard let session = state.importSessions[existing.importSessionId], session.validationStatus == "passed" else {
+                    throw InvestmentError.invalidPersistedState
+                }
+                return .exactSourceDuplicate(.init(importSessionId: session.id, completedAtISO: session.completedAtISO,
+                    transactionCount: 0, accountId: nil, accountDisplayName: nil))
+            }
+            let review = try InvestmentUpdatePlanner.review(plan, current: snapshot(workspaceID: plan.workspace.id))
+            guard review.mappingQuestions.isEmpty else { throw InvestmentError.identityChoiceRequired }
+            guard !review.requiresChoice else { throw InvestmentError.sameDateConflict }
+            guard state.documents[plan.history.document.id] == nil,
+                  state.importSessions[plan.history.importSession.id] == nil,
+                  state.normalizedDocuments[normalized.id] == nil,
+                  state.importAttempts[plan.history.successfulAttempt.id] == nil,
+                  plan.history.fingerprints.allSatisfy({ state.documentFingerprints[$0.id] == nil }),
+                  !state.investmentFailureBeforePublish else { return .repositoryIntegrityConflict }
+            var containers = state.investmentContainers, holdings = state.investmentHoldings
+            for container in review.snapshot.containers where review.affectedContainerIDs.contains(container.id) {
+                containers[container.id] = container
+            }
+            holdings = holdings.filter { !review.affectedContainerIDs.contains($0.value.containerID) }
+            for holding in review.snapshot.holdings where review.affectedContainerIDs.contains(holding.containerID) {
+                holdings[holding.id] = holding
+            }
+            // No throwing work follows publication; all readers share stateLock.
+            state.workspaces[plan.workspace.id] = state.workspaces[plan.workspace.id] ?? plan.workspace
+            state.documents[plan.history.document.id] = plan.history.document
+            state.importSessions[plan.history.importSession.id] = ImportSessionRecordDTO(
+                id: plan.history.importSession.id, workspaceId: plan.workspace.id,
+                userVisibleName: plan.history.importSession.userVisibleName, startedAtISO: plan.history.importSession.startedAtISO,
+                completedAtISO: plan.history.completedAtISO, validationStatus: "passed",
+                readerVersion: plan.history.importSession.readerVersion, parserVersion: plan.history.importSession.parserVersion,
+                layoutVersion: plan.history.importSession.layoutVersion)
+            for fingerprint in plan.history.fingerprints { state.documentFingerprints[fingerprint.id] = fingerprint }
+            state.normalizedDocuments[normalized.id] = normalized
+            state.importAttempts[plan.history.successfulAttempt.id] = plan.history.successfulAttempt
+            state.investmentContainers = containers
+            state.investmentHoldings = holdings
+            return .committed(importSessionID: plan.history.importSession.id)
+        } catch let error as InvestmentError { return .rejected(error) }
+        catch { return .repositoryIntegrityConflict }
+    }
 }
 
 private final class InMemorySalaryRepo: SalaryRepository {

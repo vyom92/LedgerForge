@@ -34,6 +34,11 @@ struct ImportFailureSummary: Equatable {
     }
 
     static func from(_ error: Error) -> Self {
+        if let error = error as? InvestmentError {
+            return Self(stage: .documentPreparation, family: .invalidDocument,
+                explanation: error.localizedDescription,
+                guidance: "No holdings were changed. Review the original or choose a supported closing-holdings statement.")
+        }
         if error is CancellationError {
             return Self(
                 stage: .cancellation,

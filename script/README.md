@@ -115,6 +115,32 @@ LEDGERFORGE_TEST_ENVIRONMENT_FILE=/absolute/external/paths-only.json \
   LedgerForgeTests/AxisCreditCardAuthenticAcceptanceTests
 ```
 
+### Sprint-96 current-holdings qualification
+
+`InvestmentSourceImportTests` and `InvestmentRAMOriginalTests` are separately
+selected original-dependent suites (eight definitions), alongside the retained
+pre-existing corpus exclusions. Select them explicitly with `test-focused`.
+The local suite reads `LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY`. The RAM suite
+requires `LEDGERFORGE_INVESTMENT_RAM_PIPE`, an owner-owned FIFO containing the
+unchanged nominated originals and independent comparison fields. Passwords and
+financial comparisons stay in memory; neither a statement substitute nor an
+oracle file is a permitted setup step.
+
+The complete Salary suite also accepts
+`LEDGERFORGE_PRIVATE_SALARY_ORACLE_PIPE` with the real Salary originals root.
+Its independent native-text/geometry comparison traverses the FIFO in memory;
+the older file-backed oracle path remains historical and is not used under the
+current source-processing rule.
+
+For an explicitly selected real-process continuation, the populated investment
+recovery test accepts `LEDGERFORGE_S96_RECOVERY_NAMESPACE` beginning with
+`s93-recovery-s96-`. It requires a fresh isolated namespace and exports only an
+ordinary app database plus its genuine format-1 backup for the existing DEBUG
+restore/reopen probe. It never selects or replaces the owner's actual Current
+database. The ordinary Dashboard/Transactions checks read Current's exact
+registered schema prefix through read-only connections, without applying a
+candidate migration.
+
 LegacyXLS's source-independent integer/buffer check constructs no workbook or
 financial row. It covers fixed-width sector identifiers, sentinel/range paths,
 allocation overflow and transcoding errors/growth. Run it with both sanitizers

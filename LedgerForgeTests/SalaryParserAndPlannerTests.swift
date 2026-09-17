@@ -82,7 +82,7 @@ struct SalaryParserAndPlannerTests {
     }
 
     @Test func salaryNavigationEligibilityAndExplicitRolloverRemainUserControlled() throws {
-        #expect(AppShellSection.ordinaryNavigation == [.dashboard, .accounts, .salary, .transactions, .imports, .settings])
+        #expect(AppShellSection.ordinaryNavigation == [.dashboard, .accounts, .investments, .salary, .transactions, .imports, .settings])
         let accounts = AccountStore()
         accounts.installAccountsWithoutObservation([
             Account(repositoryAccountId: "cbq", workspaceId: "w", institution: Institution.cbq.rawValue, name: "Current", type: .bank, currencyCode: "QAR", currentBalance: 100),

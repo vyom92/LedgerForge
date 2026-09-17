@@ -380,6 +380,7 @@ struct FinancialDocument: Identifiable {
     /// Exact typed salary payload. Salary documents deliberately contain no
     /// fabricated bank transactions or Account identity.
     let salaryStatementEvidence: SalaryStatementEvidence?
+    let investmentStatementEvidence: InvestmentStatementEvidence?
     let selectionReasons: [String]
     let createdAt: Date
 
@@ -399,6 +400,7 @@ struct FinancialDocument: Identifiable {
         cardStatementEvidence: CardStatementEvidence? = nil,
         zeroActivityEvidence: ZeroActivityStatementEvidence? = nil,
         salaryStatementEvidence: SalaryStatementEvidence? = nil,
+        investmentStatementEvidence: InvestmentStatementEvidence? = nil,
         selectionReasons: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -417,6 +419,7 @@ struct FinancialDocument: Identifiable {
         self.cardStatementEvidence = cardStatementEvidence
         self.zeroActivityEvidence = zeroActivityEvidence
         self.salaryStatementEvidence = salaryStatementEvidence
+        self.investmentStatementEvidence = investmentStatementEvidence
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
     }

@@ -77,6 +77,8 @@ private enum GlobalRuntimeStateCleanup {
         ImportSessionStore.shared.replaceImportSessions([])
         ImportAttemptStore.shared.replaceAttempts([])
         CategoryStore.shared.replaceSnapshot(.empty)
+        InvestmentStore.shared.installWithoutObservation(.empty, generation: nil)
+        InvestmentStore.shared.notifyInstalledValue()
         CategoryReconciliationGate.shared.resetForTesting()
         DeveloperConsole.shared._resetForTests()
         DevelopmentDatabaseActivityGate.shared.resetForTesting()
