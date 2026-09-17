@@ -12,7 +12,7 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-17:** the owner/Chat accepts Sprint 96 and authorizes exact publication of its already-qualified implementation, retained owner Xcode changes and reconciled benchmark documentation handoff. Current remained V20 throughout qualification; publication precedes bounded activation. Earlier records retain their original evidence, then-current schema and limits. Sprint 97 is **NEXT / NOT STARTED**; **PERSONAL-V1 remains NOT YET ADOPTED**.
+**Current alignment — 2026-09-17:** the owner/Chat accepts Sprint 96 and authorizes exact publication of its already-qualified implementation, retained owner Xcode changes and reconciled benchmark documentation handoff. Current remained V20 throughout qualification, and bounded V20→V21 activation passed after the implementation was published. Earlier records retain their original evidence, then-current schema and limits. Sprint 97 is **NEXT / NOT STARTED**; **PERSONAL-V1 remains NOT YET ADOPTED**.
 
 ---
 
@@ -62,7 +62,14 @@ Selected current-holdings scopes under **FW-P3-20/22/23** are complete. The hold
 
 ### Publication and Current activation sequence
 
-At implementation publication, Current remained at its accepted V20 schema and had not been mutated during Sprint-96 qualification or closure preparation. V1–V20 migration identities and the owner's Xcode 27 project/scheme changes are preserved. The owner-authorized implementation is published first; only then may `./script/validate.sh durable-startup` build the published Debug product and perform bounded Current V20→V21 startup, clean quit and same-database relaunch. No speculative repair, new import/population campaign or older binary on migrated Current is authorized. The actual post-publication outcome will be recorded in a documentation follow-up after it occurs.
+The actual closure sequence was:
+
+1. Publish implementation commit `759be9fed485603bdea1bd9e8192372738233208` (`feat: accept Sprint 96 current investment holdings`) and verify fresh remote main equality. Current was still V20; the worktree/index were clean.
+2. Run only the established `./script/validate.sh durable-startup` workflow. It built the ordinary Xcode Debug app from that clean published revision, with no test-memory/run-host/namespace markers, then performed two actual Current startup/quit cycles. Both reported verified SQLite, current profile and complete canonical hydration; both exited cleanly. Migration history and the database/file-set hashes were identical across relaunch.
+3. Independently compare Current before/after: V21 is present, all V1–V20 records including their original applied times are unchanged, and every pre-existing application table other than schema_migrations has identical rows. Only `investment_containers` and `investment_holdings` were added. Both are empty because closure performs schema activation, not source imports or qualification-database population.
+4. Publish this documentation-only activation follow-up. Product/test/project bytes remain those of the accepted implementation commit; no completed financial/build/test campaign is rerun for these status updates.
+
+**Current accepted schema is now V21.** The 41-holding/15-container counts describe the accepted isolated qualification/recovery portfolio and are not represented as newly imported Current data. No speculative repair or older-schema binary was used against the migrated Current database. The activation record is in the task-owned `LedgerForge-s96-activation/durable-startup.json`; `/tmp/LedgerForge-s96-activation.log` retains the bounded build/startup result. Its clean Debug build identity is revision `759be9fed485603bdea1bd9e8192372738233208`, built at `2026-09-17T02:48:06Z`; executable SHA-256 `bac413b177445fa0e4e998f6d04d6b5c591925de51ba4bcbe503ab87169d83c3`, debug dylib `6619f74a7a280ca0bc5bad3da9fef4bc75b24d2a561ded6fdd90f3d0155d2b75`.
 
 The [exact publication file inventory](../../Work%20notes/Holdings_and_valuation.md#accepted-publication-file-inventory) includes both owner Xcode files explicitly. The project retains recommended Xcode 27 settings and CodeSignOnCopy; the already-qualified acyclic subprocess signing phase preserves the exact sandbox/inherit entitlements. No unrelated recommended settings are applied during closure. No authentic original, Gmail bytes/locator payload, credential, private database/backup, render, benchmark scratch, model cache, coverage or build output enters Git.
 
