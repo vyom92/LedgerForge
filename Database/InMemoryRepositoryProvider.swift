@@ -15,6 +15,12 @@ public final class InMemoryRepositoryProvider {
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
     public let investmentRepo: InvestmentRepository
+    public let gmailInboxRepo: any GmailInboxRepository
+    public let netWorthMembershipRepo: any NetWorthMembershipRepository
+    public let intelligenceRepo: any FinancialIntelligenceRepository
+    let backgroundJobRepo: any BackgroundJobRepository
+    let backgroundPublicCacheRepo: any BackgroundPublicCacheRepository
+    let backgroundScheduleRepo: any BackgroundScheduleRepository
 
     private let state = InMemoryRepositoryState()
 
@@ -31,6 +37,12 @@ public final class InMemoryRepositoryProvider {
         self.salaryRepo = InMemorySalaryRepo(state: state, generationToken: generationToken)
         self.fundingPlanRepo = InMemoryFundingPlanRepo(state: state)
         self.investmentRepo = InMemoryInvestmentRepo(state: state, generationToken: generationToken)
+        self.gmailInboxRepo = InMemoryGmailInboxRepository()
+        self.netWorthMembershipRepo = InMemoryNetWorthMembershipRepository(state: state)
+        self.intelligenceRepo = InMemoryFinancialIntelligenceRepository(state: state)
+        self.backgroundJobRepo = UnavailableBackgroundJobRepository()
+        self.backgroundPublicCacheRepo = UnavailableBackgroundPublicCacheRepository()
+        self.backgroundScheduleRepo = UnavailableBackgroundScheduleRepository()
     }
 
     func injectInvestmentFailureBeforePublish(_ enabled: Bool) {
@@ -83,7 +95,7 @@ enum SupportingSourceFailureInjectionPoint: CaseIterable {
     case completion
 }
 
-private final class InMemoryRepositoryState {
+final class InMemoryRepositoryState {
     /// One lock serializes every durable-state observation and mutation. The
     /// confirmed provider uses it once while preparing and publishing a full
     /// copy-on-write accepted graph.
@@ -96,7 +108,20 @@ private final class InMemoryRepositoryState {
     var importSessions: [String: ImportSessionRecordDTO] = [:]
     var normalizedDocuments: [String: NormalizedDocumentDTO] = [:]
     var normalizedRows: [String: NormalizedRowDTO] = [:]
-    var transactions: [String: TransactionDTO] = [:]
+    var transactions: [String: TransactionDTO] = [:] {
+        didSet {
+            // Published only under stateLock, after the import graph has validated.
+            // A supporting row/provenance update is not a newly inserted transaction.
+            for (id, transaction) in transactions where oldValue[id] == nil && transaction.isTrusted {
+                guard let session = transaction.importSessionId else { continue }
+                categoryWork[id] = CategoryImportWork(transactionID: id, importSessionID: session,
+                    outcome: .pending, explanation: "Waiting for classification after import.")
+            }
+        }
+    }
+    var categoryRules: [String: CategoryRule] = [:]
+    var categoryIntents: [String: CategoryIntent] = [:]
+    var categoryWork: [String: CategoryImportWork] = [:]
     var categories: [String: CategoryDTO] = [:]
     var categoryAssignments: [String: TransactionCategoryAssignmentDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
@@ -109,6 +134,7 @@ private final class InMemoryRepositoryState {
     var statementEquivalenceGroups: [String: StatementEquivalenceGroupDTO] = [:]
     var statementEquivalenceMembers: [String: StatementEquivalenceMemberDTO] = [:]
     var cbqSourceIdentityRecords: [String: CBQSourceIdentityRecordDTO] = [:]
+    var bankSectionPlans: [String: BankStatementSectionPlanDTO] = [:]
     var cbqReviewedSourcePlans: [String: ReviewedCBQSourceOverlapPlanDTO] = [:]
     var cbqTransactionSourceReferenceDigests: [String: Set<String>] = [:]
     var cardInstruments: [String: CardInstrumentDTO] = [:]
@@ -126,10 +152,53 @@ private final class InMemoryRepositoryState {
     var investmentContainers: [String: InvestmentContainer] = [:]
     var investmentHoldings: [String: InvestmentHolding] = [:]
     var investmentFailureBeforePublish = false
+    var movementEvents: [String: MovementEvent] = [:]
+    var recurringDefinitions: [String: RecurringDefinition] = [:]
+    var recurringOccurrences: [String: RecurringOccurrence] = [:]
+    var reserveDesignations: [String: ReserveDesignation] = [:]
+    var salaryAssistance: [String: SalaryAssistance] = [:]
+    var intelligencePreferences: [String: IntelligencePreferences] = [:]
+    var netWorthExclusions: [String: Set<NetWorthMemberID>] = [:]
     var salaryStatements: [String: SalaryStatementDTO] = [:]
     var fundingPlans: [String: FundingPlanDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
+}
+
+private final class InMemoryNetWorthMembershipRepository: NetWorthMembershipRepository {
+    let state: InMemoryRepositoryState
+    init(state: InMemoryRepositoryState) { self.state = state }
+
+    func snapshot(workspaceID: String) throws -> NetWorthMembershipSnapshot {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let result = NetWorthMembershipSnapshot(workspaceID: workspaceID, excluded: state.netWorthExclusions[workspaceID] ?? [])
+        for member in result.excluded { try validate(member, workspaceID: workspaceID) }
+        return result
+    }
+
+    func setIncluded(_ included: Bool, member: NetWorthMemberID, workspaceID: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try validate(member, workspaceID: workspaceID)
+        let before = try snapshot(workspaceID: workspaceID).excluded
+        var updated = before
+        if included { updated.remove(member) } else { updated.insert(member) }
+        state.netWorthExclusions[workspaceID] = updated
+        return updated != before
+    }
+
+    private func validate(_ member: NetWorthMemberID, workspaceID: String) throws {
+        switch member {
+        case .account(let id):
+            guard let account = state.accounts[id], account.workspaceId == workspaceID,
+                  ["bank", "credit_card"].contains(account.accountType ?? "") else {
+                throw NetWorthMembershipError.invalidTarget
+            }
+        case .investmentContainer(let id):
+            guard state.investmentContainers[id]?.workspaceID == workspaceID else {
+                throw NetWorthMembershipError.invalidTarget
+            }
+        }
+    }
 }
 
 private final class InMemoryInvestmentRepo: InvestmentRepository {
@@ -356,9 +425,11 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
                   guard let account = state.accounts[accountID] else { return false }
                   return account.workspaceId == plan.workspaceId && account.nativeCurrency == commitment.amountCurrency
               }) else { throw RepositoryError.relationshipViolation("Funding plan relationships are invalid.") }
+        try InMemoryFinancialIntelligenceRepository(state: state).validatePlanAssistance(plan)
         if state.workspaces[plan.workspaceId] == nil {
             state.workspaces[plan.workspaceId] = WorkspaceDTO(id: plan.workspaceId, name: "Default Workspace", createdAtISO: plan.updatedAtISO)
         }
+        for id in plan.assistance?.appliedSalaryIDs ?? [] { state.salaryAssistance[id]?.draftState = .consumed }
         state.fundingPlans[plan.id] = plan
         return plan
     }
@@ -402,8 +473,8 @@ private final class InMemoryCardRepo: CardRepository {
     }
 }
 
-private final class InMemoryCategoryRepo: CategoryRepository {
-    private let state: InMemoryRepositoryState
+final class InMemoryCategoryRepo: CategoryRepository {
+    let state: InMemoryRepositoryState
 
     init(state: InMemoryRepositoryState) {
         self.state = state
@@ -516,6 +587,9 @@ private final class InMemoryCategoryRepo: CategoryRepository {
         }) else {
             throw CategoryRepositoryError.categoryInUse
         }
+        guard !state.categoryRules.values.contains(where: { $0.categoryID == id }) else {
+            throw CategoryAutomationError.ruleInUse
+        }
         state.categories.removeValue(forKey: id)
     }
 
@@ -524,30 +598,26 @@ private final class InMemoryCategoryRepo: CategoryRepository {
         guard let transaction = state.transactions[transactionId], transaction.isTrusted else {
             throw CategoryRepositoryError.transactionNotFound
         }
-        guard transaction.workspaceId == workspaceId else {
-            throw CategoryRepositoryError.workspaceMismatch
+        guard transaction.workspaceId == workspaceId else { throw CategoryRepositoryError.workspaceMismatch }
+        if let categoryId {
+            guard let category = state.categories[categoryId] else { throw CategoryRepositoryError.categoryNotFound }
+            guard category.workspaceId == workspaceId else { throw CategoryRepositoryError.workspaceMismatch }
+            guard !category.isArchived else { throw CategoryRepositoryError.categoryArchived }
         }
-        guard let categoryId else {
-            return state.categoryAssignments.removeValue(forKey: transactionId) != nil
+        let intent = CategoryIntent(kind: categoryId == nil ? .deliberatelyCleared : .manual,
+                                    categoryID: categoryId, matches: [])
+        let changed = state.categoryIntents[transactionId] != intent || state.categoryAssignments[transactionId]?.categoryId != categoryId
+        state.categoryIntents[transactionId] = intent
+        if let work = state.categoryWork[transactionId] {
+            state.categoryWork[transactionId] = CategoryImportWork(transactionID: transactionId,
+                importSessionID: work.importSessionID, outcome: .protected,
+                explanation: categoryId == nil ? "You deliberately cleared this category." : "Your category choice is protected.", origin: work.origin)
         }
-        guard let category = state.categories[categoryId] else {
-            throw CategoryRepositoryError.categoryNotFound
-        }
-        guard category.workspaceId == workspaceId else {
-            throw CategoryRepositoryError.workspaceMismatch
-        }
-        guard !category.isArchived else {
-            throw CategoryRepositoryError.categoryArchived
-        }
-        if state.categoryAssignments[transactionId]?.categoryId == categoryId {
-            return false
-        }
-        state.categoryAssignments[transactionId] = TransactionCategoryAssignmentDTO(
-            workspaceId: workspaceId,
-            transactionId: transactionId,
-            categoryId: categoryId
-        )
-        return true
+        if let categoryId {
+            state.categoryAssignments[transactionId] = TransactionCategoryAssignmentDTO(
+                workspaceId: workspaceId, transactionId: transactionId, categoryId: categoryId)
+        } else { state.categoryAssignments.removeValue(forKey: transactionId) }
+        return changed
     }
 
     nonisolated private static func categoryOrder(_ lhs: CategoryDTO, _ rhs: CategoryDTO) -> Bool {
@@ -587,8 +657,36 @@ private final class InMemoryAccountRepo: AccountRepository {
         guard state.workspaces[account.workspaceId] != nil else {
             throw RepositoryError.relationshipViolation("Workspace \(account.workspaceId) does not exist for account \(account.id).")
         }
-        state.accounts[account.id] = account
+        // Import/upsert must never reactivate an owner-classified history-only card.
+        state.accounts[account.id] = AccountDTO(
+            id: account.id, workspaceId: account.workspaceId, name: account.name,
+            institutionId: account.institutionId, accountType: account.accountType,
+            nativeCurrency: account.nativeCurrency, description: account.description,
+            createdAtISO: account.createdAtISO,
+            closedAtISO: state.accounts[account.id]?.closedAtISO ?? account.closedAtISO
+        )
         return account.id
+    }
+
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard ISO8601DateFormatter().date(from: markedAtISO) != nil else {
+            throw RepositoryError.relationshipViolation("History-only classification requires its recorded time.")
+        }
+        guard let existing = state.accounts[accountId] else {
+            throw RepositoryError.recordNotFound("Account does not exist.")
+        }
+        guard existing.workspaceId == workspaceId, existing.accountType == "credit_card" else {
+            throw RepositoryError.relationshipViolation("History-only classification requires a credit card in this workspace.")
+        }
+        guard existing.closedAtISO == nil else { return false }
+        state.accounts[accountId] = AccountDTO(
+            id: existing.id, workspaceId: existing.workspaceId, name: existing.name,
+            institutionId: existing.institutionId, accountType: existing.accountType,
+            nativeCurrency: existing.nativeCurrency, description: existing.description,
+            createdAtISO: existing.createdAtISO, closedAtISO: markedAtISO
+        )
+        return true
     }
 
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
@@ -615,7 +713,8 @@ private final class InMemoryAccountRepo: AccountRepository {
             accountType: existing.accountType,
             nativeCurrency: existing.nativeCurrency,
             description: existing.description,
-            createdAtISO: existing.createdAtISO
+            createdAtISO: existing.createdAtISO,
+            closedAtISO: existing.closedAtISO
         )
         return true
     }
@@ -706,6 +805,10 @@ private final class InMemoryAccountRepo: AccountRepository {
 
 private final class InMemoryImportSessionRepo: ImportSessionRepository {
     private let state: InMemoryRepositoryState
+    func bankSectionSnapshot(workspaceId: String) throws -> BankSectionRepositorySnapshotDTO {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return .init(sections: state.bankSectionPlans.values.filter { state.accounts[$0.accountId]?.workspaceId == workspaceId }.sorted { $0.id < $1.id })
+    }
 
     init(state: InMemoryRepositoryState) {
         self.state = state
@@ -764,6 +867,16 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         state.stateLock.lock()
         defer { state.stateLock.unlock() }
         return priorImportedStatementWithoutLock(algorithm: algorithm, fingerprint: fingerprint)
+    }
+
+    func successfulImportContainsFingerprint(algorithm: String, fingerprint: String) throws -> Bool {
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
+        return state.documentFingerprints.values.contains { storedFingerprint in
+            storedFingerprint.algorithm == algorithm
+                && storedFingerprint.fingerprint == fingerprint
+                && state.importSessions[storedFingerprint.importSessionId]?.validationStatus == "passed"
+        }
     }
 
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
@@ -879,6 +992,18 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
                 transactionObservationCount: reviewed.rows.count
             )
         }.sorted { $0.documentId < $1.documentId }
+    }
+
+    func cbqSourceCoveragePeriods(workspaceId: String) throws -> [StatementCoveragePeriodDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        var seen: Set<String> = []
+        return state.cbqReviewedSourcePlans.values.compactMap { reviewed in
+            guard reviewed.basePlan.workspace.id == workspaceId,
+                  let evidence = reviewed.basePlan.cbqStatementSourceEvidence,
+                  let start = evidence.statementStartDateISO, let end = evidence.statementEndDateISO,
+                  seen.insert(reviewed.accountId + ":" + start + ":" + end).inserted else { return nil }
+            return StatementCoveragePeriodDTO(accountID: reviewed.accountId, startISO: start, endISO: end)
+        }.sorted { ($0.accountID, $0.startISO, $0.endISO) < ($1.accountID, $1.startISO, $1.endISO) }
     }
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
@@ -1031,6 +1156,97 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     init(state: InMemoryRepositoryState, generationToken: ProviderGenerationToken) {
         self.state = state
         self.generationToken = generationToken
+    }
+
+    func reviewBankImport(_ plan: BankImportPlanDTO) -> BankImportReviewResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            if try isExactBankDuplicate(plan) { return .exactDuplicate }
+            let resolution = try bankResolution(plan)
+            return .ready(.init(plan: plan, canonicalTransactionByNormalizedRow: resolution.links))
+        } catch let hold as BankImportHoldDTO { return .held(hold) }
+        catch { return .held(.init("repository_integrity_conflict")) }
+    }
+
+    func commitBankImport(_ reviewed: ReviewedBankImportPlanDTO) -> BankImportRepositoryResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let plan = reviewed.plan
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            if try isExactBankDuplicate(plan) { return .exactDuplicate }
+            let resolution = try bankResolution(plan)
+            guard resolution.links == reviewed.canonicalTransactionByNormalizedRow else {
+                throw BankImportHoldDTO("occurrence_review_changed")
+            }
+            let history = BankImportDecision.acceptedHistory(plan.history, receipt: resolution.receipt)
+            guard let normalized = history.normalizedDocument,
+                  state.importSessions[history.importSession.id] == nil,
+                  state.documents[history.document.id] == nil,
+                  state.normalizedDocuments[normalized.id] == nil,
+                  state.importAttempts[history.successfulAttempt.id] == nil,
+                  history.fingerprints.allSatisfy({ state.documentFingerprints[$0.id] == nil }),
+                  history.normalizedRows.allSatisfy({ state.normalizedRows[$0.id] == nil }),
+                  resolution.sections.allSatisfy({ state.bankSectionPlans[$0.id] == nil }),
+                  resolution.newTransactions.allSatisfy({ state.transactions[$0.id] == nil }) else {
+                throw BankImportHoldDTO("repository_integrity_conflict")
+            }
+            if let zero = plan.zeroActivityControl, state.statementZeroActivityControls[zero.id] != nil {
+                throw BankImportHoldDTO("repository_integrity_conflict")
+            }
+            var accounts = state.accounts, identifiers = state.accountIdentifiers
+            var observations = state.identifierObservations
+            for account in resolution.newAccounts { accounts[account.id] = account }
+            for section in plan.sections {
+                for candidate in section.identifiers {
+                    let owners = identifiers.values.filter { $0.workspaceId == plan.workspace.id && $0.scheme == candidate.scheme && $0.identifier == candidate.normalizedValue }
+                    guard owners.count <= 1, owners.allSatisfy({ $0.accountId == section.source.accountId }) else {
+                        throw BankImportHoldDTO("identifier_ownership_conflict", sectionID: section.source.id)
+                    }
+                    let owner = owners.first ?? AccountIdentifierDTO(accountId: section.source.accountId, workspaceId: plan.workspace.id,
+                        scheme: candidate.scheme, identifier: candidate.normalizedValue, strength: "strong", verificationState: "verified",
+                        provenance: candidate.provenanceCode, createdAtISO: history.completedAtISO)
+                    identifiers[owner.id] = owner
+                    let observation = IdentifierObservationDTO(ownershipId: owner.id, importSessionId: history.importSession.id,
+                        documentId: history.document.id, parserProvenanceCode: candidate.provenanceCode,
+                        associationAuthorityCode: "confirmed-import", createdAtISO: history.completedAtISO)
+                    observations["\(owner.id)|\(history.importSession.id)|\(history.document.id)"] = observation
+                }
+            }
+            // The remaining writes cannot fail. All validation and injected
+            // failure points precede one publication of the accepted graph.
+            if state.confirmedImportFailureInjection != nil || state.supportingSourceFailureInjection != nil {
+                throw BankImportHoldDTO("repository_integrity_conflict")
+            }
+            state.workspaces[plan.workspace.id] = plan.workspace
+            state.accounts = accounts; state.accountIdentifiers = identifiers; state.identifierObservations = observations
+            state.documents[history.document.id] = history.document
+            for fingerprint in history.fingerprints { state.documentFingerprints[fingerprint.id] = fingerprint }
+            state.importSessions[history.importSession.id] = ImportSessionRecordDTO(id: history.importSession.id,
+                workspaceId: plan.workspace.id, userVisibleName: history.importSession.userVisibleName,
+                startedAtISO: history.importSession.startedAtISO, completedAtISO: history.completedAtISO, validationStatus: "passed",
+                readerVersion: history.importSession.readerVersion, parserVersion: history.importSession.parserVersion, layoutVersion: history.importSession.layoutVersion)
+            state.normalizedDocuments[normalized.id] = normalized
+            for row in history.normalizedRows { state.normalizedRows[row.id] = row }
+            for transaction in resolution.newTransactions { state.transactions[transaction.id] = transaction }
+            for section in resolution.sections { state.bankSectionPlans[section.id] = section }
+            if let zero = resolution.zeroActivityControl { state.statementZeroActivityControls[zero.id] = zero }
+            state.importAttempts[history.successfulAttempt.id] = history.successfulAttempt
+            return .committed(resolution.receipt)
+        } catch let hold as BankImportHoldDTO { return .held(hold) }
+        catch { return .held(.init("repository_integrity_conflict")) }
+    }
+
+    private func isExactBankDuplicate(_ plan: BankImportPlanDTO) throws -> Bool {
+        try plan.history.validateFingerprints()
+        guard let authority = plan.history.duplicateAuthorityFingerprint else { throw BankImportHoldDTO("invalid_original_fingerprint") }
+        return state.documentFingerprints.values.contains { $0.isDuplicateAuthority && $0.algorithm == authority.algorithm && $0.fingerprint == authority.fingerprint }
+    }
+
+    private func bankResolution(_ plan: BankImportPlanDTO) throws -> BankImportDecision.Resolution {
+        try BankImportDecision.resolve(plan, accounts: Array(state.accounts.values), identifiers: Array(state.accountIdentifiers.values),
+            existingSections: Array(state.bankSectionPlans.values), transactions: Array(state.transactions.values),
+            existingZeroControls: Array(state.statementZeroActivityControls.values))
     }
 
     func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
@@ -1811,6 +2027,29 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             if let semanticResult { return semanticResult }
         }
 
+        var bankSectionPlans = state.bankSectionPlans
+        var cbqSourceIdentityRecords = state.cbqSourceIdentityRecords
+        if let section = plan.bankStatementSectionPlan {
+            guard BankStatementSectionProfileContract.matches(
+                    profileID: section.parserProfileId,
+                    version: section.parserProfileVersion,
+                    nativeCurrency: section.nativeCurrency,
+                    sourceFormatCode: section.sourceEvidence.sourceFormatCode,
+                    institutionID: account.institutionId ?? ""
+                  ),
+                  section.accountId == account.id,
+                  section.documentId == history.document.id,
+                  section.importSessionId == history.importSession.id,
+                  section.normalizedDocumentId == history.normalizedDocument?.id,
+                  section.sectionOrdinal == 1,
+                  section.rows.count == transactions.values.filter({ $0.documentId == history.document.id }).count,
+                  section.identityPatterns.count == 2 else { return .repositoryIntegrityConflict }
+            for identity in section.identityPatterns {
+                cbqSourceIdentityRecords["\(history.document.id)|\(identity.kind)"] = CBQSourceIdentityRecordDTO(accountId: account.id, kind: identity.kind, pattern: identity.pattern)
+            }
+            bankSectionPlans[section.id] = section
+        }
+
         state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
         state.identifierObservations = observations; state.documents = documents; state.documentFingerprints = fingerprints
         state.importSessions = sessions; state.normalizedDocuments = normalizedDocuments; state.normalizedRows = normalizedRows
@@ -1832,6 +2071,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         state.cardSemanticProjections = cardSemanticProjections
         state.cardSemanticGroups = cardSemanticGroups
         state.cardSemanticMembers = cardSemanticMembers
+        state.cbqSourceIdentityRecords = cbqSourceIdentityRecords
+        state.bankSectionPlans = bankSectionPlans
         let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
     }
@@ -1839,7 +2080,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO, contract: CardStatementProfileContract) -> Bool {
         account.workspaceId == plan.workspace.id &&
         account.accountType == "credit_card" &&
-        account.nativeCurrency == (contract == .axis ? "INR" : "QAR") &&
+        account.nativeCurrency == contract.nativeCurrency &&
         account.institutionId == contract.institutionCode
     }
 
@@ -1874,7 +2115,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               contract.acceptsCurrentReconciliationRule(card.statement.reconciliationRuleCode) else {
             return .repositoryIntegrityConflict
         }
-        let isAccountOnlyAmexZero = contract == .amex &&
+        let isAccountOnlyAmexZero = contract.isAmex &&
             plan.zeroActivityControl != nil &&
             incomingTransactions.isEmpty &&
             card.transactionEvidence.isEmpty &&
@@ -1882,6 +2123,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             card.semanticProjection?.events.isEmpty == true &&
             card.semanticProjection?.sections.isEmpty == true
         guard
+              (contract != .amexUSDZero || isAccountOnlyAmexZero),
               card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan, contract: contract),
               card.statement.workspaceId == plan.workspace.id,
@@ -1891,7 +2133,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               card.statement.normalizedDocumentId == history.normalizedDocument?.id,
               contract.accepts(profileID: card.statement.parserProfileId),
               card.statement.parserProfileVersion == contract.profileVersion,
-              card.statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
+              card.statement.statementCurrency == contract.nativeCurrency,
               card.statement.sourceRowCount == incomingTransactions.count,
               statements[card.statement.id] == nil,
               (contract == .axis
@@ -2080,6 +2322,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id && summaryComponents[$0.id] == nil }) else {
             return .repositoryIntegrityConflict
         }
+        if contract.isAmex, let zero = plan.zeroActivityControl {
+            guard zero.matchesAmexZeroStatement(card.statement, components: card.summaryComponents) else {
+                return .repositoryIntegrityConflict
+            }
+        }
         let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
         let previous = byCode["previous_balance"]?.moneyMinor
         let balance = byCode[contract == .axis ? "axis_total_payment_due" : "new_balance"]?.moneyMinor
@@ -2165,7 +2412,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             if let sectionID = evidence.documentScopedSectionId {
                 guard selectedBySectionID[sectionID] != nil else { return .repositoryIntegrityConflict }
                 sectionTotals[sectionID, default: 0] += transaction.amountMinor
-            } else if contract != .amex && contract != .axis {
+            } else if !contract.isAmex && contract != .axis {
                 return .repositoryIntegrityConflict
             }
             guard (evidence.originalCurrency == nil && evidence.originalAmountMinor == nil && evidence.originalAmountDecimal == nil) ||
@@ -2181,7 +2428,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let sectionNet = card.sectionDecisions.reduce(Int64(0), { $0 + $1.section.signedTotalMinor })
         let summaryValid: Bool
         switch contract {
-        case .amex:
+        case .amex, .amexUSDZero:
             summaryValid = previous != nil && balance != nil &&
                 byCode["new_debits"]?.moneyMinor == increaseTotal &&
                 byCode["new_credits"]?.moneyMinor == decreaseTotal &&
@@ -2567,7 +2814,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     }
 
     private func isCBQObservationPlan(_ plan: ConfirmedImportPlanDTO) -> Bool {
-        expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil
+        plan.bankStatementSectionPlan != nil ||
+            (expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil)
     }
 
     private func compatibleCBQAccountIDs(_ plan: ConfirmedImportPlanDTO) -> [String] {
@@ -2589,10 +2837,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             let maskMatch = plan.cbqSourceIdentityPatterns.allSatisfy { incoming in
                 durableMasks.filter { $0.kind == incoming.kind }.contains { Self.masksCompatible(incoming.pattern, $0.pattern) }
             }
-            return fullMatch || maskMatch
+            return strong.isEmpty ? maskMatch : (fullMatch && strong.allSatisfy { candidate in
+                plan.cbqSourceIdentityPatterns.allSatisfy { Self.mask($0.pattern, matches: candidate) }
+            })
         }
         if let fullIncoming {
-            return strong.contains(fullIncoming) || (!durableMasks.isEmpty && durableMasks.allSatisfy { Self.mask($0.pattern, matches: fullIncoming) })
+            return strong.isEmpty
+                ? (!durableMasks.isEmpty && durableMasks.allSatisfy { Self.mask($0.pattern, matches: fullIncoming) })
+                : strong.allSatisfy { $0 == fullIncoming }
         }
         return false
     }

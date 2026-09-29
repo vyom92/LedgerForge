@@ -31,21 +31,19 @@ final class ImportHistoryViewModel: ObservableObject {
 struct AccountsAccountPresentation: Identifiable, Equatable {
     let id: String
     let displayName: String
+    let accountNumberLabel: String?
     let institution: String
+    let canonicalInstitutionID: String
     let accountType: AccountType
     let accountTypeLabel: String
     let currencyCode: String
-    let currentBalance: Decimal
+    let currentBalance: Decimal?
     let identitySummaries: [AccountIdentitySummary]
     let currentBalanceLabel: String
     let latestStatementPeriod: String?
     let dueDate: String?
     let cardInstrumentCount: Int?
-}
-
-struct NativeAccountBalanceSummary: Identifiable, Equatable {
-    let money: Money
-    var id: String { money.currency.code }
+    let isHistoryOnly: Bool
 }
 
 struct AccountImportHistoryPresentation: Identifiable, Equatable {
@@ -75,6 +73,8 @@ enum AccountDetailPresentationState: Equatable {
     case validationFailed
     case saveFailed
     case savedButRefreshFailed
+    case historyOnlySaveFailed
+    case historyOnlySavedButRefreshFailed
 #if DEBUG
     case acknowledgementRequired
     case developmentProfileChanged
@@ -92,11 +92,15 @@ enum AccountDetailPresentationState: Equatable {
             return "The display name could not be saved. Runtime data was not changed."
         case .savedButRefreshFailed:
             return "The display name was saved, but the account detail could not refresh. Retry or relaunch to load persisted data."
+        case .historyOnlySaveFailed:
+            return "The card could not be kept as history only. Retry the account change."
+        case .historyOnlySavedButRefreshFailed:
+            return "The card was kept as history only, but the account detail could not refresh. Retry or relaunch to load persisted data."
 #if DEBUG
         case .acknowledgementRequired:
-            return "Acknowledge the active development database profile before saving the display name."
+            return "Acknowledge the active development database profile before saving the account change."
         case .developmentProfileChanged:
-            return "The active development database changed. Start the display-name change again."
+            return "The active development database changed. Start the account change again."
 #endif
         }
     }
@@ -108,6 +112,11 @@ private struct PendingAccountDisplayNameMutation {
     let displayName: String
 }
 
+private struct PendingCreditCardHistoryOnlyMutation {
+    let accountID: String
+    let workspaceID: String
+}
+
 @MainActor
 final class AccountsViewModel: ObservableObject {
 
@@ -117,7 +126,7 @@ final class AccountsViewModel: ObservableObject {
     @Published private(set) var recentActivity: [Transaction] = []
     @Published private(set) var transactionCount = 0
     @Published private(set) var importHistory: [AccountImportHistoryPresentation] = []
-    @Published private(set) var nativeBalanceSummaries: [NativeAccountBalanceSummary] = []
+    @Published private(set) var nativeBalanceSummaries: [DashboardCurrencyPosition] = []
     @Published private(set) var selectedImportSession: AccountImportHistoryPresentation?
     @Published var displayNameDraft = ""
     @Published private(set) var editState: AccountDisplayNameEditState = .idle
@@ -134,6 +143,7 @@ final class AccountsViewModel: ObservableObject {
 #if DEBUG
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
     private var pendingDisplayNameMutation: PendingAccountDisplayNameMutation?
+    private var pendingHistoryOnlyMutation: PendingCreditCardHistoryOnlyMutation?
 #endif
     private var cancellables = Set<AnyCancellable>()
 
@@ -287,16 +297,19 @@ final class AccountsViewModel: ObservableObject {
 
 #if DEBUG
     var requiresDevelopmentProfileAcknowledgement: Bool {
-        acknowledgementChallenge != nil && pendingDisplayNameMutation != nil
+        acknowledgementChallenge != nil && (pendingDisplayNameMutation != nil || pendingHistoryOnlyMutation != nil)
     }
 
     func approveDevelopmentProfileAcknowledgement() {
-        guard let challenge = acknowledgementChallenge,
-              let mutation = pendingDisplayNameMutation else { return }
+        guard let challenge = acknowledgementChallenge else { return }
+        let displayNameMutation = pendingDisplayNameMutation
+        let historyOnlyMutation = pendingHistoryOnlyMutation
+        guard displayNameMutation != nil || historyOnlyMutation != nil else { return }
         switch acknowledgementGate.acknowledge(challenge) {
         case .granted, .noAcknowledgementRequired:
             discardPendingAcknowledgement()
-            performDisplayNameMutation(mutation)
+            if let historyOnlyMutation { performHistoryOnlyMutation(historyOnlyMutation) }
+            else if let displayNameMutation { performDisplayNameMutation(displayNameMutation) }
         case .staleGeneration, .developmentDatabaseUnavailable:
             discardPendingAcknowledgement()
             presentationState = .developmentProfileChanged
@@ -311,8 +324,62 @@ final class AccountsViewModel: ObservableObject {
     private func discardPendingAcknowledgement() {
         acknowledgementChallenge = nil
         pendingDisplayNameMutation = nil
+        pendingHistoryOnlyMutation = nil
     }
 #endif
+
+    /// Called only after the owner confirms that the selected card is closed
+    /// and settled. Historical imports remain eligible for this same account.
+    func markCreditCardHistoryOnly(accountID: String) {
+        guard editState == .idle, selectedRepositoryAccountID == accountID,
+              let account = selectedRuntimeAccount, account.type == .creditCard,
+              !account.isHistoryOnly, let workspaceID = account.workspaceId else { return }
+        let mutation = PendingCreditCardHistoryOnlyMutation(accountID: accountID, workspaceID: workspaceID)
+#if DEBUG
+        discardPendingAcknowledgement()
+        switch acknowledgementGate.authorization(for: .creditCardHistoryOnlyMutation) {
+        case .allowed:
+            performHistoryOnlyMutation(mutation)
+        case .acknowledgementRequired(let challenge):
+            pendingHistoryOnlyMutation = mutation
+            acknowledgementChallenge = challenge
+            presentationState = .acknowledgementRequired
+        case .developmentDatabaseUnavailable:
+            presentationState = .historyOnlySaveFailed
+        }
+#else
+        performHistoryOnlyMutation(mutation)
+#endif
+    }
+
+    private func performHistoryOnlyMutation(_ mutation: PendingCreditCardHistoryOnlyMutation) {
+        do {
+            _ = try metadataCoordinator.markCreditCardHistoryOnly(
+                accountId: mutation.accountID, workspaceId: mutation.workspaceID
+            )
+            presentationState = .ready
+            refreshPresentation()
+        } catch {
+#if DEBUG
+            if let coordinatorError = error as? AccountMetadataCoordinatorError {
+                switch coordinatorError {
+                case .acknowledgementRequired(let challenge):
+                    pendingHistoryOnlyMutation = mutation
+                    acknowledgementChallenge = challenge
+                    presentationState = .acknowledgementRequired
+                    return
+                case .staleDevelopmentProfile:
+                    discardPendingAcknowledgement()
+                    presentationState = .developmentProfileChanged
+                    return
+                default: break
+                }
+            }
+#endif
+            presentationState = (error as? AccountMetadataCoordinatorError) == .savedButRefreshFailed
+                ? .historyOnlySavedButRefreshFailed : .historyOnlySaveFailed
+        }
+    }
 
     private func performDisplayNameMutation(_ mutation: PendingAccountDisplayNameMutation) {
         do {
@@ -396,6 +463,9 @@ final class AccountsViewModel: ObservableObject {
             }
         }
 
+        nativeBalanceSummaries = DashboardPositionProjection.make(accounts: runtimeAccounts.map(\.0),
+            transactions: transactionStore.transactions, cardSnapshot: cardStore.snapshot)
+        let positions = Dictionary(uniqueKeysWithValues: nativeBalanceSummaries.flatMap { $0.banks + $0.cards }.map { ($0.id, $0) })
         accounts = runtimeAccounts.map { account, repositoryAccountID in
             let latestCardStatement = cardStore.snapshot.statements
                 .filter { $0.liabilityAccountID == repositoryAccountID }
@@ -417,28 +487,32 @@ final class AccountsViewModel: ObservableObject {
                 if let period = statement.period {
                     return "\(period.start.presentation) – \(period.end.presentation)"
                 }
-                return statement.selectedStatementMonth?.canonical
+                return statement.selectedStatementMonth.map { AppDateDisplay.month($0.canonical) }
             }
+            let currentInstrumentIDs = Set(latestCardStatement?.instrumentIDs ?? [])
+            let instrumentNumbers = Set(cardStore.snapshot.instruments
+                .filter { currentInstrumentIDs.contains($0.id) }
+                .flatMap(\.sourceObservations)
+                .compactMap { AccountDisplayText.maskedNumber($0.value) }).sorted()
             return AccountsAccountPresentation(
                 id: repositoryAccountID,
-                displayName: account.nickname ?? account.name,
-                institution: account.institution,
+                displayName: account.preferredDisplayName,
+                accountNumberLabel: account.sourceAccountNumberLabel
+                    ?? (instrumentNumbers.isEmpty ? nil : instrumentNumbers.joined(separator: " · ")),
+                institution: account.institutionDisplayName,
+                canonicalInstitutionID: account.institution,
                 accountType: account.type,
                 accountTypeLabel: Self.accountTypeLabel(account.type),
                 currencyCode: account.currencyCode,
-                currentBalance: account.currentBalance,
+                currentBalance: account.isHistoryOnly ? latestCardStatement?.newBalance?.amount : positions[repositoryAccountID]?.amount?.amount,
                 identitySummaries: account.identitySummaries,
-                currentBalanceLabel: account.type == .creditCard ? "Current Liability" : "Current Balance",
+                currentBalanceLabel: account.isHistoryOnly ? "Historical Statement Balance"
+                    : account.type == .creditCard ? "Current Liability" : "Current Balance",
                 latestStatementPeriod: latestStatementPeriod,
                 dueDate: latestCardStatement?.dueDate?.presentation,
-                cardInstrumentCount: account.type == .creditCard ? instrumentCount : nil
+                cardInstrumentCount: account.type == .creditCard ? instrumentCount : nil,
+                isHistoryOnly: account.isHistoryOnly
             )
-        }
-
-        let balancesByCurrency = Dictionary(grouping: runtimeAccounts.map(\.0), by: { $0.nativeCurrency })
-        nativeBalanceSummaries = balancesByCurrency.keys.sorted().map { currency in
-            let balances = (balancesByCurrency[currency] ?? []).map(\.currentBalanceMoney)
-            return NativeAccountBalanceSummary(money: try! Money.aggregate(balances))
         }
 
         if let selectedRepositoryAccountID,
@@ -470,8 +544,10 @@ final class AccountsViewModel: ObservableObject {
         recentActivity = selectedTransactions.sorted(by: Self.isNewer).prefix(3).map { $0 }
 
         let history = Self.importHistory(
+            accountID: selectedRepositoryAccountID,
             transactions: selectedTransactions,
-            sessions: importSessionStore.importSessions
+            sessions: importSessionStore.importSessions,
+            cardSnapshot: cardStore.snapshot
         )
         importHistory = history
         if let selectedImportSession,
@@ -482,19 +558,25 @@ final class AccountsViewModel: ObservableObject {
         }
     }
 
-    private static func importHistory(
+    static func importHistory(
+        accountID: String,
         transactions: [Transaction],
-        sessions: [RepositoryImportSession]
+        sessions: [RepositoryImportSession],
+        cardSnapshot: CardStoreSnapshot = .empty
     ) -> [AccountImportHistoryPresentation] {
         let transactionsBySessionID = Dictionary(grouping: transactions.compactMap { transaction -> (String, Transaction)? in
-            guard let sessionID = transaction.repositoryImportSessionId else { return nil }
+            guard transaction.repositoryAccountId == accountID,
+                  let sessionID = transaction.repositoryImportSessionId else { return nil }
             return (sessionID, transaction)
         }, by: { $0.0 })
 
         return sessions.compactMap { session in
-            guard let sessionTransactions = transactionsBySessionID[session.id]?.map(\.1), !sessionTransactions.isEmpty else {
-                return nil
+            let sessionTransactions = transactionsBySessionID[session.id]?.map(\.1) ?? []
+            let bank = session.bankAccountHistory[accountID]
+            let card = cardSnapshot.statements.first {
+                $0.liabilityAccountID == accountID && $0.importSessionID == session.id
             }
+            guard !sessionTransactions.isEmpty || bank != nil || card != nil else { return nil }
             let sortedDates = sessionTransactions.compactMap(\.statementDate).sorted()
             let currencies = Set(sessionTransactions.map(\.currency))
             return AccountImportHistoryPresentation(
@@ -504,13 +586,13 @@ final class AccountsViewModel: ObservableObject {
                 completedAtISO: session.completedAtISO,
                 validationStatus: session.validationStatus,
                 parserVersion: session.parserVersion,
-                transactionCount: session.partialImportSummary?.importedTransactionCount ?? sessionTransactions.count,
+                transactionCount: bank?.importedTransactionCount ?? session.partialImportSummary?.importedTransactionCount ?? sessionTransactions.count,
                 firstTransactionDate: session.partialImportSummary?.statementStartDate ?? sortedDates.first,
                 lastTransactionDate: session.partialImportSummary?.statementEndDate ?? sortedDates.last,
-                currencyCode: session.partialImportSummary?.nativeCurrency ?? (currencies.count == 1 ? currencies.first : nil),
-                isPartialImport: session.partialImportSummary != nil,
-                sourceRowCount: session.partialImportSummary?.sourceRowCount,
-                recognizedExistingRowCount: session.partialImportSummary?.recognizedExistingRowCount
+                currencyCode: bank?.nativeCurrency ?? card?.currency.code ?? session.partialImportSummary?.nativeCurrency ?? (currencies.count == 1 ? currencies.first : nil),
+                isPartialImport: bank.map { $0.importedTransactionCount > 0 && $0.recognizedExistingRowCount > 0 } ?? (session.partialImportSummary != nil),
+                sourceRowCount: bank?.sourceRowCount ?? card?.sourceRowCount ?? session.partialImportSummary?.sourceRowCount,
+                recognizedExistingRowCount: bank?.recognizedExistingRowCount ?? session.partialImportSummary?.recognizedExistingRowCount
             )
         }
         .sorted { lhs, rhs in

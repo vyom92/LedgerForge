@@ -1,6 +1,6 @@
 import Foundation
 
-enum SalarySourceAuthority: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum SalarySourceAuthority: String, CaseIterable, Equatable, Sendable, Codable {
     case qatarAirways = "qatar_airways"
 
     var displayName: String {
@@ -10,7 +10,7 @@ enum SalarySourceAuthority: String, CaseIterable, Equatable, Sendable, Codable {
     }
 }
 
-enum SalaryDocumentKind: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum SalaryDocumentKind: String, CaseIterable, Equatable, Sendable, Codable {
     case regularSalary = "regular_salary"
     case adhocPayment = "adhoc_payment"
     case annualDiscretionaryBonus = "annual_discretionary_bonus"
@@ -24,12 +24,12 @@ enum SalaryDocumentKind: String, CaseIterable, Equatable, Sendable, Codable {
     }
 }
 
-enum SalaryComponentSide: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum SalaryComponentSide: String, CaseIterable, Equatable, Sendable, Codable {
     case earning
     case deduction
 }
 
-struct SalaryComponent: Equatable, Sendable, Codable {
+nonisolated struct SalaryComponent: Equatable, Sendable, Codable {
     let side: SalaryComponentSide
     let sourceOrdinal: Int
     let sourceLabel: String
@@ -53,7 +53,7 @@ struct SalaryComponent: Equatable, Sendable, Codable {
     }
 }
 
-struct SalaryStatementEvidence: Equatable, Sendable {
+nonisolated struct SalaryStatementEvidence: Equatable, Sendable {
     static let profileID = "qatar-airways.salary.pdf"
     static let profileVersion = "1"
 
@@ -198,6 +198,7 @@ struct FundingPlanBalance: Identifiable, Equatable, Sendable {
     var included: Bool
     var money: Money?
     var provenance: FundingPlanValueProvenance
+    var financialBalanceDate: StatementDate? = nil
 }
 
 struct FundingPlanCommitment: Identifiable, Equatable, Sendable {
@@ -216,7 +217,7 @@ struct FundingPlanCommitment: Identifiable, Equatable, Sendable {
 
     /// Retain the selected recurring day; shorter months use their last day.
     /// Dates never change the row's explicit Include choice.
-    func dueDate(in month: SelectedStatementMonth) -> StatementDate? {
+    nonisolated func dueDate(in month: SelectedStatementMonth) -> StatementDate? {
         guard let dueDate else { return nil }
         guard recurs, (dueDate.year, dueDate.month) <= (month.year, month.month) else { return dueDate }
         for day in stride(from: dueDate.day, through: 1, by: -1) {
@@ -283,6 +284,25 @@ struct FundingPlan: Identifiable, Equatable, Sendable {
     var deductions: [FundingPlanDeduction] = []
     var referenceMode: FundingPlanReferenceMode = .alDar
     var effectiveAlDarReference: AlDarReferenceQuote? = nil
+    var assistance: PlanAssistance? = nil
+
+    nonisolated var recurringStart: StatementDate { assistance?.salaryCycle?.recurringStart ?? (try! StatementDate(year: month.year, month: month.month, day: 1)) }
+    nonisolated var recurringEnd: StatementDate { assistance?.salaryCycle?.recurringEnd ?? FinancialCalendar.lastDay(month)! }
+    nonisolated func includesRecurring(_ date: StatementDate) -> Bool { date >= recurringStart && date <= recurringEnd }
+    nonisolated func dueDate(for bill: FundingPlanCommitment) -> StatementDate? {
+        if let date = assistance?.carriedBillDates?[bill.id] { return try? StatementDate(canonical: date) }
+        return assistance?.salaryCycle == nil ? bill.dueDate(in: month) : bill.dueDate
+    }
+    /// Used only when explicitly carrying a template into a new draft. An
+    /// existing dated bill never advances merely because payday changes.
+    nonisolated func nextRecurringDate(for bill: FundingPlanCommitment) -> StatementDate? {
+        guard assistance?.salaryCycle != nil, bill.recurs, let original = bill.dueDate else { return bill.dueDate(in: month) }
+        let firstMonth = try! SelectedStatementMonth(year: recurringStart.year, month: recurringStart.month)
+        if let date = bill.dueDate(in: firstMonth), date >= original, includesRecurring(date) { return date }
+        let lastMonth = try! SelectedStatementMonth(year: recurringEnd.year, month: recurringEnd.month)
+        if let date = bill.dueDate(in: lastMonth), date >= original, includesRecurring(date) { return date }
+        return original
+    }
 }
 
 enum FundingPlanIncompleteReason: String, Equatable, Sendable {
@@ -291,6 +311,7 @@ enum FundingPlanIncompleteReason: String, Equatable, Sendable {
     case invalidCurrency
     case missingPlanningFX
     case invalidPlanningReference
+    case salaryReceiptNeedsReview
 }
 
 struct FundingPlanCalculation: Equatable, Sendable {
@@ -311,10 +332,76 @@ struct FundingPlanCalculation: Equatable, Sendable {
     var signedPotentialCapacity: Money? = nil
     var transferablePrincipal: Money? = nil
     var estimatedINR: Money? = nil
+    var qatarObligationShortfall: Money? = nil
+    var qatarReserveGap: Money? = nil
+}
+
+nonisolated enum PayslipReceiptState: Equatable, Sendable {
+    case pending
+    case bankCredit(id: String, date: StatementDate, includedInBalance: Bool)
+    case acknowledgedBalance
+    case needsReview
+
+    static func resolve(plan: FundingPlan, transactions: [Transaction], excludedAccounts: Set<String> = []) -> Self? {
+        guard let link = plan.assistance?.payslipFunding else { return nil }
+        guard !excludedAccounts.contains(link.accountID),
+              let balance = plan.balances.first(where: { $0.accountID == link.accountID && $0.included }),
+              let amount = balance.money else { return .needsReview }
+        // Source-established employer payroll does not stop being received if
+        // an editable category rule is later disabled. No relationship is saved.
+        let candidates = transactions.filter {
+            $0.repositoryAccountId == link.accountID && $0.creditMoney != nil && $0.currency == link.net.currency &&
+                $0.statementDate.map { String($0.canonical.prefix(7)) == plan.month.canonical } == true &&
+                $0.sourceProvenance.contains { $0.parserProfileID.hasPrefix("cbq.") } &&
+                $0.description.uppercased().hasPrefix("SALARY TRANSFER") && $0.description.uppercased().contains("QATAR AIRWAYS")
+        }
+        guard !candidates.isEmpty else {
+            if let acknowledgement = link.balanceAcknowledgement {
+                guard case .capturedAccountBalance = balance.provenance,
+                      let payday = plan.assistance?.salaryCycle?.recurringStart,
+                      let acknowledgedDate = try? StatementDate(canonical: acknowledgement.financialDate),
+                      acknowledgedDate >= payday else { return .needsReview }
+                return acknowledgement.balanceID == balance.id && acknowledgement.amount == (try? PlanningAmount(amount)) &&
+                    acknowledgement.financialDate == balance.financialBalanceDate?.canonical ? .acknowledgedBalance : .needsReview
+            }
+            if let date = balance.financialBalanceDate, let payday = plan.assistance?.salaryCycle?.recurringStart, date >= payday {
+                return .needsReview
+            }
+            return .pending
+        }
+        guard candidates.count == 1, let credit = candidates.first, let date = credit.statementDate,
+              let id = credit.repositoryTransactionId, let net = try? link.net.money(), credit.money == net else { return .needsReview }
+        // A later imported credit outranks a prior balance acknowledgment. A
+        // balance preceding the real credit cannot already include that money.
+        return .bankCredit(id: id, date: date, includedInBalance: balance.financialBalanceDate.map { $0 >= date } ?? false)
+    }
+
+    var explanation: String {
+        switch self {
+        case .pending: "Expected from payslip · bank receipt not yet recorded"
+        case .bankCredit(_, _, true): "Salary received · already included in the selected balance"
+        case .bankCredit(_, _, false): "Salary received · capture a balance dated on or after the credit"
+        case .acknowledgedBalance: "You confirmed this captured balance includes the salary"
+        case .needsReview: "Review the salary account and captured balance before calculating funding"
+        }
+    }
 }
 
 enum FundingPlanCalculator {
-    static func calculate(_ plan: FundingPlan) -> FundingPlanCalculation {
+    // Monthly worksheet inputs are complete on their own. Saved reserve
+    // targets belong to Plan insights and never reduce these selected balances.
+    static func calculate(_ savedPlan: FundingPlan, excludingAccounts: Set<String> = [], salaryReceipt: PayslipReceiptState? = nil) -> FundingPlanCalculation {
+        var plan = savedPlan
+        plan.balances.removeAll { excludingAccounts.contains($0.accountID) }
+        if let link = plan.assistance?.payslipFunding {
+            switch salaryReceipt {
+            case .pending:
+                guard let net = try? link.net.money(), let total = try? plan.expectedFixedEarnings + net else { return unavailable(.invalidCurrency) }
+                plan.expectedFixedEarnings = total
+            case .bankCredit(_, _, true), .acknowledgedBalance: break
+            case .bankCredit(_, _, false), .needsReview, nil: return unavailable(.salaryReceiptNeedsReview)
+            }
+        }
         if plan.calculationVersion == .budgetV1 { return calculateBudget(plan) }
         var reasons = Set<FundingPlanIncompleteReason>()
         guard plan.planningFX == nil || plan.alDarReference == nil else {
@@ -445,12 +532,16 @@ enum FundingPlanCalculator {
         let fee = principal.flatMap { try? Money(amount: $0.amount > 0 ? plan.configuredTransferFee.amount : 0, currency: qar) }
         let margin: Money? = if let p, let principal, let fee { try? p - principal - fee } else { nil }
         let estimate: Money? = if let t, let rate { try? rate.receiveEstimate(forQAR: t) } else { nil }
+        let afterQatarBills: Money? = if let b, let net, let cq { try? b + net - cq } else { nil }
+        let obligationGap = afterQatarBills.flatMap { try? Money(amount: max(0, -$0.amount), currency: qar) }
+        let reserveGap = afterQatarBills.flatMap { try? Money(amount: max(0, reserve.amount - max(0, $0.amount)), currency: qar) }
         return FundingPlanCalculation(expectedNet: net, selectedQARLiquidity: b, selectedINRLiquidity: e,
             indiaCommitments: ci, indiaFundingShortfall: h, requiredQARPrincipal: principal,
             effectiveTransferFee: fee, qarBeforeInvestment: margin, availableForInvestment: nil,
             finalQARBuffer: margin, incompleteReasons: reasons, totalDeductions: deductions,
             qatarCommitments: cq, positionBeforeTransfer: p, signedPotentialCapacity: a,
-            transferablePrincipal: t, estimatedINR: estimate)
+            transferablePrincipal: t, estimatedINR: estimate,
+            qatarObligationShortfall: obligationGap, qatarReserveGap: reserveGap)
     }
 
     private static func sum(_ values: [Money], currency: CurrencyCode) -> Money? {

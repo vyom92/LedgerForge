@@ -3,7 +3,7 @@
 
 import Foundation
 
-enum CardTransactionSummaryMembership: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum CardTransactionSummaryMembership: String, CaseIterable, Equatable, Sendable, Codable {
     case cbqV1AmountBilled = "cbq_v1_amount_billed"
     case cbqV1PaymentReceived = "cbq_v1_payment_received"
     case cbqV2TotalPayment = "cbq_v2_total_payment"
@@ -16,8 +16,9 @@ enum CardTransactionSummaryMembership: String, CaseIterable, Equatable, Sendable
 /// Persistence-safe exact contract descriptor shared by the main app and the
 /// subprocess probe. It deliberately uses durable codes instead of depending
 /// on parser or UI model types.
-enum CardStatementProfileContract: Equatable, Sendable {
+nonisolated enum CardStatementProfileContract: Equatable, Sendable {
     case amex
+    case amexUSDZero
     case cbqV1
     case cbqV2
     case axis
@@ -25,6 +26,7 @@ enum CardStatementProfileContract: Equatable, Sendable {
     init?(reconciliationRuleIdentifier rule: String) {
         switch rule {
         case "amex.qar.previous-minus-credits-plus-debits.v1": self = .amex
+        case "amex.usd.zero.previous-equals-new-balance.v1": self = .amexUSDZero
         case "cbq.qar.v1.previous-plus-billed-minus-payment.v1",
              "cbq.qar.v1.previous-plus-billed-minus-payment.v2": self = .cbqV1
         case "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1",
@@ -35,16 +37,25 @@ enum CardStatementProfileContract: Equatable, Sendable {
         }
     }
 
+    var isAmex: Bool { self == .amex || self == .amexUSDZero }
+    var nativeCurrency: String {
+        switch self {
+        case .amexUSDZero: return "USD"
+        case .axis: return "INR"
+        default: return "QAR"
+        }
+    }
+
     var institutionCode: String {
         switch self {
-        case .amex: return "American Express"
+        case .amex, .amexUSDZero: return "American Express"
         case .cbqV1, .cbqV2: return "Commercial Bank of Qatar"
         case .axis: return "Axis Bank"
         }
     }
     var profileID: String {
         switch self {
-        case .amex: return "amex.credit-card.pdf"
+        case .amex, .amexUSDZero: return "amex.credit-card.pdf"
         case .cbqV1, .cbqV2: return "cbq.credit-card.pdf"
         case .axis: return "axis.credit-card.pdf"
         }
@@ -61,33 +72,33 @@ enum CardStatementProfileContract: Equatable, Sendable {
         default: return "\(profileID)@\(profileVersion)"
         }
     }
-    var supportsSemanticSourceGrouping: Bool { self == .amex || self == .axis }
+    var supportsSemanticSourceGrouping: Bool { isAmex || self == .axis }
     var requiresCBQSummaryMembership: Bool { self == .cbqV1 || self == .cbqV2 }
     var requiresPhysicalSections: Bool { self != .axis }
     var accountObservationKindCode: String? {
         switch self {
-        case .amex: return "amex_membership_number"
+        case .amex, .amexUSDZero: return "amex_membership_number"
         case .cbqV1, .cbqV2: return "cbq_card_account_reference"
         case .axis: return nil
         }
     }
     var instrumentObservationKindCode: String? {
         switch self {
-        case .amex: return "amex_card_account_number"
+        case .amex, .amexUSDZero: return "amex_card_account_number"
         case .cbqV1, .cbqV2: return "cbq_masked_card_number"
         case .axis: return nil
         }
     }
     var sectionRule: String? {
         switch self {
-        case .amex: return "amex.section.signed-increases-minus-decreases.v1"
+        case .amex, .amexUSDZero: return "amex.section.signed-increases-minus-decreases.v1"
         case .cbqV1, .cbqV2: return "cbq.section.signed-source-membership.v1"
         case .axis: return nil
         }
     }
     var requiredSummaryCodes: Set<String> {
         switch self {
-        case .amex:
+        case .amex, .amexUSDZero:
             return ["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"]
         case .cbqV1:
             return ["previous_balance", "amount_billed", "payment_received", "new_balance", "minimum_amount_due", "due_date", "source_section_net_total"]
@@ -149,7 +160,7 @@ enum CardStatementProfileContract: Equatable, Sendable {
 
     var accountLevelMemberships: Set<CardTransactionSummaryMembership> {
         switch self {
-        case .amex: return []
+        case .amex, .amexUSDZero: return []
         case .cbqV1: return [.cbqV1PaymentReceived]
         case .cbqV2: return [.cbqV2TotalPayment]
         case .axis: return []
@@ -157,7 +168,7 @@ enum CardStatementProfileContract: Equatable, Sendable {
     }
     var instrumentMemberships: Set<CardTransactionSummaryMembership> {
         switch self {
-        case .amex: return []
+        case .amex, .amexUSDZero: return []
         case .cbqV1: return [.cbqV1AmountBilled]
         case .cbqV2: return [.cbqV2CreditReversal, .cbqV2Purchases, .cbqV2BilledInstallment, .cbqV2FeesCharges]
         case .axis: return []
@@ -165,7 +176,7 @@ enum CardStatementProfileContract: Equatable, Sendable {
     }
 }
 
-nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", equivalentSourceRecorded = "equivalent_source_recorded", cbqSourceOverlapCommitted = "cbq_source_overlap_committed", statementEquivalenceConflict = "statement_equivalence_conflict", statementEquivalenceEvidenceUnavailable = "statement_equivalence_evidence_unavailable", equivalentFormatAlreadyRecorded = "equivalent_format_already_recorded", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", accountChoiceRequired = "account_choice_required", identifierOwnershipConflict = "identifier_ownership_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention", sourceSnapshotAcquisitionFailed = "source_snapshot_acquisition_failed", sourceSnapshotIntegrityFailed = "source_snapshot_integrity_failed" }
+nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", equivalentSourceRecorded = "equivalent_source_recorded", cbqSourceOverlapCommitted = "cbq_source_overlap_committed", bankSourceOverlapHeld = "bank_source_overlap_held", statementEquivalenceConflict = "statement_equivalence_conflict", statementEquivalenceEvidenceUnavailable = "statement_equivalence_evidence_unavailable", equivalentFormatAlreadyRecorded = "equivalent_format_already_recorded", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", accountChoiceRequired = "account_choice_required", identifierOwnershipConflict = "identifier_ownership_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention", sourceSnapshotAcquisitionFailed = "source_snapshot_acquisition_failed", sourceSnapshotIntegrityFailed = "source_snapshot_integrity_failed" }
 nonisolated enum ImportAttemptCoverage: String, CaseIterable { case evaluatedSupportedOnly = "evaluated_supported_only", allRowsSupportedAxisUPIReviewed = "all_rows_supported_axis_upi_reviewed", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
 nonisolated enum ImportAttemptAccountDecision: String, CaseIterable { case matchedExisting = "matched_existing", userSelectedExisting = "user_selected_existing", createdNew = "created_new", resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
 nonisolated enum ImportAttemptGuidance: String, CaseIterable { case importCompleted = "import_completed", equivalentSourceRecorded = "equivalent_source_recorded", partialImportCompleted = "partial_import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required", prepareAgain = "prepare_again", retryConfirmation = "retry_confirmation" }
@@ -357,6 +368,9 @@ public struct AccountDTO: nonisolated Equatable, Sendable {
     public let nativeCurrency: String
     public let description: String?
     public let createdAtISO: String
+    /// When the owner marked this credit card closed and settled/history-only.
+    /// This is administrative metadata, not an issuer closure or settlement date.
+    public let closedAtISO: String?
 
     public init(id: String = UUID().uuidString,
                 workspaceId: String,
@@ -365,7 +379,8 @@ public struct AccountDTO: nonisolated Equatable, Sendable {
                 accountType: String? = nil,
                 nativeCurrency: String,
                 description: String? = nil,
-                createdAtISO: String) {
+                createdAtISO: String,
+                closedAtISO: String? = nil) {
         self.id = id
         self.workspaceId = workspaceId
         self.name = name
@@ -374,6 +389,7 @@ public struct AccountDTO: nonisolated Equatable, Sendable {
         self.nativeCurrency = nativeCurrency
         self.description = description
         self.createdAtISO = createdAtISO
+        self.closedAtISO = closedAtISO
     }
 }
 
@@ -666,6 +682,11 @@ public struct CardRepositorySnapshotDTO: nonisolated Equatable, Sendable {
         self.semanticGroups = semanticGroups
         self.semanticMembers = semanticMembers
     }
+}
+
+public struct BankSectionRepositorySnapshotDTO: nonisolated Equatable, Sendable {
+    public let sections: [BankStatementSectionPlanDTO]
+    public init(sections: [BankStatementSectionPlanDTO] = []) { self.sections = sections }
 }
 
 public struct ImportSessionDTO: nonisolated Equatable, Sendable {
@@ -982,6 +1003,44 @@ public struct StatementZeroActivityControlDTO: nonisolated Equatable, Sendable {
         return true
     }
 
+    /// Empty Amex statements retain two independently persisted views of the
+    /// printed controls. Bind them before a provider accepts or hydrates the
+    /// graph, including the selected USD account-only layout.
+    func matchesAmexZeroStatement(_ statement: CardStatementDTO,
+                                  components: [CardStatementSummaryComponentDTO]) -> Bool {
+        guard isValid(),
+              let contract = CardStatementProfileContract(reconciliationRuleIdentifier: statement.reconciliationRuleCode),
+              contract.isAmex, statement.sourceRowCount == 0,
+              workspaceId == statement.workspaceId, accountId == statement.liabilityAccountId,
+              documentId == statement.documentId, importSessionId == statement.importSessionId,
+              normalizedDocumentId == statement.normalizedDocumentId,
+              parserProfileId == statement.parserProfileId, parserProfileVersion == statement.parserProfileVersion,
+              nativeCurrency == contract.nativeCurrency, nativeCurrency == statement.statementCurrency,
+              statementDateISO == statement.statementDateISO,
+              statementStartDateISO == statement.statementStartDateISO,
+              statementEndDateISO == statement.statementEndDateISO,
+              selectedStatementMonthISO == statement.selectedStatementMonthISO,
+              Set(components.map(\.componentCode)) == contract.requiredSummaryCodes,
+              components.count == contract.requiredSummaryCodes.count,
+              components.allSatisfy({ $0.cardStatementId == statement.id }),
+              cardPreviousBalanceMinor == nil, cardPreviousBalanceDecimal == nil,
+              cardTotalPaymentDueMinor == nil, cardTotalPaymentDueDecimal == nil else { return false }
+        let byCode = Dictionary(uniqueKeysWithValues: components.map { ($0.componentCode, $0) })
+        if nativeCurrency == "USD" {
+            guard let cardPaymentDueDateISO,
+                  byCode["due_date"]?.dateISO == cardPaymentDueDateISO else { return false }
+        } else if cardPaymentDueDateISO != nil { return false }
+        func matches(_ code: String, minor: Int64?, decimal: String?) -> Bool {
+            guard let component = byCode[code], let minor, let decimal else { return false }
+            return component.moneyCurrency == nativeCurrency && component.moneyMinor == minor &&
+                component.moneyDecimal == decimal
+        }
+        return matches("previous_balance", minor: openingBalanceMinor, decimal: openingBalanceDecimal) &&
+            matches("new_balance", minor: closingBalanceMinor, decimal: closingBalanceDecimal) &&
+            matches("new_debits", minor: debitTotalMinor, decimal: debitTotalDecimal) &&
+            matches("new_credits", minor: creditTotalMinor, decimal: creditTotalDecimal)
+    }
+
     /// The selected durable account is part of the zero-activity authority.
     /// Structural similarity or a caller-supplied account choice must never
     /// override the exact registered institution, family type, or currency.
@@ -990,7 +1049,8 @@ public struct StatementZeroActivityControlDTO: nonisolated Equatable, Sendable {
               let binding = ZeroActivityProfileBinding.resolve(
                   profileID: parserProfileId,
                   profileVersion: parserProfileVersion,
-                  sourceFormatCode: sourceFormatCode
+                  sourceFormatCode: sourceFormatCode,
+                  nativeCurrencyCode: nativeCurrency
               ) else { return false }
         return account.id == accountId &&
             account.workspaceId == workspaceId &&
@@ -1306,6 +1366,12 @@ public struct CBQSourceObservationSummaryDTO: nonisolated Equatable, Sendable {
         self.representedTransactionCount = representedTransactionCount
         self.transactionObservationCount = transactionObservationCount
     }
+}
+
+public struct StatementCoveragePeriodDTO: nonisolated Equatable, Sendable {
+    public let accountID: String
+    public let startISO: String
+    public let endISO: String
 }
 
 struct RepositoryImportAttempt: nonisolated Identifiable, Equatable {

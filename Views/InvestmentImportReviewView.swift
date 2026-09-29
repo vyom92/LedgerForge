@@ -7,6 +7,12 @@ struct InvestmentImportReviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            if let error = preparation.investmentReviewError {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(theme.typography.formBody)
+                    .foregroundStyle(LFTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let plan = preparation.investmentPlan {
                 ForEach(plan.evidence.scopes.filter { scope in
                     scope.positions.contains { $0.units.value > 0 }
@@ -18,7 +24,7 @@ struct InvestmentImportReviewView: View {
                             Text(scope.identity).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                         }
                         Spacer()
-                        Text(scope.holdingsDate).font(theme.typography.formBody)
+                        Text(AppDateDisplay.civil(scope.holdingsDate)).font(theme.typography.formBody)
                     }
                 }
                 if let review = preparation.investmentReview {
@@ -55,7 +61,7 @@ struct InvestmentImportReviewView: View {
                         }
                     }
                     ForEach(plan.evidence.scopes.filter { review.sameDateConflictScopes.contains($0.key) || plan.choices.replaceSameDateScopes.contains($0.key) }, id: \.key) { scope in
-                        Toggle("Use this statement’s holdings for \(scope.displayName) on \(scope.holdingsDate)", isOn: Binding(
+                        Toggle("Use this statement’s holdings for \(scope.displayName) on \(AppDateDisplay.civil(scope.holdingsDate))", isOn: Binding(
                             get: { plan.choices.replaceSameDateScopes.contains(scope.key) },
                             set: { enabled in
                                 var choices = plan.choices
@@ -85,9 +91,6 @@ struct InvestmentImportReviewView: View {
                     Text(plan.evidence.excludedSectionDescription)
                         .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 }
-            }
-            if let error = preparation.investmentReviewError {
-                Text(error).font(theme.typography.formBody).foregroundStyle(LFTheme.warning)
             }
         }
     }

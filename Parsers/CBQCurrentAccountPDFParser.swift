@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum CBQCurrentAccountPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCurrentAccountPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case changedHeader
     case malformedSourceEvidence
@@ -21,10 +21,16 @@ enum CBQCurrentAccountPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class CBQCurrentAccountPDFParser: StatementParser {
+nonisolated final class CBQCurrentAccountPDFParser: StatementParser {
     static let historyProfileID = "cbq.current-account.history.pdf"
     static let monthlyProfileID = "cbq.current-account.monthly.pdf"
     static let profileVersion = "1"
+    static let bankProfileIDs = [historyProfileID, monthlyProfileID,
+        CBQCurrentAccountPDFFamily.legacyCurrent.profileID,
+        CBQCurrentAccountPDFFamily.usdMonthly.profileID,
+        CBQCurrentAccountPDFFamily.savingsLegacy.profileID,
+        CBQCurrentAccountPDFFamily.savingsMonthly.profileID,
+        CBQCurrentAccountPDFFamily.eSavingsMonthly.profileID]
 
     var name: String { "CBQ Current Account PDF" }
 
@@ -51,13 +57,23 @@ final class CBQCurrentAccountPDFParser: StatementParser {
         let fragments = Dictionary(uniqueKeysWithValues: pairs)
         let family: CBQCurrentAccountPDFFamily
         if fragments["ACCOUNT"] != nil { family = .history }
-        else if fragments["MASKED_ACCOUNT"] != nil { family = .monthly }
+        else if let product = fragments["PRODUCT"] {
+            switch product {
+            case "Current Account-Retail":
+                if fragments["SOURCE_SECOND_DATE_ROLE"] == "value_date" { family = .legacyCurrent }
+                else if fragments["CURRENCY_CODE"] == "USD" { family = .usdMonthly }
+                else { family = .monthly }
+            case "Savings Account": family = fragments["SOURCE_SECOND_DATE_ROLE"] == "value_date" ? .savingsLegacy : .savingsMonthly
+            case "E Savings Account": family = .eSavingsMonthly
+            default: throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+            }
+        } else if fragments["MASKED_ACCOUNT"] != nil { family = .monthly }
         else { throw CBQCurrentAccountPDFParserError.malformedSourceEvidence }
 
-        let currency = try CurrencyCode("QAR")
+        let currency = try CurrencyCode(family == .usdMonthly ? "USD" : "QAR")
         let identifiers: [FinancialIdentifier]
         let partialIdentities: [CBQSourceIdentityObservation]
-        let statementEvidence: SourceStatementEvidence?
+        var statementEvidence: SourceStatementEvidence?
         if family == .history {
             guard let rawAccount = fragments["ACCOUNT"] else { throw CBQCurrentAccountPDFParserError.malformedSourceEvidence }
             do {
@@ -67,8 +83,7 @@ final class CBQCurrentAccountPDFParser: StatementParser {
             statementEvidence = SourceStatementEvidence(sourceFormatCode: "history-pdf", statementBoundaryDate: nil, period: nil, openingBalance: nil, closingBalance: nil)
         } else {
             guard let rawAccount = fragments["MASKED_ACCOUNT"], let rawIBAN = fragments["MASKED_IBAN"],
-                  let boundaryText = fragments["STATEMENT_BOUNDARY"], let startText = fragments["PERIOD_START"],
-                  let openingText = fragments["OPENING_BALANCE"], let closingText = fragments["CLOSING_BALANCE"] else {
+                  let boundaryText = fragments["STATEMENT_BOUNDARY"], let closingText = fragments["CLOSING_BALANCE"] else {
                 throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
             }
             do {
@@ -79,16 +94,37 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                 guard CBQSourceIdentityObservation.validatePair(partialIdentities) else {
                     throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
                 }
-                let boundary = try Self.monthlyBoundaryDate(boundaryText)
-                let start = try Self.monthlyDate(startText)
-                let period = try DeclaredStatementPeriod(start: start, end: boundary)
-                statementEvidence = SourceStatementEvidence(
-                    sourceFormatCode: "monthly-pdf",
-                    statementBoundaryDate: boundary,
-                    period: period,
-                    openingBalance: try Money(amount: Self.decimal(openingText), currency: currency),
-                    closingBalance: try Money(amount: Self.decimal(closingText), currency: currency)
-                )
+                if family == .savingsLegacy || family == .legacyCurrent {
+                    let boundary = try Self.monthlyBoundaryDate(boundaryText)
+                    let period = try fragments["PERIOD_START"].map {
+                        try DeclaredStatementPeriod(start: Self.legacyDate($0), end: boundary)
+                    }
+                    guard let openingText = fragments["OPENING_BALANCE"] else {
+                        throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+                    }
+                    statementEvidence = SourceStatementEvidence(
+                        sourceFormatCode: "legacy-pdf",
+                        statementBoundaryDate: boundary, period: period,
+                        openingBalance: try Money(amount: Self.decimal(openingText), currency: currency),
+                        closingBalance: try Money(amount: Self.decimal(closingText), currency: currency)
+                    )
+                } else {
+                    guard let openingText = fragments["OPENING_BALANCE"],
+                          family != .monthly || fragments["PERIOD_START"] != nil else {
+                        throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+                    }
+                    let boundary = try Self.monthlyBoundaryDate(boundaryText)
+                    let period = try fragments["PERIOD_START"].map {
+                        try DeclaredStatementPeriod(start: Self.monthlyDate($0), end: boundary)
+                    }
+                    statementEvidence = SourceStatementEvidence(
+                        sourceFormatCode: "monthly-pdf",
+                        statementBoundaryDate: boundary,
+                        period: period,
+                        openingBalance: try Money(amount: Self.decimal(openingText), currency: currency),
+                        closingBalance: try Money(amount: Self.decimal(closingText), currency: currency)
+                    )
+                }
             } catch { throw CBQCurrentAccountPDFParserError.malformedSourceEvidence }
             identifiers = []
         }
@@ -101,19 +137,20 @@ final class CBQCurrentAccountPDFParser: StatementParser {
             guard row.values.count == CBQCurrentAccountPDFNormalizer.logicalHeader.count,
                   !row.values[1].isEmpty else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
             do {
-                let postingDate = family == .history ? try Self.historyDate(row.values[0]) : try Self.monthlyDate(row.values[0])
+                let postingDate = family == .history ? try Self.historyDate(row.values[0]) : [.savingsLegacy, .legacyCurrent].contains(family) ? try Self.legacyDate(row.values[0]) : try Self.monthlyDate(row.values[0])
                 if family == .history, let previousDate, postingDate > previousDate {
                     throw CBQCurrentAccountPDFParserError.ascendingHistory(sourceOrdinal: row.rowNumber)
                 }
-                if family == .monthly, let previousDate, postingDate < previousDate {
+                if family != .history, let previousDate, postingDate < previousDate {
                     throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
                 }
                 previousDate = postingDate
-                let sourceTransactionDate = row.values[2].isEmpty ? nil : try Self.monthlyDate(row.values[2])
+                let sourceTransactionDate = [.savingsLegacy, .legacyCurrent].contains(family) || row.values[2].isEmpty ? nil : try Self.monthlyDate(row.values[2])
+                let valueDate = [.savingsLegacy, .legacyCurrent].contains(family) ? try Self.legacyDate(row.values[2]) : nil
                 let signedAmount = try Self.decimal(row.values[3])
                 guard signedAmount != .zero else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
                 let balance = try Self.decimal(row.values[4])
-                if family == .monthly {
+                if family != .history {
                     guard let prior = previousBalance, prior + signedAmount == balance else {
                         throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: row.rowNumber)
                     }
@@ -124,7 +161,7 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                 let structuredDigest = Self.structuredReferenceDigest(in: row.values[1])
                 transactions.append(Transaction(
                     statementDate: postingDate,
-                    valueDate: nil,
+                    valueDate: valueDate,
                     description: row.values[1],
                     reference: nil,
                     debitMoney: try debit.map { try Money(amount: $0, currency: currency) },
@@ -145,7 +182,8 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                         parserProfileID: profileID,
                         parserProfileVersion: Self.profileVersion,
                         sourceTransactionDate: sourceTransactionDate,
-                        structuredReferenceDigest: structuredDigest
+                        structuredReferenceDigest: structuredDigest,
+                        literalRunningBalance: row.rawValues?[4] ?? row.values[4]
                     )]
                 ))
             } catch let error as CBQCurrentAccountPDFParserError { throw error }
@@ -153,8 +191,17 @@ final class CBQCurrentAccountPDFParser: StatementParser {
         }
         let zeroEvidence: ZeroActivityStatementEvidence?
         if transactions.isEmpty {
-            guard family == .monthly, let statementEvidence,
-                  let period = statementEvidence.period,
+            if [.legacyCurrent, .savingsLegacy].contains(family), let source = statementEvidence {
+                statementEvidence = SourceStatementEvidence(
+                    sourceFormatCode: source.sourceFormatCode,
+                    statementBoundaryDate: source.statementBoundaryDate,
+                    period: nil,
+                    openingBalance: source.openingBalance,
+                    closingBalance: source.closingBalance
+                )
+            }
+            guard family != .history, let statementEvidence,
+                  (family == .legacyCurrent || family == .savingsLegacy || statementEvidence.period != nil),
                   let opening = statementEvidence.openingBalance,
                   let closing = statementEvidence.closingBalance,
                   let regionStart = fragments["FINANCIAL_REGION_START"].flatMap(Int.init),
@@ -173,24 +220,26 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                 financialRegionEndOrdinal: regionEnd,
                 financialRegionSignature: signature,
                 statementDate: statementEvidence.statementBoundaryDate,
-                statementPeriod: period, nativeCurrency: currency,
+                statementPeriod: [.legacyCurrent, .savingsLegacy].contains(family) ? nil : statementEvidence.period,
+                nativeCurrency: currency,
                 openingBalance: opening, closingBalance: closing
             )
         } else {
             zeroEvidence = nil
         }
-        if !transactions.isEmpty, family == .monthly, let expected = statementEvidence?.closingBalance,
+        if !transactions.isEmpty, family != .history, let expected = statementEvidence?.closingBalance,
            transactions.last?.runningBalanceMoney != expected {
             throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: document.rows.last?.rowNumber ?? 0)
         }
         return FinancialDocument(
             sourceDocument: document.document,
             metadata: document.metadata,
-            parserName: family == .history ? "CBQ Current Account History PDF" : "CBQ Current Account Monthly PDF",
+            parserName: Self.parserName(for: family),
             parserProfileID: profileID,
             parserProfileVersion: Self.profileVersion,
             bookedCurrency: currency,
-            declaredStatementPeriod: statementEvidence?.period,
+            declaredStatementPeriod: transactions.isEmpty && [.legacyCurrent, .savingsLegacy].contains(family)
+                ? nil : statementEvidence?.period,
             transactions: transactions,
             financialIdentifiers: identifiers,
             cbqSourceIdentityObservations: partialIdentities,
@@ -224,6 +273,25 @@ final class CBQCurrentAccountPDFParser: StatementParser {
             throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
         }
         return try StatementDate(year: 2000 + year, month: month, day: day)
+    }
+
+    private static func legacyDate(_ source: String) throws -> StatementDate {
+        guard source.range(of: #"^[0-9]{2}[A-Za-z]{3}[0-9]{2}$"#, options: .regularExpression) != nil else {
+            throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+        }
+        return try monthlyDate("\(source.prefix(2))-\(source.dropFirst(2).prefix(3))-\(source.suffix(2))")
+    }
+
+    private static func parserName(for family: CBQCurrentAccountPDFFamily) -> String {
+        switch family {
+        case .history: return "CBQ Current Account History PDF"
+        case .legacyCurrent: return "CBQ Current Account Legacy PDF"
+        case .monthly: return "CBQ Current Account Monthly PDF"
+        case .usdMonthly: return "CBQ Current Account USD Monthly PDF"
+        case .savingsLegacy: return "CBQ Savings Account Legacy PDF"
+        case .savingsMonthly: return "CBQ Savings Account Monthly PDF"
+        case .eSavingsMonthly: return "CBQ E Savings Account Monthly PDF"
+        }
     }
 
     private static func monthlyBoundaryDate(_ source: String) throws -> StatementDate {

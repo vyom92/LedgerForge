@@ -1,6 +1,6 @@
 import Foundation
 
-enum AxisBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedDocumentContent
     case missingHeader
     case duplicateHeader
@@ -29,14 +29,14 @@ enum AxisBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct AxisBankAccountXLSNormalizationResult {
+nonisolated struct AxisBankAccountXLSNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class AxisBankAccountXLSNormalizer {
+nonisolated final class AxisBankAccountXLSNormalizer {
     static let logicalHeader = [
         "Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"
     ]

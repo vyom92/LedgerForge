@@ -37,9 +37,11 @@ nonisolated enum ZurichISPClientError: Error, LocalizedError, Equatable, Sendabl
     case unauthorizedRedirect
     case malformedSource
     case unsupportedSignIn
+    case incompleteCredentials
     case rejectedSignIn
     case malformedPINChallenge
     case rejectedPIN
+    case unexpectedSignInPage
     case sessionExpired
     case policySelection
     case partialResponse
@@ -47,7 +49,7 @@ nonisolated enum ZurichISPClientError: Error, LocalizedError, Equatable, Sendabl
 
     var invalidatesSession: Bool {
         switch self {
-        case .rejectedSignIn, .rejectedPIN, .unsupportedSignIn, .sessionExpired, .unauthorizedRedirect, .timedOut, .cancelled:
+        case .rejectedSignIn, .rejectedPIN, .unsupportedSignIn, .unexpectedSignInPage, .sessionExpired, .unauthorizedRedirect, .timedOut, .cancelled:
             true
         default:
             false
@@ -59,7 +61,12 @@ nonisolated enum ZurichISPClientError: Error, LocalizedError, Equatable, Sendabl
         case .inFlight: "An ISP connection check is already in progress."
         case .cancelled: "The ISP connection check was cancelled."
         case .timedOut: "The ISP connection check took too long."
-        case .rejectedSignIn, .rejectedPIN: "Zurich did not accept the supplied credentials."
+        case .incompleteCredentials: "Enter your Zurich username, password and full memorable PIN."
+        case .rejectedSignIn: "Zurich did not complete the username and password step. Use the eye controls to check your entry, or verify the login on Zurich’s website before trying again."
+        case .rejectedPIN: "Zurich returned to the memorable PIN step. Check that you entered the full memorable PIN, not only the three characters requested on the website."
+        case .malformedPINChallenge: "LedgerForge could not read Zurich’s requested PIN positions. Your saved connection has not been replaced."
+        case .unexpectedSignInPage: "Zurich showed another page after sign-in that LedgerForge could not continue safely. Open Zurich’s website to review it. This does not mean your password was rejected."
+        case .sessionExpired: "Zurich returned to sign-in before the holdings check completed. Your previous holdings are retained."
         case .unsupportedSignIn: "Zurich requested a sign-in step LedgerForge cannot complete."
         case .unauthorizedRedirect: "Zurich redirected outside the approved sign-in origin."
         case .responseTooLarge: "A Zurich response exceeded the safety limit."
@@ -132,7 +139,7 @@ actor ZurichISPClient {
             throw ZurichISPClientError.incompleteAccount
         }
         guard credentials.username.isEmpty == false, credentials.password.isEmpty == false, credentials.memorablePIN.count >= 3 else {
-            throw ZurichISPClientError.rejectedSignIn
+            throw ZurichISPClientError.incompleteCredentials
         }
         if sessionCredentials != credentials {
             reset()
@@ -217,8 +224,30 @@ actor ZurichISPClient {
 
         status("Submitting the requested memorable PIN positions…")
         let pinReply = try await request(label: "PIN", url: pinAction, method: "POST", form: pinFields)
-        try requireSuccessfulHome(pinReply)
+        try await finishSignIn(from: pinReply, status: status)
         isAuthenticated = true
+    }
+
+    private func finishSignIn(from response: HTTPPayload, status: @escaping @Sendable (String) -> Void) async throws {
+        var page = response
+        var visited: Set<String> = []
+        // Zurich can put optional notices between PIN verification and home.
+        // Continue only the owner-approved form action, never a new credential,
+        // consent, or account action. Repeated/unknown steps stop without retry.
+        for _ in 0..<3 {
+            if isSuccessfulHome(page) { return }
+            if isLoginPage(page) { throw ZurichISPClientError.sessionExpired }
+            if page.html?.contains("ucPinValidator$TextBoxPin") == true { throw ZurichISPClientError.rejectedPIN }
+            if containsUnsupportedSignIn(page) { throw ZurichISPClientError.unsupportedSignIn }
+            guard let html = page.html, let url = page.response.url,
+                  let continuation = try ZurichISPSignInContinuation.read(html: html, pageURL: url),
+                  visited.insert(continuation.identity).inserted else {
+                throw ZurichISPClientError.unexpectedSignInPage
+            }
+            status("Continuing past Zurich’s optional notice…")
+            page = try await request(label: "SignInNotice", url: continuation.url, method: "POST", encodedForm: continuation.body)
+        }
+        guard isSuccessfulHome(page) else { throw ZurichISPClientError.unexpectedSignInPage }
     }
 
     private func select(policy: ObservedPolicy, from page: HTTPPayload) async throws -> HTTPPayload {
@@ -271,7 +300,7 @@ actor ZurichISPClient {
         )
     }
 
-    private func request(label: String, url: URL, method: String, form: [FormField] = [], ajax: Bool = false) async throws -> HTTPPayload {
+    private func request(label: String, url: URL, method: String, form: [FormField] = [], ajax: Bool = false, encodedForm: Data? = nil) async throws -> HTTPPayload {
         try Task.checkCancellation()
         guard Self.isAuthorized(url) else { throw ZurichISPClientError.unauthorizedRedirect }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: Self.requestTimeout)
@@ -280,7 +309,7 @@ actor ZurichISPClient {
         if ajax { request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With") }
         if method == "POST" {
             request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try formEncoded(form)
+            request.httpBody = try encodedForm ?? formEncoded(form)
         }
         do {
             let requestSession = session
@@ -379,6 +408,7 @@ nonisolated private struct HTMLInput: Sendable {
 nonisolated private struct HTMLForm: Sendable {
     let attributes: [String: String]
     let inputs: [HTMLInput]
+    let body: String
     func hasEnabledSubmit(named name: String) -> Bool {
         inputs.contains { $0.name == name && $0.type.lowercased() == "submit" && $0.attributes["disabled"] == nil }
     }
@@ -390,7 +420,7 @@ nonisolated private enum HTMLParser {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         return regex.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap { match in
             guard let attributes = substring(html, match.range(at: 1)), let body = substring(html, match.range(at: 2)) else { return nil }
-            return HTMLForm(attributes: attributesMap(attributes), inputs: inputs(in: body))
+            return HTMLForm(attributes: attributesMap(attributes), inputs: inputs(in: body), body: body)
         }
     }
 
@@ -447,7 +477,10 @@ nonisolated private func requireForm(in payload: HTTPPayload, containing fieldNa
 
 nonisolated private func formAction(_ form: HTMLForm, relativeTo pageURL: URL) throws -> URL {
     let action = form.attributes["action"] ?? ""
-    guard let url = URL(string: action, relativeTo: pageURL)?.absoluteURL,
+    // HTML's empty action submits to the current document. Foundation does not
+    // resolve an empty URL string on every supported SDK.
+    let resolved = action.isEmpty ? pageURL : URL(string: action, relativeTo: pageURL)?.absoluteURL
+    guard let url = resolved,
           url.scheme?.lowercased() == "https",
           url.host?.lowercased() == "online.zurichinternationalsolutions.com",
           url.port == nil || url.port == 443 else {
@@ -515,10 +548,63 @@ nonisolated private func requestedPINIndexes(in form: HTMLForm, memorablePIN: St
     return unique
 }
 
-nonisolated private func requireSuccessfulHome(_ payload: HTTPPayload) throws {
-    guard let url = payload.response.url else { throw ZurichISPClientError.rejectedPIN }
-    if containsUnsupportedSignIn(payload) { throw ZurichISPClientError.unsupportedSignIn }
-    guard url.path.lowercased() == "/corporate/memberjourney/home/index" else { throw ZurichISPClientError.rejectedPIN }
+nonisolated private func isSuccessfulHome(_ payload: HTTPPayload) -> Bool {
+    payload.response.url?.path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "corporate/memberjourney/home/index"
+}
+
+/// Nonfinancial sign-in form mechanics. These bytes live only in the active
+/// URLSession; no reminder, hidden token, or credential becomes ledger data.
+nonisolated struct ZurichISPSignInContinuation: Sendable {
+    let url: URL
+    let body: Data
+    let identity: String
+
+    static func read(html: String, pageURL: URL) throws -> Self? {
+        let forms = HTMLParser.forms(in: html)
+        guard forms.count == 1 else { return nil }
+        var choices: [Self] = []
+        for form in forms {
+            guard form.attributes["method"]?.lowercased() == "post" else { continue }
+            let inputs = form.inputs.filter { $0.attributes["disabled"] == nil }
+            let submits = inputs.filter { $0.type.lowercased() == "submit" }
+            let checkboxes = inputs.filter { $0.type.lowercased() == "checkbox" }
+            guard submits.count == 1, let submit = submits.first,
+                  normalizedText(submit.value).lowercased() == "continue",
+                  checkboxes.count <= 1,
+                  Set(inputs.map(\.name)).count == inputs.count,
+                  inputs.allSatisfy({ ["hidden", "submit", "checkbox"].contains($0.type.lowercased()) }),
+                  form.body.range(of: #"(?i)<(?:select|textarea|button)\b"#, options: .regularExpression) == nil else { continue }
+
+            let visible = normalizedText(form.body.replacingOccurrences(
+                of: #"(?is)<(script|style)\b.*?</\1\s*>"#, with: "", options: .regularExpression)).lowercased()
+            let maintenance = visible.contains("maintenance") || visible.contains("service interruption")
+            var fields = formFields(form, selectedSubmit: submit.name)
+            if let checkbox = checkboxes.first {
+                guard let label = associatedLabel(checkbox, in: form.body) else { continue }
+                let declinesPasswordChange = label == "i confirm i do not wish to reset my password at this time"
+                let acknowledgesNotice = ["i have read this notice", "i acknowledge this notice"].contains(label)
+                guard declinesPasswordChange || (maintenance && acknowledgesNotice) else { continue }
+                fields.set(checkbox.name, to: checkbox.value.isEmpty ? "on" : checkbox.value)
+            } else {
+                guard maintenance else { continue }
+            }
+            let url = try formAction(form, relativeTo: pageURL)
+            choices.append(Self(url: url, body: try formEncoded(fields), identity: url.path + "|" + submit.name + "|" + visible))
+        }
+        guard choices.count == 1 else { return nil }
+        return choices[0]
+    }
+
+    private static func associatedLabel(_ input: HTMLInput, in html: String) -> String? {
+        guard let id = input.attributes["id"],
+              let regex = try? NSRegularExpression(pattern: #"(?is)<label\b([^>]*)>(.*?)</label\s*>"#) else { return nil }
+        let labels = regex.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap { match -> String? in
+            guard let attributes = Range(match.range(at: 1), in: html), let body = Range(match.range(at: 2), in: html),
+                  HTMLParser.attributesMap(String(html[attributes]))["for"] == id else { return nil }
+            return normalizedText(String(html[body])).lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        }
+        return labels.count == 1 ? labels[0] : nil
+    }
 }
 
 nonisolated private func observedPolicies(in payload: HTTPPayload, expectedPolicyIDs: Set<String>) throws -> [ObservedPolicy] {

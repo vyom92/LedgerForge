@@ -1,6 +1,6 @@
 import Foundation
 
-enum QatarAirwaysSalaryPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum QatarAirwaysSalaryPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedSource
     case unsupportedHeading
     case unsupportedKind
@@ -26,7 +26,7 @@ enum QatarAirwaysSalaryPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-struct QatarAirwaysSalaryPDFParser {
+nonisolated struct QatarAirwaysSalaryPDFParser {
     static let name = "Qatar Airways Salary PDF Parser"
 
     func canRecognize(_ rawDocument: RawDocument) -> Bool {

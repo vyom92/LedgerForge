@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct ParserSelection {
+nonisolated struct ParserSelection {
 
     let parser: StatementParser?
     let parserName: String?

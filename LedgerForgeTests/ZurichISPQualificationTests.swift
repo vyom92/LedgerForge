@@ -20,6 +20,179 @@ struct ZurichISPQualificationTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func authenticContributionSettlementRetainsBothTotalsAndPublishedUnits() async throws {
+        let directory = try isolatedDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let package = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_S99_V26_BACKUP"]))
+        let destination = directory.appendingPathComponent("settlement.sqlite")
+        _ = try BackupCompatibility.prepareCandidate(package: package, manifest: BackupFiles.verifyPackage(package), destination: destination)
+        let provider = try SQLiteRepositoryProvider(path: destination.path)
+        defer { provider.database.close() }
+        let workspace = try #require(try provider.workspaceRepo.workspace(id: "default-workspace"))
+        let baseline = try provider.investmentRepo.snapshot(workspaceID: workspace.id)
+        let old = try #require(baseline.latestZioAccount)
+        // Previously accepted observations decode and validate without a new
+        // field, a rewritten source identity or a database migration.
+        try old.validate(expectedPolicyIDs: old.policyIDs, now: Date())
+        let oldRoundTripMatches = try JSONDecoder().decode(ZurichISPAccountSnapshot.self, from: JSONEncoder().encode(old)) == old
+        #expect(oldRoundTripMatches)
+        let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace.id)
+        let history = try historyCounts(provider.database)
+        let captured = try await LiveCapture.shared.fetch(expectedPolicyIDs: old.policyIDs)
+        let parsed = try ZurichISPAccountSnapshot.parse(captured.source, expectedPolicyIDs: old.policyIDs, now: Date())
+        let oracle = try independentOracle(records: captured.records)
+        #expect(oracle.digest == digest(of: parsed))
+        #expect(oracle.pendingPolicyCount == parsed.policies.filter { ($0.pendingAllocation ?? 0) > 0 }.count)
+        #expect(oracle.pendingPolicyCount > 0)
+        for policy in parsed.policies {
+            let allocated = try #require(policy.allocatedContributions)
+            let pending = try #require(policy.pendingAllocation)
+            let recorded = try InvestmentArithmetic.add(allocated.amount.value, pending)
+            let controlsMatch = pending >= 0 && recorded == policy.contributions.amount.value &&
+                ZurichISPPolicyObservation.cents(policy.value.amount.value - allocated.amount.value) == ZurichISPPolicyObservation.cents(policy.growth.amount.value)
+            #expect(controlsMatch)
+        }
+        let plan = ZurichISPHoldingsPlan(providerGeneration: provider.generationToken, workspace: workspace, baseline: baseline, source: parsed)
+        #expect(provider.investmentRepo.saveZurichHoldings(plan) == .saved)
+        let accepted = try provider.investmentRepo.snapshot(workspaceID: workspace.id)
+        let acceptedSourceMatches = accepted.latestZioAccount == parsed
+        let unrelatedInvestmentsMatch = nonISP(from: accepted) == nonISP(from: baseline)
+        let transactionsMatch = try provider.transactionRepo.trustedTransactions(workspaceId: workspace.id) == facts
+        #expect(acceptedSourceMatches && unrelatedInvestmentsMatch && transactionsMatch)
+        #expect(try historyCounts(provider.database) == history)
+        try comparePersistedFunds(accepted, source: parsed, expectedPolicyIDs: old.policyIDs, originalHoldingIDs: zioHoldingIDs(in: baseline))
+        let cache = try provider.backgroundPublicCacheRepo.snapshot(now: Date())
+        let valuations = Dictionary(uniqueKeysWithValues: accepted.holdings.map { holding in
+            let quote = InvestmentPriceRegistry.confirmedMapping(for: holding).flatMap { cache.investmentQuotes[$0.identity] }
+            return (holding.id, InvestmentValuation(holding: holding, quote: quote))
+        })
+        let overview = InvestmentOverview.build(holdings: accepted.holdings, valuations: valuations, legs: cache.alDarLegs,
+            containers: accepted.containers, ispAccount: parsed)
+        let performance = try #require(overview.ispPerformance)
+        let reported = try #require(overview.ispReported)
+        let allocated = try parsed.policies.reduce(Decimal.zero) { try InvestmentArithmetic.add($0, #require($1.allocatedContributions).amount.value) }
+        let pending = try parsed.policies.reduce(Decimal.zero) { try InvestmentArithmetic.add($0, #require($1.pendingAllocation)) }
+        let recorded = try InvestmentArithmetic.add(allocated, pending)
+        func exact(_ actual: InvestmentConvertedAmount?, _ expected: Decimal) throws {
+            let actual = try #require(actual)
+            let matches = actual.numerator == (try InvestmentArithmetic.product(InvestmentArithmetic.Exact(expected), actual.denominator))
+            #expect(matches)
+        }
+        try exact(performance.usd?.cost, allocated)
+        try exact(reported.allocatedContributions.first { $0.currency == "USD" }, allocated)
+        try exact(reported.pendingAllocation.first { $0.currency == "USD" }, pending)
+        try exact(reported.contributions.first { $0.currency == "USD" }, recorded)
+        let policyContainers = Set(accepted.containers.filter { parsed.policyIDs.contains($0.identity) }.map(\.id))
+        let members = accepted.holdings.filter { policyContainers.contains($0.containerID) }
+        let values = members.compactMap { valuations[$0.id]?.currentValue }
+        #expect(values.count == members.count)
+        let value = try values.reduce(Decimal.zero, InvestmentArithmetic.add)
+        try exact(performance.usd?.value, value)
+        try exact(performance.usd?.gain, InvestmentArithmetic.subtract(value, allocated))
+        #expect(overview.ispFunds.allSatisfy { $0.scope.costCount == 0 && $0.scope.returnPercent == nil })
+        let memory = DatabaseProvider(inMemory: true)
+        #expect(memory.investmentRepo.saveZurichHoldings(.init(providerGeneration: memory.generationToken,
+            workspace: workspace, baseline: .empty, source: parsed)) == .saved)
+        let memorySnapshot = try memory.investmentRepo.snapshot(workspaceID: workspace.id)
+        let memorySourceMatches = memorySnapshot.latestZioAccount == parsed
+        #expect(memorySourceMatches)
+        try await replayAndFailureRetention(captured, expectedPolicyIDs: old.policyIDs, provider: provider,
+                                            workspaceID: workspace.id, accepted: accepted)
+        try await backupRestoreAndReopen(provider: provider, databaseURL: destination, expected: accepted)
+        print("S99 Zurich settlement: authentic policy tables and fund rows independently reconciled; pending-policy count \(oracle.pendingPolicyCount); exact totals, published units, memory/SQLite, replay, failure retention, backup and reopen passed.")
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func salaryChecksShareAuthenticReceiptsAndRespectInFlightOwnerChanges() async throws {
+        let directory = try isolatedDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // One genuine authenticated response sequence stays in RAM. All race
+        // interleavings below replay those exact bytes into isolated copies.
+        for mode in ["completed", "disabled", "dismissed", "sourceUpdated"] {
+            let packagePath = try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_S99_V26_BACKUP"])
+            let package = URL(fileURLWithPath: packagePath), manifest = try BackupFiles.verifyPackage(package)
+            let destination = directory.appendingPathComponent(mode + ".sqlite")
+            _ = try BackupCompatibility.prepareCandidate(package: package, manifest: manifest, destination: destination)
+            let provider = try SQLiteRepositoryProvider(path: destination.path)
+            defer { provider.database.close() }
+            let workspace = try #require(try provider.workspaceRepo.workspace(id: "default-workspace"))
+            let baseline = try provider.investmentRepo.snapshot(workspaceID: workspace.id)
+            let policies = Set(baseline.containers.filter { $0.institution == "Zurich ISP" }.map(\.identity))
+            let captured = try await LiveCapture.shared.fetch(expectedPolicyIDs: policies)
+            let parsed = try ZurichISPAccountSnapshot.parse(captured.source, expectedPolicyIDs: policies, now: Date())
+            #expect(try independentOracle(records: captured.records).digest == digest(of: parsed))
+            let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace.id)
+            let salary = try #require(facts.filter { $0.nativeCurrency == "QAR" && $0.direction == "credit" &&
+                $0.description?.localizedCaseInsensitiveContains("SALARY TRANSFER") == true &&
+                $0.description?.localizedCaseInsensitiveContains("QATAR AIRWAYS") == true }.max { $0.postedDateISO < $1.postedDateISO })
+            let day = try StatementDate(canonical: String(salary.postedDateISO.prefix(10)))
+            let month = try SelectedStatementMonth(year: day.month == 12 ? day.year + 1 : day.year, month: day.month == 12 ? 1 : day.month + 1)
+            let initial = SalaryAssistance(transactionID: salary.id, workspaceID: workspace.id, financialDate: day.canonical, targetMonth: month.canonical)
+            let observation = SalaryISPVerification.observation(parsed, for: initial)
+            #expect(observation.ispState == .indeterminate && observation.ispBaseline == nil)
+            #expect(observation.ispLastFetchAt == ISO8601DateFormatter().string(from: parsed.fetchedAt))
+            #expect(observation.ispExplanation.contains("No suitable observation"))
+            let preferences = IntelligencePreferences(workspaceID: workspace.id, salaryISPEnabled: true)
+            try provider.intelligenceRepo.applyPlanning(.preferences(preferences, replacing: nil))
+            try provider.intelligenceRepo.applyPlanning(.salary(initial, replacing: nil))
+            let replay = BlockingReplay(records: captured.records)
+            let executor = BackgroundUpdateExecutor(provider: provider, activation: try provider.database.validatedActivationStamp(), workspaceID: workspace.id,
+                ispClient: .init(transport: { request, _ in try await replay.response(for: request) }))
+            let configuration = BackgroundScheduleConfiguration()
+            // The accepted lease arbitrates manual, monthly and salary reads.
+            do {
+                let lease = try #require(try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP))
+                defer { withExtendedLifetime(lease) {} }
+                let instant = Date()
+                #expect(try await executor.nextSalaryISPCheck(now: instant) == instant.addingTimeInterval(60))
+                #expect(await executor.refreshISP(configuration: configuration, manual: false, salaryCheck: true) == .alreadyRunning)
+            }
+            let work = Task { await executor.refreshISP(configuration: configuration, manual: true) }
+            do { try await until { await replay.isWaiting } }
+            catch { work.cancel(); await replay.release(); _ = await work.result; throw error }
+            let attempted = try #require(try provider.intelligenceRepo.snapshot(workspaceID: workspace.id)?.salaries.first)
+            #expect(attempted.ispLastAttemptAt != nil)
+            var expectedSalary = attempted
+            var competingSource: ZurichISPAccountSnapshot?
+            if mode == "disabled" {
+                var disabled = preferences; disabled.salaryISPEnabled = false
+                try provider.intelligenceRepo.applyPlanning(.preferences(disabled, replacing: preferences))
+            } else if mode == "dismissed" {
+                expectedSalary.ispState = .dismissed
+                try provider.intelligenceRepo.applyPlanning(.salary(expectedSalary, replacing: attempted))
+            } else if mode == "sourceUpdated" {
+                #expect(provider.investmentRepo.saveZurichHoldings(.init(providerGeneration: provider.generationToken,
+                    workspace: workspace, baseline: baseline, source: parsed)) == .saved)
+                competingSource = parsed
+            }
+            await replay.release()
+            let result = await work.value
+            let current = try provider.investmentRepo.snapshot(workspaceID: workspace.id)
+            let after = try #require(try provider.intelligenceRepo.snapshot(workspaceID: workspace.id)?.salaries.first)
+            if mode == "sourceUpdated" {
+                #expect(result == .ispFailed(InvestmentError.staleReview.errorDescription!))
+                #expect(try provider.backgroundJobRepo.jobRecord(.zurichISP)?.outcome == .failedFinal)
+                #expect(current.latestZioAccount == competingSource)
+                #expect(after == expectedSalary)
+            } else {
+                #expect(result == .completed(.committedCurrentHoldings))
+                let received = try #require(current.latestZioAccount)
+                #expect(try independentOracle(records: captured.records).digest == digest(of: received))
+                if mode == "completed" {
+                    #expect(after.ispState == .indeterminate && after.ispLastFetchAt != nil)
+                    // A completed receipt satisfies the salary check with no new transport.
+                    let sharedReceiptOutcome = await executor.refreshISP(configuration: configuration, manual: false, salaryCheck: true)
+                    #expect(sharedReceiptOutcome == .notDue)
+                } else { #expect(after == expectedSalary) }
+            }
+            #expect(nonISP(from: current) == nonISP(from: baseline))
+            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspace.id) == facts)
+            #expect(await replay.responseCount == captured.records.count)
+        }
+        print("S99 salary-linked ISP: one authentic capture, four exact-byte replays; indeterminate evidence, shared lease/receipt, switch-off, dismissal and competing source update passed.")
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func liveAccountQualificationReplayAndV22Persistence() async throws {
         let directory = try isolatedDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -293,7 +466,7 @@ struct ZurichISPQualificationTests {
         try BackupFiles.createDirectory(destination)
         await coordinator.createBackup(to: destination)
         guard let package = coordinator.lastBackupURL else { throw QualificationError.missingEnvironment }
-        #expect((try BackupFiles.verifyPackage(package)).schemaVersion == 22)
+        #expect((try BackupFiles.verifyPackage(package)).schemaVersion == BackupCompatibility.supportedSchemaVersion)
         await coordinator.verifyRestore(from: package)
         await coordinator.replaceLedger()
         #expect(try DatabaseProvider.shared.investmentRepo.snapshot(workspaceID: "default-workspace") == expected)
@@ -324,7 +497,7 @@ struct ZurichISPQualificationTests {
     }
 
     private func until(_ predicate: () async -> Bool) async throws {
-        for _ in 0..<100 { if await predicate() { return }; try await Task.sleep(for: .milliseconds(20)) }
+        for _ in 0..<500 { if await predicate() { return }; try await Task.sleep(for: .milliseconds(20)) }
         throw QualificationError.timeout
     }
 
@@ -348,7 +521,18 @@ private actor LiveCapture {
         let client = ZurichISPClient(observer: { endpoint, _ in labels.append(endpoint) }, transport: { request, session in
             try await transport.fetch(request, session: session)
         })
-        let source = try await client.fetch(credentials: credentials, expectedPolicyIDs: expectedPolicyIDs, status: { _ in })
+        let source: ZurichISPSourceAccount
+        do {
+            source = try await client.fetch(credentials: credentials, expectedPolicyIDs: expectedPolicyIDs, status: { _ in })
+        } catch {
+            // Authentication mechanics only; never print response bodies, form
+            // values, cookies, credentials, or financial-source contents.
+            if let label = labels.values().last, ["MemberJourney", "Login", "PIN", "SignInNotice"].contains(label),
+               let record = transport.records().last {
+                print("ZIO sign-in stopped after \(label); HTTP \(record.statusCode); path \(record.url.path).")
+            }
+            throw error
+        }
         let captured = Captured(source: source, records: transport.records(), labels: labels.values())
         savedCredentials = credentials; cached = captured
         return captured
@@ -362,6 +546,7 @@ private nonisolated struct Captured: Sendable {
 }
 
 private nonisolated struct ResponseRecord: Sendable {
+    let request: URLRequest
     let url: URL
     let statusCode: Int
     let body: Data
@@ -379,7 +564,7 @@ private nonisolated final class NativeCaptureTransport: @unchecked Sendable {
     func fetch(_ request: URLRequest, session: URLSession) async throws -> (Data, HTTPURLResponse) {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, let url = http.url else { throw URLError(.badServerResponse) }
-        record(.init(url: url, statusCode: http.statusCode, body: data))
+        record(.init(request: request, url: url, statusCode: http.statusCode, body: data))
         return (data, http)
     }
     private func record(_ value: ResponseRecord) { lock.lock(); defer { lock.unlock() }; values.append(value) }
@@ -396,6 +581,7 @@ private actor FIFOReplay {
         defer { index += 1 }
         if index == failAt { throw URLError(.networkConnectionLost) }
         let record = records[index]
+        try record.verifyRequest(request)
         guard let response = HTTPURLResponse(url: record.url, statusCode: record.statusCode, httpVersion: nil, headerFields: nil) else {
             throw URLError(.badServerResponse)
         }
@@ -409,11 +595,13 @@ private actor BlockingReplay {
     private var index = 0
     init(records: [ResponseRecord]) { self.records = records }
     var isWaiting: Bool { continuation != nil }
+    var responseCount: Int { index }
     func response(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         if index == 0 { await withCheckedContinuation { continuation = $0 } }
         guard index < records.count else { throw URLError(.badServerResponse) }
         defer { index += 1 }
         let record = records[index]
+        try record.verifyRequest(request)
         guard let response = HTTPURLResponse(url: record.url, statusCode: record.statusCode, httpVersion: nil, headerFields: nil) else {
             throw URLError(.badServerResponse)
         }
@@ -422,7 +610,20 @@ private actor BlockingReplay {
     func release() { continuation?.resume(); continuation = nil }
 }
 
-private nonisolated struct OracleMetadata: Decodable { let policyCount: Int; let positionCount: Int; let regularCount: Int; let digest: String; let usdSummaryDigest: String }
+private extension ResponseRecord {
+    func verifyRequest(_ replay: URLRequest) throws {
+        // Compare requests to the authentic in-memory exchange as well as its
+        // responses. A replay cannot silently accept changed PIN assignments,
+        // hidden fields, selected submit, encoding, destination, or HTTP method.
+        guard replay.httpMethod == request.httpMethod, replay.url == request.url,
+              replay.httpBody == request.httpBody,
+              replay.value(forHTTPHeaderField: "Content-Type") == request.value(forHTTPHeaderField: "Content-Type") else {
+            throw URLError(.badServerResponse)
+        }
+    }
+}
+
+private nonisolated struct OracleMetadata: Decodable { let policyCount: Int; let positionCount: Int; let regularCount: Int; let digest: String; let usdSummaryDigest: String; let pendingPolicyCount: Int }
 
 private nonisolated func independentOracle(records: [ResponseRecord]) throws -> OracleMetadata {
     let script = #"""
@@ -489,7 +690,8 @@ for policy in sorted(policies):
  required_contrib=('Contributions','Value','Growth')
  if any(key not in summary for key in required_summary) or any(key not in contrib for key in required_contrib): raise ValueError('table_shape')
  if summary['Plan currency'].strip() not in ('USD','US Dollar','US Dollars'): raise ValueError('currency')
- if amount(summary['Total contributions'])!=amount(contrib['Contributions']) or amount(summary['Value'])!=amount(contrib['Value']) or amount(summary['Growth'])!=amount(contrib['Growth']): raise ValueError('table_controls')
+ if amount(summary['Total contributions'])>amount(contrib['Contributions']) or amount(summary['Value'])!=amount(contrib['Value']) or amount(summary['Growth'])!=amount(contrib['Growth']): raise ValueError('table_controls')
+ if amount(summary['Total contributions'])<0 or cents(amount(summary['Value'])-amount(summary['Total contributions']))!=cents(amount(summary['Growth'])): raise ValueError('allocated_growth_control')
  if ('Vested value' in summary) != ('Vested value' in contrib): raise ValueError('vested_shape')
  if 'Vested value' in summary and amount(summary['Vested value'])!=amount(contrib['Vested value']): raise ValueError('vested_control')
  total=amount(contrib['Value'])
@@ -510,7 +712,7 @@ totals=[]
 for key in ('Contributions','Growth','Vested value'):
  total=sum(amount(row[key]) for row in contributions.values() if key in row).quantize(Decimal('1'),rounding=ROUND_HALF_UP)
  totals.append(format(total if total else Decimal(0),'f'))
-print(json.dumps({'policyCount':len(policies),'positionCount':sum(len(v[1]) for v in policies.values()),'regularCount':sum(len(v) for v in regulars.values()),'digest':hashlib.sha256('\n'.join(parts).encode()).hexdigest(),'usdSummaryDigest':hashlib.sha256('|'.join(totals).encode()).hexdigest()}))
+print(json.dumps({'policyCount':len(policies),'positionCount':sum(len(v[1]) for v in policies.values()),'regularCount':sum(len(v) for v in regulars.values()),'digest':hashlib.sha256('\n'.join(parts).encode()).hexdigest(),'usdSummaryDigest':hashlib.sha256('|'.join(totals).encode()).hexdigest(),'pendingPolicyCount':sum(amount(contributions[p]['Contributions'])>amount(summaries[p]['Total contributions']) for p in policies)}))
 """#
     let body = try JSONSerialization.data(withJSONObject: records.map { ["url": $0.url.absoluteString, "body": $0.body.base64EncodedString()] })
     let process = Process(), input = Pipe(), output = Pipe(), errors = Pipe()

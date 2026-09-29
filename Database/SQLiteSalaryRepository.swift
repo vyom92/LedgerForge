@@ -10,7 +10,9 @@ final class SQLiteSalaryRepository: SalaryRepository {
     }
 
     func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
-        return db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
             do { try plan.history.validateFingerprints() } catch { return .repositoryIntegrityConflict }
             do { try SalaryPersistenceDTOValidator.validate(statement: plan.statement) } catch { return .repositoryIntegrityConflict }
@@ -48,9 +50,15 @@ final class SQLiteSalaryRepository: SalaryRepository {
                 return .repositoryIntegrityConflict
             }
         }
+
+        } catch { return .repositoryIntegrityConflict }
     }
 
     func snapshot(workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
+        try Self.readSnapshot(db: db, workspaceId: workspaceId)
+    }
+
+    static func readSnapshot(db: SQLiteDatabase, workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
         let statements = try db.query(sql: """
             SELECT id, workspace_id, document_id, import_session_id, normalized_document_id,
                    source_fingerprint_algorithm, source_fingerprint_digest, source_authority,
@@ -62,7 +70,7 @@ final class SQLiteSalaryRepository: SalaryRepository {
             ORDER BY financial_period, created_at, id;
             """, params: [workspaceId]) { row -> SalaryStatementDTO in
                 let statementID = row.string(at: 0) ?? ""
-                let components = try self.components(statementID: statementID)
+                let components = try Self.components(db: db, statementID: statementID)
                 return SalaryStatementDTO(
                     id: statementID,
                     workspaceId: row.string(at: 1) ?? "",
@@ -149,7 +157,7 @@ final class SQLiteSalaryRepository: SalaryRepository {
         try db.executePrepared(sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;", params: ["passed", history.completedAtISO, history.completedAtISO, history.importSession.id])
     }
 
-    private func components(statementID: String) throws -> [SalaryComponentDTO] {
+    private static func components(db: SQLiteDatabase, statementID: String) throws -> [SalaryComponentDTO] {
         try db.query(sql: "SELECT id, salary_statement_id, side, source_ordinal, source_label, amount_currency, amount_minor, amount_decimal FROM salary_components WHERE salary_statement_id = ? ORDER BY CASE side WHEN 'earning' THEN 0 ELSE 1 END, source_ordinal;", params: [statementID]) { row in
             SalaryComponentDTO(id: row.string(at: 0) ?? "", salaryStatementId: row.string(at: 1) ?? "", sideCode: row.string(at: 2) ?? "", sourceOrdinal: Int(row.int64(at: 3) ?? 0), sourceLabel: row.string(at: 4) ?? "", amountCurrency: row.string(at: 5) ?? "", amountMinor: row.int64(at: 6) ?? 0, amountDecimal: row.string(at: 7) ?? "")
         }
@@ -158,7 +166,11 @@ final class SQLiteSalaryRepository: SalaryRepository {
 
 final class SQLiteFundingPlanRepository: FundingPlanRepository {
     private let db: SQLiteDatabase
-    init(db: SQLiteDatabase) { self.db = db }
+    private let supportsAssistance: Bool
+    private let supportsBalanceDates: Bool
+    init(db: SQLiteDatabase, supportsAssistance: Bool = true, supportsBalanceDates: Bool = true) {
+        self.db = db; self.supportsAssistance = supportsAssistance; self.supportsBalanceDates = supportsBalanceDates
+    }
 
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
         try db.query(sql: """
@@ -194,6 +206,13 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 plan.referenceMode = row.string(at: 25)
                 plan.deductions = try self.deductions(planID: id)
                 plan.effectiveReference = try self.effectiveReference(planID: id)
+                if self.supportsAssistance {
+                    plan.assistance = try self.db.query(sql: "SELECT assistance_json FROM plan_assistance WHERE workspace_id=? AND plan_month=?;", params: [plan.workspaceId,plan.planMonthISO]) { row -> PlanAssistance in
+                        let value: PlanAssistance = try SQLiteFinancialIntelligenceRepository.decode(row.string(at: 0))
+                        guard value.workspaceID == plan.workspaceId, value.month == plan.planMonthISO else { throw FinancialIntelligenceError.invalidRecord }
+                        return value
+                    }.first
+                }
                 return plan
             }
     }
@@ -253,6 +272,9 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
                 for balance in plan.balances {
                     try db.executePrepared(sql: "INSERT INTO funding_plan_balances (id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [balance.id, balance.planId, balance.sourceOrdinal, balance.accountId, balance.nativeCurrency, balance.included ? 1 : 0, balance.amountCurrency ?? NSNull(), balance.amountMinor ?? NSNull(), balance.amountDecimal ?? NSNull(), balance.provenanceCode, balance.carriedSourcePlanId ?? NSNull(), balance.capturedAtISO ?? NSNull()])
+                    if supportsBalanceDates {
+                        try db.executePrepared(sql: "UPDATE funding_plan_balances SET financial_balance_date=? WHERE id=?;", params: [balance.financialBalanceDateISO ?? NSNull(), balance.id])
+                    } else if balance.financialBalanceDateISO != nil { throw RepositoryError.relationshipViolation("This historical schema cannot save a financial balance date.") }
                 }
                 for commitment in plan.commitments {
                     try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
@@ -270,6 +292,9 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                                       reference.returnedINRRawDecimal, reference.boundShortfallINRMinor,
                                       reference.boundShortfallINRDecimal, reference.fetchedAtISO, reference.classificationCode])
                 }
+                if supportsAssistance {
+                    try SQLiteFinancialIntelligenceRepository(db: db, supportsBalanceDates: supportsBalanceDates).savePlanAssistance(plan)
+                } else if plan.assistance != nil { throw FinancialIntelligenceError.unavailable }
                 try db.execute(sql: "COMMIT;")
                 return plan
             } catch {
@@ -322,8 +347,8 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     private func balances(planID: String) throws -> [FundingPlanBalanceDTO] {
-        try db.query(sql: "SELECT id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at FROM funding_plan_balances WHERE funding_plan_id = ? ORDER BY source_ordinal;", params: [planID]) { row in
-            FundingPlanBalanceDTO(id: row.string(at: 0) ?? "", planId: row.string(at: 1) ?? "", sourceOrdinal: Int(row.int64(at: 2) ?? 0), accountId: row.string(at: 3) ?? "", nativeCurrency: row.string(at: 4) ?? "", included: row.int64(at: 5) == 1, amountCurrency: row.string(at: 6), amountMinor: row.int64(at: 7), amountDecimal: row.string(at: 8), provenanceCode: row.string(at: 9) ?? "", carriedSourcePlanId: row.string(at: 10), capturedAtISO: row.string(at: 11))
+        try db.query(sql: "SELECT id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at, \(supportsBalanceDates ? "financial_balance_date" : "NULL") FROM funding_plan_balances WHERE funding_plan_id = ? ORDER BY source_ordinal;", params: [planID]) { row in
+            FundingPlanBalanceDTO(id: row.string(at: 0) ?? "", planId: row.string(at: 1) ?? "", sourceOrdinal: Int(row.int64(at: 2) ?? 0), accountId: row.string(at: 3) ?? "", nativeCurrency: row.string(at: 4) ?? "", included: row.int64(at: 5) == 1, amountCurrency: row.string(at: 6), amountMinor: row.int64(at: 7), amountDecimal: row.string(at: 8), provenanceCode: row.string(at: 9) ?? "", carriedSourcePlanId: row.string(at: 10), capturedAtISO: row.string(at: 11), financialBalanceDateISO: row.string(at: 12))
         }
     }
 

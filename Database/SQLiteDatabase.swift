@@ -53,19 +53,26 @@ nonisolated public struct SQLiteRow: Sendable {
         let string: String?
         let int64: Int64?
         let bool: Bool
+        let data: Data?
     }
     private let columns: [Column]
 
     fileprivate init(statement: OpaquePointer?) {
         columns = (0..<sqlite3_column_count(statement)).map { index in
             guard sqlite3_column_type(statement, index) != SQLITE_NULL else {
-                return Column(string: nil, int64: nil, bool: false)
+                return Column(string: nil, int64: nil, bool: false, data: nil)
+            }
+            if sqlite3_column_type(statement, index) == SQLITE_BLOB {
+                let count = Int(sqlite3_column_bytes(statement, index))
+                let data = sqlite3_column_blob(statement, index).map { Data(bytes: $0, count: count) } ?? Data()
+                return Column(string: nil, int64: nil, bool: false, data: data)
             }
             let string = sqlite3_column_text(statement, index).map { String(cString: $0) }
             return Column(
                 string: string,
                 int64: sqlite3_column_int64(statement, index),
-                bool: sqlite3_column_int(statement, index) != 0
+                bool: sqlite3_column_int(statement, index) != 0,
+                data: nil
             )
         }
     }
@@ -86,6 +93,10 @@ nonisolated public struct SQLiteRow: Sendable {
     public func bool(at index: Int32) -> Bool {
         column(at: index)?.bool ?? false
     }
+
+    public func data(at index: Int32) -> Data? {
+        column(at: index)?.data
+    }
 }
 
 /// Synchronous connection ownership shared by the app and subprocess helper.
@@ -103,9 +114,113 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
     private let path: String
     private let ownershipLock = NSRecursiveLock()
     private var db: OpaquePointer?
+    private let ledgerAccess: LedgerAccessCoordinator
+    private let accessStateLock = NSLock()
+    private var storedStamp: LedgerActivationStamp?
+    private var selectedSnapshotMode: Bool?
+    private var storedPermit: LedgerLifecyclePermit?
+    private var activationStamp: LedgerActivationStamp? {
+        get { accessStateLock.lock(); defer { accessStateLock.unlock() }; return storedStamp }
+        set { accessStateLock.lock(); defer { accessStateLock.unlock() }; storedStamp = newValue }
+    }
+    private var immutableSnapshot: Bool {
+        accessStateLock.lock(); defer { accessStateLock.unlock() }; return selectedSnapshotMode == true
+    }
+    private func selectAccessMode(_ access: Access) throws {
+        accessStateLock.lock(); defer { accessStateLock.unlock() }
+        let snapshot = access == .readOnlySnapshot
+        if let selectedSnapshotMode, selectedSnapshotMode != snapshot { throw LedgerAccessError.incompatible }
+        selectedSnapshotMode = snapshot
+    }
+    private var storedOpeningOrMigrating = false
+    private var openingOrMigrating: Bool {
+        get { accessStateLock.lock(); defer { accessStateLock.unlock() }; return storedOpeningOrMigrating }
+        set { accessStateLock.lock(); defer { accessStateLock.unlock() }; storedOpeningOrMigrating = newValue }
+    }
+    var lifecyclePermit: LedgerLifecyclePermit? {
+        get { accessStateLock.lock(); defer { accessStateLock.unlock() }; return storedPermit }
+        set {
+            accessStateLock.lock(); let previous = storedPermit; storedPermit = newValue; accessStateLock.unlock()
+            withExtendedLifetime(previous) {}
+        }
+    }
+    private var storedOwnsMigrationRecovery = false
+    private var ownsMigrationRecovery: Bool {
+        get { accessStateLock.lock(); defer { accessStateLock.unlock() }; return storedOwnsMigrationRecovery }
+        set { accessStateLock.lock(); defer { accessStateLock.unlock() }; storedOwnsMigrationRecovery = newValue }
+    }
+    private let allowMigrationRecovery: Bool
+    private let requiredActivation: LedgerActivationStamp?
+    // The helper verifies an exact existing ledger once, then keeps no SQLite
+    // handle alive between synchronous repository operations. This lets the
+    // established access gate exclude a restore before the helper can reopen
+    // after a network await. Foreground providers retain their ordinary
+    // connection lifetime.
+    private var enrolledScopedConnection = false
+    private var enrolledScopedConnectionClosed = false
 
-    public init(path: String) {
+    var currentActivationStamp: LedgerActivationStamp? { activationStamp }
+    func validatedActivationStamp() throws -> LedgerActivationStamp {
+        try withExclusiveAccess {
+            guard let stamp = activationStamp else { throw LedgerAccessError.missingAuthority }
+            return stamp
+        }
+    }
+
+    private func withLedgerAccess<T>(_ operation: () throws -> T) throws -> T {
+        if immutableSnapshot || path == ":memory:" { return try operation() }
+        return try ledgerAccess.withAccess(permit: lifecyclePermit) {
+            ownershipLock.lock(); defer { ownershipLock.unlock() }
+            guard !enrolledScopedConnectionClosed else { throw LedgerAccessError.unavailable }
+            let openedForScopedOperation = enrolledScopedConnection && db == nil
+            do {
+                if openedForScopedOperation {
+                    guard !enrolledScopedConnectionClosed else { throw LedgerAccessError.unavailable }
+                    try openConnectionLocked(access: .existing)
+                }
+                if db != nil && !openingOrMigrating {
+                    _ = try ledgerAccess.validate(expected: activationStamp, permit: lifecyclePermit)
+                }
+                let result = try operation()
+                if openedForScopedOperation { try closeConnectionLocked() }
+                return result
+            } catch let operationError {
+                if openedForScopedOperation {
+                    do { try closeConnectionLocked() }
+                    catch let closeError {
+                        enrolledScopedConnectionClosed = true
+                        throw closeError
+                    }
+                }
+                throw operationError
+            }
+        }
+    }
+
+    func verifyAuthoritySchema(_ version: Int) throws {
+        try withLedgerAccess {
+            guard !immutableSnapshot, path != ":memory:", lifecyclePermit == nil else { return }
+            if activationStamp?.schemaVersion == 0 && requiredActivation == nil {
+                activationStamp = try ledgerAccess.publish(schemaVersion: version, transitioning: false)
+            } else if activationStamp?.schemaVersion != version { throw LedgerAccessError.incompatible }
+        }
+    }
+    func adoptCompletedLifecycle(_ stamp: LedgerActivationStamp) throws {
+        try ledgerAccess.withAccess {
+            _ = try ledgerAccess.validate(expected: stamp, permit: nil)
+            ownershipLock.lock(); defer { ownershipLock.unlock() }
+            activationStamp = stamp; lifecyclePermit = nil
+        }
+    }
+
+
+    public convenience init(path: String) { self.init(path: path, lifecyclePermit: nil, requiredActivation: nil) }
+    init(path: String, lifecyclePermit: LedgerLifecyclePermit?, requiredActivation: LedgerActivationStamp? = nil, allowMigrationRecovery: Bool = false) {
         self.path = path
+        self.ledgerAccess = .shared(path: path)
+        self.storedPermit = lifecyclePermit
+        self.requiredActivation = requiredActivation
+        self.allowMigrationRecovery = allowMigrationRecovery
     }
 
     deinit {
@@ -114,16 +229,60 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
 
     /// Keeps a synchronous, multi-call operation on this connection indivisible.
     /// Retain the repository's existing transaction decisions inside this scope.
-    func withExclusiveAccess<Result>(_ operation: () throws -> Result) rethrows -> Result {
-        ownershipLock.lock()
-        defer { ownershipLock.unlock() }
-        return try operation()
+    func withExclusiveAccess<Result>(_ operation: () throws -> Result) throws -> Result {
+        try withLedgerAccess {
+            ownershipLock.lock(); defer { ownershipLock.unlock() }
+            return try operation()
+        }
     }
 
     public func open(access: Access = .createIfMissing) throws {
         ownershipLock.lock()
+        let scopedConnection = enrolledScopedConnection
+        ownershipLock.unlock()
+        guard !scopedConnection else { throw LedgerAccessError.unavailable }
+        try selectAccessMode(access)
+        if allowMigrationRecovery, lifecyclePermit == nil,
+           let stamp = try? ledgerAccess.readStamp(), stamp.transitioning, stamp.transitionKind == "migration" {
+            lifecyclePermit = try ledgerAccess.beginLifecycle(recovering: true)
+            ownsMigrationRecovery = true
+        }
+
+        return try withLedgerAccess {
+        ownershipLock.lock()
         defer { ownershipLock.unlock() }
+        try openConnectionLocked(access: access)
+        }
+    }
+
+    /// Switches the fully verified enrolled helper provider to a connection
+    /// scope. It is deliberately unavailable to ordinary providers, snapshots
+    /// and migration paths. The caller already holds the access gate, so this
+    /// checked close happens before that outer gate can be released.
+    func beginEnrolledExistingConnectionScope() throws {
+        guard requiredActivation != nil, !immutableSnapshot, path != ":memory:" else {
+            throw LedgerAccessError.incompatible
+        }
+        try ledgerAccess.withAccess(permit: lifecyclePermit) {
+            ownershipLock.lock(); defer { ownershipLock.unlock() }
+            guard !enrolledScopedConnection, db != nil else { throw LedgerAccessError.unavailable }
+            try closeConnectionLocked()
+            enrolledScopedConnection = true
+            enrolledScopedConnectionClosed = false
+        }
+    }
+
+    private func openConnectionLocked(access: Access) throws {
         if db != nil { return }
+        if !immutableSnapshot && path != ":memory:" {
+            if let requiredActivation {
+                _ = try ledgerAccess.validate(expected: requiredActivation, permit: nil)
+            } else if FileManager.default.fileExists(atPath: ledgerAccess.activationURL.path) {
+                _ = try ledgerAccess.validate(expected: nil, permit: lifecyclePermit)
+            }
+        }
+        openingOrMigrating = true
+        defer { openingOrMigrating = false }
         let flags: Int32
         let filename: String
         switch access {
@@ -141,41 +300,54 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         }
         if sqlite3_open_v2(filename, &db, flags, nil) != SQLITE_OK {
             let extended = sqlite3_extended_errcode(db)
-            close()
+            if let db {
+                let closeResult = sqlite3_close(db)
+                guard closeResult == SQLITE_OK else {
+                    if enrolledScopedConnection { enrolledScopedConnectionClosed = true }
+                    throw SQLiteDatabaseError.closeFailed(closeResult)
+                }
+                self.db = nil
+            }
             throw SQLiteDatabaseError.execution(SQLiteExecutionError(primaryCode: extended & 0xff, extendedCode: extended, operation: .open))
         }
         // Protect every startup statement from concurrent openers, including
         // the first WAL-mode pragma used by independent providers.
-        sqlite3_busy_timeout(db, 5000)
-        if access == .readOnlySnapshot {
-            try execute(sql: "PRAGMA query_only = ON;")
-            return
-        }
-        // Configure recommended PRAGMAs for production-safe defaults
-        // Enable write-ahead logging for concurrency
         do {
+            sqlite3_busy_timeout(db, 5000)
+            if access == .readOnlySnapshot {
+                try execute(sql: "PRAGMA query_only = ON;")
+                return
+            }
+            // Configure recommended PRAGMAs for production-safe defaults.
             try execute(sql: "PRAGMA journal_mode = WAL;")
+            var persistWAL: Int32 = 1
+            guard path == ":memory:" || sqlite3_file_control(db, "main", SQLITE_FCNTL_PERSIST_WAL, &persistWAL) == SQLITE_OK else {
+                throw LedgerAccessError.unavailable
+            }
             // Enable foreign keys enforcement
             try execute(sql: "PRAGMA foreign_keys = ON;")
             // Use NORMAL synchronous for balanced durability/performance
             try execute(sql: "PRAGMA synchronous = NORMAL;")
-        } catch {
-            close()
-            throw error
+            if !immutableSnapshot && path != ":memory:" {
+                activationStamp = lifecyclePermit != nil
+                    ? try ledgerAccess.readStamp()
+                    : try ledgerAccess.initializeIfNeeded(schemaVersion: 0)
+            }
+        } catch let operationError {
+            do { try closeConnectionLocked() }
+            catch let closeError {
+                if enrolledScopedConnection { enrolledScopedConnectionClosed = true }
+                throw closeError
+            }
+            throw operationError
         }
     }
 
-    public func close() {
-        ownershipLock.lock()
-        defer { ownershipLock.unlock() }
-        // A reentrant callback can request close while its statement is active.
-        // Preserve the live handle if SQLite refuses; checked close reports why.
-        if let db, sqlite3_close(db) == SQLITE_OK {
-            self.db = nil
-        }
-    }
+    public func close() { try? closeChecked() }
 
     public func createBackup(at destinationPath: String) throws {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
@@ -203,11 +375,21 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
             throw SQLiteDatabaseError.backupFailed("destination-close")
         }
         destinationClosed = true
+
+        }
     }
 
     public func closeChecked() throws {
-        ownershipLock.lock()
-        defer { ownershipLock.unlock() }
+        func closeExplicitly() throws {
+            ownershipLock.lock(); defer { ownershipLock.unlock() }
+            if enrolledScopedConnection { enrolledScopedConnectionClosed = true }
+            try closeConnectionLocked()
+        }
+        if immutableSnapshot || path == ":memory:" { try closeExplicitly() }
+        else { try ledgerAccess.withAccess(permit: lifecyclePermit) { try closeExplicitly() } }
+    }
+
+    private func closeConnectionLocked() throws {
         guard let db else { return }
         let result = sqlite3_close(db)
         guard result == SQLITE_OK else { throw SQLiteDatabaseError.closeFailed(result) }
@@ -215,18 +397,28 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     func totalChangeCounter() throws -> Int64 {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
-        // Includes this provider's writes. External connection changes are
-        // separately revalidated by the product's generation/operation boundary.
-        return sqlite3_total_changes64(db)
+        // Monotonic for this connection: local writes plus SQLite's external
+        // commit version. Restore must notice writes from the enrolled helper.
+        let externalVersion = try querySingleInt(sql: "PRAGMA data_version;")
+        let result = sqlite3_total_changes64(db).addingReportingOverflow(Int64(externalVersion))
+        guard !result.overflow else { throw LedgerAccessError.unavailable }
+        return result.partialValue
+
+        }
     }
 
     public func checkpointAndClose() throws {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
+        if enrolledScopedConnection { enrolledScopedConnectionClosed = true }
         var logFrames: Int32 = 0
         var checkpointedFrames: Int32 = 0
         let checkpointResult = sqlite3_wal_checkpoint_v2(
@@ -244,9 +436,13 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
             throw SQLiteDatabaseError.closeFailed(closeResult)
         }
         self.db = nil
+
+        }
     }
 
     public func execute(sql: String) throws {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
@@ -256,10 +452,14 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
             sqlite3_free(errMsg)
             throw executionError(resultCode: result, operation: operation(for: sql))
         }
+
+        }
     }
 
     // Execute a prepared statement with parameter bindings. Parameters are bound in order.
     public func executePrepared(sql: String, params: [Any?] = []) throws {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
@@ -275,9 +475,13 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
             throw executionError(resultCode: rc, operation: operation(for: sql))
         }
+
+        }
     }
 
     public func query<T>(sql: String, params: [Any?] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
@@ -300,13 +504,33 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
                 throw executionError(resultCode: rc, operation: .query)
             }
         }
+
+        }
     }
 
     public func runMigrations(_ migrations: [Migration]) throws {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         try MigrationChainValidator.validateRegistered(migrations)
         try open()
+        openingOrMigrating = true
+        defer { openingOrMigrating = false }
+        defer {
+            // An ordinary failed migration rolls back its transaction. Publish
+            // a new epoch only if the surviving registered prefix is verified;
+            // crash/interrupted or unverifiable state remains pending.
+            if path != ":memory:", lifecyclePermit == nil, activationStamp?.transitioning == true,
+               let prefix = try? validatedMigrationHistory(against: migrations, requiresCompleteChain: false),
+               let stable = try? ledgerAccess.publish(schemaVersion: prefix.count, transitioning: false) {
+                activationStamp = stable
+            }
+        }
+        let priorSchema = (try? querySingleInt(sql: "SELECT MAX(version) FROM schema_migrations;")) ?? 0
+        if path != ":memory:" && priorSchema != migrations.count {
+            activationStamp = try ledgerAccess.publish(schemaVersion: priorSchema, transitioning: true)
+        }
 
         let hasMigrationTable = try tableExists("schema_migrations")
         let hasApplicationSchema = try querySingleInt(sql: """
@@ -390,6 +614,18 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
             against: migrations,
             requiresCompleteChain: true
         )
+
+        if ownsMigrationRecovery, let permit = lifecyclePermit {
+            activationStamp = try permit.finish(schemaVersion: migrations.count)
+            lifecyclePermit = nil; ownsMigrationRecovery = false
+        }
+        if path != ":memory:" && lifecyclePermit == nil {
+            if activationStamp?.schemaVersion != migrations.count || activationStamp?.transitioning == true {
+                activationStamp = try ledgerAccess.publish(schemaVersion: migrations.count, transitioning: false)
+            }
+        }
+
+        }
     }
 
     // MARK: - Helpers
@@ -417,15 +653,21 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     public func queryInt(_ sql: String) throws -> Int {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         return try querySingleInt(sql: sql)
+
+        }
     }
 
     func validatedMigrationHistory(
         against migrations: [Migration],
         requiresCompleteChain: Bool
     ) throws -> [PersistedMigrationRecord] {
+        return try withLedgerAccess {
+
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         try MigrationChainValidator.validateRegistered(migrations)
@@ -439,6 +681,8 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
             requiresCompleteChain: requiresCompleteChain
         )
         return records
+
+        }
     }
 
     private func bind(_ params: [Any?], to stmt: OpaquePointer?) {
@@ -449,6 +693,10 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
                 continue
             }
             switch value {
+            case let bytes as Data:
+                _ = bytes.withUnsafeBytes { buffer in
+                    sqlite3_bind_blob64(stmt, idx, buffer.baseAddress, UInt64(buffer.count), SQLITE_TRANSIENT)
+                }
             case let s as String:
                 sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
             case let i as Int:

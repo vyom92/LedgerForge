@@ -6,7 +6,7 @@
 
 import Foundation
 
-protocol StatementParser {
+nonisolated protocol StatementParser {
 
     var name: String { get }
 

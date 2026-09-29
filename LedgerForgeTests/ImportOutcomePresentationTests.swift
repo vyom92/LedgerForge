@@ -290,6 +290,7 @@ struct ImportOutcomePresentationTests {
             (.cbqSourceOverlapCommitted, "CBQ source recorded", "Recorded exact CBQ source lineage and persisted 2 new transaction(s)"),
             (.statementEquivalenceConflict, "Statement equivalence conflict", "The same statement period differs financially across formats. No new financial history was written"),
             (.statementEquivalenceEvidenceUnavailable, "Equivalence evidence unavailable", "Existing overlapping history lacks exact projection evidence. No new financial history was written"),
+            (.bankSourceOverlapHeld, "Bank statement held", "An account section has unresolved or conflicting source evidence. No account section was imported"),
             (.equivalentFormatAlreadyRecorded, "Format already recorded", "This source format is already represented for the statement period. No new financial history was written"),
             (.partialImportCommitted, "Partial import completed", "Persisted 2 new transaction(s) from a reviewed partial statement"),
             (.reviewedPartialPlanStale, "Partial review out of date", "Repository truth changed after review. No new financial history was written"),

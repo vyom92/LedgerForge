@@ -6,6 +6,15 @@ import Testing
 @MainActor
 struct AccountsViewModelTests {
 
+    @Test func accountNumberPresentationShowsOnlyKnownLastFourDigits() {
+        #expect(AccountDisplayText.maskedNumber("123456789012") == "xxx9012")
+        #expect(AccountDisplayText.maskedNumber("XXXX XXXX 1234") == "xxx1234")
+        #expect(AccountDisplayText.maskedNumber("****-5678") == "xxx5678")
+        #expect(AccountDisplayText.maskedNumber("12XX") == nil)
+        #expect(AccountDisplayText.maskedNumber("123") == nil)
+        #expect(AccountDisplayText.maskedNumber("") == nil)
+    }
+
     @Test func exposesEveryHydratedAccountAndScopesSelectionByRepositoryID() {
         let coordinator = RecordingMetadataCoordinator()
         let stores = PresentationStores()
@@ -146,6 +155,11 @@ private final class RecordingMetadataCoordinator: AccountMetadataCoordinating {
     private(set) var callCount = 0
 
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
+        callCount += 1
+        return true
+    }
+
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
         callCount += 1
         return true
     }

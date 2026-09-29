@@ -6,13 +6,13 @@
 
 import Foundation
 
-final class StatementParserRegistry {
+nonisolated final class StatementParserRegistry {
 
-    static let shared = StatementParserRegistry()
+    @MainActor static let shared = StatementParserRegistry()
 
     private let parsers: [StatementParser]
 
-    private init() {
+    init() {
 
         parsers = [
 

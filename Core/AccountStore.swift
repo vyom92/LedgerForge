@@ -138,6 +138,7 @@ final class AccountStore: ObservableObject {
             // Update balance and lastImport
             var updated = existing
             updated.nativeCurrency = try! CurrencyCode(currency)
+            updated.currentBalanceAsOfISO = nil
             if let latestBalance = latestBalance {
                 updated.currentBalanceMoney = try! Money(amount: latestBalance, currency: updated.nativeCurrency)
             }
@@ -187,6 +188,7 @@ final class AccountStore: ObservableObject {
             guard let idx = self.accounts.firstIndex(where: { $0.id == id }) else { return }
             var updated = self.accounts[idx]
             updated.currentBalanceMoney = try! Money(amount: newBalance, currency: updated.nativeCurrency)
+            updated.currentBalanceAsOfISO = nil
             if let lastImport = lastImport {
                 updated.lastImport = lastImport
             }

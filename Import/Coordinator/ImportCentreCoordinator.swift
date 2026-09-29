@@ -50,6 +50,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             _ operationID: UUID,
             _ progress: @escaping (ImportProgress) -> Void
         ) async throws -> Preparation
+        var refreshQueuedPreparation: @MainActor (Preparation) throws -> Preparation = { $0 }
         let review: @MainActor (_ preparation: Preparation) throws -> ImportCentreReviewState
         let refreshPartialReview: @MainActor (
             _ preparation: Preparation,
@@ -61,7 +62,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             _ reviewedPartialPlan: ReviewedPartialImportPlanDTO?
         ) async -> ImportOutcomePresentation
         let cancelPreparation: @MainActor (_ preparation: Preparation) -> Void
-        let cancelPasswordChallenge: @MainActor () -> Void
+        let cancelPasswordChallenge: @MainActor (_ operationID: UUID?) -> Void
         let failureSummary: @MainActor (_ error: Error) -> ImportFailureSummary
         let isRetryablePreparationFailure: @MainActor (_ error: Error) -> Bool
         /// A process-local, batch-scoped UI decision only. The production closure
@@ -99,11 +100,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         fileprivate(set) var accountChoice: ImportAccountChoice?
         fileprivate(set) var cardSectionDraftAccountID: String?
         fileprivate(set) var cardSectionDraftChoices: [String: ImportCardInstrumentChoice]
+        fileprivate(set) var bankSectionDraftChoices: [String: ImportBankSectionChoice]
         fileprivate(set) var partialReview: PartialImportReviewResult
         fileprivate(set) var validationPassed: Bool
         fileprivate(set) var outcome: ImportOutcomePresentation?
         fileprivate(set) var completionDisposition: CompletionDisposition?
         fileprivate(set) var failureMessage: String?
+        fileprivate(set) var preparationFailure: ImportFailureSummary? = nil
         fileprivate(set) var retrySourceURL: URL?
         fileprivate(set) var recoveryContext: ConfirmedImportRecoveryContext?
     }
@@ -118,8 +121,9 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     @Published private(set) var batchCancellationRequested = false
 
     private let dependencies: Dependencies
-    private var preparationTask: Task<Void, Never>?
-    private var activePreparation: (itemID: UUID, operationID: UUID)?
+    private var preparationTasks: [UUID: Task<Void, Never>] = [:]
+    private var activePreparations: [UUID: UUID] = [:]
+    private var preparationLimit = 1
     /// Exists only for one coordinator queue and is cleared by every batch drain.
     /// It is deliberately not durable and does not replace PreparedImport's
     /// exact-source, generation, or provider-owned commit checks.
@@ -233,7 +237,9 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     var permitsContinue: Bool {
-        guard let item = currentItem, !preparationIsActive else { return false }
+        guard let item = currentItem,
+              activePreparations[item.id] == nil,
+              !batchCancellationRequested else { return false }
         switch item.phase {
         case .failed, .validationFailed:
             return true
@@ -272,13 +278,24 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         case .pending, .preparing, .awaitingReview, .committing:
             return true
         case .awaitingConfirmation:
-            guard let preparation = item.preparation else { return preparationIsActive }
-            return preparationIsActive || dependencies.isAutomaticallyCommittable(preparation, automaticReviewState(for: item))
+            // Look-ahead preparation must not hide a decision for this item.
+            return currentItemWillAutomaticallyCommit
         case .completed:
             return item.completionDisposition == .committed || item.completionDisposition == .exactDuplicate
         case .validationFailed, .failed, .skipped, .cancelled:
             return false
         }
+    }
+
+    /// Password entry is an owner decision even while preparation is suspended.
+    /// A look-ahead or obsolete challenge must not replace this item's surface.
+    func showsAutomaticBatchProgress(passwordChallengeID: UUID?) -> Bool {
+        if let passwordChallengeID, let item = currentItem,
+           item.phase == .preparing,
+           item.preparationOperationID == passwordChallengeID {
+            return false
+        }
+        return showsAutomaticBatchProgress
     }
 
     @discardableResult
@@ -296,17 +313,19 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     /// The caller invokes this only after displaying the selected source count and
     /// the explicit “Prepare and import batch” action.
     @discardableResult
-    func startConfirmedBatch(_ sourceURLs: [URL]) -> Bool {
-        startBatch(sourceURLs, confirmedForAutomaticCommit: true)
+    func startConfirmedBatch(_ sourceURLs: [URL], preparationLimit: Int = 1) -> Bool {
+        startBatch(sourceURLs, confirmedForAutomaticCommit: true, preparationLimit: preparationLimit)
     }
 
     @discardableResult
     private func startBatch(
         _ sourceURLs: [URL],
-        confirmedForAutomaticCommit: Bool
+        confirmedForAutomaticCommit: Bool,
+        preparationLimit: Int = 1
     ) -> Bool {
         guard !sourceURLs.isEmpty, permitsSourceSelection else { return false }
 
+        self.preparationLimit = confirmedForAutomaticCommit ? min(2, max(1, preparationLimit)) : 1
         selectionFailureMessage = nil
         recoveryActionRequestID = nil
         batchCancellationRequested = false
@@ -330,6 +349,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 accountChoice: nil,
                 cardSectionDraftAccountID: nil,
                 cardSectionDraftChoices: [:],
+                bankSectionDraftChoices: [:],
                 partialReview: .ordinaryFullImport,
                 validationPassed: false,
                 outcome: nil,
@@ -342,7 +362,9 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         guard let firstItemID = items.first?.id else { return false }
         activeItemID = firstItemID
         presentedItemID = firstItemID
-        return startPreparation(for: firstItemID)
+        let started = startPreparation(for: firstItemID)
+        fillPreparationWindow()
+        return started
     }
 
     func attachPresentationOwner(_ ownerID: UUID) {
@@ -385,8 +407,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         selectionFailureMessage = nil
         switch item.phase {
         case .preparing, .awaitingReview:
-            dependencies.cancelPasswordChallenge()
-            preparationTask?.cancel()
+            dependencies.cancelPasswordChallenge(item.preparationOperationID)
+            preparationTasks[item.id]?.cancel()
             if let preparation = item.preparation {
                 dependencies.cancelPreparation(preparation)
             }
@@ -405,12 +427,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.accountChoice = nil
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
+            $0.bankSectionDraftChoices = [:]
             $0.partialReview = .ordinaryFullImport
             $0.recoveryContext = nil
             $0.outcome = nil
             $0.completionDisposition = nil
         }
-        guard activePreparation == nil else { return }
+        guard activePreparations[item.id] == nil else { return }
         advanceToNextPending(after: item.id)
     }
 
@@ -419,8 +442,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         selectionFailureMessage = nil
         switch item.phase {
         case .preparing, .awaitingReview:
-            dependencies.cancelPasswordChallenge()
-            preparationTask?.cancel()
+            dependencies.cancelPasswordChallenge(item.preparationOperationID)
+            preparationTasks[item.id]?.cancel()
             if let preparation = item.preparation {
                 dependencies.cancelPreparation(preparation)
             }
@@ -439,12 +462,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.accountChoice = nil
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
+            $0.bankSectionDraftChoices = [:]
             $0.partialReview = .ordinaryFullImport
             $0.recoveryContext = nil
             $0.outcome = nil
             $0.completionDisposition = nil
         }
-        guard activePreparation == nil else { return }
+        guard activePreparations[item.id] == nil else { return }
         advanceToNextPending(after: item.id)
     }
 
@@ -497,59 +521,19 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         automaticCommitRequestID = nil
         batchCancellationRequested = true
         selectionFailureMessage = nil
-
-        guard let item = currentItem else {
-            cancelPendingItems()
-            completeBatchCancellation()
-            return
-        }
-        if item.phase == .committing {
-            return
-        }
-
-        switch item.phase {
-        case .preparing, .awaitingReview:
-            dependencies.cancelPasswordChallenge()
-            preparationTask?.cancel()
-            if let preparation = item.preparation {
-                dependencies.cancelPreparation(preparation)
-            }
-            markItemCancelled(item.id)
-            cancelPendingItems()
-            if activePreparation == nil {
-                completeBatchCancellation()
-            }
-        case .awaitingConfirmation:
-            if let preparation = item.preparation {
-                dependencies.cancelPreparation(preparation)
-            }
-            markItemCancelled(item.id)
-            cancelPendingItems()
-            completeBatchCancellation()
-        case .validationFailed, .completed, .failed:
-            if let preparation = item.preparation {
-                dependencies.cancelPreparation(preparation)
-                mutateItem(item.id) { $0.preparation = nil }
-            }
-            cancelPendingItems()
-            completeBatchCancellation()
-        case .pending, .skipped, .cancelled:
-            cancelPendingItems()
-            completeBatchCancellation()
-        case .committing:
-            break
-        }
+        dependencies.cancelPasswordChallenge(nil)
+        cancelPendingItems()
+        completeBatchCancellation()
     }
 
     @discardableResult
     func reset() -> Bool {
         guard currentItem?.phase != .committing else { return false }
-        if activePreparation != nil {
-            dependencies.cancelPasswordChallenge()
-            preparationTask?.cancel()
-        } else {
-            disposeAllPreparations()
+        if !activePreparations.isEmpty {
+            dependencies.cancelPasswordChallenge(nil)
+            for task in preparationTasks.values { task.cancel() }
         }
+        disposeAllPreparations()
         automaticCommitTask?.cancel()
         automaticCommitTask = nil
         automaticCommitRequestID = nil
@@ -572,6 +556,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.accountChoice = choice
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
+            $0.bankSectionDraftChoices = [:]
             do {
                 $0.partialReview = try dependencies.refreshPartialReview(preparation, choice)
             } catch {
@@ -619,6 +604,30 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             } else {
                 item.accountChoice = nil
             }
+            do {
+                item.partialReview = try dependencies.refreshPartialReview(preparation, item.accountChoice)
+            } catch {
+                item.partialReview = .unsupportedEvidence
+            }
+        }
+        scheduleAutomaticCommitIfEligible(for: item.id)
+    }
+
+    /// Stores a section decision in the in-memory review draft. A confirmed
+    /// batch can proceed only after every required section has a complete choice;
+    /// the provider rechecks the whole parent before any accepted write.
+    func updateBankSectionChoice(
+        sectionID: String,
+        choice: ImportBankSectionChoice
+    ) {
+        guard let item = currentItem,
+              item.phase == .awaitingConfirmation,
+              let preparation = item.preparation else { return }
+        mutateItem(item.id) { item in
+            item.cardSectionDraftAccountID = nil
+            item.cardSectionDraftChoices = [:]
+            item.bankSectionDraftChoices[sectionID] = choice
+            item.accountChoice = .bankSections(item.bankSectionDraftChoices)
             do {
                 item.partialReview = try dependencies.refreshPartialReview(preparation, item.accountChoice)
             } catch {
@@ -753,27 +762,6 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 $0.preparation = preparation
             }
 
-            let review: ImportCentreReviewState
-            do {
-                review = try dependencies.review(preparation)
-            } catch {
-                dependencies.cancelPreparation(preparation)
-                throw error
-            }
-            guard isCurrentPreparation(itemID: itemID, operationID: operationID),
-                  !Task.isCancelled,
-                  item(withID: itemID)?.phase == .awaitingReview else {
-                dependencies.cancelPreparation(preparation)
-                return
-            }
-            mutateItem(itemID) {
-                $0.preparationOperationID = nil
-                $0.identityReview = review.identityReview
-                $0.accountChoice = review.initialAccountChoice
-                $0.partialReview = review.partialReview
-                $0.validationPassed = review.validationPassed
-                $0.phase = review.validationPassed ? .awaitingConfirmation : .validationFailed
-            }
         } catch is CancellationError {
             preserveCancelledState(itemID: itemID, operationID: operationID)
         } catch let error as ImportError where error == .cancelled {
@@ -790,8 +778,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 $0.accountChoice = nil
                 $0.cardSectionDraftAccountID = nil
                 $0.cardSectionDraftChoices = [:]
+                $0.bankSectionDraftChoices = [:]
                 $0.partialReview = .ordinaryFullImport
                 $0.failureMessage = summary.displayText
+                $0.preparationFailure = summary
                 $0.retrySourceURL = dependencies.isRetryablePreparationFailure(error) ? sourceURL : nil
             }
             DeveloperConsole.shared.error(
@@ -821,18 +811,43 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     private func isCurrentPreparation(itemID: UUID, operationID: UUID) -> Bool {
-        activePreparation?.itemID == itemID
-            && activePreparation?.operationID == operationID
-            && activeItemID == itemID
+        activePreparations[itemID] == operationID
             && item(withID: itemID)?.preparationOperationID == operationID
     }
 
+    private func reviewQueuedItem(_ itemID: UUID) {
+        guard activeItemID == itemID, let item = item(withID: itemID),
+              item.phase == .awaitingReview, let original = item.preparation else { return }
+        do {
+            let preparation = try dependencies.refreshQueuedPreparation(original)
+            let review = try dependencies.review(preparation)
+            mutateItem(itemID) {
+                $0.preparation = preparation
+                $0.preparationOperationID = nil
+                $0.identityReview = review.identityReview
+                $0.accountChoice = review.initialAccountChoice
+                $0.bankSectionDraftChoices = [:]
+                $0.partialReview = review.partialReview
+                $0.validationPassed = review.validationPassed
+                $0.phase = review.validationPassed ? .awaitingConfirmation : .validationFailed
+            }
+        } catch {
+            dependencies.cancelPreparation(original)
+            let summary = dependencies.failureSummary(error)
+            mutateItem(itemID) {
+                $0.preparation = nil; $0.preparationOperationID = nil
+                $0.phase = .failed; $0.failureMessage = summary.displayText
+                $0.preparationFailure = summary
+                $0.retrySourceURL = dependencies.isRetryablePreparationFailure(error) ? item.sourceURL : nil
+            }
+        }
+    }
+
     private func releasePreparationSlot(itemID: UUID, operationID: UUID) {
-        guard activePreparation?.itemID == itemID,
-              activePreparation?.operationID == operationID else { return }
-        activePreparation = nil
-        preparationTask = nil
-        preparationIsActive = false
+        guard activePreparations[itemID] == operationID else { return }
+        activePreparations.removeValue(forKey: itemID)
+        preparationTasks.removeValue(forKey: itemID)
+        preparationIsActive = !activePreparations.isEmpty
         if batchCancellationRequested {
             cancelPendingItems()
             completeBatchCancellation()
@@ -843,10 +858,18 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             advanceToNextPending(after: itemID)
             return
         }
-        // This runs only after the serial preparation slot has been released.
-        // Starting a commit earlier would leave preparationIsActive true and make
-        // the next queue item unable to acquire the serial slot.
+        reviewQueuedItem(itemID)
         scheduleAutomaticCommitIfEligible(for: itemID)
+    }
+
+    private func fillPreparationWindow() {
+        guard preparationLimit > 1, confirmedBatchID == batchID, confirmedBatchID != nil,
+              !batchCancellationRequested,
+              let activeIndex = items.firstIndex(where: { $0.id == activeItemID }),
+              !items[activeIndex...].contains(where: { $0.phase == .failed }) else { return }
+        while activePreparations.count + items.filter({ $0.preparation != nil && activePreparations[$0.id] == nil }).count < preparationLimit {
+            guard let next = items.first(where: { $0.phase == .pending }), startPreparation(for: next.id) else { break }
+        }
     }
 
     private func automaticReviewState(for item: Item) -> ImportCentreReviewState {
@@ -865,7 +888,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         guard confirmedBatchID != nil,
               confirmedBatchID == batchID,
               !batchCancellationRequested,
-              !preparationIsActive,
+              activePreparations[item.id] == nil,
               activeItemID == item.id,
               item.phase == .awaitingConfirmation,
               item.preparation?.id == preparation.id else { return false }
@@ -902,11 +925,11 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
 
     @discardableResult
     private func startPreparation(for itemID: UUID) -> Bool {
-        guard activeItemID == itemID,
+        guard activeItemID == itemID || preparationLimit > 1,
               let item = item(withID: itemID),
               item.phase == .pending || item.phase == .failed,
-              activePreparation == nil,
-              !preparationIsActive,
+              activePreparations[itemID] == nil,
+              activePreparations.count < preparationLimit,
               !batchCancellationRequested else { return false }
 
         let operationID = UUID()
@@ -919,17 +942,19 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.accountChoice = nil
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
+            $0.bankSectionDraftChoices = [:]
             $0.partialReview = .ordinaryFullImport
             $0.validationPassed = false
             $0.outcome = nil
             $0.completionDisposition = nil
             $0.failureMessage = nil
+            $0.preparationFailure = nil
             $0.retrySourceURL = nil
             $0.recoveryContext = nil
         }
-        activePreparation = (itemID, operationID)
+        activePreparations[itemID] = operationID
         preparationIsActive = true
-        preparationTask = Task { [weak self] in
+        preparationTasks[itemID] = Task { [weak self] in
             await self?.runPreparation(
                 sourceURL: item.sourceURL,
                 itemID: itemID,
@@ -940,9 +965,14 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     private func advanceToNextPending(after itemID: UUID) {
-        guard activeItemID == itemID else { return }
+        guard activeItemID == itemID,
+              let completedIndex = items.firstIndex(where: { $0.id == itemID }) else { return }
         activeItemID = nil
-        guard let nextItemID = items.first(where: { $0.phase == .pending })?.id else {
+        // A look-ahead failure still owns its place in the review lane. Once
+        // explicitly continued, its retained failure must not be selected again.
+        guard let nextItemID = items.dropFirst(completedIndex + 1).first(where: {
+            [.pending, .preparing, .awaitingReview, .failed].contains($0.phase)
+        })?.id else {
             // The explicit consent cannot outlive the completed source list.
             confirmedBatchID = nil
             presentedItemID = itemID
@@ -950,13 +980,23 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         }
         activeItemID = nextItemID
         presentedItemID = nextItemID
-        _ = startPreparation(for: nextItemID)
+        if item(withID: nextItemID)?.phase == .pending { _ = startPreparation(for: nextItemID) }
+        else { reviewQueuedItem(nextItemID); scheduleAutomaticCommitIfEligible(for: nextItemID) }
+        fillPreparationWindow()
     }
 
     private func cancelPendingItems() {
-        let pendingIDs = items.filter { $0.phase == .pending }.map(\.id)
-        for itemID in pendingIDs {
-            markItemCancelled(itemID)
+        // A suspended password prompt does not observe Task cancellation on its
+        // own. Resume it before cancelling look-ahead preparation tasks so every
+        // slot can reach its defer and drain after batch/presentation teardown.
+        dependencies.cancelPasswordChallenge(nil)
+        for item in items where item.phase != .committing {
+            preparationTasks[item.id]?.cancel()
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+                mutateItem(item.id) { $0.preparation = nil }
+            }
+            if !Self.isTerminal(item.phase) { markItemCancelled(item.id) }
         }
     }
 
@@ -969,6 +1009,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.accountChoice = nil
             $0.cardSectionDraftAccountID = nil
             $0.cardSectionDraftChoices = [:]
+            $0.bankSectionDraftChoices = [:]
             $0.partialReview = .ordinaryFullImport
             $0.outcome = nil
             $0.completionDisposition = nil
@@ -979,6 +1020,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     private func completeBatchCancellation() {
+        guard activePreparations.isEmpty, currentItem?.phase != .committing else { return }
         if currentItem?.phase != .committing {
             activeItemID = nil
         }
@@ -1080,6 +1122,7 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                         progress: progress
                     )
                 },
+                refreshQueuedPreparation: { try engine.refreshQueuedPreparation($0) },
                 review: { preparation in
                     // A known duplicate still receives identity review so a
                     // bank/card duplicate can reach the repository's truthful
@@ -1120,8 +1163,8 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                     )
                 },
                 cancelPreparation: { engine.cancelPreparedImport($0) },
-                cancelPasswordChallenge: {
-                    StatementPasswordChallengeController.shared.cancel()
+                cancelPasswordChallenge: { operationID in
+                    StatementPasswordChallengeController.shared.cancel(challengeID: operationID)
                 },
                 failureSummary: { ImportFailureSummary.from($0) },
                 isRetryablePreparationFailure: { error in

@@ -1,4 +1,5 @@
 import AppKit
+import Charts
 import SwiftUI
 
 private func investmentTextWidth(_ values: [String], role: LFFontRole, theme: LFTheme) -> CGFloat {
@@ -8,6 +9,7 @@ private func investmentTextWidth(_ values: [String], role: LFFontRole, theme: LF
 
 struct InvestmentOverviewView: View {
     @Environment(\.lfTheme) private var theme
+    @State private var expandedDetailsID: String?
     let overview: InvestmentOverview
     let viewPortfolioHoldings: (InvestmentPortfolioSummary) -> Void
 
@@ -15,8 +17,20 @@ struct InvestmentOverviewView: View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                 LFPanel(title: "Investment overview") {
-                    overallSummary
-                    overviewStatus(now: context.date)
+                    if let comparison = capitalComparison {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .center, spacing: theme.spacing.majorModuleGap) {
+                                overviewFigures(now: context.date).frame(minWidth: 560)
+                                capitalChart(comparison).frame(width: 340)
+                            }
+                            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                                overviewFigures(now: context.date)
+                                capitalChart(comparison)
+                            }
+                        }
+                    } else {
+                        overviewFigures(now: context.date)
+                    }
                 }
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 460), spacing: theme.spacing.sectionGap)],
@@ -25,98 +39,154 @@ struct InvestmentOverviewView: View {
                         portfolioCard(portfolio, now: context.date)
                     }
                 }
-
-                DisclosureGroup("Valuation and currency basis") {
-                    VStack(alignment: .leading, spacing: theme.spacing.small) {
-                        Text("Current unrealised comparison uses supported acquisition cost and the same current FX basis for value and cost. It is not historical currency performance.")
-                        Text("ISP statements do not report fund acquisition costs.")
-                        ForEach(AlDarCurrency.allCases, id: \.self) { currency in
-                            if let leg = overview.fxLegs[currency] {
-                                Text("Al Dar · QAR 1 = \(leg.returned.rawToken) \(currency.rawValue) · fetched \(leg.fetchedAtISO)")
-                            }
-                        }
-                        Text("Native quantities, costs, prices, provider dates and individual policy ownership are available in holding Details.")
-                    }
-                    .textSelection(.enabled)
-                    .padding(.top, theme.spacing.micro)
-                }
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
             }
             .foregroundStyle(theme.palette.primaryText)
             .padding(.trailing, theme.spacing.micro)
         }
     }
 
+    private func overviewFigures(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            overallSummary
+            inlineAmounts("Invested / contributed",
+                          orderedLines(overview.performance, currency: "USD").compactMap { $0.cost?.covering(overview.performance.costCount) })
+            partialPerformance(overview.performance)
+            status(overview.total, now: now)
+            DisclosureGroup("Calculation details", isExpanded: detailsBinding("overview")) {
+                valuationDetails.padding(.top, theme.spacing.small)
+            }
+            .font(theme.typography.secondary)
+        }
+    }
+
+    // These are two current comparison endpoints, not a historical series.
+    // Never compare a partial capital baseline with the whole portfolio value.
+    private var capitalComparison: (capital: InvestmentConvertedAmount, current: InvestmentConvertedAmount, amounts: [Double])? {
+        let scope = overview.performance
+        guard scope.hasCompleteCost, scope.hasCompleteGain,
+              scope.holdingCount == overview.total.holdingCount,
+              overview.total.priceCount == overview.total.holdingCount,
+              let capital = scope.usd?.cost?.covering(scope.holdingCount),
+              let current = overview.total.usd?.value?.covering(scope.holdingCount),
+              scope.usd?.gain?.covering(scope.holdingCount) != nil else { return nil }
+        let amounts = [capital, current].compactMap { amount -> Double? in
+            guard let token = try? InvestmentRatioFormatter.rounded(numerator: amount.numerator, denominator: amount.denominator, places: 6),
+                  let value = Double(token), value.isFinite, value >= 0,
+                  (value * 1.15).isFinite else { return nil }
+            return value
+        }
+        guard amounts.count == 2 else { return nil }
+        return (capital, current, amounts)
+    }
+
+    private func capitalChart(_ comparison: (capital: InvestmentConvertedAmount, current: InvestmentConvertedAmount, amounts: [Double])) -> some View {
+        let color = profitColor(overview.performance.usd?.gain?.numerator.sign ?? 0)
+        return VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text("Capital → current value · USD")
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+            Chart {
+                ForEach(0..<2, id: \.self) { index in
+                    AreaMark(x: .value("Comparison", index), y: .value("USD", comparison.amounts[index]))
+                        .foregroundStyle(color.opacity(0.13))
+                    LineMark(x: .value("Comparison", index), y: .value("USD", comparison.amounts[index]))
+                        .foregroundStyle(color.opacity(0.8))
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                    PointMark(x: .value("Comparison", index), y: .value("USD", comparison.amounts[index]))
+                        .foregroundStyle(color)
+                        .symbolSize(35)
+                }
+            }
+            .chartXScale(domain: 0...1, range: .plotDimension(padding: 5))
+            .chartYScale(domain: 0...max(1, (comparison.amounts.max() ?? 0) * 1.15))
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 88)
+            .accessibilityHidden(true)
+            HStack {
+                comparisonEndpoint("Capital", amount: comparison.capital, alignment: .leading)
+                Spacer(minLength: theme.spacing.controlGap)
+                comparisonEndpoint("Current value", amount: comparison.current, alignment: .trailing)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Capital to current value comparison in USD. Capital \(comparison.capital.display). Current value \(comparison.current.display).")
+        .help("Current invested cost and allocated contributions compared with current holdings value. This is a capital comparison, not a historical timeline. Pending allocation is excluded.")
+    }
+
+    private func comparisonEndpoint(_ title: String, amount: InvestmentConvertedAmount, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: theme.spacing.micro) {
+            Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Text(amount.display).font(theme.typography.tableMoney).monospacedDigit()
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
     private var overallSummary: some View {
         ViewThatFits(in: .horizontal) {
-            VStack(alignment: .leading, spacing: theme.spacing.small) {
-                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        valueHero(scope: overview.total, nativeCurrency: "USD", title: "Current value")
-                        moneyMeasure("Invested cost", scope: overview.total, nativeCurrency: "USD", field: \.cost)
-                        moneyMeasure("Gain / loss", scope: overview.total, nativeCurrency: "USD", field: \.gain, profit: true)
-                        returnMeasure(overview.total)
-                }
-                Text(costPerformanceScope(overview.total))
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                valueMeasure(overview.total, currency: "USD")
+                moneyMeasure("Gain / loss", scope: overview.performance, currency: "USD", field: \.gain, prominent: true)
+                percentageMeasure("Growth %", overview.performance.returnPercent, prominent: true, sign: growthSign(overview.performance))
             }
-            .frame(minWidth: 900, maxWidth: .infinity, alignment: .leading)
-
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                valueHero(scope: overview.total, nativeCurrency: "USD", title: "Current value")
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        moneyMeasure("Invested cost", scope: overview.total, nativeCurrency: "USD", field: \.cost)
-                        moneyMeasure("Gain / loss", scope: overview.total, nativeCurrency: "USD", field: \.gain, profit: true)
-                        returnMeasure(overview.total)
-                    }
-                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                        moneyMeasure("Invested cost", scope: overview.total, nativeCurrency: "USD", field: \.cost)
-                        moneyMeasure("Gain / loss", scope: overview.total, nativeCurrency: "USD", field: \.gain, profit: true)
-                        returnMeasure(overview.total)
-                    }
+                valueMeasure(overview.total, currency: "USD")
+                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                    moneyMeasure("Gain / loss", scope: overview.performance, currency: "USD", field: \.gain, prominent: true)
+                    percentageMeasure("Growth %", overview.performance.returnPercent, prominent: true, sign: growthSign(overview.performance))
                 }
-                Text(costPerformanceScope(overview.total))
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func portfolioCard(_ portfolio: InvestmentPortfolioSummary, now: Date) -> some View {
-        LFPanel(title: portfolio.group.rawValue, trailing: holdingsAction(for: portfolio)) {
+        let currency = nativeCurrency(for: portfolio)
+        let performance = portfolio.group == .isp ? overview.ispPerformance ?? portfolio.scope : portfolio.scope
+        return LFPanel(title: portfolio.group.rawValue, trailing: holdingsAction(for: portfolio)) {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                valueHero(scope: portfolio.scope, nativeCurrency: nativeCurrency(for: portfolio), title: "Current value", spreadEquivalent: true)
-
-                if portfolio.group == .isp {
-                    ispReportedSummary
-                }
-                if portfolio.group != .isp || portfolio.scope.costCount > 0 {
-                    ViewThatFits(in: .horizontal) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        valueMeasure(portfolio.scope, currency: currency)
+                        moneyMeasure(portfolio.group == .isp ? "Growth" : "Gain / loss", scope: performance, currency: currency, field: \.gain, prominent: true)
+                        percentageMeasure("Growth %", performance.returnPercent, prominent: true, sign: growthSign(performance))
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                        valueMeasure(portfolio.scope, currency: currency)
                         HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                            moneyMeasure("Invested cost", scope: portfolio.scope, nativeCurrency: nativeCurrency(for: portfolio), field: \.cost)
-                            moneyMeasure("Gain / loss", scope: portfolio.scope, nativeCurrency: nativeCurrency(for: portfolio), field: \.gain, profit: true)
-                        }
-                        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                            moneyMeasure("Invested cost", scope: portfolio.scope, nativeCurrency: nativeCurrency(for: portfolio), field: \.cost)
-                            moneyMeasure("Gain / loss", scope: portfolio.scope, nativeCurrency: nativeCurrency(for: portfolio), field: \.gain, profit: true)
+                            moneyMeasure(portfolio.group == .isp ? "Growth" : "Gain / loss", scope: performance, currency: currency, field: \.gain, prominent: true)
+                            percentageMeasure("Growth %", performance.returnPercent, prominent: true, sign: growthSign(performance))
                         }
                     }
-                    percentageMeasures(scope: portfolio.scope, capitalShare: portfolio.capitalShare,
-                                       profitShare: portfolio.profitShare, portfolio: portfolio)
-                    Text(costPerformanceScope(portfolio.scope))
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                portfolioStatus(portfolio.scope, now: now)
+                Divider().overlay(theme.palette.divider)
+                if portfolio.group == .isp {
+                    inlineAmounts("Allocated contributions", overview.ispReported?.allocatedContributions ?? [])
+                } else {
+                    inlineAmounts("Invested cost",
+                                  orderedLines(performance, currency: currency).compactMap { $0.cost?.covering(performance.costCount) })
+                }
+                if portfolio.group == .isp, let source = overview.ispReported, !source.pendingAllocation.isEmpty {
+                    inlineAmounts("Pending allocation", source.pendingAllocation)
+                        .help("Recorded by Zurich; awaiting fund units. Excluded from current value and growth.")
+                }
+                partialPerformance(performance)
+                status(portfolio.scope, now: now)
+
+                DisclosureGroup("Details", isExpanded: detailsBinding(portfolio.id)) {
+                    portfolioDetails(portfolio, performance: performance)
+                        .padding(.top, theme.spacing.small)
+                }
+                .font(theme.typography.secondary)
+                .accessibilityIdentifier("investment.details.\(portfolio.id)")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func detailsBinding(_ id: String) -> Binding<Bool> {
+        Binding(get: { expandedDetailsID == id }, set: { expandedDetailsID = $0 ? id : nil })
     }
 
     private func holdingsAction(for portfolio: InvestmentPortfolioSummary) -> AnyView {
@@ -132,233 +202,193 @@ struct InvestmentOverviewView: View {
         portfolio.group == .indianMF ? "INR" : "USD"
     }
 
-    /// One large native amount gives the eye a clear first reading. The converted
-    /// equivalent remains adjacent, quieter, and fully visible.
-    private func valueHero(scope: InvestmentOverviewScope, nativeCurrency: String, title: String, spreadEquivalent: Bool = false) -> some View {
-        let lines = orderedLines(scope, nativeCurrency: nativeCurrency)
-        let valueTitle = scope.priceCount < scope.holdingCount ? "Priced holdings value" : title
-        return Group {
-            if spreadEquivalent, let equivalent = lines.dropFirst().first {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        heroAmount(lines.first, title: valueTitle, count: scope.priceCount, emphasized: true)
-                        heroAmount(equivalent, title: "Equivalent", count: scope.priceCount, emphasized: false)
-                    }
-                    VStack(alignment: .leading, spacing: theme.spacing.small) {
-                        heroAmount(lines.first, title: valueTitle, count: scope.priceCount, emphasized: true)
-                        heroAmount(equivalent, title: "Equivalent", count: scope.priceCount, emphasized: false)
-                    }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                    heroAmount(lines.first, title: valueTitle, count: scope.priceCount, emphasized: true)
-                    ForEach(lines.dropFirst()) { line in
-                        Text(line.value?.covering(scope.priceCount)?.display ?? "—")
-                            .font(theme.typography.tableMoney)
-                            .monospacedDigit()
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .accessibilityLabel("\(line.currency) equivalent \(line.value?.covering(scope.priceCount)?.display ?? "Unavailable")")
-                    }
-                }
-            }
-        }
-        .frame(minWidth: investmentTextWidth(lines.dropFirst().map { $0.value?.covering(scope.priceCount)?.display ?? "—" }, role: .tableMoney, theme: theme), maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func heroAmount(_ line: InvestmentOverviewLine?, title: String, count: Int, emphasized: Bool) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text(title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-            amountText(line?.value?.covering(count), emphasized: emphasized)
-                .foregroundStyle(emphasized ? theme.palette.primaryText : theme.palette.secondaryText)
-                .accessibilityLabel("\(line?.currency ?? "") \(title) \(line?.value?.covering(count)?.display ?? "Unavailable")")
-        }
-        .frame(minWidth: investmentTextWidth([line?.value?.covering(count)?.display ?? "—"], role: emphasized ? .headlineMoney : .tableMoney, theme: theme), maxWidth: .infinity, alignment: .leading)
+    // The same type scale makes value, gain and percentage equally easy to scan.
+    // Secondary currencies stay adjacent without competing with the primary amount.
+    private func valueMeasure(_ scope: InvestmentOverviewScope, currency: String) -> some View {
+        moneyMeasure(scope.priceCount < scope.holdingCount ? "Priced holdings value" : "Current value",
+                     scope: scope, currency: currency, field: \.value, prominent: true)
     }
 
     private func moneyMeasure(
         _ title: String,
         scope: InvestmentOverviewScope,
-        nativeCurrency: String,
+        currency: String,
         field: KeyPath<InvestmentOverviewLine, InvestmentConvertedAmount?>,
-        profit: Bool = false
+        prominent: Bool = false
     ) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+        let lines = orderedLines(scope, currency: currency)
+        let count = field == \.value ? scope.priceCount : field == \.cost ? scope.costCount : scope.gainCount
+        let amounts = lines.map { $0[keyPath: field]?.covering(count) }
+        let profit = field == \.gain
+        let primaryRole: LFFontRole = prominent ? .headlineMoney : .tableMoney
+        let width = max(investmentTextWidth([amounts.first.flatMap { $0 }?.display ?? "—"], role: primaryRole, theme: theme),
+                        investmentTextWidth(amounts.dropFirst().map { $0?.display ?? "—" }, role: .tableMoney, theme: theme))
+        return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(title)
-                .font(theme.typography.caption)
+                .font(prominent ? theme.typography.body : theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
-            ForEach(orderedLines(scope, nativeCurrency: nativeCurrency)) { line in
-                amountText(line[keyPath: field]?.covering(field == \.cost ? scope.costCount : scope.gainCount), profit: profit)
-                    .accessibilityLabel("\(line.currency) \(title) \(line[keyPath: field]?.covering(field == \.cost ? scope.costCount : scope.gainCount)?.display ?? "Unavailable")")
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                amountText(amounts[index], profit: profit, prominent: prominent && index == 0, secondary: index > 0)
+                    .accessibilityLabel("\(line.currency) \(title) \(amounts[index]?.display ?? "Unavailable")")
             }
         }
-        .frame(minWidth: investmentTextWidth(scope.lines.map { $0[keyPath: field]?.covering(field == \.cost ? scope.costCount : scope.gainCount)?.display ?? "—" }, role: .tableMoney, theme: theme), maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: width, maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Return is defined on the priced, cost-backed portion. Shares are always
-    /// visible and label that same known-cost scope when it is partial.
-    private func percentageMeasures(
-        scope: InvestmentOverviewScope,
-        capitalShare: String?,
-        profitShare: String?,
-        portfolio: InvestmentPortfolioSummary?
-    ) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
-                percentageMeasure("Return", scope.returnPercent)
-                percentageMeasure(capitalLabel(scope, portfolio: portfolio), capitalShare)
-                percentageMeasure(profitLabel(scope, portfolio: portfolio), profitShare)
-            }
-            VStack(alignment: .leading, spacing: theme.spacing.small) {
-                percentageMeasure("Return", scope.returnPercent)
-                percentageMeasure(capitalLabel(scope, portfolio: portfolio), capitalShare)
-                percentageMeasure(profitLabel(scope, portfolio: portfolio), profitShare)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func growthSign(_ scope: InvestmentOverviewScope) -> Int? {
+        scope.lines.first { $0.gain?.covering(scope.gainCount) != nil && $0.gainCost?.covering(scope.gainCount) != nil }?.gain?.numerator.sign
     }
 
-    private func returnMeasure(_ scope: InvestmentOverviewScope) -> some View {
-        percentageMeasure("Return", scope.returnPercent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func percentageMeasure(_ title: String, _ value: String?) -> some View {
+    private func percentageMeasure(_ title: String, _ value: String?, prominent: Bool = false, sign: Int? = nil) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(title)
-                .font(theme.typography.caption)
+                .font(prominent ? theme.typography.body : theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Text(value ?? "—")
-                .font(theme.typography.tableMoney)
+                .font(prominent ? theme.typography.headlineMoney : theme.typography.tableMoney)
+                .foregroundStyle(value == nil ? theme.palette.secondaryText : sign.map(profitColor) ?? theme.palette.primaryText)
                 .monospacedDigit()
                 .fixedSize(horizontal: true, vertical: false)
         }
-        .frame(minWidth: max(investmentTextWidth([value ?? "—"], role: .tableMoney, theme: theme),
-                             investmentTextWidth(title.split(separator: " ").map(String.init), role: .caption, theme: theme)),
+        .frame(minWidth: investmentTextWidth([value ?? "—"], role: prominent ? .headlineMoney : .tableMoney, theme: theme),
                maxWidth: .infinity, alignment: .leading)
     }
 
-    private func capitalLabel(_ scope: InvestmentOverviewScope, portfolio: InvestmentPortfolioSummary?) -> String {
-        if portfolio == nil { return "Capital share" }
-        return overview.total.hasCompleteCost ? "Share of invested money" : "Share of known invested money"
+    private func inlineAmounts(_ title: String, _ amounts: [InvestmentConvertedAmount]) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: theme.spacing.small) {
+                Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                Text(amounts.isEmpty ? "—" : amounts.map(\.display).joined(separator: "  ·  "))
+                    .font(theme.typography.tableMoney).monospacedDigit().fixedSize()
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                Text(amounts.isEmpty ? "—" : amounts.map(\.display).joined(separator: "  ·  "))
+                    .font(theme.typography.tableMoney).monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
-    private func profitLabel(_ scope: InvestmentOverviewScope, portfolio: InvestmentPortfolioSummary?) -> String {
-        let sign = overview.total.usd?.gain?.numerator.sign ?? 0
-        let base = sign < 0 ? "Share of net loss" : "Share of net gain"
-        if portfolio == nil { return base }
-        return overview.total.hasCompleteGain ? base : (sign < 0 ? "Share of known net loss" : "Share of known net gain")
+    @ViewBuilder private func partialPerformance(_ scope: InvestmentOverviewScope) -> some View {
+        if scope.holdingCount > 0, !scope.hasCompleteGain {
+            Text(scope.gainCount == 0 ? "Growth basis unavailable" : "Growth covers \(scope.gainCount) of \(scope.holdingCount) holdings")
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+        }
     }
 
-    private var ispReportedSummary: some View {
-        Group {
-            if let source = overview.ispReported {
-                VStack(alignment: .leading, spacing: theme.spacing.small) {
-                    Divider().overlay(theme.palette.divider)
-                    Text("Zurich policy figures · \(source.valuationDays.map(InvestmentPriceDates.display).joined(separator: ", "))")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                            reportedMeasure("Total contributions", source.contributions)
-                            reportedMeasure("Reported growth", source.growth, profit: true)
-                            if !source.vested.isEmpty { reportedMeasure(source.vestedLabel, source.vested) }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        VStack(alignment: .leading, spacing: theme.spacing.small) {
-                            reportedMeasure("Total contributions", source.contributions)
-                            reportedMeasure("Reported growth", source.growth, profit: true)
-                            if !source.vested.isEmpty { reportedMeasure(source.vestedLabel, source.vested) }
-                        }
-                    }
-                    Text("Policy growth is reported by Zurich. Fund acquisition cost and investment return are unavailable.")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
-                }
+    private func portfolioDetails(_ portfolio: InvestmentPortfolioSummary, performance: InvestmentOverviewScope) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                percentageMeasure(overview.performance.hasCompleteCost ? "Share of invested / contributed money" : "Share of known invested money", portfolio.capitalShare)
+                percentageMeasure(overview.profitShareLabel, portfolio.profitShare)
+            }
+            if portfolio.group == .isp {
+                ispReportedDetails
             } else {
-                Text("Fund cost and return are unavailable. Connect ISP Account in Settings to see Zurich’s reported contributions and policy growth.")
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
+                Text(costPerformanceScope(performance))
             }
+        }
+        .font(theme.typography.secondary)
+        .foregroundStyle(theme.palette.secondaryText)
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder private var ispReportedDetails: some View {
+        if let source = overview.ispReported {
+            Text("Zurich policy figures · \(source.valuationDays.map(InvestmentPriceDates.display).joined(separator: ", "))")
+            Text(overview.ispPerformance == nil
+                 ? "Current holdings and the contribution snapshot need to match before growth can be compared."
+                 : "Growth compares published holdings with allocated contributions. Pending allocation is excluded from growth and net worth until the new fund units appear.")
+            inlineAmounts("Total recorded contributions", source.contributions)
+            inlineAmounts("Reported growth at that date", source.growth)
+            if !source.vested.isEmpty { inlineAmounts(source.vestedLabel, source.vested) }
+        } else {
+            Text("Connect ISP Account in Settings to compare current value with Zurich’s reported contributions.")
         }
     }
 
-    private func reportedMeasure(_ title: String, _ amounts: [InvestmentConvertedAmount], profit: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text(title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-            ForEach(amounts, id: \.currency) { amount in
-                amountText(amount, profit: profit)
-                    .accessibilityLabel("\(amount.currency) \(title) \(amount.display)")
+    private var valuationDetails: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(overview.performanceBasis)
+            Text("Value and cost use the same current FX rates. Growth is not annualized or adjusted for withdrawals.")
+            Text("ISP uses allocated contributions at policy level. Individual fund acquisition costs remain unavailable.")
+            ForEach(AlDarCurrency.allCases, id: \.self) { currency in
+                if let leg = overview.fxLegs[currency] {
+                    Text("Al Dar · QAR 1 = \(leg.returned.rawToken) \(currency.rawValue) · fetched \(AppDateDisplay.timestamp(leg.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
+                }
             }
-            if amounts.isEmpty { amountText(nil) }
+            Text("Native quantities, costs, prices, source dates and policy ownership are available in holding Details.")
         }
-        .frame(minWidth: investmentTextWidth(amounts.map(\.display), role: .tableMoney, theme: theme), maxWidth: .infinity, alignment: .leading)
+        .font(theme.typography.secondary)
+        .foregroundStyle(theme.palette.secondaryText)
+        .textSelection(.enabled)
     }
 
-    private func orderedLines(_ scope: InvestmentOverviewScope, nativeCurrency: String) -> [InvestmentOverviewLine] {
+    private func orderedLines(_ scope: InvestmentOverviewScope, currency: String) -> [InvestmentOverviewLine] {
         scope.lines.sorted { lhs, rhs in
             if lhs.currency == rhs.currency { return false }
-            if lhs.currency == nativeCurrency { return true }
-            if rhs.currency == nativeCurrency { return false }
+            if lhs.currency == currency { return true }
+            if rhs.currency == currency { return false }
             return lhs.currency < rhs.currency
         }
     }
 
-    private func amountText(_ amount: InvestmentConvertedAmount?, profit: Bool = false, emphasized: Bool = false) -> some View {
+    private func amountText(_ amount: InvestmentConvertedAmount?, profit: Bool = false, prominent: Bool = false, secondary: Bool = false) -> some View {
         Text(amount?.display ?? "—")
-            .font(emphasized ? theme.typography.headlineMoney : theme.typography.tableMoney)
+            .font(prominent ? theme.typography.headlineMoney : theme.typography.tableMoney)
             .monospacedDigit()
-            .foregroundStyle(profit ? amount.map { profitColor($0.numerator.sign) } ?? theme.palette.secondaryText : theme.palette.primaryText)
+            .foregroundStyle(profit && !secondary ? amount.map { profitColor($0.numerator.sign) } ?? theme.palette.secondaryText
+                             : secondary ? theme.palette.secondaryText : theme.palette.primaryText)
             .fixedSize(horizontal: true, vertical: false)
     }
 
     private func costPerformanceScope(_ scope: InvestmentOverviewScope) -> String {
+        guard scope.holdingCount > 0 else { return "No current holdings in this portfolio." }
         if scope.costCount == scope.holdingCount && scope.gainCount == scope.holdingCount {
-            return "Cost, return and shares cover all \(scope.holdingCount) holdings."
+            return "Cost, growth and shares cover all \(scope.holdingCount) holdings."
         }
         if scope.costCount == scope.gainCount {
-            return "Cost, return and shares use the \(scope.costCount) of \(scope.holdingCount) holdings with reported cost."
+            return "Cost, growth and shares use \(scope.costCount) of \(scope.holdingCount) holdings with reported cost."
         }
-        return "Cost uses \(scope.costCount) of \(scope.holdingCount) holdings; return and shares use \(scope.gainCount) with both cost and a price."
+        return "Cost uses \(scope.costCount) of \(scope.holdingCount) holdings; growth and shares use \(scope.gainCount) with both cost and a price."
     }
 
-    private func overviewStatus(now: Date) -> some View {
-        status(scope: overview.total, now: now, noun: "holdings", details: "Native values remain available in Details.")
-    }
-
-    private func portfolioStatus(_ scope: InvestmentOverviewScope, now: Date) -> some View {
-        status(scope: scope, now: now, noun: "holdings", details: "Some converted amounts are unavailable.")
-    }
-
-    private func status(scope: InvestmentOverviewScope, now: Date, noun: String, details: String) -> some View {
+    private func status(_ scope: InvestmentOverviewScope, now: Date) -> some View {
         let priced = scope.priceCount == scope.holdingCount
-            ? "\(scope.holdingCount) \(noun) priced"
-            : "Partial: \(scope.priceCount)/\(scope.holdingCount) \(noun) priced"
+            ? "\(scope.holdingCount) holdings priced"
+            : "\(scope.priceCount) of \(scope.holdingCount) holdings priced"
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text(priced).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-            freshness(scope, now: now)
-            if scope.fxMissing { Text(details).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText) }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: theme.spacing.controlGap) {
+                    Text(priced)
+                    freshness(scope, now: now)
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                    Text(priced)
+                    freshness(scope, now: now)
+                }
+            }
+            if scope.fxMissing { Text("Some converted amounts are unavailable.") }
         }
+        .font(theme.typography.secondary)
+        .foregroundStyle(theme.palette.secondaryText)
     }
 
     @ViewBuilder private func freshness(_ scope: InvestmentOverviewScope, now: Date) -> some View {
         let age = scope.oldestAge(at: now)
+        let freshness = scope.oldestFreshnessAge(at: now)
         if !scope.quotes.isEmpty {
-            Label(age == 0 ? "Data updated today" : "Oldest data \(age) \(age == 1 ? "day" : "days") ago\(age >= 4 ? " · Stale" : "")", systemImage: "clock")
-                .font(theme.typography.caption)
-                .foregroundStyle(freshnessColor(age))
+            Label(age == 0 ? "Data updated today" : "Oldest data \(age) \(age == 1 ? "day" : "days") ago\(freshness >= 4 ? " · Stale" : "")", systemImage: "clock")
+                .foregroundStyle(FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(freshness))))
         }
     }
 
     private func profitColor(_ value: Int) -> Color {
         value > 0 ? theme.financialPositive : value < 0 ? theme.financialNegative : theme.palette.primaryText
-    }
-
-    private func freshnessColor(_ days: Int) -> Color {
-        if days == 0 { return Color(nsColor: .systemGreen) }
-        let progress = CGFloat(min(3, max(0, days - 1))) / 3
-        return Color(nsColor: NSColor.systemYellow.blended(withFraction: progress, of: .systemRed) ?? .systemRed)
     }
 }
 
@@ -392,10 +422,13 @@ struct InvestmentPortfolioDetailView: View {
                                         VStack(alignment: .leading, spacing: theme.spacing.micro) {
                                             Text(container.displayName + " · " + container.identity).font(theme.typography.rowTitle)
                                             Text("Contributions \(InvestmentArithmetic.displayedMoney(policy.contributions.amount.value, currency: policy.currency)) · Portal value \(InvestmentArithmetic.displayedMoney(policy.value.amount.value, currency: policy.currency)) · Reported growth \(InvestmentArithmetic.displayedMoney(policy.growth.amount.value, currency: policy.currency))")
+                                            if let pending = policy.pendingAllocation, pending > 0, let allocated = policy.allocatedContributions {
+                                                Text("Allocated contributions \(InvestmentArithmetic.displayedMoney(allocated.amount.value, currency: policy.currency)) · Pending allocation \(InvestmentArithmetic.displayedMoney(pending, currency: policy.currency))")
+                                            }
                                             if let vested = policy.vestedValue {
                                                 Text("Vested value \(InvestmentArithmetic.displayedMoney(vested.amount.value, currency: policy.currency))")
                                             }
-                                            Text("Portal valuation \(InvestmentPriceDates.display(policy.valuationDay)) · fetched \(policy.fetchedAt.formatted(.iso8601))")
+                                            Text("Portal valuation \(InvestmentPriceDates.display(policy.valuationDay)) · fetched \(AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
                                                 .foregroundStyle(theme.palette.secondaryText)
                                         }
                                     }
@@ -432,7 +465,7 @@ struct InvestmentPortfolioDetailView: View {
             if let quote = fund.quote {
                 DisclosureGroup("Source details") {
                     VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                        Text("\(quote.dateBasis.label) · last successful fetch \(quote.fetchedAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text("\(quote.dateBasis.label) · last successful fetch \(InvestmentPriceDates.fetchInstant(quote.fetchedAt))")
                         Text(quote.qualification)
                     }
                     .font(theme.typography.caption)
@@ -588,8 +621,9 @@ struct InvestmentPortfolioDetailView: View {
             }
             if let oldestFX = scope.fxDates.min() {
                 let age = max(0, Int(now.timeIntervalSince(oldestFX) / 86_400))
-                Text(age == 0 ? "Currency rates updated today" : "Currency rates \(age) \(age == 1 ? "day" : "days") old\(age >= 4 ? " · Stale" : "")")
-                    .foregroundStyle(freshnessColor(age))
+                let freshness = Int(WeekdayFreshness.seconds(from: oldestFX, to: now) / 86_400)
+                Text(age == 0 ? "Currency rates updated today" : "Currency rates \(age) \(age == 1 ? "day" : "days") old\(freshness >= 4 ? " · Stale" : "")")
+                    .foregroundStyle(freshnessColor(freshness))
             }
         }
         .font(theme.typography.caption)
@@ -599,7 +633,7 @@ struct InvestmentPortfolioDetailView: View {
         Group {
             if let quote = fund.quote {
                 Text("NAV / price \(MoneyFormatting.unitPrice(quote.price.sourceText, currency: quote.mapping.currency)) · \(InvestmentPriceDates.display(quote.valuationDay))")
-                    .foregroundStyle(freshnessColor(quote.age(at: now)))
+                    .foregroundStyle(freshnessColor(quote.freshnessAge(at: now)))
             } else {
                 Text("NAV / price unavailable")
                     .foregroundStyle(theme.palette.secondaryText)
@@ -718,8 +752,6 @@ struct InvestmentPortfolioDetailView: View {
     }
 
     private func freshnessColor(_ days: Int) -> Color {
-        if days == 0 { return Color(nsColor: .systemGreen) }
-        let progress = CGFloat(min(3, max(0, days - 1))) / 3
-        return Color(nsColor: NSColor.systemYellow.blended(withFraction: progress, of: .systemRed) ?? .systemRed)
+        FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(days)))
     }
 }

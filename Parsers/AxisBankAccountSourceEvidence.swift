@@ -7,7 +7,7 @@
 import CryptoKit
 import Foundation
 
-enum AxisBankAccountSourceEvidenceError: Error, Equatable {
+nonisolated enum AxisBankAccountSourceEvidenceError: Error, Equatable {
     case malformedAccountIdentifier
     case malformedDeclaredStatementPeriod
     case malformedNumericReference
@@ -18,7 +18,7 @@ enum AxisBankAccountSourceEvidenceError: Error, Equatable {
 /// Source-format grammar remains owned by the CSV and PDF implementations.
 /// This helper only converts already-recognized source evidence into canonical
 /// parser-owned domain values.
-enum AxisBankAccountSourceEvidence {
+nonisolated enum AxisBankAccountSourceEvidence {
 
     /// Canonical source-owned cheque/reference evidence shared by the three
     /// authentic Axis bank carriers. Surrounding cell whitespace is inert;

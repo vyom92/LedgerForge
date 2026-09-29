@@ -92,6 +92,9 @@ struct RepositoryRuntimeSnapshot {
     let salaryStatements: [SalaryStatement]
     let fundingPlans: [FundingPlan]
     let investments: InvestmentSnapshot
+    let netWorthMembership: NetWorthMembershipSnapshot?
+    let intelligence: FinancialIntelligenceSnapshot?
+    let financialSources: FinancialSourceContext
     let hydrationResult: RepositoryStoreHydrationResult
     let providerGeneration: ProviderGenerationToken?
 
@@ -105,6 +108,9 @@ struct RepositoryRuntimeSnapshot {
         salaryStatements: [SalaryStatement],
         fundingPlans: [FundingPlan],
         investments: InvestmentSnapshot = .empty,
+        netWorthMembership: NetWorthMembershipSnapshot? = nil,
+        intelligence: FinancialIntelligenceSnapshot? = nil,
+        financialSources: FinancialSourceContext = .empty,
         providerGeneration: ProviderGenerationToken?
     ) {
         self.accounts = accounts
@@ -116,6 +122,9 @@ struct RepositoryRuntimeSnapshot {
         self.salaryStatements = salaryStatements
         self.fundingPlans = fundingPlans
         self.investments = investments
+        self.netWorthMembership = netWorthMembership
+        self.intelligence = intelligence
+        self.financialSources = financialSources
         self.providerGeneration = providerGeneration
         self.hydrationResult = RepositoryStoreHydrationResult(
             didHydrate: true,
@@ -193,6 +202,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
 final class RepositoryStoreHydrator {
 
     private var installedResult: RepositoryStoreHydrationResult?
+    private var snapshotProvider: DatabaseProvider?
 
     private let accountRepo: AccountRepository
     private let importSessionRepo: ImportSessionRepository
@@ -202,6 +212,8 @@ final class RepositoryStoreHydrator {
     private let salaryRepo: SalaryRepository
     private let fundingPlanRepo: FundingPlanRepository
     private let investmentRepo: InvestmentRepository
+    private let netWorthMembershipRepo: any NetWorthMembershipRepository
+    private let intelligenceRepo: any FinancialIntelligenceRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
@@ -211,6 +223,8 @@ final class RepositoryStoreHydrator {
     private let salaryStore: SalaryStore
     private let fundingPlanStore: FundingPlanStore
     private let investmentStore: InvestmentStore
+    private let netWorthMembershipStore: NetWorthMembershipStore
+    private let intelligenceStore: FinancialIntelligenceStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private let providerGeneration: ProviderGenerationToken?
@@ -239,6 +253,8 @@ final class RepositoryStoreHydrator {
             salaryRepo: databaseProvider.salaryRepo,
             fundingPlanRepo: databaseProvider.fundingPlanRepo,
             investmentRepo: databaseProvider.investmentRepo,
+            netWorthMembershipRepo: databaseProvider.netWorthMembershipRepo,
+            intelligenceRepo: databaseProvider.intelligenceRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
             categoryStore: categoryStore,
@@ -253,6 +269,7 @@ final class RepositoryStoreHydrator {
             categoryReconciliationGate: categoryReconciliationGate,
             participatesInLifecycleGate: participatesInLifecycleGate
         )
+        snapshotProvider = databaseProvider
     }
 
     init(
@@ -264,6 +281,8 @@ final class RepositoryStoreHydrator {
         salaryRepo: SalaryRepository = EmptySalaryRepo(),
         fundingPlanRepo: FundingPlanRepository = EmptyFundingPlanRepo(),
         investmentRepo: InvestmentRepository = EmptyInvestmentRepository(),
+        netWorthMembershipRepo: any NetWorthMembershipRepository = UnavailableNetWorthMembershipRepository(),
+        intelligenceRepo: any FinancialIntelligenceRepository = UnavailableFinancialIntelligenceRepository(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
@@ -271,6 +290,8 @@ final class RepositoryStoreHydrator {
         salaryStore: SalaryStore = .shared,
         fundingPlanStore: FundingPlanStore = .shared,
         investmentStore: InvestmentStore = .shared,
+        netWorthMembershipStore: NetWorthMembershipStore = .shared,
+        intelligenceStore: FinancialIntelligenceStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -287,6 +308,8 @@ final class RepositoryStoreHydrator {
         self.salaryRepo = salaryRepo
         self.fundingPlanRepo = fundingPlanRepo
         self.investmentRepo = investmentRepo
+        self.netWorthMembershipRepo = netWorthMembershipRepo
+        self.intelligenceRepo = intelligenceRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.categoryStore = categoryStore
@@ -294,6 +317,8 @@ final class RepositoryStoreHydrator {
         self.salaryStore = salaryStore
         self.fundingPlanStore = fundingPlanStore
         self.investmentStore = investmentStore
+        self.netWorthMembershipStore = netWorthMembershipStore
+        self.intelligenceStore = intelligenceStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -304,7 +329,14 @@ final class RepositoryStoreHydrator {
     }
 
     @discardableResult
-    func hydrateIfNeeded(forceRefresh: Bool = false) throws -> RepositoryStoreHydrationResult {
+    func hydrateIfNeeded(
+        forceRefresh: Bool = false,
+        didPublishSnapshot: ((RepositoryRuntimeSnapshot) -> Void)? = nil
+    ) throws -> RepositoryStoreHydrationResult {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.hydration)
+        defer { GmailQualificationTiming.end(.hydration, started: timing, count: transactionStore.transactions.count) }
+#endif
         guard persistenceState.isUsable else {
             throw RepositoryStoreHydrationError.persistenceUnavailable
         }
@@ -332,6 +364,7 @@ final class RepositoryStoreHydrator {
         do {
             let snapshot = try stageHydration()
             publish(snapshot)
+            didPublishSnapshot?(snapshot)
             return snapshot.hydrationResult
         } catch {
             if accountStore === AccountStore.shared, providerGeneration == DatabaseProvider.shared.generationToken {
@@ -347,6 +380,15 @@ final class RepositoryStoreHydrator {
     /// changing any global or injected runtime store. Staging deliberately performs
     /// no actor hop and emits no observer publication.
     func stageHydration() throws -> RepositoryRuntimeSnapshot {
+        if let snapshotProvider { return try snapshotProvider.withConsistentSnapshot { try stageConsistentHydration() } }
+        return try stageConsistentHydration()
+    }
+
+    private func stageConsistentHydration() throws -> RepositoryRuntimeSnapshot {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.hydrationStage)
+        defer { GmailQualificationTiming.end(.hydrationStage, started: timing) }
+#endif
         guard persistenceState.isUsable else {
             throw RepositoryStoreHydrationError.persistenceUnavailable
         }
@@ -354,16 +396,31 @@ final class RepositoryStoreHydrator {
         let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
         let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
+        let categoryAutomation = try categoryRepo.automationSnapshot(workspaceId: workspaceId)
+        let intelligence = try intelligenceRepo.snapshot(workspaceID: workspaceId)
         let cardDTOs = try cardRepo.snapshot(workspaceId: workspaceId)
         let zeroActivityControls = try importSessionRepo.statementZeroActivityControls(workspaceId: workspaceId)
+        let bankSections = try importSessionRepo.bankSectionSnapshot(workspaceId: workspaceId)
+        let cbqPeriods = try importSessionRepo.cbqSourceCoveragePeriods(workspaceId: workspaceId)
         let salaryDTOs = try salaryRepo.snapshot(workspaceId: workspaceId)
         let fundingPlanDTOs = try fundingPlanRepo.plans(workspaceId: workspaceId)
         let investments = try investmentRepo.snapshot(workspaceID: workspaceId).validated(workspaceID: workspaceId)
-        let identitiesByAccountID = Dictionary(
-            uniqueKeysWithValues: try accountDTOs.map { accountDTO in
-                (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
-            }
-        )
+        let identifiersByAccountID = Dictionary(uniqueKeysWithValues: try accountDTOs.map {
+            ($0.id, try accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId))
+        })
+        let identitiesByAccountID = identifiersByAccountID.mapValues(Self.identitySummaries)
+        var numberPatternsByAccountID: [String: [String]] = [:]
+        for section in bankSections.sections {
+            numberPatternsByAccountID[section.accountId, default: []] += section.identityPatterns
+                .filter { $0.kind.contains("account_number") }.map(\.pattern)
+        }
+        for observation in try accountRepo.cbqSourceIdentityRecords(workspaceId: workspaceId)
+            where observation.kind == CBQSourceIdentityObservationKind.maskedAccountNumber.rawValue {
+            numberPatternsByAccountID[observation.accountId, default: []].append(observation.pattern)
+        }
+        for observation in cardDTOs.sourceObservations where observation.subjectKind == "liability_account" {
+            numberPatternsByAccountID[observation.subjectId, default: []].append(observation.sourceValue)
+        }
         let preferredSources = try importSessionRepo.preferredTransactionSources(workspaceId: workspaceId)
         let preferredSourcesByTransactionID = Dictionary(uniqueKeysWithValues: preferredSources.map { ($0.transactionId, $0) })
         let statementProjections = try importSessionRepo.statementFinancialProjections(workspaceId: workspaceId)
@@ -378,7 +435,7 @@ final class RepositoryStoreHydrator {
                 importedDocumentsByID[documentID] = document
             }
         }
-        for documentID in Set(cardDTOs.statements.map(\.documentId) + zeroActivityControls.map(\.documentId) + statementProjections.map(\.documentID)) where importedDocumentsByID[documentID] == nil {
+        for documentID in Set(cardDTOs.statements.map(\.documentId) + zeroActivityControls.map(\.documentId) + statementProjections.map(\.documentID) + bankSections.sections.map(\.documentId)) where importedDocumentsByID[documentID] == nil {
             if let document = try importSessionRepo.importedDocument(id: documentID) {
                 importedDocumentsByID[documentID] = document
             }
@@ -392,7 +449,8 @@ final class RepositoryStoreHydrator {
             salaryStatements: salaryDTOs.statements,
             investmentSessionIDs: Set(investments.containers.compactMap(\.importSessionID) + investments.holdings.compactMap(\.importSessionID)),
             zeroActivityControls: zeroActivityControls,
-            cardStatements: cardDTOs.statements
+            cardStatements: cardDTOs.statements,
+            bankSections: bankSections.sections
         )
         try Self.validatePartialAttemptConsistency(
             sessions: importSessions,
@@ -414,6 +472,13 @@ final class RepositoryStoreHydrator {
             sessions: importSessions,
             transactions: transactionDTOs
         )
+        try Self.validateBankSections(bankSections, accounts: accountDTOs, transactions: transactionDTOs,
+                                      documents: importedDocumentsByID, sessions: importSessions)
+        let bankOccurrences = bankSections.sections.flatMap(\.rows)
+        guard Set(bankOccurrences.map(\.normalizedRowId)).count == bankOccurrences.count else {
+            throw RepositoryStoreHydrationError.invalidStatementEquivalence("duplicate bank source occurrence")
+        }
+        let bankOccurrencesByRowID = Dictionary(uniqueKeysWithValues: bankOccurrences.map { ($0.normalizedRowId, $0) })
         let cardEvidenceByTransactionID = Dictionary(uniqueKeysWithValues: cardDTOs.transactionEvidence.map { ($0.transactionId, $0) })
         let transactions = try transactionDTOs.map {
             try Self.transaction(
@@ -422,7 +487,8 @@ final class RepositoryStoreHydrator {
                 importedDocumentsByID: importedDocumentsByID,
                 preferredSource: preferredSourcesByTransactionID[$0.id],
                 workspaceID: workspaceId,
-                cardEvidence: cardEvidenceByTransactionID[$0.id]
+                cardEvidence: cardEvidenceByTransactionID[$0.id],
+                bankOccurrencesByRowID: bankOccurrencesByRowID
             )
         }
         let cardSnapshot = try Self.cardSnapshot(
@@ -436,16 +502,32 @@ final class RepositoryStoreHydrator {
             from: accountDTOs,
             transactions: transactions,
             identitiesByAccountID: identitiesByAccountID,
-            cardSnapshot: cardSnapshot
+            numberPatternsByAccountID: numberPatternsByAccountID,
+            cardSnapshot: cardSnapshot,
+            bankSections: bankSections.sections,
+            zeroActivityControls: zeroActivityControls
         )
-        let categorySnapshot = try Self.categorySnapshot(
+        var categorySnapshot = try Self.categorySnapshot(
             categories: categoryDTOs,
             assignments: categoryAssignmentDTOs,
             trustedTransactions: transactionDTOs,
             workspaceID: workspaceId
         )
+        categorySnapshot.automation = categoryAutomation
+        categorySnapshot.providerGeneration = providerGeneration
         let salaryStatements = try Self.salaryStatements(from: salaryDTOs, workspaceID: workspaceId)
         let fundingPlans = try Self.fundingPlans(from: fundingPlanDTOs, accounts: accountDTOs, workspaceID: workspaceId)
+        let membership: NetWorthMembershipSnapshot?
+        do {
+            let value = try netWorthMembershipRepo.snapshot(workspaceID: workspaceId)
+            guard value.workspaceID == workspaceId else { throw NetWorthMembershipError.invalidSnapshot }
+            try value.validate(accounts: accountDTOs, investments: investments)
+            membership = value
+        } catch NetWorthMembershipError.unavailable {
+            // Explicit historical/read-only provider capability. Other data can
+            // hydrate, but reporting cannot infer the owner's saved choices.
+            membership = nil
+        }
 
         return RepositoryRuntimeSnapshot(
             accounts: accounts,
@@ -457,8 +539,138 @@ final class RepositoryStoreHydrator {
             salaryStatements: salaryStatements,
             fundingPlans: fundingPlans,
             investments: investments,
+            netWorthMembership: membership,
+            intelligence: intelligence,
+            financialSources: Self.financialSourceContext(accounts: accounts, identifiers: identifiersByAccountID,
+                bankSections: bankSections.sections, projections: statementProjections, cards: cardSnapshot, zeroControls: zeroActivityControls, cbqPeriods: cbqPeriods),
             providerGeneration: providerGeneration
         )
+    }
+
+    private static func validateBankSections(_ snapshot: BankSectionRepositorySnapshotDTO, accounts: [AccountDTO], transactions: [TransactionDTO], documents: [String: ImportedDocumentDTO], sessions: [RepositoryImportSession]) throws {
+        let accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        let sessionIDs = Set(sessions.map(\.id))
+        guard Set(snapshot.sections.map(\.id)).count == snapshot.sections.count,
+              Set(snapshot.sections.flatMap(\.rows).map(\.normalizedRowId)).count == snapshot.sections.reduce(0, { $0 + $1.rows.count }) else {
+            throw RepositoryStoreHydrationError.invalidStatementEquivalence("duplicate bank source graph")
+        }
+        for group in Dictionary(grouping: snapshot.sections, by: \.documentId).values {
+            guard group.map(\.sectionOrdinal).sorted() == Array(1...group.count) else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("incomplete bank section order")
+            }
+        }
+        for section in snapshot.sections {
+            guard let profileContract = BankStatementSectionProfileContract(rawValue: section.parserProfileId),
+                  profileContract.parserProfileVersion == section.parserProfileVersion,
+                  profileContract.nativeCurrency == section.nativeCurrency,
+                  profileContract.sourceFormatCode == section.sourceEvidence.sourceFormatCode else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank section profile")
+            }
+            let relationship = BankImportDecision.relationshipProfiles.contains(section.parserProfileId)
+            let standalone = BankImportDecision.standaloneProfiles.contains(section.parserProfileId)
+            let identityValid: Bool
+            if relationship {
+                let axis = section.parserProfileId.hasPrefix("axis.")
+                guard let details = section.sourceDetails, details.recognizedRowCount == section.rows.count,
+                      details.firstPage > 0, details.lastPage >= details.firstPage,
+                      details.regionSignature.count == 64, !details.regionDescriptor.isEmpty,
+                      let start = section.sourceRangeStart, let end = section.sourceRangeEnd, start > 0, end >= start,
+                      section.rows.allSatisfy({ start <= $0.sourceOrdinal && $0.sourceOrdinal <= end }),
+                      details.controls.allSatisfy({ start <= $0.sourceOrdinal && $0.sourceOrdinal <= end &&
+                          details.firstPage <= $0.sourcePage && $0.sourcePage <= details.lastPage &&
+                          BankSectionControlKind(rawValue: $0.kind) != nil && !$0.literal.isEmpty }),
+                      accountsByID[section.accountId]?.institutionId == (axis ? "Axis Bank" : "HDFC Bank"),
+                      section.nativeCurrency == "INR", section.identityPatterns.count == 1 else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid relationship section evidence")
+                }
+                let observation = section.identityPatterns[0]
+                identityValid = axis
+                    ? observation.kind == "axis_masked_account_number" && observation.pattern.contains("X") && BankImportDecision.mask(observation.pattern, matches: observation.pattern)
+                    : observation.kind == "hdfc_account_number" && observation.pattern.range(of: #"^[0-9]{14}$"#, options: .regularExpression) != nil
+            } else if standalone {
+                let axis = section.parserProfileId.hasPrefix("axis.")
+                let observation = section.identityPatterns.first
+                identityValid = section.identityPatterns.count == 1 &&
+                    observation?.kind == (axis ? "axis_account_number" : "hdfc_account_number") &&
+                    observation?.pattern.range(of: axis ? #"^[0-9]{15}$"# : #"^[0-9]{14}$"#, options: .regularExpression) != nil &&
+                    accountsByID[section.accountId]?.institutionId == (axis ? "Axis Bank" : "HDFC Bank") &&
+                    section.nativeCurrency == "INR" && section.sectionOrdinal == 1 && section.sourceDetails == nil &&
+                    section.parserProfileVersion == BankImportDecision.supportedVersion(for: section.parserProfileId) &&
+                    section.sourceEvidence.statementStartDateISO != nil && section.sourceEvidence.statementEndDateISO != nil &&
+                    section.parserProfileId.hasSuffix("." + section.sourceEvidence.sourceFormatCode) &&
+                    (section.rows.isEmpty || (section.sourceRangeStart == section.rows.map(\.sourceOrdinal).min() &&
+                        section.sourceRangeEnd == section.rows.map(\.sourceOrdinal).max()))
+            } else if profileContract.institutionID == "Commercial Bank of Qatar" {
+                let masks = try section.identityPatterns.map { observation in
+                    guard let kind = CBQSourceIdentityObservationKind(rawValue: observation.kind) else {
+                        throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank section identity")
+                    }
+                    return try CBQSourceIdentityObservation(kind: kind, rawPattern: observation.pattern)
+                }
+                identityValid = CBQSourceIdentityObservation.validatePair(masks) && section.sectionOrdinal == 1 &&
+                    section.sourceRangeStart == section.rows.map(\.sourceOrdinal).min() &&
+                    section.sourceRangeEnd == section.rows.map(\.sourceOrdinal).max()
+            } else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("unsupported bank section profile")
+            }
+            guard let account = accountsByID[section.accountId], account.accountType == "bank", account.nativeCurrency == section.nativeCurrency,
+                  account.institutionId == profileContract.institutionID,
+                  identityValid, documents[section.documentId]?.importSessionId == section.importSessionId,
+                  sessionIDs.contains(section.importSessionId), section.sectionOrdinal > 0,
+                  !section.normalizedDocumentId.isEmpty, !section.productLabel.isEmpty,
+                  Set(section.rows.map(\.sourceOrdinal)).count == section.rows.count else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank section ownership")
+            }
+            for occurrence in section.rows {
+                let source = occurrence.source
+                guard let transaction = transactionsByID[source.incomingTransactionId],
+                      transaction.accountId == section.accountId,
+                      transaction.postedDateISO == source.postingDateISO,
+                      transaction.valueDateISO == occurrence.valueDateISO,
+                      transaction.nativeCurrency == source.nativeCurrency, source.nativeCurrency == section.nativeCurrency,
+                      transaction.amountMinor == source.signedAmountMinor, transaction.amountDecimal == source.signedAmountDecimal,
+                      transaction.direction == source.direction, transaction.runningBalanceMinor == source.runningBalanceMinor,
+                      !occurrence.literalNarration.isEmpty, !occurrence.literalBalance.isEmpty else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank occurrence relationship")
+                }
+                if transaction.documentId == section.documentId {
+                    guard transaction.importSessionId == section.importSessionId,
+                          transaction.description == occurrence.literalNarration, transaction.reference == occurrence.literalReference,
+                          transaction.rawRows.contains(where: {
+                              $0.normalizedDocumentId == section.normalizedDocumentId && $0.normalizedRowId == source.normalizedRowId &&
+                              $0.sourceOrdinal == source.sourceOrdinal && $0.normalizedRecordDigest == source.normalizedRecordDigest &&
+                              $0.parserProfileId == section.parserProfileId && $0.parserProfileVersion == section.parserProfileVersion
+                          }) else { throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid first bank source") }
+                } else {
+                    guard relationship || standalone, let profile = transaction.rawRows.first?.parserProfileId,
+                          (BankImportDecision.relationshipProfiles + BankImportDecision.standaloneProfiles).contains(profile),
+                          transaction.rawRows.first?.parserProfileVersion == BankImportDecision.supportedVersion(for: profile),
+                          profile.hasPrefix(section.parserProfileId.hasPrefix("axis.") ? "axis." : "hdfc."),
+                          transaction.financialDateRole == FinancialDateRole.transactionDate.rawValue else {
+                        throw RepositoryStoreHydrationError.invalidStatementEquivalence("unsupported supporting bank source")
+                    }
+                    let referencesAgree = profile.hasPrefix("axis.") ? transaction.reference == occurrence.literalReference :
+                        BankImportDecision.hdfcReference(transaction.reference, narration: transaction.description ?? "", profile: profile) ==
+                        BankImportDecision.hdfcReference(occurrence.literalReference, narration: occurrence.literalNarration, profile: section.parserProfileId)
+                    guard referencesAgree else { throw RepositoryStoreHydrationError.invalidStatementEquivalence("conflicting bank reference") }
+                }
+                if let date = source.sourceTransactionDateISO { _ = try StatementDate(canonical: date) }
+                let balance = try Money(canonicalDecimal: source.runningBalanceDecimal, currency: source.nativeCurrency)
+                let balanceLiteral: String
+                if ["cbq.current-account.legacy.pdf", "cbq.savings-account.legacy.pdf"].contains(section.parserProfileId) {
+                    guard let canonical = CBQLegacyBookBalanceLiteral.canonicalText(occurrence.literalBalance,
+                        profileID: section.parserProfileId, version: section.parserProfileVersion) else {
+                        throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid legacy bank literal balance")
+                    }
+                    balanceLiteral = canonical
+                } else { balanceLiteral = occurrence.literalBalance }
+                guard try balance.minorUnits() == source.runningBalanceMinor,
+                      Decimal(string: balanceLiteral.replacingOccurrences(of: ",", with: ""), locale: Locale(identifier: "en_US_POSIX")) == balance.amount else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank literal balance")
+                }
+            }
+        }
     }
 
     /// Synchronously publishes a previously validated complete snapshot on the
@@ -466,6 +678,10 @@ final class RepositoryStoreHydrator {
     /// lease.
     @MainActor
     func publish(_ snapshot: RepositoryRuntimeSnapshot) {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.hydrationPublish, count: snapshot.transactions.count)
+        defer { GmailQualificationTiming.end(.hydrationPublish, started: timing, count: snapshot.transactions.count) }
+#endif
         installSnapshotWithoutObservation(snapshot)
         notifyObserversOfInstalledSnapshot()
     }
@@ -487,6 +703,8 @@ final class RepositoryStoreHydrator {
         salaryStore.installWithoutObservation(snapshot.salaryStatements)
         fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration)
         investmentStore.installWithoutObservation(snapshot.investments, generation: snapshot.providerGeneration)
+        netWorthMembershipStore.installWithoutObservation(snapshot.netWorthMembership, generation: snapshot.providerGeneration)
+        intelligenceStore.installWithoutObservation(snapshot.intelligence, generation: snapshot.providerGeneration, sources: snapshot.financialSources)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -513,6 +731,8 @@ final class RepositoryStoreHydrator {
         salaryStore.notifyInstalledValue()
         fundingPlanStore.notifyInstalledValue()
         investmentStore.notifyInstalledValue()
+        netWorthMembershipStore.notifyInstalledValue()
+        intelligenceStore.notifyInstalledValue()
     }
 
     private static func salaryStatements(
@@ -671,7 +891,7 @@ final class RepositoryStoreHydrator {
                     provenance = .capturedAccountBalance(capturedAtISO: captured)
                 default: throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid balance provenance")
                 }
-                return FundingPlanBalance(id: value.id, accountID: value.accountId, nativeCurrency: nativeCurrency, included: value.included, money: money, provenance: provenance)
+                return FundingPlanBalance(id: value.id, accountID: value.accountId, nativeCurrency: nativeCurrency, included: value.included, money: money, provenance: provenance, financialBalanceDate: try value.financialBalanceDateISO.map { try StatementDate(canonical: $0) })
             }
             @MainActor
             func commitments(region: String, currency: String) throws -> [FundingPlanCommitment] {
@@ -739,7 +959,8 @@ final class RepositoryStoreHydrator {
                 deductions: try dto.deductions.map { FundingPlanDeduction(id: $0.id, label: $0.label,
                     money: try persistedMoney(currency: "QAR", minor: $0.amountMinor, decimal: $0.amountDecimal), recurs: $0.recurs, carriedSourceRowID: $0.carriedSourceRowId) },
                 referenceMode: FundingPlanReferenceMode(rawValue: dto.referenceMode ?? "alDar")!,
-                effectiveAlDarReference: try dto.effectiveReference?.quote()
+                effectiveAlDarReference: try dto.effectiveReference?.quote(),
+                assistance: dto.assistance
             )
         }
     }
@@ -985,7 +1206,8 @@ final class RepositoryStoreHydrator {
         salaryStatements: [SalaryStatementDTO],
         investmentSessionIDs: Set<String> = [],
         zeroActivityControls: [StatementZeroActivityControlDTO] = [],
-        cardStatements: [CardStatementDTO] = []
+        cardStatements: [CardStatementDTO] = [],
+        bankSections: [BankStatementSectionPlanDTO] = []
     ) throws -> [RepositoryImportSession] {
         var referencedSessionIDs = Set(
             transactions.compactMap { transaction -> String? in
@@ -1000,6 +1222,7 @@ final class RepositoryStoreHydrator {
         referencedSessionIDs.formUnion(investmentSessionIDs)
         referencedSessionIDs.formUnion(zeroActivityControls.map(\.importSessionId))
         referencedSessionIDs.formUnion(cardStatements.map(\.importSessionId))
+        referencedSessionIDs.formUnion(bankSections.map(\.importSessionId))
 
         let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
         return try referencedSessionIDs.sorted().compactMap { sessionID in
@@ -1015,6 +1238,22 @@ final class RepositoryStoreHydrator {
                 dispositions: dispositionDTOs,
                 transactionsByID: transactionsByID
             )
+            let accountSections = Dictionary(grouping: bankSections.filter { $0.importSessionId == sessionID }, by: \.accountId)
+            let bankHistory = try accountSections.mapValues { sections in
+                guard let currency = sections.first?.nativeCurrency,
+                      sections.allSatisfy({ $0.nativeCurrency == currency }) else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank history currency")
+                }
+                let sourceCount = sections.reduce(0) { $0 + $1.rows.count }
+                let importedCount = sections.reduce(0) { count, section in
+                    count + section.rows.filter { occurrence in
+                        let transaction = transactionsByID[occurrence.source.incomingTransactionId]
+                        return transaction?.importSessionId == sessionID && transaction?.documentId == section.documentId
+                    }.count
+                }
+                return RepositoryBankAccountHistory(sourceRowCount: sourceCount, importedTransactionCount: importedCount,
+                    recognizedExistingRowCount: sourceCount - importedCount, nativeCurrency: currency)
+            }
             return RepositoryImportSession(
                 id: session.id,
                 workspaceId: session.workspaceId,
@@ -1024,7 +1263,8 @@ final class RepositoryStoreHydrator {
                 validationStatus: session.validationStatus,
                 parserVersion: session.parserVersion,
                 partialImportSummary: partial.summary,
-                incomingRowDispositions: partial.dispositions
+                incomingRowDispositions: partial.dispositions,
+                bankAccountHistory: bankHistory
             )
         }
     }
@@ -1188,6 +1428,10 @@ final class RepositoryStoreHydrator {
         let sectionByID = Dictionary(uniqueKeysWithValues: snapshot.sections.map { ($0.id, $0) })
         let projectionByID = Dictionary(uniqueKeysWithValues: snapshot.semanticProjections.map { ($0.id, $0) })
         let groupByID = Dictionary(uniqueKeysWithValues: snapshot.semanticGroups.map { ($0.id, $0) })
+        let componentsByStatement = Dictionary(grouping: snapshot.summaryComponents, by: \.cardStatementId)
+        let evidenceByStatement = Dictionary(grouping: snapshot.transactionEvidence, by: \.cardStatementId)
+        let sectionsByStatement = Dictionary(grouping: snapshot.sections, by: \.cardStatementId)
+        let observationsBySection = Dictionary(grouping: snapshot.sectionObservations, by: \.cardStatementSectionId)
         let instrumentIDs = Set(snapshot.instruments.map(\.id))
         guard snapshot.instrumentIdentifiers.allSatisfy({
             $0.workspaceId == workspaceID && instrumentIDs.contains($0.instrumentId)
@@ -1304,11 +1548,13 @@ final class RepositoryStoreHydrator {
                   statementAccount.institutionId == contract.institutionCode,
                   contract.accepts(profileID: statement.parserProfileId),
                   statement.parserProfileVersion == contract.profileVersion,
-                  statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
+                  statement.statementCurrency == contract.nativeCurrency,
+                  statementAccount.nativeCurrency == statement.statementCurrency,
+                  (contract != .amexUSDZero || (statement.sourceRowCount == 0 && hasZeroActivityControl)),
                   statement.sourceRowCount > 0 || hasZeroActivityControl else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement relationship")
             }
-            let statementComponents = snapshot.summaryComponents.filter { $0.cardStatementId == statement.id }
+            let statementComponents = componentsByStatement[statement.id, default: []]
             let sourceFormat = statement.parserProfileId.hasSuffix(".xlsx") ? "xlsx" : "pdf"
             let summaryCodes = Set(statementComponents.map(\.componentCode))
             let summaryCoverageIsValid = contract == .axis
@@ -1319,6 +1565,11 @@ final class RepositoryStoreHydrator {
                 )
             guard summaryCoverageIsValid, summaryCodes.count == statementComponents.count else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement summary coverage")
+            }
+            if contract.isAmex, let zero = matchingZeroActivityControls.first {
+                guard zero.matchesAmexZeroStatement(statement, components: statementComponents) else {
+                    throw RepositoryStoreHydrationError.invalidCardState("zero-control Amex semantics")
+                }
             }
             if contract == .axis, let zero = matchingZeroActivityControls.first {
                 let summaries = Dictionary(uniqueKeysWithValues: statementComponents.map { ($0.componentCode, $0) })
@@ -1380,9 +1631,9 @@ final class RepositoryStoreHydrator {
             guard contract == .axis || (previous != nil && balance != nil) else {
                 throw RepositoryStoreHydrationError.invalidCardState("summary balance coverage")
             }
-            let durableSections = snapshot.sections.filter { $0.cardStatementId == statement.id }
+            let durableSections = sectionsByStatement[statement.id, default: []]
                 .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
-            let permitsAccountOnlyAmexZero = contract == .amex &&
+            let permitsAccountOnlyAmexZero = contract.isAmex &&
                 statement.sourceRowCount == 0 && hasZeroActivityControl
             guard (contract == .axis
                     ? durableSections.isEmpty
@@ -1407,9 +1658,7 @@ final class RepositoryStoreHydrator {
                       ), byDecimal == byMinor else {
                     throw RepositoryStoreHydrationError.invalidCardState("statement section relationship")
                 }
-                let observations = try snapshot.sectionObservations.filter {
-                    $0.cardStatementSectionId == section.id
-                }.map { observation -> CardSourceIdentityObservation in
+                let observations = try observationsBySection[section.id, default: []].map { observation -> CardSourceIdentityObservation in
                     guard observation.workspaceId == workspaceID,
                           observation.documentId == statement.documentId,
                           observation.importSessionId == statement.importSessionId,
@@ -1478,7 +1727,7 @@ final class RepositoryStoreHydrator {
             } else {
                 throw RepositoryStoreHydrationError.invalidCardState("semantic membership coverage")
             }
-            let evidenceRows = snapshot.transactionEvidence.filter { $0.cardStatementId == statement.id }
+            let evidenceRows = evidenceByStatement[statement.id, default: []]
             guard evidenceRows.count == (isSupportingSource ? 0 : statement.sourceRowCount) else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement row count")
             }
@@ -1538,7 +1787,7 @@ final class RepositoryStoreHydrator {
                 }
                 if let sectionID = evidence.documentScopedSectionId {
                     sectionNetByID[sectionID, default: 0] += transaction.amountMinor
-                } else if contract != .amex && contract != .axis {
+                } else if !contract.isAmex && contract != .axis {
                     throw RepositoryStoreHydrationError.invalidCardState("CBQ structural section coverage")
                 }
                 allRowsNet += transaction.amountMinor
@@ -1585,7 +1834,7 @@ final class RepositoryStoreHydrator {
             let sectionNet = durableSections.reduce(Int64(0)) { $0 + $1.signedTotalMinor }
             let summaryValid: Bool
             switch contract {
-            case .amex:
+            case .amex, .amexUSDZero:
                 summaryValid = previousMinor != nil && balanceMinor != nil &&
                     componentByCode["new_debits"]?.money.flatMap { try? $0.minorUnits() } == increase &&
                     componentByCode["new_credits"]?.money.flatMap { try? $0.minorUnits() } == decrease &&
@@ -1914,11 +2163,17 @@ final class RepositoryStoreHydrator {
         from accountDTOs: [AccountDTO],
         transactions: [Transaction],
         identitiesByAccountID: [String: [AccountIdentitySummary]],
-        cardSnapshot: CardStoreSnapshot
+        numberPatternsByAccountID: [String: [String]],
+        cardSnapshot: CardStoreSnapshot,
+        bankSections: [BankStatementSectionPlanDTO],
+        zeroActivityControls: [StatementZeroActivityControlDTO]
     ) throws -> [Account] {
-        try accountDTOs.map { accountDTO in
-            let accountTransactions = transactions.filter { $0.repositoryAccountId == accountDTO.id }
+        let transactionsByAccount = Dictionary(grouping: transactions, by: \.repositoryAccountId)
+        return try accountDTOs.map { accountDTO in
+            let isHistoryOnly = accountDTO.accountType == "credit_card" && accountDTO.closedAtISO != nil
+            let accountTransactions = transactionsByAccount[accountDTO.id, default: []]
             let latestBalance: Money?
+            var balanceAsOfISO: String?
             if accountDTO.accountType == "credit_card" {
                 let accountStatements = cardSnapshot.statements.filter { $0.liabilityAccountID == accountDTO.id }
                 let latestStatement: CardStatement?
@@ -1959,9 +2214,20 @@ final class RepositoryStoreHydrator {
                     latestBalance = nil
                 }
             } else {
-                latestBalance = try latestRunningBalance(from: accountTransactions, currency: accountDTO.nativeCurrency)
+                let selected = try latestBankBalance(
+                    from: accountTransactions,
+                    currency: accountDTO.nativeCurrency,
+                    sections: bankSections.filter { $0.accountId == accountDTO.id },
+                    zeroControls: zeroActivityControls.filter { $0.accountId == accountDTO.id }
+                )
+                latestBalance = selected?.money
+                balanceAsOfISO = selected?.date.canonical
             }
 
+            let accountIdentities = identitiesByAccountID[accountDTO.id] ?? []
+            let accountNumbers = accountIdentities.filter { $0.kind != "IBAN" }.map(\.redactedValue)
+                + (numberPatternsByAccountID[accountDTO.id] ?? [])
+            let labels = Set(accountNumbers.compactMap(AccountDisplayText.maskedNumber)).sorted()
             return Account(
                 repositoryAccountId: accountDTO.id,
                 workspaceId: accountDTO.workspaceId,
@@ -1970,11 +2236,66 @@ final class RepositoryStoreHydrator {
                 type: accountType(from: accountDTO.accountType),
                 currencyCode: accountDTO.nativeCurrency,
                 currentBalance: latestBalance?.amount ?? .zero,
-                includeInNetWorth: true,
+                currentBalanceAsOfISO: balanceAsOfISO,
+                includeInNetWorth: !isHistoryOnly,
+                status: isHistoryOnly ? .closed : .active,
                 lastImport: nil,
-                identitySummaries: identitiesByAccountID[accountDTO.id] ?? []
+                identitySummaries: identitiesByAccountID[accountDTO.id] ?? [],
+                sourceProductName: sourceProductName(account: accountDTO, sections: bankSections.filter { $0.accountId == accountDTO.id }),
+                sourceAccountLabel: sourceAccountLabel(sections: bankSections.filter { $0.accountId == accountDTO.id }),
+                sourceAccountNumberLabel: labels.isEmpty ? nil : labels.joined(separator: " · ")
             )
         }
+    }
+
+    private static func financialSourceContext(accounts: [Account], identifiers: [String: [AccountIdentifierDTO]],
+        bankSections: [BankStatementSectionPlanDTO], projections: [StatementFinancialProjectionRecordDTO],
+        cards: CardStoreSnapshot, zeroControls: [StatementZeroActivityControlDTO], cbqPeriods: [StatementCoveragePeriodDTO]) -> FinancialSourceContext {
+        let contexts = accounts.compactMap { account -> IntelligenceAccountContext? in
+            guard let id = account.repositoryAccountId else { return nil }
+            let route = account.sourceProductName?.split(separator: " ").last.map(String.init)
+            let verified = identifiers[id, default: []].filter {
+                $0.strength == FinancialIdentifierStrength.strong.rawValue &&
+                $0.verificationState == FinancialIdentifierVerificationState.verified.rawValue
+            }
+            return .init(id: id, title: account.preferredDisplayName, sourceLabel: account.sourceAccountLabel,
+                currency: account.currencyCode, domain: account.type == .creditCard ? "credit_card" : account.type.rawValue,
+                routeType: route.flatMap { ["NRE", "NRO"].contains($0) ? $0 : nil },
+                verifiedIdentifiers: Set(verified.map { $0.identifier.uppercased() }.filter { !$0.isEmpty }),
+                selectionDetail: account.currentBalanceAsOfISO.flatMap { try? StatementDate(canonical: String($0.prefix(10))) }.map { "Balance dated " + $0.presentation } ?? "Balance date unavailable")
+        }
+        var periods: [FinancialCoveragePeriod] = []
+        var seen: Set<String> = []
+        func append(_ accountID: String, _ start: String?, _ end: String?) {
+            guard let start, let end, let first = try? StatementDate(canonical: start),
+                  let last = try? StatementDate(canonical: end), first <= last,
+                  seen.insert(accountID + ":" + start + ":" + end).inserted else { return }
+            periods.append(.init(accountID: accountID, start: first, end: last))
+        }
+        for section in bankSections { append(section.accountId, section.sourceEvidence.statementStartDateISO, section.sourceEvidence.statementEndDateISO) }
+        for value in projections { append(value.accountID, value.projection.statementStartDateISO, value.projection.statementEndDateISO) }
+        for value in cards.statements { append(value.liabilityAccountID, value.period?.start.canonical, value.period?.end.canonical) }
+        for value in zeroControls { append(value.accountId, value.statementStartDateISO, value.statementEndDateISO) }
+        for value in cbqPeriods { append(value.accountID, value.startISO, value.endISO) }
+        // A row's date or a selected month never establishes complete coverage.
+        return .init(accounts: contexts, periods: periods)
+    }
+
+    private static func sourceProductName(account: AccountDTO, sections: [BankStatementSectionPlanDTO]) -> String? {
+        guard account.accountType == "bank", let institution = account.institutionId,
+              ["Axis Bank", "HDFC Bank"].contains(institution) else { return nil }
+        let roles = Set(sections.flatMap { section in
+            section.productLabel.uppercased().split(whereSeparator: { !$0.isLetter }).filter { ["NRE", "NRO"].contains(String($0)) }.map(String.init)
+        })
+        guard roles.count == 1, let role = roles.first else { return nil }
+        return institution.replacingOccurrences(of: " Bank", with: "") + " " + role
+    }
+
+    private static func sourceAccountLabel(sections: [BankStatementSectionPlanDTO]) -> String? {
+        let products = Set(sections.map(\.productLabel).filter { !$0.isEmpty }).sorted()
+        let identities = Set(sections.flatMap(\.identityPatterns).filter { $0.kind.contains("account_number") }.map(\.pattern)).sorted()
+        guard !products.isEmpty || !identities.isEmpty else { return nil }
+        return (products + identities).joined(separator: " · ")
     }
 
     private static func identitySummaries(from identifiers: [AccountIdentifierDTO]) -> [AccountIdentitySummary] {
@@ -2016,7 +2337,8 @@ final class RepositoryStoreHydrator {
         importedDocumentsByID: [String: ImportedDocumentDTO],
         preferredSource: PreferredTransactionSourceDTO?,
         workspaceID: String,
-        cardEvidence: CardTransactionEvidenceDTO?
+        cardEvidence: CardTransactionEvidenceDTO?,
+        bankOccurrencesByRowID: [String: BankTransactionOccurrencePlanDTO] = [:]
     ) throws -> Transaction {
         guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
@@ -2077,7 +2399,11 @@ final class RepositoryStoreHydrator {
                   !(raw.parserProfileVersion ?? "").isEmpty else {
                 throw RepositoryStoreHydrationError.invalidSourceProvenance(dto.id)
             }
-            return TransactionSourceProvenance(normalizedDocumentID: raw.normalizedDocumentId!, normalizedRowID: raw.normalizedRowId, sourceOrdinal: ordinal, normalizedRecordDigest: raw.normalizedRecordDigest!, parserProfileID: raw.parserProfileId!, parserProfileVersion: raw.parserProfileVersion!)
+            let bankOccurrence = bankOccurrencesByRowID[raw.normalizedRowId]
+            return TransactionSourceProvenance(normalizedDocumentID: raw.normalizedDocumentId!, normalizedRowID: raw.normalizedRowId, sourceOrdinal: ordinal, normalizedRecordDigest: raw.normalizedRecordDigest!, parserProfileID: raw.parserProfileId!, parserProfileVersion: raw.parserProfileVersion!,
+                sourceTransactionDate: try bankOccurrence?.source.sourceTransactionDateISO.map { try StatementDate(canonical: $0) },
+                structuredReferenceDigest: bankOccurrence?.source.structuredReferenceDigest,
+                literalRunningBalance: bankOccurrence?.literalBalance)
         }
         guard !provenance.isEmpty,
               Set(provenance.map(\.normalizedRowID)).count == provenance.count else {
@@ -2177,6 +2503,75 @@ final class RepositoryStoreHydrator {
         default:
             return .bank
         }
+    }
+
+    /// A zero-row source can establish a later account balance without inventing
+    /// a transaction. Only that account's actual closing evidence participates;
+    /// transaction-bearing section totals do not override their booked rows.
+    private static func latestBankBalance(
+        from transactions: [Transaction], currency: String,
+        sections: [BankStatementSectionPlanDTO],
+        zeroControls: [StatementZeroActivityControlDTO]
+    ) throws -> (money: Money, date: StatementDate)? {
+        struct ClosingObservation: Equatable {
+            let documentID: String
+            let date: StatementDate
+            let balance: Money
+        }
+        var closings: [ClosingObservation] = []
+        for section in sections where section.rows.isEmpty {
+            if zeroControls.contains(where: { $0.documentId == section.documentId && $0.authorityRole == "supporting" }) {
+                continue
+            }
+            let evidence = section.sourceEvidence
+            guard let minor = evidence.closingBalanceMinor,
+                  let decimal = evidence.closingBalanceDecimal else {
+                guard evidence.closingBalanceMinor == nil, evidence.closingBalanceDecimal == nil else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("incomplete bank closing balance")
+                }
+                continue
+            }
+            let balance = try Money(canonicalDecimal: decimal, currency: section.nativeCurrency)
+            guard section.nativeCurrency == currency, try balance.minorUnits() == minor else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("invalid bank closing balance")
+            }
+            guard let date = evidence.statementBoundaryDateISO ?? evidence.statementEndDateISO else { continue }
+            closings.append(ClosingObservation(documentID: section.documentId,
+                date: try StatementDate(canonical: date), balance: balance))
+        }
+        for control in zeroControls where control.authorityRole == "authoritative" {
+            guard ZeroActivityProfileBinding.resolve(profileID: control.parserProfileId,
+                profileVersion: control.parserProfileVersion, sourceFormatCode: control.sourceFormatCode,
+                nativeCurrencyCode: control.nativeCurrency)?.accountTypeCode == "bank"
+            else { continue }
+            let evidence = try control.evidence()
+            guard let balance = evidence.closingBalance,
+                  let date = evidence.statementDate ?? evidence.statementPeriod?.end else { continue }
+            guard balance.currency.code == currency else {
+                throw RepositoryStoreHydrationError.runningBalanceCurrencyMismatch
+            }
+            let observation = ClosingObservation(documentID: control.documentId, date: date, balance: balance)
+            // A section and its ordinary zero control describe the same source.
+            if !closings.contains(observation) { closings.append(observation) }
+        }
+        let transactionDate = transactions.filter { $0.runningBalanceMoney != nil }.compactMap(\.statementDate).max()
+        func selectedTransactionBalance() throws -> (money: Money, date: StatementDate)? {
+            guard let date = transactionDate,
+                  let money = try latestRunningBalance(from: transactions, currency: currency) else { return nil }
+            return (money, date)
+        }
+        guard let closingDate = closings.map(\.date).max() else {
+            return try selectedTransactionBalance()
+        }
+        if let transactionDate, transactionDate > closingDate {
+            return try selectedTransactionBalance()
+        }
+        let latest = closings.filter { $0.date == closingDate }
+        guard let balance = latest.first?.balance, latest.allSatisfy({ $0.balance == balance }) else { return nil }
+        if transactionDate == closingDate {
+            guard try latestRunningBalance(from: transactions, currency: currency) == balance else { return nil }
+        }
+        return (balance, closingDate)
     }
 
     static func latestRunningBalance(from transactions: [Transaction], currency: String) throws -> Money? {

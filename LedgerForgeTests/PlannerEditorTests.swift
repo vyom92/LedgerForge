@@ -83,6 +83,31 @@ struct PlannerEditorTests {
         #expect(try setup.spy.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal == "5000.00")
     }
 
+    @Test func unchangedCanonicalPublicationPreservesEveryMonthDraftAndInvalidRawText() throws {
+        let setup = try editor()
+        let september = setup.vm.month
+        let october = try SelectedStatementMonth(canonical: "2026-10")
+        _ = setup.vm.updateMoney(.fixed, text: "5000.")
+        setup.vm.switchMonth(to: october)
+        setup.vm.setFX(rateText: "22.75junk", dateText: "2026-10-")
+        let octoberText = setup.vm.rawText, octoberErrors = setup.vm.fieldErrors
+        // Helper holdings hydration also publishes the unchanged planning store.
+        setup.store.installWithoutObservation(setup.store.plans, generation: setup.store.generation)
+        setup.store.notifyInstalledValue()
+        #expect(setup.vm.rawText == octoberText)
+        #expect(setup.vm.fieldErrors == octoberErrors)
+        #expect(setup.vm.isDirty)
+        #expect(setup.vm.saveState == .ready)
+        setup.vm.switchMonth(to: september)
+        #expect(setup.vm.moneyText(.fixed) == "5000.")
+        #expect(setup.vm.isDirty)
+        #expect(setup.vm.saveState == .ready)
+        setup.vm.switchMonth(to: october)
+        #expect(setup.vm.rawText == octoberText)
+        #expect(setup.vm.fieldErrors == octoberErrors)
+        #expect(setup.spy.saves == 0)
+    }
+
     @Test func dirtyDraftSurvivesCanonicalConflict() throws {
         let setup = try editor()
         var published = setup.vm.plan
@@ -229,7 +254,7 @@ struct PlannerEditorTests {
     }
 
     @Test func manualFXCalendarSelectionPreservesTheChosenDayAndSaveBoundary() throws {
-        #expect(SalaryWorkspaceViewModel.monthTitle(try SelectedStatementMonth(canonical: "2026-08")) == "Aug 2026")
+        #expect(SalaryWorkspaceViewModel.monthTitle(try SelectedStatementMonth(canonical: "2026-08")) == "Aug 26")
         for zone in ["Asia/Qatar", "America/Los_Angeles", "Pacific/Kiritimati"] {
             let timeZone = try #require(TimeZone(identifier: zone))
             let setup = try editor()

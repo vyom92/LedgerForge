@@ -16,6 +16,101 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         self.generationToken = generationToken
     }
 
+    func reviewBankImport(_ plan: BankImportPlanDTO) -> BankImportReviewResult {
+        do {
+
+        return try db.withExclusiveAccess {
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do {
+                if try isExactBankDuplicate(plan) { return .exactDuplicate }
+                let resolution = try bankResolution(plan)
+                return .ready(.init(plan: plan, canonicalTransactionByNormalizedRow: resolution.links))
+            } catch let hold as BankImportHoldDTO { return .held(hold) }
+            catch { return .held(.init("repository_integrity_conflict")) }
+        }
+
+        } catch { return .persistenceUnavailable }
+    }
+
+    func commitBankImport(_ reviewed: ReviewedBankImportPlanDTO) -> BankImportRepositoryResult {
+        do {
+
+        return try db.withExclusiveAccess {
+            let plan = reviewed.plan
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                if try isExactBankDuplicate(plan) {
+                    try db.execute(sql: "ROLLBACK;")
+                    return .exactDuplicate
+                }
+                let resolution = try bankResolution(plan)
+                guard resolution.links == reviewed.canonicalTransactionByNormalizedRow else {
+                    throw BankImportHoldDTO("occurrence_review_changed")
+                }
+                try db.executePrepared(sql: "INSERT INTO workspaces (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspace.id, plan.workspace.name, plan.workspace.createdAtISO, plan.workspace.updatedAtISO ?? NSNull()])
+                for account in resolution.newAccounts {
+                    try ensureInstitutionExists(id: account.institutionId, createdAtISO: account.createdAtISO)
+                    try db.executePrepared(sql: "INSERT INTO accounts (id,workspace_id,name,institution_id,account_type,native_currency,description,created_at) VALUES (?,?,?,?,?,?,?,?);", params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), account.createdAtISO])
+                }
+                var observations = [(String, ConfirmedImportIdentifierCandidateDTO)]()
+                for section in plan.sections {
+                    for candidate in section.identifiers {
+                        let owners = try db.query(sql: "SELECT id,account_id FROM account_identifiers WHERE workspace_id=? AND scheme=? AND identifier=?;", params: [plan.workspace.id,candidate.scheme,candidate.normalizedValue]) { ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "") }
+                        guard owners.count <= 1, owners.allSatisfy({ $0.1 == section.source.accountId }) else { throw BankImportHoldDTO("identifier_ownership_conflict", sectionID: section.source.id) }
+                        let ownershipID = owners.first?.0 ?? UUID().uuidString
+                        if owners.isEmpty {
+                            try db.executePrepared(sql: "INSERT INTO account_identifiers (id,account_id,workspace_id,scheme,identifier,provenance,created_at) VALUES (?,?,?,?,?,?,?);", params: [ownershipID,section.source.accountId,plan.workspace.id,candidate.scheme,candidate.normalizedValue,Self.provenanceJSON(candidate),plan.history.completedAtISO])
+                        }
+                        observations.append((ownershipID,candidate))
+                    }
+                }
+                let history = BankImportDecision.acceptedHistory(plan.history, receipt: resolution.receipt)
+                // Common history insertion does not assign its account argument
+                // when no whole-statement projection/zero control is supplied.
+                // Each transaction above already has its section-owned account.
+                try insert(history: history, transactions: resolution.newTransactions, events: [], observations: observations,
+                    projection: nil, equivalenceReview: .notApplicable, workspaceID: plan.workspace.id,
+                    accountID: resolution.accounts[0].id, zeroActivityControl: resolution.zeroActivityControl)
+                let canonical = try SQLiteTransactionRepo(db: db).trustedTransactions(workspaceId: plan.workspace.id)
+                for section in resolution.sections {
+                    guard let account = resolution.accounts.first(where: { $0.id == section.accountId }) else { throw BankImportHoldDTO("missing_section_account") }
+                    try insertBankStatementSection(section, workspaceID: plan.workspace.id, history: history, account: account, transactions: canonical)
+                }
+                try db.execute(sql: "COMMIT;")
+                return .committed(resolution.receipt)
+            } catch let hold as BankImportHoldDTO {
+                try? db.execute(sql: "ROLLBACK;")
+                return .held(hold)
+            } catch let error as SQLiteExecutionError where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+            } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                return .held(.init("repository_integrity_conflict"))
+            }
+        }
+
+        } catch { return .persistenceUnavailable }
+    }
+
+    private func isExactBankDuplicate(_ plan: BankImportPlanDTO) throws -> Bool {
+        try plan.history.validateFingerprints()
+        guard let authority = plan.history.duplicateAuthorityFingerprint else { throw BankImportHoldDTO("invalid_original_fingerprint") }
+        return try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm=? AND fingerprint=? AND is_duplicate_authority=1;", [authority.algorithm,authority.fingerprint]) > 0
+    }
+
+    private func bankResolution(_ plan: BankImportPlanDTO) throws -> BankImportDecision.Resolution {
+        let accountRepo = SQLiteAccountRepo(db: db)
+        let accounts = try accountRepo.accounts(workspaceId: plan.workspace.id)
+        let identifiers = try accounts.flatMap { try accountRepo.identifiers(accountId: $0.id, workspaceId: plan.workspace.id) }
+        return try BankImportDecision.resolve(plan, accounts: accounts, identifiers: identifiers,
+            existingSections: SQLiteImportSessionRepo(db: db).bankSectionSnapshot(workspaceId: plan.workspace.id).sections,
+            transactions: SQLiteTransactionRepo(db: db).trustedTransactions(workspaceId: plan.workspace.id),
+            existingZeroControls: SQLiteImportSessionRepo(db: db).statementZeroActivityControls(workspaceId: plan.workspace.id))
+    }
+
     func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
         guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
         do {
@@ -25,7 +120,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     func commitReviewedCBQSourceOverlap(_ reviewed: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
-        return db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard consumePlan(reviewed.id), reviewed.basePlan.providerGeneration == generationToken,
                   reviewed.hasValidDigest(), reviewed.blockedCount == 0 else { return .reviewedPartialPlanStale }
             do {
@@ -52,6 +149,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 try? db.execute(sql: "ROLLBACK;"); return .repositoryIntegrityConflict
             }
         }
+
+        } catch { return .repositoryIntegrityConflict }
     }
 
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
@@ -76,7 +175,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     func commitReviewedPartialImport(_ reviewedPlan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
-        return db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard consumePlan(reviewedPlan.id),
                   reviewedPlan.basePlan.providerGeneration == generationToken,
                   reviewedPlan.hasValidDigest(),
@@ -128,10 +229,14 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 return .repositoryIntegrityConflict
             }
         }
+
+        } catch { return .repositoryIntegrityConflict }
     }
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
-        return db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
             guard (try? plan.historyTemplate.validateFingerprints()) != nil else {
                 return .repositoryIntegrityConflict
@@ -157,6 +262,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 return .repositoryIntegrityConflict
             }
         }
+
+        } catch { return .repositoryIntegrityConflict }
     }
 
     private func commitInsideTransaction(_ plan: ConfirmedImportPlanDTO) throws -> ConfirmedImportRepositoryResult {
@@ -400,8 +507,67 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 return .repositoryIntegrityConflict
             }
         }
+        if let section = plan.bankStatementSectionPlan {
+            guard !isSupportingSource else { return .repositoryIntegrityConflict }
+            try insertBankStatementSection(section, workspaceID: plan.workspace.id, history: plan.historyTemplate, account: account, transactions: transactions)
+        }
         let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
+    }
+
+    private func insertBankStatementSection(
+        _ section: BankStatementSectionPlanDTO,
+        workspaceID: String,
+        history: ConfirmedImportHistoryTemplateDTO,
+        account: AccountDTO,
+        transactions: [TransactionDTO]
+    ) throws {
+        guard BankStatementSectionProfileContract.matches(
+                profileID: section.parserProfileId,
+                version: section.parserProfileVersion,
+                nativeCurrency: section.nativeCurrency,
+                sourceFormatCode: section.sourceEvidence.sourceFormatCode,
+                institutionID: account.institutionId ?? ""
+              ),
+              section.accountId == account.id,
+              section.documentId == history.document.id,
+              section.importSessionId == history.importSession.id,
+              section.normalizedDocumentId == history.normalizedDocument?.id,
+              section.sectionOrdinal > 0,
+              section.nativeCurrency == account.nativeCurrency,
+              section.parserProfileId == history.normalizedDocument?.profileId,
+              section.parserProfileVersion == history.normalizedDocument?.profileVersion,
+              section.sourceEvidence.sourceFormatCode.isEmpty == false,
+              !section.identityPatterns.isEmpty,
+              section.rows.allSatisfy({ occurrence in history.normalizedRows.contains { $0.id == occurrence.normalizedRowId } }),
+              Set(section.rows.map(\.sourceOrdinal)).count == section.rows.count,
+              Set(section.rows.map(\.normalizedRowId)).count == section.rows.count,
+              try count("SELECT COUNT(*) FROM bank_statement_sections WHERE id = ? OR (document_id = ? AND section_ordinal = ?);", [section.id, history.document.id, section.sectionOrdinal]) == 0 else {
+            throw RepositoryError.relationshipViolation("Invalid bank statement section plan.")
+        }
+        try db.executePrepared(
+            sql: "INSERT INTO bank_statement_sections (id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, native_currency, source_format_code, product_label, section_ordinal, source_range_start, source_range_end, statement_boundary_date, statement_start_date, statement_end_date, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, source_row_count, created_at, source_details_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [section.id, workspaceID, account.id, history.document.id, history.importSession.id, history.normalizedDocument?.id ?? "", section.parserProfileId, section.parserProfileVersion, section.nativeCurrency, section.sourceEvidence.sourceFormatCode, section.productLabel, section.sectionOrdinal, section.sourceRangeStart ?? NSNull(), section.sourceRangeEnd ?? NSNull(), section.sourceEvidence.statementBoundaryDateISO ?? NSNull(), section.sourceEvidence.statementStartDateISO ?? NSNull(), section.sourceEvidence.statementEndDateISO ?? NSNull(), section.sourceEvidence.openingBalanceMinor ?? NSNull(), section.sourceEvidence.openingBalanceDecimal ?? NSNull(), section.sourceEvidence.closingBalanceMinor ?? NSNull(), section.sourceEvidence.closingBalanceDecimal ?? NSNull(), section.rows.count, history.completedAtISO, try section.sourceDetails.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) } ?? NSNull()]
+        )
+        for identity in section.identityPatterns {
+            try db.executePrepared(
+                sql: "INSERT INTO bank_section_identity_observations (id, bank_statement_section_id, kind, pattern, created_at) VALUES (?,?,?,?,?);",
+                params: ["bank-section-identity-\(section.id)-\(identity.kind)", section.id, identity.kind, identity.pattern, history.completedAtISO]
+            )
+        }
+        let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        for occurrence in section.rows {
+            let row = occurrence.source
+            guard let transaction = transactionsByID[row.incomingTransactionId],
+                  transaction.accountId == account.id,
+                  transaction.postedDateISO == row.postingDateISO else {
+                throw RepositoryError.relationshipViolation("Bank occurrence is not owned by its canonical transaction.")
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO bank_transaction_occurrences (id, bank_statement_section_id, canonical_transaction_id, normalized_row_id, source_ordinal, posting_date, source_transaction_date, value_date, native_currency, signed_amount_minor, signed_amount_decimal, direction, running_balance_minor, running_balance_decimal, literal_narration, literal_reference, literal_balance, structured_reference_digest, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: ["bank-occurrence-\(section.id)-\(row.sourceOrdinal)", section.id, transaction.id, row.normalizedRowId, row.sourceOrdinal, row.postingDateISO, row.sourceTransactionDateISO ?? NSNull(), occurrence.valueDateISO ?? NSNull(), row.nativeCurrency, row.signedAmountMinor, row.signedAmountDecimal, row.direction, row.runningBalanceMinor, row.runningBalanceDecimal, occurrence.literalNarration, occurrence.literalReference ?? NSNull(), occurrence.literalBalance, row.structuredReferenceDigest ?? NSNull(), history.completedAtISO]
+            )
+        }
     }
 
     private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
@@ -418,7 +584,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         contract: CardStatementProfileContract
     ) -> Bool {
         account.workspaceId == plan.workspace.id && account.accountType == "credit_card" &&
-        account.nativeCurrency == (contract == .axis ? "INR" : "QAR") &&
+        account.nativeCurrency == contract.nativeCurrency &&
         account.institutionId == contract.institutionCode
     }
 
@@ -873,7 +1039,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         let sectionNet = decisions.reduce(Int64(0)) { $0 + $1.section.signedTotalMinor }
         let summaryValid: Bool
         switch contract {
-        case .amex:
+        case .amex, .amexUSDZero:
             summaryValid = false
         case .axis:
             summaryValid = false
@@ -977,7 +1143,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               let projection = card.semanticProjection else {
             return .repositoryIntegrityConflict
         }
-        let isAccountOnlyAmexZero = contract == .amex &&
+        let isAccountOnlyAmexZero = contract.isAmex &&
             plan.zeroActivityControl != nil &&
             plan.transactionTemplates.isEmpty &&
             card.transactionEvidence.isEmpty &&
@@ -986,6 +1152,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             projection.sections.isEmpty
         guard
               projection.isValid(),
+              (contract != .amexUSDZero || isAccountOnlyAmexZero),
               card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan),
               card.statement.workspaceId == plan.workspace.id,
@@ -996,7 +1163,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               contract.supportsSemanticSourceGrouping,
               contract.accepts(profileID: card.statement.parserProfileId),
               card.statement.parserProfileVersion == contract.profileVersion,
-              card.statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
+              card.statement.statementCurrency == contract.nativeCurrency,
               projection.reconciliationRuleCode == card.statement.reconciliationRuleCode,
               card.statement.sourceRowCount == projection.events.count,
               plan.transactionTemplates.count == projection.events.count,
@@ -1166,6 +1333,11 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         guard summaryCoverageIsValid,
               summaryCodes.count == card.summaryComponents.count,
               card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id }) else { return .repositoryIntegrityConflict }
+        if contract.isAmex, let zero = plan.zeroActivityControl {
+            guard zero.matchesAmexZeroStatement(card.statement, components: card.summaryComponents) else {
+                return .repositoryIntegrityConflict
+            }
+        }
         let summary = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
         let previous = summary["previous_balance"]
         let balance = summary[contract == .axis ? "axis_total_payment_due" : "new_balance"]
@@ -1202,9 +1374,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         if contract != .axis {
             guard let instrumentTotal, instrumentTotal.moneyMinor != nil else { return .repositoryIntegrityConflict }
         }
-        if contract == .amex {
+        if contract.isAmex {
             guard let credits = summary["new_credits"], let debits = summary["new_debits"],
-                  credits.moneyCurrency == "QAR", debits.moneyCurrency == "QAR",
+                  credits.moneyCurrency == contract.nativeCurrency, debits.moneyCurrency == contract.nativeCurrency,
                   credits.moneyMinor != nil, debits.moneyMinor != nil,
                   previousMinor! - credits.moneyMinor! + debits.moneyMinor! == balanceMinor! else {
                 return .repositoryIntegrityConflict
@@ -1537,7 +1709,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     private func isCBQObservationPlan(_ plan: ConfirmedImportPlanDTO) -> Bool {
-        expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil
+        plan.bankStatementSectionPlan != nil ||
+            (expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil)
     }
 
     private func compatibleCBQAccountIDs(_ plan: ConfirmedImportPlanDTO) throws -> [String] {
@@ -1555,18 +1728,22 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             params: [accountID, plan.workspace.id, "institution_account_id"]
         ) { $0.string(at: 0) ?? "" }.filter { $0.count == 13 }
         let durableMasks = try db.query(
-            sql: "SELECT kind, pattern FROM cbq_source_identity_observations WHERE account_id = ? AND workspace_id = ? ORDER BY kind, pattern;",
-            params: [accountID, plan.workspace.id]
+            sql: "SELECT kind, pattern FROM cbq_source_identity_observations WHERE account_id = ? AND workspace_id = ? UNION ALL SELECT i.kind, i.pattern FROM bank_section_identity_observations i JOIN bank_statement_sections s ON s.id = i.bank_statement_section_id WHERE s.account_id = ? AND s.workspace_id = ? ORDER BY kind, pattern;",
+            params: [accountID, plan.workspace.id, accountID, plan.workspace.id]
         ) { (kind: $0.string(at: 0) ?? "", pattern: $0.string(at: 1) ?? "") }
         if !plan.cbqSourceIdentityPatterns.isEmpty {
             let fullMatch = strong.contains { candidate in plan.cbqSourceIdentityPatterns.allSatisfy { Self.mask($0.pattern, matches: candidate) } }
             let maskMatch = plan.cbqSourceIdentityPatterns.allSatisfy { incoming in
                 durableMasks.filter { $0.kind == incoming.kind }.contains { Self.masksCompatible(incoming.pattern, $0.pattern) }
             }
-            return fullMatch || maskMatch
+            return strong.isEmpty ? maskMatch : (fullMatch && strong.allSatisfy { candidate in
+                plan.cbqSourceIdentityPatterns.allSatisfy { Self.mask($0.pattern, matches: candidate) }
+            })
         }
         if let fullIncoming {
-            return strong.contains(fullIncoming) || (!durableMasks.isEmpty && durableMasks.allSatisfy { Self.mask($0.pattern, matches: fullIncoming) })
+            return strong.isEmpty
+                ? (!durableMasks.isEmpty && durableMasks.allSatisfy { Self.mask($0.pattern, matches: fullIncoming) })
+                : strong.allSatisfy { $0 == fullIncoming }
         }
         return false
     }
@@ -2239,7 +2416,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         return consumedPlanIDs.insert(id).inserted
     }
 
-    private func loadAccount(id: String) throws -> AccountDTO? { try db.query(sql: "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;", params: [id]) { row in AccountDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", name: row.string(at: 2) ?? "", institutionId: row.string(at: 3), accountType: row.string(at: 4), nativeCurrency: row.string(at: 5) ?? "", description: row.string(at: 6), createdAtISO: row.string(at: 7) ?? "") }.first }
+    private func loadAccount(id: String) throws -> AccountDTO? { try db.query(sql: "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at FROM accounts WHERE id = ?;", params: [id]) { row in AccountDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", name: row.string(at: 2) ?? "", institutionId: row.string(at: 3), accountType: row.string(at: 4), nativeCurrency: row.string(at: 5) ?? "", description: row.string(at: 6), createdAtISO: row.string(at: 7) ?? "", closedAtISO: row.string(at: 8)) }.first }
     private func count(_ sql: String, _ params: [Any?]) throws -> Int { Int(try db.query(sql: sql, params: params) { $0.int64(at: 0) ?? 0 }.first ?? 0) }
     private func cardSemanticMultisetKey(date: String, effect: String, currency: String, decimal: String) -> String {
         [date, effect, currency, decimal].map { "\($0.utf8.count):\($0)" }.joined()

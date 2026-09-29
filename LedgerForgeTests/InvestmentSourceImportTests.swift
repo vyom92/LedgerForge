@@ -48,6 +48,95 @@ struct InvestmentSourceImportTests {
             forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) }, rejectedAttemptHydration: {})
     }
 
+    /// Explicit, one-time continuation of the owner-selected clean candidate.
+    /// This uses the ordinary import path; independent original comparisons are
+    /// performed separately in memory against the resulting candidate.
+    @Test(.globalRuntimeStateIsolation)
+    func populateFinalAdoptionCandidateFromSelectedInvestmentOriginals() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let directory = URL(fileURLWithPath: "/Users/vyom/Library/Containers/com.vyom.LedgerForge/Data/Library/Application Support/LedgerForge/Development/Namespaces/s98-adoption-candidate-01a0b713", isDirectory: true)
+        let path = directory.appendingPathComponent("ledgerforge-development.sqlite").path
+        guard environment["LEDGERFORGE_S98_ADOPTION_CANDIDATE"] == "1",
+              environment["LEDGERFORGE_S98_ADOPTION_CANDIDATE_DIRECTORY"] == directory.path,
+              FileManager.default.fileExists(atPath: path) else { throw EnvironmentError.missingCurrentSources }
+        let originalsRoot = URL(fileURLWithPath: "/Users/vyom/Documents/Ledger Forge/Originals/Investments", isDirectory: true)
+        let selected = [
+            ("IBKR/IBKR_2.csv", "de800cb13b22a9e3827b0006ca21ff63b34457f79f8f20363911f1939dbcd46a"),
+            ("IBKR/IBKR_1.csv", "587d64b73fdf8269b29a664c1100838d575487bf1a5408bc5ca087c17df2df84"),
+            ("ZurichISP/Detail_by_txn_v1_-_since_2020.csv", "48c94d7e042abdf131ec97c2703b9b10fd5174f18c41874db1e8c6aff8faec63"),
+            ("ZurichISP/Detail_by_txn_v1_-_since_2020(2).csv", "9a4a7687b90f0e68db382635a9471718360bc9a3cfbbb72566fb82c3cc8c1c03"),
+            ("ZurichISP/Detail_by_txn_v1_-_since_2020(3).csv", "57debd801facc84fb17fae5ea9c1ba1bfd43938de50d902e3370e5698fe67a68")
+        ]
+        for (name, sha) in selected {
+            guard try BackupFiles.hash(originalsRoot.appendingPathComponent(name)).sha256 == sha else {
+                throw EnvironmentError.missingCurrentSources
+            }
+        }
+        let sqlite = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing)
+        defer { sqlite.database.close() }
+        try BackupCompatibility.verifyDatabase(sqlite.database)
+        guard try sqlite.database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 333 else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite)
+        let before = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+        guard before.containers.allSatisfy({ !["Interactive Brokers", "Zurich ISP"].contains($0.institution) }) else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        let accounts = try provider.accountRepo.accounts(workspaceId: "default-workspace")
+        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace")
+        let cards = try provider.cardRepo.snapshot(workspaceId: "default-workspace")
+        let sections = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: "default-workspace")
+        let inboxAccounts = try provider.gmailInboxRepo.storedAccounts()
+        let inboxes = try inboxAccounts.map { try provider.gmailInboxRepo.load(account: $0) }
+        guard inboxes.count == 1, inboxes[0].sources.count == 416, inboxes[0].messages.count == 557 else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        let store = InvestmentStore(), importer = engine(provider, store: store)
+        for (name, sha) in selected {
+            let prepared = try await importer.prepareImport(from: originalsRoot.appendingPathComponent(name))
+            guard prepared.validation.passed, !prepared.investmentConfirmationBlocked,
+                  let expected = prepared.investmentReview?.snapshot else {
+                importer.cancelPreparedImport(prepared)
+                throw EnvironmentError.missingCurrentSources
+            }
+            let result = await importer.commitPreparedImport(prepared)
+            guard result.succeeded, result.persisted,
+                  try provider.investmentRepo.snapshot(workspaceID: "default-workspace") == expected,
+                  store.snapshot == expected else { throw EnvironmentError.missingCurrentSources }
+            print("ADOPTION_LOCAL_SOURCE_COMMITTED sha256=\(sha)")
+        }
+        let populated = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+        let originalContainerIDs = Set(before.containers.map(\.id))
+        guard populated.containers.filter({ originalContainerIDs.contains($0.id) }) == before.containers,
+              populated.holdings.filter({ originalContainerIDs.contains($0.containerID) }) == before.holdings,
+              try provider.accountRepo.accounts(workspaceId: "default-workspace") == accounts,
+              try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace") == transactions,
+              try provider.cardRepo.snapshot(workspaceId: "default-workspace") == cards,
+              try provider.importSessionRepo.bankSectionSnapshot(workspaceId: "default-workspace") == sections,
+              try inboxAccounts.map({ try provider.gmailInboxRepo.load(account: $0) }) == inboxes,
+              try sqlite.database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 338 else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        for (name, sha) in selected {
+            let source = originalsRoot.appendingPathComponent(name)
+            let replay = try await importer.prepareImport(from: source)
+            let result = await importer.commitPreparedImport(replay)
+            guard result.previousImport != nil, !result.persisted,
+                  try provider.investmentRepo.snapshot(workspaceID: "default-workspace") == populated,
+                  try BackupFiles.hash(source).sha256 == sha else { throw EnvironmentError.missingCurrentSources }
+        }
+        try sqlite.database.checkpointAndClose()
+        let reopened = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing)
+        defer { reopened.database.close() }
+        try BackupCompatibility.verifyDatabase(reopened.database)
+        guard try reopened.investmentRepo.snapshot(workspaceID: "default-workspace") == populated,
+              try reopened.database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 338 else {
+            throw EnvironmentError.missingCurrentSources
+        }
+        print("ADOPTION_LOCAL_SOURCES_READY originals=5 exact_replays=5 total_imports=338 unchanged_existing_financial_state=true fresh_reopen=true")
+    }
+
     @Test func sameDateOriginalsRequireTheSameChoiceInEitherOrder() async throws {
         let sources = try currentSources().filter { $0.deletingLastPathComponent().lastPathComponent == "IBKR" }
         let csvs = sources.filter { $0.pathExtension == "csv" }
@@ -128,7 +217,7 @@ struct InvestmentSourceImportTests {
         await coordinator.createBackup(to: destination)
         guard let package = coordinator.lastBackupURL else { throw EnvironmentError.missingCurrentSources }
         let manifest = try BackupFiles.verifyPackage(package)
-        #expect(manifest.formatVersion == 1 && manifest.schemaVersion == 22)
+        #expect(manifest.formatVersion == 1 && manifest.schemaVersion == 23)
         let originalPackageHash = try BackupFiles.hash(package.appendingPathComponent("ledger.sqlite")).sha256
         await coordinator.verifyRestore(from: package)
         #expect(coordinator.candidateManifest == manifest)
@@ -300,6 +389,8 @@ struct InvestmentSourceImportTests {
             #expect(choiceCommitted)
 
             let before = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+            let reportingExcluded = try #require(before.containers.first(where: { $0.institution != "Zurich ISP" }))
+            try provider.netWorthMembershipRepo.setIncluded(false, member: .investmentContainer(reportingExcluded.id), workspaceID: "default-workspace")
             let updater = engine(provider, store: store)
             let prepared = try await updater.prepareImport(from: dated[1].0)
             guard let expected = prepared.investmentReview?.snapshot else { throw EnvironmentError.missingCurrentSources }
@@ -314,6 +405,7 @@ struct InvestmentSourceImportTests {
             let unrelated = before.holdings.filter { policyIDs.contains($0.containerID) }
                 == expected.holdings.filter { policyIDs.contains($0.containerID) }
             #expect(accepted && exact && store.snapshot == expected && unrelated)
+            #expect(try provider.netWorthMembershipRepo.snapshot(workspaceID: "default-workspace").excluded == [.investmentContainer(reportingExcluded.id)])
 
             // A previously accepted original replays without changing the newer set.
             let oldReplay = try await updater.prepareImport(from: olderPDF)

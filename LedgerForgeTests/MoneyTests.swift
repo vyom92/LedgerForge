@@ -32,15 +32,16 @@ struct MoneyTests {
         #expect(try CurrencyCatalog.shared.definition(for: "KWD").fractionDigits == 3)
     }
 
-    @Test func catalogIsVersionedAtV2() {
-        #expect(CurrencyCatalog.version == "ledgerforge.currency-catalog.v2")
+    @Test func catalogIsVersionedAtV3() {
+        #expect(CurrencyCatalog.version == "ledgerforge.currency-catalog.v3")
     }
 
-    @Test func catalogContainsExactly155DeterministicSortedUniqueDefinitions() {
+    @Test func catalogContains155ActiveAndSourceRequiredHistoricalDefinitions() {
         let definitions = CurrencyCatalog.shared.definitions
         let codes = definitions.map { $0.code.code }
 
-        #expect(definitions.count == 155)
+        #expect(definitions.count == 157)
+        #expect(definitions.filter { !["BGN", "HRK"].contains($0.code.code) }.count == 155)
         #expect(codes == codes.sorted())
         #expect(Set(codes).count == definitions.count)
         #expect(definitions == definitions.sorted { $0.code < $1.code })
@@ -48,6 +49,8 @@ struct MoneyTests {
 
     @Test func catalogIncludesRequiredOrdinaryCurrenciesAndScales() throws {
         let expectedScales = [
+            "BGN": 2,
+            "HRK": 2,
             "KRW": 0,
             "QAR": 2,
             "BHD": 3,
@@ -92,7 +95,7 @@ struct MoneyTests {
     }
 
     @Test func exactScaleRejectsFractionalKRWFourthDecimalBHDAndThirdDecimalTwoScale() {
-        let cases = [("1.1", "KRW"), ("1.2345", "BHD"), ("1.001", "EUR")]
+        let cases = [("1.1", "KRW"), ("1.2345", "BHD"), ("1.001", "EUR"), ("1.001", "BGN"), ("1.001", "HRK")]
 
         for (amount, currency) in cases {
             do {
@@ -110,6 +113,8 @@ struct MoneyTests {
         let values = [
             ("0", "KRW", "0", Int64(0)),
             ("12.34", "QAR", "12.34", Int64(1_234)),
+            ("-12.34", "BGN", "-12.34", Int64(-1_234)),
+            ("12.34", "HRK", "12.34", Int64(1_234)),
             ("-1.234", "BHD", "-1.234", Int64(-1_234))
         ]
 

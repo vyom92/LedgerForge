@@ -74,6 +74,31 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(c.finalQARBuffer, try money("-360"))
     }
 
+    func testWorksheetUsesSelectedBalancesAndOnlyItsOwnKeepInCBQAmount() throws {
+        var plan = try inputPlan()
+        plan.balances.append(.init(id: "manual-inr", accountID: "my-selected-inr-bank", nativeCurrency: try CurrencyCode("INR"), included: true, money: try money("900", "INR"), provenance: .manual))
+        let before = plan
+        let result = FundingPlanCalculator.calculate(plan)
+        XCTAssertEqual(result.positionBeforeTransfer, try money("850"))
+        XCTAssertEqual(result.selectedINRLiquidity, try money("900", "INR"))
+        XCTAssertEqual(result.indiaFundingShortfall, try money("0", "INR"))
+        XCTAssertEqual(plan, before)
+        plan.keepInCBQ = try money("600")
+        XCTAssertEqual(FundingPlanCalculator.calculate(plan).positionBeforeTransfer, try money("350"))
+    }
+
+    func testNoBillsDoNotCreateAnObligationShortfallOrChargeUnusedTransferFee() throws {
+        var plan = try inputPlan()
+        plan.qatarCommitments = []; plan.indiaCommitments = []
+        plan.keepInCBQ = try money("0")
+        let result = FundingPlanCalculator.calculate(plan)
+        XCTAssertEqual(result.qatarObligationShortfall, try money("0"))
+        XCTAssertEqual(result.qatarReserveGap, try money("0"))
+        XCTAssertEqual(result.finalQARBuffer, try money("1250"))
+        XCTAssertEqual(result.effectiveTransferFee, try money("0"))
+        XCTAssertEqual(result.transferablePrincipal, try money("1240"))
+    }
+
     func testMissingRatePreservesQatarAndZeroRequirementDoesNotNeedFX() throws {
         var plan = try inputPlan(); plan.planningFX = nil; plan.referenceMode = .alDar
         var c = FundingPlanCalculator.calculate(plan)
@@ -253,6 +278,7 @@ final class BudgetPlanningTests: XCTestCase {
             XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.commitments.first?.dueDateISO, String(format: "%@-%02d", sourceMonth, day))
             let next = try editor(month: nextMonth, active: active, store: store).0
             XCTAssertEqual(next.plan.qatarCommitments.first?.dueDate(in: next.month)?.canonical, expected)
+            XCTAssertEqual(next.plan.dueDate(for: try XCTUnwrap(next.plan.qatarCommitments.first))?.canonical, expected)
         }
     }
 
@@ -267,16 +293,43 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.calculation.indiaCommitments, try money("120", "INR"))
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let october = try editor(month: "2026-10", active: active, store: store).0
-        XCTAssertEqual(october.plan.indiaCommitments.first?.dueDate(in: october.month)?.canonical, "2026-10-01")
+        XCTAssertEqual(october.plan.dueDate(for: try XCTUnwrap(october.plan.indiaCommitments.first))?.canonical, "2026-11-01")
         october.save()
         let november = try editor(month: "2026-11", active: active, store: store).0
-        XCTAssertEqual(november.plan.indiaCommitments.first?.dueDate(in: november.month)?.canonical, "2026-11-01")
+        XCTAssertEqual(november.plan.dueDate(for: try XCTUnwrap(november.plan.indiaCommitments.first))?.canonical, "2026-12-01")
         var lastDay = try XCTUnwrap(november.plan.indiaCommitments.first)
         lastDay.dueDate = try StatementDate(canonical: "2026-01-31")
         XCTAssertEqual(lastDay.dueDate(in: try SelectedStatementMonth(canonical: "2026-02"))?.canonical, "2026-02-28")
         XCTAssertEqual(lastDay.dueDate(in: try SelectedStatementMonth(canonical: "2028-02"))?.canonical, "2028-02-29")
         XCTAssertEqual(lastDay.dueDate(in: try SelectedStatementMonth(canonical: "2026-04"))?.canonical, "2026-04-30")
         XCTAssertEqual(lastDay.dueDate(in: try SelectedStatementMonth(canonical: "2026-03"))?.canonical, "2026-03-31")
+    }
+
+    func testSalaryDateEditsKeepExplicitOverdueBillsAndMonthEndTemplates() throws {
+        let (vm, active, store) = try editor()
+        let id = try bill(vm, region: "qatar", amount: "120")
+        let due = try XCTUnwrap(FinancialCalendar.instant(StatementDate(canonical: "2026-09-10")))
+        vm.setBillDate(region: "qatar", id: id, date: due, timeZone: TimeZone(secondsFromGMT: 0)!)
+        let cycle = try XCTUnwrap(SalaryFundingCycle.expected(month: vm.month, day: 26))
+        XCTAssertTrue(vm.setSalaryCycle(cycle))
+        XCTAssertEqual(vm.plan.dueDate(for: try XCTUnwrap(vm.plan.qatarCommitments.first))?.canonical, "2026-09-10")
+        XCTAssertEqual(vm.calculation.qatarCommitments, try money("120"))
+        vm.save(); XCTAssertEqual(vm.saveState, .saved)
+        let october = try editor(month: "2026-10", active: active, store: store).0
+        XCTAssertEqual(october.plan.assistance?.salaryCycle?.expectedDay, 26)
+        XCTAssertEqual(october.plan.assistance?.salaryCycle?.previousPayday, "2026-09-26")
+        XCTAssertEqual(october.plan.dueDate(for: try XCTUnwrap(october.plan.qatarCommitments.first))?.canonical, "2026-11-10")
+
+        let (january, januaryProvider, januaryStore) = try editor(month: "2027-01")
+        let monthEnd = try bill(january, region: "qatar", amount: "120")
+        january.setBillDate(region: "qatar", id: monthEnd,
+            date: try XCTUnwrap(FinancialCalendar.instant(StatementDate(canonical: "2027-01-31"))), timeZone: TimeZone(secondsFromGMT: 0)!)
+        january.save(); XCTAssertEqual(january.saveState, .saved)
+        let february = try editor(month: "2027-02", active: januaryProvider, store: januaryStore).0
+        XCTAssertEqual(february.plan.dueDate(for: try XCTUnwrap(february.plan.qatarCommitments.first))?.canonical, "2027-02-28")
+        february.save(); XCTAssertEqual(february.saveState, .saved)
+        let march = try editor(month: "2027-03", active: januaryProvider, store: januaryStore).0
+        XCTAssertEqual(march.plan.dueDate(for: try XCTUnwrap(march.plan.qatarCommitments.first))?.canonical, "2027-03-31")
     }
 
     func testBackgroundCalendarChangeUpdatesMonthChoicesWithoutReplacingDraft() async throws {

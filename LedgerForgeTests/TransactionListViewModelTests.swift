@@ -162,6 +162,8 @@ enum Sprint89TransactionPresentationOracle {
         let expectedState: TransactionPresentationResultState = expected.isEmpty ? .validEmpty : .ready
         try require(actual.state == expectedState, "\(name) state")
         try require(actual.rows.map(\.stableID) == expected.map(\.stableID), "\(name) membership/order")
+        try require(actual.rows.map(\.accountDisplayName) == expected.map(\.accountName), "\(name) account names")
+        try require(actual.rows.map(\.institutionDisplayName) == expected.map(\.institution), "\(name) institution names")
         let expectedTotals = try totals(rows: expected)
         try require(actual.totals == expectedTotals, "\(name) totals")
     }
@@ -220,8 +222,8 @@ enum Sprint89TransactionPresentationOracle {
                 stableID: transaction.repositoryTransactionId.map { "durable:" + $0 }
                     ?? "runtime:" + transaction.id.uuidString.lowercased(),
                 accountID: transaction.repositoryAccountId,
-                accountName: account?.name ?? "Unavailable",
-                institution: account?.institution ?? "Unavailable",
+                accountName: account.map(expectedAccountTitle) ?? "Unavailable",
+                institution: account.map { shortInstitution($0.institution) } ?? "Unavailable",
                 categoryID: categoryID,
                 categoryName: categoryID == nil ? "Uncategorized" : (categories[categoryID!]?.name ?? "Unavailable"),
                 domain: domain,
@@ -229,6 +231,22 @@ enum Sprint89TransactionPresentationOracle {
                 date: transaction.statementDate
             )
         }
+    }
+
+    // Owner display contract: a nickname wins; identifier-only names use the
+    // retained product label; all visible institution names abbreviate CBQ.
+    // Keep this independent of the production presentation engine/accessors.
+    private static func expectedAccountTitle(_ account: Account) -> String {
+        if let nickname = account.nickname, nickname.contains(where: { !$0.isWhitespace }) {
+            return shortInstitution(nickname)
+        }
+        let identifierOnly = account.name.range(of: "^[0-9Xx* \\-]+$", options: .regularExpression) != nil
+        let label = identifierOnly ? (account.sourceProductName ?? account.institution + " account") : account.name
+        return shortInstitution(label)
+    }
+
+    private static func shortInstitution(_ text: String) -> String {
+        text.replacingOccurrences(of: "(?i)Commercial Bank of Qatar", with: "CBQ", options: .regularExpression)
     }
 
     private static func matches(_ row: Row, filter: TransactionPresentationFilterSpec) -> Bool {
@@ -395,6 +413,15 @@ struct TransactionListViewModelTests {
     func acceptedCanonicalSnapshotMatchesIndependentInMemoryOracle() async throws {
         let context = try await authenticTransactionListContext()
         let missing = try Sprint89TransactionPresentationOracle.verify(hydrated: context.snapshot)
+        let amounts = context.transactionStore.transactions.map(\.money)
+        for localeID in ["en_US", "en_IN", "ar_QA"] {
+            let locale = Locale(identifier: localeID)
+            let singleValueDisplays = amounts.map { MoneyFormatting.display($0, locale: locale) }
+            let displaysMatch = MoneyFormatting.display(amounts, locale: locale) == singleValueDisplays
+            #expect(displaysMatch)
+        }
+        let nativeAmountsUnchanged = context.transactionStore.transactions.map(\.money) == amounts
+        #expect(nativeAmountsUnchanged)
         print("Sprint 89 in-memory presentation oracle passed; missing genuine cases: " + missing.joined(separator: ", "))
     }
 
@@ -843,6 +870,44 @@ struct TransactionListViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func coherentStorePublicationRebuildsSelectedRowsOnce() async throws {
+        let context = try await authenticTransactionListContext()
+        let model = TransactionListViewModel(
+            transactionStore: context.transactionStore, importSessionStore: context.importSessionStore,
+            accountStore: context.accountStore, categoryStore: context.categoryStore
+        )
+        model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let original = model.transactionPresentationResult
+        let selected = try #require(original.rows.first?.stableID)
+        model.selectPresentationRow(id: selected)
+        let revision = model.canonicalContentRevision
+        let builds = model.canonicalProjectionBuildCount
+        let queries = model.queryEvaluationCount
+
+        context.transactionStore.notifyTransactionsOfInstalledValues()
+        context.accountStore.notifyAccountsOfInstalledValue()
+        context.categoryStore.notifySnapshotOfInstalledValue()
+        for _ in 0..<100 where model.canonicalContentRevision == revision {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.canonicalContentRevision == revision + 1)
+        #expect(model.canonicalProjectionBuildCount == builds + 1)
+        #expect(model.queryEvaluationCount == queries + 1)
+        #expect(model.selectedPresentationRowID == selected)
+        #expect(model.transactionPresentationResult.rows.map(\.stableID) == original.rows.map(\.stableID))
+        #expect(model.transactionPresentationResult.totals == original.totals)
+
+        context.transactionStore.notifyTransactionsOfInstalledValues()
+        model.synchronizePresentation(generation: nil, availabilityState: .unavailable)
+        let withdrawnRevision = model.canonicalContentRevision
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(model.canonicalContentRevision == withdrawnRevision)
+        #expect(model.transactionPresentationResult.state == .unavailable)
+        #expect(model.allPresentationRows.isEmpty)
+        #expect(model.selectedPresentationRowID == nil)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func presentationAvailabilityRequiresCurrentOrEmptyStateAndGeneration() async throws {
         let context = try await authenticTransactionListContext()
         let viewModel = TransactionListViewModel(
@@ -943,13 +1008,7 @@ private enum AcceptedTransactionSnapshot {
 @MainActor
 private func authenticTransactionListContext() async throws -> AuthenticTransactionListContext {
     if let cached = AcceptedTransactionSnapshot.cached { return cached }
-    let identity = try DevelopmentDatabaseIdentity.applicationOwned(environment: ProcessInfo.processInfo.environment)
-    let databaseURL = identity.canonicalDevelopmentURL
-    guard !identity.isIsolatedCanonicalNamespace,
-          identity.authorizesCurrentDatabaseIdentity(at: databaseURL),
-          FileManager.default.fileExists(atPath: databaseURL.path) else {
-        throw RepositoryError.persistenceUnavailable
-    }
+    let databaseURL = try AuthenticSourceTestSupport.presentationDatabaseURL()
     // Read-only access applies before provider initialization, so this
     // presentation check cannot create a database, apply migrations, or write rows.
     let provider = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: databaseURL)

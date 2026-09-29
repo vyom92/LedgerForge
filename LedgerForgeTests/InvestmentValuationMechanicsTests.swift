@@ -72,7 +72,7 @@ struct InvestmentValuationMechanicsTests {
                                 ("2027-01-01T00:00:00Z", "2026-12-31")] {
             #expect(InvestmentPriceDates.priorWeekday(instant(now)) == expected)
         }
-        #expect(InvestmentPriceDates.display("2026-12-31") == "31 Dec 2026")
+        #expect(InvestmentPriceDates.display("2026-12-31") == "31 Dec 26")
         #expect(InvestmentPriceDates.isWeekend(instant("2026-09-20T12:00:00Z")))
     }
 
@@ -82,6 +82,24 @@ struct InvestmentValuationMechanicsTests {
         #expect(InvestmentPriceDates.age(day: "2026-09-17", instant: observed, zone: "Pacific/Honolulu", now: now) == 0)
         #expect(InvestmentPriceDates.age(day: "2026-09-17", instant: nil, zone: "Asia/Kolkata", now: now) == 1)
         #expect(InvestmentPriceDates.age(day: "2026-09-17", instant: nil, zone: "America/New_York", now: now) == 0)
+    }
+
+    @Test func weekdayFreshnessPreservesCalendarAgeAndSourceTimeZone() throws {
+        let friday = "2026-09-18"
+        for (now, calendarAge, freshness) in [("2026-09-19T12:00:00Z", 1, 0), ("2026-09-20T12:00:00Z", 2, 0),
+                                             ("2026-09-21T12:00:00Z", 3, 1), ("2026-09-24T12:00:00Z", 6, 4)] {
+            #expect(InvestmentPriceDates.age(day: friday, instant: nil, zone: "UTC", now: instant(now)) == calendarAge)
+            #expect(InvestmentPriceDates.freshnessAge(day: friday, instant: nil, zone: "UTC", now: instant(now)) == freshness)
+        }
+        let sundayInNewYork = instant("2026-09-21T01:00:00Z")
+        #expect(InvestmentPriceDates.freshnessAge(day: friday, instant: nil, zone: "America/New_York", now: sundayInNewYork) == 0)
+        #expect(InvestmentPriceDates.freshnessAge(day: friday, instant: nil, zone: "Asia/Kolkata", now: sundayInNewYork) == 1)
+        #expect(WeekdayFreshness.seconds(from: instant("2026-09-18T20:00:00Z"), to: instant("2026-09-21T08:00:00Z")) == 12 * 3_600)
+        #expect(WeekdayFreshness.seconds(from: instant("2026-09-20T20:00:00Z"), to: instant("2026-09-20T08:00:00Z")) == 0)
+        #expect(WeekdayFreshness.days(from: instant("2026-09-18T00:00:00Z"), to: instant("2026-10-02T00:00:00Z")) == 10)
+        #expect(try StatementDate(canonical: "2026-01-01").presentation == "01 Jan 26")
+        #expect(AppDateDisplay.date(instant("2026-01-01T23:30:00Z"), zone: TimeZone(secondsFromGMT: 0)!) == "01 Jan 26")
+        #expect(AppDateDisplay.timestamp(instant("2026-01-01T23:30:00Z"), zone: TimeZone(secondsFromGMT: 3 * 3_600)!) == "02 Jan 26, 02:30 · UTC+03:00")
     }
 
     @Test func publicJSONPreservesLexemesAndRejectsAmbiguousSyntax() throws {

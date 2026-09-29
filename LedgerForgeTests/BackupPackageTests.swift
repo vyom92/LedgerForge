@@ -23,7 +23,8 @@ final class BackupPackageTests: XCTestCase {
             application: .init(identifier: nil, version: nil, build: nil),
             database: .init(file: "ledger.sqlite", byteSize: hash.size, sha256: hash.sha256),
             schemaVersion: version, migrations: try BackupCompatibility.identities(for: version),
-            contents: BackupManifest.contentDescription, exclusions: BackupManifest.excluded)
+            contents: version >= 23 ? BackupManifest.contentDescription : BackupManifest.legacyContentDescription,
+            exclusions: BackupManifest.excluded)
         try JSONEncoder().encode(manifest).write(to: package.appendingPathComponent("manifest.json"))
         return package
     }
@@ -78,11 +79,11 @@ final class BackupPackageTests: XCTestCase {
         let db = SQLiteDatabase(path: candidate.path)
         try db.open(access: .readOnlySnapshot); defer { db.close() }
         try BackupCompatibility.verifyDatabase(db)
-        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 22)
+        XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, allMigrations.count)
         XCTAssertEqual(try db.queryInt("SELECT count(*) FROM funding_plan_al_dar_references;"), 0)
     }
-    func testV18V19AndV20PackagesUpgradeOnlyTheirMissingTail() throws {
-        for version in [18, 19, 20] {
+    func testSupportedPackagesUpgradeOnlyTheirMissingTail() throws {
+        for version in 18...BackupCompatibility.supportedSchemaVersion {
             let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
             let source = try package(at: directory, version: version)
             let manifest = try BackupFiles.verifyPackage(source)
@@ -92,7 +93,8 @@ final class BackupPackageTests: XCTestCase {
             let db = SQLiteDatabase(path: candidate.path)
             try db.open(access: .readOnlySnapshot); defer { db.close() }
             try BackupCompatibility.verifyDatabase(db)
-            XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, 22)
+            XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, allMigrations.count)
+            XCTAssertEqual(try db.queryInt("SELECT count(*) FROM net_worth_exclusions;"), 0)
         }
     }
 
@@ -267,6 +269,68 @@ final class BackupPackageTests: XCTestCase {
         XCTAssertThrowsError(try gate.begin(.repositoryWrite))
         gate.finishExclusive(providerChanged: true)
         XCTAssertFalse(gate.hasActiveOperations)
+    }
+
+    func testNamespaceAuthorityPublishesAfterRestoreAndRollback() async throws {
+        for rollback in [false, true] {
+            let directory = try temporary()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let backup = try package(at: directory)
+            let current = directory.appendingPathComponent("current.sqlite")
+            let provider = try SQLiteRepositoryProvider(path: current.path, migrations: allMigrations)
+            let initial = try provider.database.validatedActivationStamp()
+            let enrollmentStore = BackgroundEnrollmentStore(url: directory.appendingPathComponent("enrollment.json"))
+            let initialEnrollment = BackgroundEnrollment(revision: UUID(), databasePath: current.path,
+                workspaceID: "mechanical-workspace", activation: initial, enabled: true)
+            try enrollmentStore.save(initialEnrollment)
+            let saved = DatabaseProvider.shared
+            DatabaseProvider.shared = .verifiedSQLite(provider)
+            defer { DatabaseProvider.shared = saved }
+            let coordinator = BackupRestoreCoordinator(testingAt: current, enrollmentStore: enrollmentStore)
+            coordinator.installTestProvider(provider)
+            if rollback { coordinator.failuresForTesting = [.afterPreservation] }
+            await coordinator.verifyRestore(from: backup)
+            XCTAssertNotNil(coordinator.candidateManifest, coordinator.message)
+            await coordinator.replaceLedger()
+            XCTAssertTrue(DatabaseProvider.shared.persistenceState.isUsable, coordinator.message)
+            XCTAssertNil(coordinator.ledgerLifecyclePermit)
+            XCTAssertFalse(DatabaseActivityGate.shared.hasExclusiveOperation)
+            let authority = LedgerAccessCoordinator.shared(path: current.path)
+            let stable = try authority.withAccess { try authority.validate(expected: nil, permit: nil) }
+            XCTAssertFalse(stable.transitioning)
+            XCTAssertNotEqual(stable.epoch, initial.epoch)
+            XCTAssertEqual(stable.schemaVersion, allMigrations.count)
+            let receipt = try XCTUnwrap(RestoreLayout(current: current).readReceipt())
+            XCTAssertEqual(receipt.phase, rollback ? .rolledBack : .activated)
+            try coordinator.closeTestProvider()
+            let recovery = BackupRestoreCoordinator(testingAt: current, enrollmentStore: enrollmentStore)
+            try recovery.recoverBeforeStartup()
+            XCTAssertEqual(try authority.readStamp().transitioning, !rollback)
+            let reopened = try SQLiteRepositoryProvider(path: current.path, migrations: allMigrations,
+                access: .existing, lifecyclePermit: recovery.ledgerLifecyclePermit)
+            recovery.installTestProvider(reopened)
+            DatabaseProvider.shared = .verifiedSQLite(reopened)
+            await recovery.startupDidHydrate()
+            XCTAssertNil(recovery.ledgerLifecyclePermit)
+            XCTAssertFalse(DatabaseActivityGate.shared.hasExclusiveOperation)
+            XCTAssertFalse(try reopened.database.validatedActivationStamp().transitioning)
+            let beforeOrdinaryReopen = try reopened.database.validatedActivationStamp()
+            XCTAssertEqual(try enrollmentStore.load()?.activation, beforeOrdinaryReopen)
+            try recovery.closeTestProvider()
+            // Simulate exit after stable publication but before operational repair.
+            try enrollmentStore.save(initialEnrollment)
+            let ordinary = BackupRestoreCoordinator(testingAt: current, enrollmentStore: enrollmentStore)
+            try ordinary.recoverBeforeStartup()
+            XCTAssertNil(ordinary.ledgerLifecyclePermit)
+            let repaired = try XCTUnwrap(enrollmentStore.load())
+            XCTAssertEqual(repaired.activation, beforeOrdinaryReopen)
+            XCTAssertNotEqual(repaired.revision, initialEnrollment.revision)
+            try ordinary.recoverBeforeStartup()
+            XCTAssertEqual(try enrollmentStore.load(), repaired)
+            let unchanged = try SQLiteRepositoryProvider(path: current.path, migrations: allMigrations, access: .existing)
+            XCTAssertEqual(try unchanged.database.validatedActivationStamp(), beforeOrdinaryReopen)
+            unchanged.database.close()
+        }
     }
     func testStaleGenerationRejectsOperations() throws {
         let validity = ProviderGenerationValidity()

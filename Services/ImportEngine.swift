@@ -53,6 +53,7 @@ enum ConfirmedImportRecoveryReason: Equatable, Sendable {
     case identityConflict
     case identifierOwnershipConflict
     case repositoryIntegrityConflict
+    case bankSourceOverlapHeld
 }
 
 struct ImportEngineResult: Equatable {
@@ -82,6 +83,7 @@ struct ImportEngineResult: Equatable {
     let isInvestmentImport: Bool
     let accountOutcome: ImportAccountOutcome
     let recoveryRoute: ConfirmedImportRecoveryRoute
+    let bankSections: [BankImportReceiptDTO.Section]
 #if DEBUG
     private(set) var developmentProtectedActionOutcome: DevelopmentProtectedActionOutcome?
 #endif
@@ -106,7 +108,8 @@ struct ImportEngineResult: Equatable {
         isSalaryImport: Bool = false,
         isInvestmentImport: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable,
-        recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable
+        recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable,
+        bankSections: [BankImportReceiptDTO.Section] = []
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -128,6 +131,7 @@ struct ImportEngineResult: Equatable {
         self.isInvestmentImport = isInvestmentImport
         self.accountOutcome = accountOutcome
         self.recoveryRoute = recoveryRoute
+        self.bankSections = bankSections
 #if DEBUG
         self.developmentProtectedActionOutcome = nil
 #endif
@@ -306,7 +310,10 @@ struct PreparedImport: Identifiable {
 
 final class ImportEngine {
 
-    static let shared = ImportEngine()
+    static let shared = ImportEngine(importCoordinator: DefaultImportCoordinator(
+        readerRegistry: DefaultReaderRegistry(),
+        passwordProvider: DefaultPasswordProvider(additionalRememberedCandidates: GmailImportSource.additionalCASCredential)
+    ))
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
     private let sourceSnapshotAcquirer: (URL) throws -> SourceContentSnapshot
@@ -540,11 +547,23 @@ final class ImportEngine {
 
         let investmentParser = InvestmentStatementParser()
         if investmentParser.canRecognize(rawDocument) {
-            try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
-            let financialDocument = try investmentParser.parse(rawDocument)
+            let financialDocument: FinancialDocument
+            let validation: ImportValidationResult
+            if investmentParser.isEmailDeliveredFamily(rawDocument) {
+                let interpretation = try await ImportInterpretationWorker.investment(rawDocument, progress: { phase in
+                    try self.publishPreparationProgress(phase, requestId: requestId, progress: progress)
+                })
+                financialDocument = interpretation.financialDocument
+                validation = interpretation.validation
+            } else {
+                // IBKR and Zurich retain their existing execution route.
+                try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
+                financialDocument = try investmentParser.parse(rawDocument)
+                try Task.checkCancellation()
+                try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
+                validation = ImportValidator.validate(financialDocument: financialDocument)
+            }
             try Task.checkCancellation()
-            try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
-            let validation = ImportValidator.validate(financialDocument: financialDocument)
             let importSession = ImportSession(fileName: rawDocument.fileName, institution: nil,
                 documentType: .investment, parserName: InvestmentStatementParser.name, transactionCount: 0, validation: validation)
             let coordinator = importPersistenceCoordinatorFactory()
@@ -568,11 +587,11 @@ final class ImportEngine {
         if sourceFormat == .pdf {
             let salaryParser = QatarAirwaysSalaryPDFParser()
             if salaryParser.canRecognize(rawDocument) {
-                try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
-                let financialDocument = try salaryParser.parse(rawDocument)
-                try Task.checkCancellation()
-                try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
-                let validation = ImportValidator.validate(financialDocument: financialDocument)
+                let interpretation = try await ImportInterpretationWorker.salary(rawDocument, progress: { phase in
+                    try self.publishPreparationProgress(phase, requestId: requestId, progress: progress)
+                })
+                let financialDocument = interpretation.financialDocument
+                let validation = interpretation.validation
                 try Task.checkCancellation()
                 let importSession = ImportSession(
                     fileName: rawDocument.fileName,
@@ -614,185 +633,35 @@ final class ImportEngine {
             }
         }
 
-        try publishPreparationProgress(.detectingInstitution, requestId: requestId, progress: progress)
-        let detection = InstitutionDetector().detectWithReasons(in: rawDocument)
-        let institutionCandidate = detection.importCandidate
-
-        try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
-        let classification = try await StatementClassificationDetector().classify(
-            document: rawDocument,
-            institution: institutionCandidate
+        let interpretation = try await ImportInterpretationWorker.bankOrCard(
+            rawDocument, sourceFormat: sourceFormat, sourceURL: url,
+            progress: { phase in
+                try self.publishPreparationProgress(phase, requestId: requestId, progress: progress)
+            }
         )
-        let document: Document
-        let normalizedRows: [NormalizedRow]
-        let normalizedHeader: NormalizedRow?
-        let sourceContext: NormalizedDocument.SourceContext
-        var statementPasswordCredentialTarget: ImportFramework.StatementPasswordCredentialTarget?
-        var axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation?
-        switch sourceFormat {
-        case .csv:
-            let csvDocument = CSVAnalyzer().analyze(text: contents, fileURL: url)
-            let normalization = CSVNormalizer().normalizeWithSourceContext(
-                text: contents,
-                document: csvDocument
+        try Task.checkCancellation()
+        let document = interpretation.document
+        let metadata = interpretation.metadata
+        let financialDocument = interpretation.financialDocument
+        let validation = interpretation.validation
+        let parserName = interpretation.parserName
+        let axisCreditCardPDFPresentation = interpretation.axisCreditCardPDFPresentation
+        let statementPasswordCredentialTarget: ImportFramework.StatementPasswordCredentialTarget?
+        if let presentation = axisCreditCardPDFPresentation {
+            statementPasswordCredentialTarget = .init(
+                institutionCode: KeychainStatementPasswordCredentialStore.axisInstitutionScope,
+                scope: presentation == .appPDF
+                    ? KeychainStatementPasswordCredentialStore.axisAppPDFScope
+                    : KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope
             )
-            document = csvDocument
-            normalizedRows = normalization.rows
-            normalizedHeader = normalization.header
-            sourceContext = normalization.sourceContext
+        } else {
             statementPasswordCredentialTarget = nil
-        case .pdf:
-            guard let readerPageTexts = rawDocument.pdfPageTexts else {
-                throw ImportError.invalidDocument(message: "PDF reader did not retain page evidence.")
-            }
-            switch institutionCandidate.institutionCode {
-            case Institution.axis.rawValue:
-                let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
-                if classification.documentType == .creditCardStatement {
-                    let card = try AxisCreditCardPDFNormalizer().normalize(
-                            text: contents,
-                            pageTexts: readerPageTexts,
-                            pageEvidence: rawDocument.pdfPageEvidence,
-                            taggedTables: rawDocument.pdfTaggedTables,
-                            fileURL: url
-                        )
-                    normalization = (card.document, card.rows, card.header, card.sourceContext)
-                    axisCreditCardPDFPresentation = card.presentation
-                    statementPasswordCredentialTarget = .init(
-                        institutionCode: KeychainStatementPasswordCredentialStore.axisInstitutionScope,
-                        scope: card.presentation == .appPDF
-                            ? KeychainStatementPasswordCredentialStore.axisAppPDFScope
-                            : KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope
-                    )
-                } else {
-                    let bank = try AxisBankAccountPDFNormalizer().normalize(
-                        text: contents,
-                        pageEvidence: rawDocument.pdfPageEvidence,
-                        fileURL: url
-                    )
-                    normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
-                    statementPasswordCredentialTarget = nil
-                }
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-            case Institution.hdfc.rawValue:
-                let normalization = try HDFCBankAccountPDFNormalizer().normalize(
-                    text: contents, pageEvidence: rawDocument.pdfPageEvidence, fileURL: url
-                )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            case Institution.cbq.rawValue:
-                let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
-                if classification.documentType == .creditCardStatement {
-                    let card = try CBQCreditCardPDFNormalizer().normalize(
-                        text: contents, pageTexts: readerPageTexts, fileURL: url
-                    )
-                    normalization = (card.document, card.rows, card.header, card.sourceContext)
-                } else {
-                    let bank = try CBQCurrentAccountPDFNormalizer().normalize(
-                            text: contents,
-                            pageTexts: readerPageTexts,
-                            pageEvidence: rawDocument.pdfPageEvidence,
-                            fileURL: url
-                        )
-                    normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
-                }
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            case Institution.amex.rawValue:
-                let normalization = try AmericanExpressCreditCardPDFNormalizer().normalize(
-                        text: contents,
-                        pageTexts: readerPageTexts,
-                        pageEvidence: rawDocument.pdfPageEvidence,
-                        fileURL: url
-                    )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            default:
-                throw ImportError.invalidDocument(message: "No suitable PDF normalizer found.")
-            }
-        case .xls:
-            switch institutionCandidate.institutionCode {
-            case Institution.axis.rawValue:
-                let normalization = try AxisBankAccountXLSNormalizer().normalize(
-                    rawDocument: rawDocument
-                )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            case Institution.hdfc.rawValue:
-                let normalization = try HDFCBankAccountXLSNormalizer().normalize(
-                    rawDocument: rawDocument
-                )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            case Institution.cbq.rawValue:
-                let normalization = try CBQCurrentAccountXLSNormalizer().normalize(
-                    rawDocument: rawDocument
-                )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            default:
-                throw ImportError.invalidDocument(
-                    message: "No suitable XLS normalizer found."
-                )
-            }
-        case .xlsx:
-            switch institutionCandidate.institutionCode {
-            case Institution.axis.rawValue:
-                guard classification.documentType == .creditCardStatement else {
-                    throw ImportError.invalidDocument(message: "No suitable XLSX normalizer found.")
-                }
-                let normalization = try AxisCreditCardXLSXNormalizer().normalize(
-                    rawDocument: rawDocument
-                )
-                document = normalization.document
-                normalizedRows = normalization.rows
-                normalizedHeader = normalization.header
-                sourceContext = normalization.sourceContext
-                statementPasswordCredentialTarget = nil
-            default:
-                throw ImportError.invalidDocument(
-                    message: "No suitable XLSX normalizer found."
-                )
-            }
-        case .unknown:
-            throw ImportError.unsupportedFile(extension: rawDocument.fileExtension)
         }
-
-        try publishPreparationProgress(.selectingParser, requestId: requestId, progress: progress)
-        let selection = StatementParserSelector().selectParser(
-            for: document,
-            institution: institutionCandidate,
-            classification: classification
-        )
-        let parser = selection.parser
-        let metadata = selection.legacyMetadata
-
         developerConsole.info(.`import`, "Institution detected", metadata: ["institution": metadata.institution.rawValue])
         developerConsole.info(
             .`import`,
             "Parser selected",
-            metadata: ["selection": parser == nil ? "Unavailable" : "Recognized"]
+            metadata: ["selection": "Recognized"]
         )
 
         developerConsole.debug(.parser, "Document structure recognized", metadata: [
@@ -803,37 +672,14 @@ final class ImportEngine {
             "firstTransactionRow": "\(document.firstTransactionRow ?? -1)"
         ])
         developerConsole.debug(.parser, "Normalization completed", metadata: [
-            "rows": "\(normalizedRows.count)"
+            "rows": "\(interpretation.normalizedRowCount)"
         ])
 
-        guard let parser else {
-            developerConsole.warning(.`import`, "No suitable parser found.")
-            throw ImportError.invalidDocument(message: "No suitable parser found.")
-        }
-        let normalizedDocument = NormalizedDocument(
-            document: document,
-            metadata: metadata,
-            rows: normalizedRows,
-            header: normalizedHeader,
-            sourceContext: sourceContext
-        )
-
-        try publishPreparationProgress(.parsingFinancialContent, requestId: requestId, progress: progress)
-        let financialDocument = try parser.parse(
-            document: normalizedDocument
-        )
-        try Task.checkCancellation()
         developerConsole.debug(.parser, "Row count", metadata: ["transactions": "\(financialDocument.transactions.count)"])
-
-        try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
-        let validation = ImportValidator.validate(
-            financialDocument: financialDocument
-        )
-        try Task.checkCancellation()
         developerConsole.info(.validation, "Validation completed", metadata: ["passed": validation.passed ? "true" : "false", "issues": "\(validation.issues.count)"])
         if validation.passed {
             let credentialTarget = statementPasswordCredentialTarget
-                ?? .init(institutionCode: detection.metadata.institution.statementPasswordCredentialScope)
+                ?? .init(institutionCode: interpretation.credentialInstitution.statementPasswordCredentialScope)
             try await importCoordinator.confirmSuccessfulPassword(
                 for: passwordRequest,
                 target: credentialTarget
@@ -844,7 +690,7 @@ final class ImportEngine {
             fileName: document.filename,
             institution: metadata.institution,
             documentType: metadata.documentType,
-            parserName: parser.name,
+            parserName: parserName,
             transactionCount: financialDocument.transactions.count,
             validation: validation
         )
@@ -871,7 +717,7 @@ final class ImportEngine {
             fileName: document.filename,
             detectedInstitution: metadata.institution,
             detectedDocumentType: metadata.documentType,
-            parserName: parser.name,
+            parserName: parserName,
             financialDocument: financialDocument,
             validation: validation,
             importSession: importSession,
@@ -895,6 +741,42 @@ final class ImportEngine {
 
     func commitPreparedImport(_ preparedImport: PreparedImport) async -> ImportEngineResult {
         await commitPreparedImport(preparedImport, accountChoice: nil)
+    }
+
+    /// A bounded look-ahead preparation may have finished before the preceding
+    /// commit. Refresh only its repository-dependent authority when it reaches
+    /// the single review/commit lane. Parsed content remains bound to the same
+    /// live original snapshot; no prepared object survives a provider change.
+    func refreshQueuedPreparation(_ prepared: PreparedImport) throws -> PreparedImport {
+        guard prepared.providerGeneration == providerGenerationProvider(),
+              persistenceStateProvider().isUsable,
+              livePreparedImports[prepared.id]?.sourceSnapshot.id == prepared.sourceSnapshot.id else {
+            throw PersistenceWorkflowError.unavailable
+        }
+        guard try prepared.sourceSnapshot.recomputedSourceByteFingerprint() == prepared.sourceSnapshot.sourceByteFingerprint else {
+            throw ImportEngineCommitError.sourceSnapshotIntegrityFailed
+        }
+        let coordinator = importPersistenceCoordinatorFactory()
+        let previous = prepared.validation.passed ? try coordinator.priorImportedStatement(fingerprint: prepared.fingerprint) : nil
+        let isInvestment = prepared.financialDocument.investmentStatementEvidence != nil
+        let isSalary = prepared.financialDocument.salaryStatementEvidence != nil
+        let equivalence: StatementEquivalenceReviewResult = prepared.validation.passed && previous == nil && !isInvestment && !isSalary
+            ? try coordinator.reviewStatementEquivalence(financialDocument: prepared.financialDocument,
+                importSession: prepared.importSession, validation: prepared.validation, fingerprintSet: prepared.fingerprintSet,
+                accountChoice: nil, providerGeneration: prepared.providerGeneration) : .notApplicable
+        let investmentPlan = prepared.validation.passed && isInvestment
+            ? try coordinator.prepareInvestmentImport(financialDocument: prepared.financialDocument,
+                importSession: prepared.importSession, fingerprintSet: prepared.fingerprintSet,
+                providerGeneration: prepared.providerGeneration) : nil
+        return PreparedImport(id: prepared.id, sourceURL: prepared.sourceURL, rawContents: prepared.rawContents,
+            fileName: prepared.fileName, detectedInstitution: prepared.detectedInstitution,
+            detectedDocumentType: prepared.detectedDocumentType, parserName: prepared.parserName,
+            financialDocument: prepared.financialDocument, validation: prepared.validation,
+            importSession: prepared.importSession, fingerprint: prepared.fingerprint,
+            sourceSnapshot: prepared.sourceSnapshot, fingerprintSet: prepared.fingerprintSet,
+            advisoryPreviousImport: previous, statementEquivalenceReview: equivalence,
+            providerGeneration: prepared.providerGeneration, axisCreditCardPDFPresentation: prepared.axisCreditCardPDFPresentation,
+            investmentPlan: investmentPlan)
     }
 
     func reviewPreparedImport(_ preparedImport: PreparedImport) throws -> ImportIdentityReview {
@@ -1236,7 +1118,8 @@ final class ImportEngine {
             isSalaryImport: persistenceResult.isSalaryImport,
             isInvestmentImport: preparedImport.financialDocument.investmentStatementEvidence != nil,
             accountOutcome: persistenceResult.accountOutcome,
-            recoveryRoute: recoveryRoute
+            recoveryRoute: recoveryRoute,
+            bankSections: persistenceResult.bankSections
         )
     }
 
@@ -1307,6 +1190,8 @@ final class ImportEngine {
         for error: ImportPersistenceCoordinationError
     ) -> ConfirmedImportRecoveryRoute {
         switch error {
+        case .bankSourceHeld:
+            return .reviewRequired(.bankSourceOverlapHeld)
         case .ambiguousIdentity:
             return .reviewRequired(.identityAmbiguous)
         case .conflictingIdentity:
@@ -1459,7 +1344,8 @@ final class ImportEngine {
         }
     }
 
-    nonisolated private static func acquireSourceSnapshot(from url: URL) throws -> SourceContentSnapshot {
+    private static func acquireSourceSnapshot(from url: URL) throws -> SourceContentSnapshot {
+        if url.scheme == GmailImportSource.scheme { return try GmailImportSource.acquireSnapshot(from: url) }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
             if didAccess {

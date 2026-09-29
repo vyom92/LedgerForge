@@ -1,6 +1,6 @@
 import Foundation
 
-final class InstitutionDetector {
+nonisolated final class InstitutionDetector {
     private let signatureDetector: SignatureInstitutionDetector
 
     init(signatureDetector: SignatureInstitutionDetector = SignatureInstitutionDetector()) {

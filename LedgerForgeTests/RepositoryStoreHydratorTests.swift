@@ -194,11 +194,23 @@ struct RepositoryStoreHydratorTests {
         let stores = RuntimeStores()
         let hydrator = makeHydrator(seeded: seeded, stores: stores)
 
-        let firstResult = try hydrator.hydrateIfNeeded()
-        let secondResult = try hydrator.hydrateIfNeeded()
+        var observedResults: [RepositoryStoreHydrationResult] = []
+        let observe: (RepositoryRuntimeSnapshot) -> Void = { snapshot in
+            #expect(stores.accounts.accounts.map(\.id) == snapshot.accounts.map(\.id))
+            #expect(stores.transactions.transactions.map(\.id) == snapshot.transactions.map(\.id))
+            #expect(stores.importSessions.importSessions == snapshot.importSessions)
+            #expect(stores.categories.snapshot == snapshot.categorySnapshot)
+            #expect(stores.cards.snapshot == snapshot.cardSnapshot)
+            observedResults.append(snapshot.hydrationResult)
+        }
+        let firstResult = try hydrator.hydrateIfNeeded(didPublishSnapshot: observe)
+        let secondResult = try hydrator.hydrateIfNeeded(didPublishSnapshot: observe)
 
         #expect(firstResult.didHydrate)
         #expect(!secondResult.didHydrate)
+        #expect(observedResults == [firstResult])
+        let forcedResult = try hydrator.hydrateIfNeeded(forceRefresh: true, didPublishSnapshot: observe)
+        #expect(observedResults == [firstResult, forcedResult])
         #expect(stores.accounts.accounts.count == 1)
         #expect(stores.transactions.transactions.count == seeded.plan.transactionTemplates.count)
     }
@@ -258,11 +270,13 @@ struct RepositoryStoreHydratorTests {
         let sessionsBefore = stores.importSessions.importSessions
         let attemptsBefore = stores.importAttempts.attempts
         repository.documentReadError = RepositoryError.persistenceUnavailable
+        var publishedAfterFailure = false
 
         #expect(throws: RepositoryError.self) {
-            _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+            _ = try hydrator.hydrateIfNeeded(forceRefresh: true) { _ in publishedAfterFailure = true }
         }
 
+        #expect(!publishedAfterFailure)
         #expect(stores.accounts.accounts.map(HydratedAccountObservation.init) == accountsBefore)
         #expect(HydratedTransactionObservation.matches(
             stores.transactions.transactions.map(HydratedTransactionObservation.init),

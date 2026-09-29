@@ -8,7 +8,7 @@
 import Foundation
 
 /// Supported strategies for determining transaction direction.
-enum TransactionDirectionStrategy {
+nonisolated enum TransactionDirectionStrategy {
     case debitCreditColumns
     case amountAndDrCr
     case signedAmount
@@ -16,25 +16,25 @@ enum TransactionDirectionStrategy {
 }
 
 /// Describes the financial direction of a transaction.
-enum TransactionType {
+nonisolated enum TransactionType {
     case debit
     case credit
 }
 
 /// The result returned after resolving transaction direction.
-struct DirectionResult {
+nonisolated struct DirectionResult {
     let debit: Decimal?
     let credit: Decimal?
     let transactionType: TransactionType
 }
 
-enum DirectionResolutionError: Error, Equatable {
+nonisolated enum DirectionResolutionError: Error, Equatable {
     case missingDebitAndCredit
     case populatedDebitAndCredit
 }
 
 /// Resolves transaction direction independently of any financial institution.
-final class DirectionResolver {
+nonisolated final class DirectionResolver {
 
     static func resolve(
         strategy: TransactionDirectionStrategy,

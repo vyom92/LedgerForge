@@ -14,7 +14,7 @@
 
 import Foundation
 
-struct ColumnMapping {
+nonisolated struct ColumnMapping {
 
     var date: Int?
     var description: Int?
@@ -53,7 +53,7 @@ struct ColumnMapping {
 
 }
 
-final class ColumnDetector {
+nonisolated final class ColumnDetector {
 
     func detect(from headerRow: String,
                 delimiter: Character) -> ColumnMapping {

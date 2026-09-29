@@ -189,6 +189,149 @@ struct CategoryRepositoryTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func exactNewWorkConflictManualClearAndVersionRacesHaveProviderParity() async throws {
+        for kind in CategoryProviderKind.allCases {
+            try await withCategoryProvider(kind) { provider in
+                let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
+                guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
+                    Issue.record("Genuine source import failed"); return
+                }
+                let workspace = plan.workspace.id
+                let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+                let first = try #require(facts.first { !($0.description ?? "").isEmpty })
+                let repository = provider.categoryRepo
+                let initial = try #require(try repository.automationSnapshot(workspaceId: workspace))
+                #expect(initial.pendingIDs == Set(facts.map(\.id)))
+                #expect(initial.work.values.allSatisfy { $0.origin == .newImport })
+                _ = provider.confirmedImportRepo.commitConfirmedImport(plan)
+                #expect(try repository.automationSnapshot(workspaceId: workspace) == initial)
+                let a = try createCategory(name: "Review A", id: "rule-category-a", workspaceID: workspace, repository: repository)
+                let b = try createCategory(name: "Review B", id: "rule-category-b", workspaceID: workspace, repository: repository)
+                var rule = CategoryRule(id: "mechanics-rule", workspaceID: workspace, name: "Exact original narration", version: 1,
+                    isEnabled: true, categoryID: a.id, accountID: first.accountId, currency: first.nativeCurrency,
+                    direction: first.direction, predicates: [.init(field: .narration, match: .exact, text: try #require(first.description))])
+                try repository.saveRule(rule, previousVersion: nil)
+                var other = rule; other.id = "conflicting-rule"; other.categoryID = b.id
+                try repository.saveRule(other, previousVersion: nil)
+                @MainActor func evaluate() throws -> CategoryEvaluation {
+                    CategoryEvaluation.evaluate(inputs: [.init(transaction: first)],
+                        snapshot: try #require(try repository.automationSnapshot(workspaceId: workspace)),
+                        assignments: Dictionary(uniqueKeysWithValues: try repository.assignments(workspaceId: workspace).map { ($0.transactionId, $0.categoryId) }),
+                        activeCategoryIDs: [a.id, b.id])
+                }
+                let conflict = try evaluate()
+                #expect(conflict.decisions.first?.outcome == .conflict)
+                #expect(try repository.applyCategoryEvaluation(conflict, workspaceId: workspace, historical: false) == 1)
+                #expect(try repository.assignments(workspaceId: workspace).isEmpty)
+                #expect(try repository.automationSnapshot(workspaceId: workspace)?.work[first.id]?.outcome == .conflict)
+                try repository.deleteRule(id: other.id, workspaceId: workspace, version: 1)
+                let proposed = try evaluate()
+                #expect(proposed.decisions.first?.categoryID == a.id)
+                // Clearing a never-assigned row is still an explicit protected choice.
+                #expect(try repository.setCategory(categoryId: nil, transactionId: first.id, workspaceId: workspace))
+                #expect(try repository.applyCategoryEvaluation(proposed, workspaceId: workspace, historical: true) == 1)
+                #expect(try repository.assignments(workspaceId: workspace).isEmpty)
+                #expect(try repository.automationSnapshot(workspaceId: workspace)?.intents[first.id]?.kind == .deliberatelyCleared)
+                #expect(try !repository.setCategory(categoryId: nil, transactionId: first.id, workspaceId: workspace))
+                #expect(try repository.setCategory(categoryId: b.id, transactionId: first.id, workspaceId: workspace))
+                #expect(try evaluate().decisions.first?.outcome == .protected)
+                let oldPreview = try evaluate()
+                rule.version += 1; rule.categoryID = b.id
+                try repository.saveRule(rule, previousVersion: 1)
+                #expect(throws: CategoryAutomationError.stalePreview) {
+                    try repository.applyCategoryEvaluation(oldPreview, workspaceId: workspace, historical: true)
+                }
+                #expect(try repository.assignments(workspaceId: workspace).first?.categoryId == b.id)
+                #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspace) == facts)
+            }
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func automaticAssignmentIsIdempotentAndChoosingTheSameCategoryMakesItManual() async throws {
+        for kind in CategoryProviderKind.allCases {
+            try await withCategoryProvider(kind) { provider in
+                let seeded = try await seedTrustedTransaction(in: provider)
+                let repository = provider.categoryRepo, workspace = seeded.workspaceID
+                let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+                let first = try #require(facts.first { !($0.description ?? "").isEmpty })
+                let category = try createCategory(name: "Rule mechanics", id: "automatic-category", workspaceID: workspace, repository: repository)
+                let rule = CategoryRule(id: "automatic-rule", workspaceID: workspace, name: "Exact source text", version: 1,
+                    isEnabled: true, categoryID: category.id, accountID: first.accountId, currency: first.nativeCurrency,
+                    direction: first.direction, predicates: [.init(field: .narration, match: .exact, text: try #require(first.description))])
+                try repository.saveRule(rule, previousVersion: nil)
+                let evaluation = CategoryEvaluation.evaluate(inputs: [.init(transaction: first)],
+                    snapshot: try #require(try repository.automationSnapshot(workspaceId: workspace)), assignments: [:], activeCategoryIDs: [category.id])
+                #expect(try repository.applyCategoryEvaluation(evaluation, workspaceId: workspace, historical: false) == 1)
+                #expect(try repository.applyCategoryEvaluation(evaluation, workspaceId: workspace, historical: false) == 0)
+                #expect(try repository.automationSnapshot(workspaceId: workspace)?.intents[first.id]?.kind == .automatic)
+                var disabled = rule; disabled.version = 2; disabled.isEnabled = false
+                try repository.saveRule(disabled, previousVersion: 1)
+                let noMatch = CategoryEvaluation.evaluate(inputs: [.init(transaction: first)],
+                    snapshot: try #require(try repository.automationSnapshot(workspaceId: workspace)),
+                    assignments: [first.id: category.id], activeCategoryIDs: [category.id])
+                #expect(noMatch.decisions.first?.outcome == .noMatch)
+                #expect(try repository.applyCategoryEvaluation(noMatch, workspaceId: workspace, historical: true) == 1)
+                #expect(try repository.assignments(workspaceId: workspace).isEmpty)
+                #expect(try repository.automationSnapshot(workspaceId: workspace)?.intents[first.id] == nil)
+                disabled.version = 3; disabled.isEnabled = true
+                try repository.saveRule(disabled, previousVersion: 2)
+                let again = CategoryEvaluation.evaluate(inputs: [.init(transaction: first)],
+                    snapshot: try #require(try repository.automationSnapshot(workspaceId: workspace)),
+                    assignments: [:], activeCategoryIDs: [category.id])
+                #expect(try repository.applyCategoryEvaluation(again, workspaceId: workspace, historical: true) == 1)
+                #expect(try repository.setCategory(categoryId: category.id, transactionId: first.id, workspaceId: workspace))
+                #expect(try repository.automationSnapshot(workspaceId: workspace)?.intents[first.id]?.kind == .manual)
+                let stores = CategoryRuntimeStores()
+                _ = try makeHydrator(provider: provider, stores: stores, workspaceID: workspace).hydrateIfNeeded(forceRefresh: true)
+                #expect(stores.categories.snapshot.automation?.intents[first.id]?.kind == .manual)
+                #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspace) == facts)
+            }
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func categoryWorkerResumesReplacementGenerationAfterOldEvaluationReturns() async throws {
+        let first = DatabaseProvider(inMemory: true), second = DatabaseProvider(inMemory: true)
+        let oldSeed = try await seedTrustedTransaction(in: first)
+        let newSeed = try await seedTrustedTransaction(in: second)
+        let stores = CategoryRuntimeStores()
+        var current = first
+        let gate = CategoryEvaluationPause()
+        let oldFacts = try first.transactionRepo.trustedTransactions(workspaceId: oldSeed.workspaceID)
+        let newFacts = try second.transactionRepo.trustedTransactions(workspaceId: newSeed.workspaceID)
+        _ = try makeHydrator(provider: first, stores: stores, workspaceID: oldSeed.workspaceID).hydrateIfNeeded(forceRefresh: true)
+        let session = CategoryAutomationSession(categories: stores.categories, transactions: stores.transactions,
+            provider: { current }, coordinator: {
+                CategoryManagementCoordinator(provider: { current }, workspaceID: newSeed.workspaceID, categoryStore: stores.categories,
+                    forcedHydration: { provider, _, workspace in
+                        try makeHydrator(provider: provider, stores: stores, workspaceID: workspace).hydrateIfNeeded(forceRefresh: true)
+                    })
+            }, enabled: true, evaluate: { inputs, snapshot, assignments, active in
+                await gate.pauseFirst()
+                return CategoryEvaluation.evaluate(inputs: inputs, snapshot: snapshot, assignments: assignments, activeCategoryIDs: active)
+            })
+        session.start()
+        for _ in 0..<100 {
+            if await gate.hasStarted { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(await gate.hasStarted)
+        current = second
+        _ = try makeHydrator(provider: second, stores: stores, workspaceID: newSeed.workspaceID).hydrateIfNeeded(forceRefresh: true)
+        await gate.release()
+        for _ in 0..<150 {
+            if !session.isWorking && stores.categories.snapshot.automation?.pendingIDs.isEmpty == true { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!session.isWorking)
+        #expect(try second.categoryRepo.automationSnapshot(workspaceId: newSeed.workspaceID)?.pendingIDs.isEmpty == true)
+        #expect(try first.categoryRepo.automationSnapshot(workspaceId: oldSeed.workspaceID)?.pendingIDs == Set(oldFacts.map(\.id)))
+        #expect(try first.transactionRepo.trustedTransactions(workspaceId: oldSeed.workspaceID) == oldFacts)
+        #expect(try second.transactionRepo.trustedTransactions(workspaceId: newSeed.workspaceID) == newFacts)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func hydrationPublishesDurableCategoriesAndAssignmentsAcrossProviderReconstruction() async throws {
         let concrete = InMemoryRepositoryProvider()
         let provider = DatabaseProvider(
@@ -577,4 +720,15 @@ private func withTemporaryCategoryDatabase(_ body: (String) async throws -> Void
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
     try await body(folder.appendingPathComponent("categories.sqlite").path)
+}
+
+private actor CategoryEvaluationPause {
+    private(set) var hasStarted = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func pauseFirst() async {
+        guard !hasStarted else { return }
+        hasStarted = true
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() { continuation?.resume(); continuation = nil }
 }

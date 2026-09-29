@@ -1,6 +1,6 @@
 import Foundation
 
-enum CBQCurrentAccountXLSParserError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCurrentAccountXLSParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case missingHeader
     case changedHeader
@@ -47,7 +47,7 @@ enum CBQCurrentAccountXLSParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class CBQCurrentAccountXLSParser: StatementParser {
+nonisolated final class CBQCurrentAccountXLSParser: StatementParser {
     static let profileID = "cbq.current-account.xls"
     static let profileVersion = "1"
 

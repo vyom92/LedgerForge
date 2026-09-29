@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum CBQCreditCardPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCreditCardPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocument
     case changedHeader
     case malformedSourceEvidence
@@ -21,7 +21,7 @@ enum CBQCreditCardPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class CBQCreditCardPDFParser: StatementParser {
+nonisolated final class CBQCreditCardPDFParser: StatementParser {
     static let profileID = "cbq.credit-card.pdf"
     static let profileVersion = "1"
     static let v1ProfileID = "cbq.credit-card.pdf.v1"
@@ -143,7 +143,8 @@ final class CBQCreditCardPDFParser: StatementParser {
                     original = try Money(amount: effect == .increasesAmountOwed ? magnitude.amount : -magnitude.amount, currency: originalCurrency)
                 }
 
-                let expectedScope = values[2].hasPrefix("Paid using bankDirect") ? "account_level" : "instrument_level"
+                let expectedScope = CBQCreditCardPDFNormalizer.isAccountRepayment(values[2])
+                    ? "account_level" : "instrument_level"
                 guard values[8] == expectedScope else { throw CBQCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
                 let scope: CardTransactionScope = values[8] == "account_level" ? .accountLevel : .instrument
                 let membership: CardTransactionSummaryMembership?

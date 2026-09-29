@@ -1,6 +1,31 @@
 import Combine
 import CryptoKit
 import Foundation
+#if DEBUG
+import OSLog
+
+/// Opt-in, nonfinancial timing for the isolated Gmail qualification run.
+/// Disabled by default and absent from Release; no source identities or values
+/// are accepted by this measurement surface.
+nonisolated enum GmailQualificationTiming {
+    enum Phase: String { case navigationTransactions, transactionRows, transactionQuery, hydration, hydrationStage, hydrationPublish, inboxAttention, inboxReconciliation, sourceNormalization, sourceParsing, sourceValidation, spendingRows, movementSuggestions, spendingProjection, planningProjection, intelligenceMutation, fundingCalculation }
+    private static let enabled = ProcessInfo.processInfo.environment["LEDGERFORGE_GMAIL_TIMING_PROBE"] == "1"
+    private static let logger = Logger(subsystem: "com.vyom.LedgerForge", category: "GmailQualificationTiming")
+
+    static func begin(_ phase: Phase, count: Int = 0) -> TimeInterval? {
+        guard enabled else { return nil }
+        let started = ProcessInfo.processInfo.systemUptime
+        logger.notice("begin phase=\(phase.rawValue, privacy: .public) span=\(started, privacy: .public) count=\(count, privacy: .public) main_thread=\(Thread.isMainThread, privacy: .public)")
+        return started
+    }
+
+    static func end(_ phase: Phase, started: TimeInterval?, count: Int = 0) {
+        guard let started else { return }
+        let milliseconds = (ProcessInfo.processInfo.systemUptime - started) * 1_000
+        logger.notice("end phase=\(phase.rawValue, privacy: .public) span=\(started, privacy: .public) duration_ms=\(milliseconds, privacy: .public) count=\(count, privacy: .public) main_thread=\(Thread.isMainThread, privacy: .public)")
+    }
+}
+#endif
 
 /// Facts embedded in the product by Xcode, never obtained from the live checkout.
 struct BuildIdentity: Codable, Equatable {

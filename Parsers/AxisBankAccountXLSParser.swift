@@ -1,6 +1,6 @@
 import Foundation
 
-enum AxisBankAccountXLSParserError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankAccountXLSParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case missingHeader
     case changedHeader
@@ -56,7 +56,7 @@ enum AxisBankAccountXLSParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class AxisBankAccountXLSParser: StatementParser {
+nonisolated final class AxisBankAccountXLSParser: StatementParser {
     static let profileID = "axis.bank-account.xls"
     static let profileVersion = "1"
 
@@ -240,7 +240,8 @@ final class AxisBankAccountXLSParser: StatementParser {
                             ),
                             parserProfileID: Self.profileID,
                             parserProfileVersion: Self.profileVersion,
-                            structuredReferenceDigest: reference.digest
+                            structuredReferenceDigest: reference.digest,
+                            literalRunningBalance: row.rawValues?[5] ?? row.values[5]
                         )
                     ],
                     verifiedAxisUPIEventEvidence:

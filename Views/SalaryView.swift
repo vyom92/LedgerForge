@@ -5,8 +5,13 @@ struct SalaryView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject var viewModel: SalaryWorkspaceViewModel
     @ObservedObject var referenceSession: AlDarReferenceSession
+    var onTransactions: (Set<String>) -> Void = { _ in }
     @ObservedObject private var salaryStore: SalaryStore = .shared
-    @State private var section = "This Month"
+    @ObservedObject private var intelligenceStore: FinancialIntelligenceStore = .shared
+    private var section: String {
+        get { viewModel.destinationSection }
+        nonmutating set { viewModel.destinationSection = newValue }
+    }
     @State private var confirmingDiscard = false
     @State private var showingFXDatePicker = false
     @State private var fxDateSelection = Date()
@@ -15,6 +20,9 @@ struct SalaryView: View {
     @State private var showingINRFunds = false
     @State private var showingManualFX = false
     @State private var showingDeductions = true
+    @State private var showingPlanningAccounts = false
+    @State private var showingSalaryCycle = false
+    @State private var reviewingPayslip: SalaryStatement?
 
     private var amountWidth: CGFloat {
         let values = viewModel.plan.balances.compactMap(\.money)
@@ -31,7 +39,7 @@ struct SalaryView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let width = max(0, min(1280, geometry.size.width - theme.spacing.pagePadding * 2))
+            let width = max(0, geometry.size.width - theme.spacing.pagePadding * 2)
             let wide = width >= minimumColumn * 2 + 18
             let columnWidth = wide ? (width - 18) / 2 : width
             let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
@@ -40,8 +48,9 @@ struct SalaryView: View {
                     header(width: width)
                     HStack(spacing: 4) {
                         planningSectionButton("Monthly plan", value: "This Month", icon: "calendar")
+                        planningSectionButton("Plan insights", value: "Plan insights", icon: "chart.xyaxis.line")
                         planningSectionButton("Salary History", value: "Salary History", icon: "clock.arrow.circlepath")
-                    }.padding(4).frame(maxWidth: 400)
+                    }.padding(4).frame(maxWidth: 600)
                         .background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
                         .accessibilityElement(children: .contain).accessibilityLabel("Planning section")
                 }.frame(width: width, alignment: .leading)
@@ -49,6 +58,23 @@ struct SalaryView: View {
                 Divider()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
+                    if section != "Salary History" {
+                        ForEach(viewModel.payslipProposals) { statement in
+                            HStack(spacing: 16) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(AppDateDisplay.month(statement.evidence.financialPeriod.canonical)) payslip is ready")
+                                        .font(theme.typography.body.weight(.semibold))
+                                    Text("\(MoneyFormatting.display(statement.evidence.printedNet)) net pay · review before adding it to your plan")
+                                        .font(theme.typography.body)
+                                }
+                                Spacer()
+                                Button("Review salary draft") {
+                                    viewModel.switchMonth(to: statement.evidence.financialPeriod)
+                                    if viewModel.month == statement.evidence.financialPeriod && viewModel.canEdit { reviewingPayslip = statement }
+                                }.lfPrimaryAction().disabled(!viewModel.canEdit)
+                            }.padding(16).background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+                        }
+                    }
                     if section == "This Month" {
                         if let error = viewModel.errorMessage { Text(error).foregroundStyle(LFTheme.warning).font(theme.typography.secondary) }
                         let referenceWidth = AlDarFXCard.minimumWidth(theme: theme, legs: referenceSession.legs)
@@ -71,6 +97,8 @@ struct SalaryView: View {
                             Text("Your estimates stay separate from imported payslips. Save when you’re ready.")
                                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                         }
+                    } else if section == "Plan insights" {
+                        PlanningInsightsView(planner: viewModel, selection: $viewModel.insightSelection, model: viewModel.planningAnalysis, onTransactions: onTransactions, onMonthlyPlan: { section = "This Month" })
                     } else { history }
                 }.frame(width: width, alignment: .leading).padding(theme.spacing.pagePadding)
                     .font(theme.typography.body)
@@ -80,6 +108,18 @@ struct SalaryView: View {
         .confirmationDialog("Discard this draft and reload the current database?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
             Button("Discard and reload", role: .destructive) { viewModel.discardAndReload() }
             Button("Keep draft", role: .cancel) {}
+        }
+        .sheet(isPresented: $showingPlanningAccounts) {
+            PlanningAccountsEditor(accounts: viewModel.availablePlanningAccounts, workspaceID: viewModel.plan.workspaceID, generation: viewModel.generation)
+        }
+        .sheet(isPresented: $showingSalaryCycle) {
+            PlanningSalaryCycleEditor(plan: viewModel.plan, metadata: intelligenceStore.snapshot, onApply: { viewModel.setSalaryCycle($0) })
+        }
+        .sheet(item: $reviewingPayslip) { statement in
+            PayslipProposalEditor(statement: statement, plan: viewModel.plan, accounts: viewModel.eligibleAccounts) { accountID in
+                if viewModel.applyPayslip(statement, accountID: accountID) { reviewingPayslip = nil; section = "This Month"; return true }
+                return false
+            }
         }
         .onAppear {
             viewModel.plannerOpened()
@@ -151,8 +191,32 @@ struct SalaryView: View {
                     Text(!SalaryWorkspaceViewModel.planningMonths.contains(viewModel.month) ? "Saved plan · read only" : viewModel.statusText)
                         .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     Spacer(minLength: 4)
+                    Button("Planning accounts") { showingPlanningAccounts = true }
+                        .lfSecondaryAction().disabled(!viewModel.canEdit)
                     Button("Save") { viewModel.save() }.keyboardShortcut("s", modifiers: .command)
                         .lfPrimaryAction().tint(theme.palette.accent).disabled(!viewModel.canSave)
+                }
+            }
+            if section != "Salary History" {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let cycle = viewModel.plan.assistance?.salaryCycle {
+                            Text("\(fullMonthTitle(viewModel.month)) salary · \(cycle.receivedSalaryID == nil ? "expected" : "received") \(cycle.recurringStart.presentation)")
+                                .font(theme.typography.body.weight(.semibold))
+                            Text("Bills generated \(cycle.billRange) · Recurring payments \(cycle.recurringRange)")
+                                .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                            if cycle.needsPreviousBoundaryReview(in: intelligenceStore.snapshot) {
+                                Text("Previous salary date changed · review payday dates").foregroundStyle(LFTheme.warning)
+                            }
+                        } else {
+                            Text("Saved calendar-month plan").font(theme.typography.body.weight(.semibold))
+                            Text("Use salary dates to include the recurring payments funded by this month’s salary.")
+                                .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Button(viewModel.plan.assistance?.salaryCycle == nil ? "Use salary dates" : "Edit payday") { showingSalaryCycle = true }
+                        .lfSecondaryAction().disabled(!viewModel.canEdit)
                 }
             }
             if viewModel.saveState == .committedNeedsRefresh {
@@ -189,18 +253,23 @@ struct SalaryView: View {
             : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
         return LFPanel(title: "Your month at a glance", systemImage: "calendar") {
             layout {
-                summary("Available to send", calculation.transferablePrincipal,
-                        secondary: calculation.estimatedINR, secondaryLabel: "Estimated INR", context: "After Qatar bills, savings kept in CBQ and the transfer fee")
+                summary("Worksheet transfer estimate", calculation.transferablePrincipal,
+                        secondary: calculation.estimatedINR, secondaryLabel: "Estimated INR", context: "After Qatar bills, your Keep in CBQ amount and the transfer fee")
                 summary(usesFunds ? "India still to fund" : "India requirement",
                         usesFunds ? calculation.indiaFundingShortfall : calculation.indiaCommitments,
                         secondary: calculation.requiredQARPrincipal, secondaryLabel: "Required QAR", context: "To cover the bills you’ve included")
-                summary((calculation.finalQARBuffer?.amount ?? 0) < 0 ? "Funding gap" : "Funding surplus",
-                        calculation.finalQARBuffer, secondary: nil, context: "After covering India and keeping your CBQ reserve")
+                summary((calculation.finalQARBuffer?.amount ?? 0) < 0 ? "Worksheet gap" : "Worksheet remainder",
+                        calculation.finalQARBuffer, secondary: nil, context: "After covering India and your Keep in CBQ amount")
             }
-            if let deficit = calculation.signedPotentialCapacity, deficit.amount < 0 {
-                Label("Qatar shortfall: \(display(deficit))", systemImage: "exclamationmark.circle").font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+            if let deficit = calculation.qatarObligationShortfall, deficit.amount > 0 {
+                Label("Qatar bills need \(display(deficit)) more cash before any transfer.", systemImage: "exclamationmark.circle").font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+            }
+            if let gap = calculation.qatarReserveGap, gap.amount > 0 {
+                Label("Funds after Qatar bills are \(display(gap)) below the Keep in CBQ amount entered in this plan.", systemImage: "shield.lefthalf.filled").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
             if !viewModel.hasValidCalculation { Text("Complete the highlighted entries to calculate.").font(theme.typography.secondary).foregroundStyle(LFTheme.warning) }
+            Text("This worksheet uses the amounts you enter here. Saved reserve targets apply separately in Plan insights.")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }
     }
 
@@ -234,11 +303,24 @@ struct SalaryView: View {
     private func qatarColumn(width: CGFloat) -> some View {
         LFPanel(contentSpacing: 16) {
             countryHeading("🇶🇦", "In Qatar", "What comes in, what stays and what you can send")
-            sectionHeading("Starting balance · pre-salary", "building.columns")
+            sectionHeading(viewModel.plan.assistance?.appliedSalaryIDs.isEmpty == false ? "Dated funds · received salary included" : "Starting balance · pre-salary", "building.columns")
             balances(currency: "QAR", width: width)
+            if !receivedSalaryContext.isEmpty {
+                Text(receivedSalaryContext).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
             valueRow("Starting funds", viewModel.calculation.selectedQARLiquidity, truth: "")
             Divider()
-            sectionHeading("Expected salary", "briefcase")
+            if let source = viewModel.plan.assistance?.payslipFunding, let money = try? source.net.money() {
+                sectionHeading("Salary from payslip", "doc.text")
+                valueRow("Net pay", money, truth: viewModel.payslipReceiptState?.explanation ?? "Receipt needs review")
+                Text("Payroll deductions are already included in this net amount.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                if viewModel.canAcknowledgePayslipBalance && viewModel.payslipReceiptState != .acknowledgedBalance {
+                    Button("This captured balance includes my salary") { viewModel.acknowledgePayslipInCapturedBalance() }.lfSecondaryAction()
+                }
+                Button("Remove payslip estimate") { viewModel.removePayslipEstimate() }.lfSecondaryAction()
+                Divider()
+            }
+            sectionHeading(viewModel.plan.assistance?.appliedSalaryIDs.isEmpty == false || viewModel.plan.assistance?.payslipFunding != nil ? "Additional income estimate" : "Expected salary", "briefcase")
             moneyRow("Fixed earnings", field: .fixed, width: width)
             moneyRow("Variable earnings", field: .variable, width: width)
             DisclosureGroup(isExpanded: $showingDeductions) {
@@ -253,13 +335,14 @@ struct SalaryView: View {
             valueRow("Take-home estimate", viewModel.calculation.expectedNet, truth: "")
             Divider()
             sectionHeading("Bills in Qatar", "list.bullet.rectangle")
+            confirmedCommitments(currency: "QAR")
             commitmentRows(region: "qatar", values: viewModel.plan.qatarCommitments, width: width)
             valueRow("Total bills", viewModel.calculation.qatarCommitments, truth: "")
             Divider()
             moneyRow("Keep in CBQ", field: .reserve, width: width)
-            Text("Money to leave in your account after everything is paid.").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text("Money to leave after bills in this monthly plan. Enter zero to retain no extra amount here.").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             moneyRow("Transfer fee", field: .fee, width: width)
-            valueRow("Available to send", viewModel.calculation.transferablePrincipal, truth: "After bills, CBQ reserve and one transfer fee")
+            valueRow("Worksheet transfer estimate", viewModel.calculation.transferablePrincipal, truth: "After selected bills, your Keep in CBQ amount and one transfer fee")
         }
     }
 
@@ -267,6 +350,7 @@ struct SalaryView: View {
         LFPanel(contentSpacing: 16) {
             countryHeading("🇮🇳", "In India", "The bills and payments you want to cover")
             sectionHeading("Bills in India", "list.bullet.rectangle")
+            confirmedCommitments(currency: "INR")
             commitmentRows(region: "india", values: viewModel.plan.indiaCommitments, width: width)
             valueRow("Total needed", viewModel.calculation.indiaCommitments, truth: "")
             Divider()
@@ -303,6 +387,60 @@ struct SalaryView: View {
         }.frame(maxWidth: max(540, amountWidth + 220), alignment: .leading)
     }
 
+    private var receivedSalaryContext: String {
+        let ids = Set(viewModel.plan.assistance?.appliedSalaryIDs ?? [])
+        let values = intelligenceStore.snapshot?.salaries.filter { ids.contains($0.id) } ?? []
+        let dates = values.compactMap { try? StatementDate(canonical: $0.financialDate) }.sorted().map(\.presentation)
+        return dates.isEmpty ? "" : "Salary received \(dates.joined(separator: ", ")) is already included in the captured account funds for this plan. It is not added again as expected income."
+    }
+
+    private func confirmedCommitments(currency: String) -> some View {
+        let definitions = (intelligenceStore.snapshot?.recurring ?? []).filter {
+            $0.revisions.contains { $0.amount.currency == currency }
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(definitions) { definition in
+                let firstMonth = try! SelectedStatementMonth(year: viewModel.plan.recurringStart.year, month: viewModel.plan.recurringStart.month)
+                let lastMonth = try! SelectedStatementMonth(year: viewModel.plan.recurringEnd.year, month: viewModel.plan.recurringEnd.month)
+                let due = [firstMonth, lastMonth].compactMap { PlanningIntelligence.dueDate(definition: definition, month: $0) }
+                    .filter { viewModel.plan.includesRecurring($0.0) }.min { $0.0 < $1.0 }
+                let key = due.map { definition.id + ":" + $0.0.canonical }
+                let applied = key.flatMap { viewModel.plan.assistance?.appliedRecurringIDs[$0] } != nil
+                let next = nextCommitmentDate(definition)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(definition.title).font(theme.typography.body.weight(.semibold))
+                    if !definition.isEnabled {
+                        Text("Recurring rule is paused")
+                    } else if viewModel.excludedPlanningAccountIDs.contains(definition.accountID) {
+                        Text("Funding account removed from planning · add it back or edit the recurring commitment")
+                    } else if let due {
+                        Text("Due \(due.0.presentation) · \((try? due.1.amount.money()).map { MoneyFormatting.display($0) } ?? "Amount unavailable") · \(applied ? "Added to this draft" : "Ready to review")")
+                    } else if let next {
+                        Text("Outside this salary plan · next due \(next.presentation)")
+                    } else {
+                        Text("No scheduled payment in this salary plan")
+                    }
+                }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+            if !definitions.isEmpty {
+                Button("Review recurring payments") {
+                    viewModel.insightSelection.section = "Commitments"; section = "Plan insights"
+                }.lfSecondaryAction()
+            }
+        }
+    }
+
+    private func nextCommitmentDate(_ definition: RecurringDefinition) -> StatementDate? {
+        // Inspect schedule boundaries, not arbitrary future months. The first
+        // effective rule may begin long after the selected worksheet month.
+        let starts = [viewModel.month] + definition.revisions.compactMap { try? SelectedStatementMonth(canonical: String($0.effectiveFrom.prefix(7))) }
+        let months = starts.flatMap { month -> [SelectedStatementMonth] in
+            let next = try? SelectedStatementMonth(year: month.month == 12 ? month.year + 1 : month.year, month: month.month == 12 ? 1 : month.month + 1)
+            return [month] + [next].compactMap { $0 }
+        }.filter { $0 > viewModel.month }.sorted()
+        return months.compactMap { PlanningIntelligence.dueDate(definition: definition, month: $0)?.0 }.first
+    }
+
     private func input(_ title: String, key: String, placeholder: String? = nil, currency: String? = nil, binding: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             TextField(title, text: Binding(get: { binding.wrappedValue }, set: { value in
@@ -331,20 +469,20 @@ struct SalaryView: View {
                 let balance = viewModel.plan.balances.first { $0.accountID == account.repositoryAccountId }
                 let key = "balance.\(account.repositoryAccountId ?? "")"
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle(account.nickname ?? account.name, isOn: Binding(get: { balance?.included ?? false }, set: { viewModel.setAccountIncluded(account, included: $0) }))
+                    Toggle(account.selectionTitle, isOn: Binding(get: { balance?.included ?? false }, set: { viewModel.setAccountIncluded(account, included: $0) }))
                     if currency == "QAR" || balance?.included == true {
                         HStack {
                             input("Planning balance", key: key, placeholder: "0", currency: currency, binding: Binding(get: { viewModel.amountInputText(key) }, set: { viewModel.setManualBalance(account, text: $0) })).frame(maxWidth: amountWidth)
                             Button("Capture current") { viewModel.captureAccountBalance(account) }.lfSecondaryAction()
                         }
-                        Text(balance.map { viewModel.provenanceText($0.provenance) } ?? "Enter a planning balance").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                        Text(balance.map { viewModel.balanceProvenanceText($0) } ?? "Enter a planning balance").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                         if viewModel.unavailableCurrentBalanceAccountIDs.contains(account.repositoryAccountId ?? "") {
                             Text("Couldn’t refresh this balance. Your estimate is unchanged.").font(theme.typography.caption).foregroundStyle(LFTheme.warning)
                         }
                     }
                 }
             }
-            ForEach(viewModel.plan.balances.filter { balance in balance.nativeCurrency.code == currency && !accounts.contains(where: { $0.repositoryAccountId == balance.accountID }) }) { balance in
+            ForEach(viewModel.plan.balances.filter { balance in balance.nativeCurrency.code == currency && !viewModel.excludedPlanningAccountIDs.contains(balance.accountID) && !accounts.contains(where: { $0.repositoryAccountId == balance.accountID }) }) { balance in
                 Text("Saved balance · \(display(balance.money))").foregroundStyle(LFTheme.warning)
             }
         }
@@ -392,7 +530,7 @@ struct SalaryView: View {
                             let cards = viewModel.eligibleCommitmentAccounts.filter { $0.nativeCurrency.code == value.money.currency.code }
                             Picker("Related card", selection: Binding(get: { value.fundingAccountID ?? "" }, set: { viewModel.editCommitment(region: region, id: value.id, field: "account", text: $0) })) {
                                 Text("None").tag("")
-                                ForEach(cards, id: \.id) { Text($0.nickname ?? $0.name).tag($0.repositoryAccountId ?? "") }
+                                ForEach(cards, id: \.id) { Text($0.selectionTitle).tag($0.repositoryAccountId ?? "") }
                                 if let id = value.fundingAccountID, !cards.contains(where: { $0.repositoryAccountId == id }) { Text(viewModel.retainedCommitmentAccountLabel(id: id)).tag(id) }
                             }
                             Button("Remove bill", role: .destructive) { viewModel.removeCommitment(region: region, id: value.id) }
@@ -410,11 +548,11 @@ struct SalaryView: View {
             billDateSelection = viewModel.billDatePickerValue(for: row)
             billDateRowID = row.id
         } label: {
-            Label(row.dueDate(in: viewModel.month)?.presentation ?? "No date", systemImage: "calendar")
+            Label(viewModel.plan.dueDate(for: row)?.presentation ?? "No date", systemImage: "calendar")
                 .font(theme.typography.secondary).fixedSize().padding(.vertical, 5)
         }
         .lfIconAction().foregroundStyle(theme.palette.primaryText)
-        .accessibilityLabel("Due date for \(row.label)").accessibilityValue(row.dueDate(in: viewModel.month)?.presentation ?? "No date")
+        .accessibilityLabel("Due date for \(row.label)").accessibilityValue(viewModel.plan.dueDate(for: row)?.presentation ?? "No date")
         .popover(isPresented: Binding(get: { billDateRowID == row.id }, set: { if !$0 { billDateRowID = nil } })) {
             VStack(alignment: .leading, spacing: 12) {
                 DatePicker("First due date", selection: $billDateSelection, displayedComponents: .date)
@@ -508,7 +646,7 @@ struct SalaryView: View {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(statement.evidence.kind.displayName).font(theme.typography.sectionTitle)
-                                        Text("Pay period \(SalaryWorkspaceViewModel.monthTitle(statement.evidence.financialPeriod)) · Print date \(statement.evidence.printDate?.canonical ?? "Not printed")")
+                                        Text("Pay period \(SalaryWorkspaceViewModel.monthTitle(statement.evidence.financialPeriod)) · Print date \(statement.evidence.printDate?.presentation ?? "Not printed")")
                                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                                     }
                                     Spacer()

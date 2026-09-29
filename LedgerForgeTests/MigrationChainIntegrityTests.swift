@@ -57,7 +57,11 @@ struct MigrationChainIntegrityTests {
         #expect(migrationV19.version == 19)
         #expect(migrationV20.version == 20)
         #expect(migrationV21.version == 21)
-        #expect(migrationV22.version == allMigrations.count)
+        #expect(migrationV24.version == 24)
+        #expect(migrationV25.version == 25)
+        #expect(migrationV26.version == 26)
+        #expect(migrationV28.version == 28)
+        #expect(migrationV29.version == allMigrations.count)
     }
 
     @Test
@@ -76,6 +80,9 @@ struct MigrationChainIntegrityTests {
                 "card_statement_sections",
                 "card_statement_semantic_projections",
                 "statement_zero_activity_controls"
+                ,"bank_statement_sections"
+                ,"bank_section_identity_observations"
+                ,"bank_transaction_occurrences"
             ]
             let placeholders = requiredTables.map { _ in "?" }.joined(separator: ",")
             let installed = try provider.database.query(
@@ -124,6 +131,9 @@ struct MigrationChainIntegrityTests {
                 "card_statement_sections",
                 "card_statement_semantic_projections",
                 "statement_zero_activity_controls"
+                ,"bank_statement_sections"
+                ,"bank_section_identity_observations"
+                ,"bank_transaction_occurrences"
             ] {
                 #expect(try database.queryInt("SELECT COUNT(*) FROM \(table);") == 0)
             }

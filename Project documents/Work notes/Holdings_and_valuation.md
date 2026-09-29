@@ -14,6 +14,18 @@ What current holdings model and qualified valuation sources can represent the ow
 
 ## Current conclusion
 
+### Accepted Sprint-99 allocated-capital and presentation correction — 29 Sep 2026
+
+The [final accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) uses Zurich **allocated** contributions once per complete policy as the ISP/aggregate capital basis. Current published holdings less allocated contributions gives growth; divide by allocated contributions for growth %. Recorded contributions exceeding that baseline appear separately as Pending allocation, excluded from growth/current value/net worth until new units settle. Individual fund cost is not inferred from allocation weights. Source observation, holdings and quote dates retain their meanings; a cumulative gap does not prove a specific salary posting. The current-value/capital chart is not historical performance.
+
+The genuine settlement capture/oracle, provider/replay/backup checks and saved-connection native refresh passed. Latest approved holdings and price mappings yield 41 priced holdings in the observed owner ledger; older mapping/held checkpoints are historical. P/L/growth hierarchy and matching sign colors are accepted within the recorded native limits. Broader usability and actual historical performance remain separate; closeout opens no provider session.
+
+### Sprint-99 contribution baseline correction — 28 Sep 2026, not accepted
+
+The owner selects Zurich's source-supported policy contributions as the ISP invested-capital baseline. The aggregate combines supported non-ISP acquisition cost with each complete ISP policy contribution once. Current ISP growth is corresponding priced holdings value less those contributions; growth percentage divides that difference by a positive contribution baseline. This is a contribution comparison, not an annualized or money-weighted return. Quote, holdings and policy-observation dates remain distinct, with missing price/FX coverage disclosed.
+
+Individual ISP funds still have no established acquisition cost: current allocation and contribution-strategy percentages do not allocate policy contributions into invented lots. Their cost-dependent fund measures remain unavailable. The dated portal-reported policy growth stays separate from the comparison using current prices. Focused original-ledger verification and native presentation renewal are part of the active Sprint-99 window.
+
 <a id="sprint-97-refresh-contract"></a>
 ### Sprint 97 — accepted implementation contract, 2026-09-17
 

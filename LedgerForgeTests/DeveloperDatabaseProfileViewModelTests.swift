@@ -13,8 +13,10 @@ struct DeveloperDatabaseProfileViewModelTests {
             rememberedProfile: .migrationSandbox,
             sourceVersion: 4
         )
-        defer { setup.coordinator.closeOwnedProvider() }
-        defer { try? FileManager.default.removeItem(at: setup.root) }
+        defer {
+            setup.coordinator.closeOwnedProvider()
+            try? FileManager.default.removeItem(at: setup.root)
+        }
 
         #expect(!setup.viewModel.developerModeEnabled)
         #expect(setup.viewModel.selectedProfileKind == .migrationSandbox)
@@ -26,8 +28,10 @@ struct DeveloperDatabaseProfileViewModelTests {
     @Test(.globalRuntimeStateIsolation)
     func enablingModeDoesNotSwitchAndExplicitActivationPublishesCommittedState() throws {
         let setup = try makeProfileViewModelSetup(name: "Activate")
-        defer { setup.coordinator.closeOwnedProvider() }
-        defer { try? FileManager.default.removeItem(at: setup.root) }
+        defer {
+            setup.coordinator.closeOwnedProvider()
+            try? FileManager.default.removeItem(at: setup.root)
+        }
         let initialEpoch = setup.viewModel.publicationEpoch
 
         setup.viewModel.setDeveloperModeEnabled(true)
@@ -47,8 +51,10 @@ struct DeveloperDatabaseProfileViewModelTests {
     @Test(.globalRuntimeStateIsolation)
     func disablingModeReturnsToCurrentOnlyAfterCommittedActivation() throws {
         let setup = try makeProfileViewModelSetup(name: "Disable")
-        defer { setup.coordinator.closeOwnedProvider() }
-        defer { try? FileManager.default.removeItem(at: setup.root) }
+        defer {
+            setup.coordinator.closeOwnedProvider()
+            try? FileManager.default.removeItem(at: setup.root)
+        }
 
         setup.viewModel.setDeveloperModeEnabled(true)
         setup.viewModel.selectProfile(.temporarySession)
@@ -64,8 +70,10 @@ struct DeveloperDatabaseProfileViewModelTests {
     @Test(.globalRuntimeStateIsolation)
     func blockedReturnToCurrentLeavesModeEnabledAndProfileTruthful() throws {
         let setup = try makeProfileViewModelSetup(name: "Blocked")
-        defer { setup.coordinator.closeOwnedProvider() }
-        defer { try? FileManager.default.removeItem(at: setup.root) }
+        defer {
+            setup.coordinator.closeOwnedProvider()
+            try? FileManager.default.removeItem(at: setup.root)
+        }
 
         setup.viewModel.setDeveloperModeEnabled(true)
         setup.viewModel.selectProfile(.persistentDebug)
@@ -83,8 +91,10 @@ struct DeveloperDatabaseProfileViewModelTests {
     @Test(.globalRuntimeStateIsolation)
     func sandboxResetRecreatesFromSelectedHistoricalSource() throws {
         let setup = try makeProfileViewModelSetup(name: "SandboxReset")
-        defer { setup.coordinator.closeOwnedProvider() }
-        defer { try? FileManager.default.removeItem(at: setup.root) }
+        defer {
+            setup.coordinator.closeOwnedProvider()
+            try? FileManager.default.removeItem(at: setup.root)
+        }
 
         setup.viewModel.setDeveloperModeEnabled(true)
         setup.viewModel.selectProfile(.migrationSandbox)

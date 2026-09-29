@@ -51,8 +51,13 @@ nonisolated struct InvestmentOverviewLine: Identifiable, Equatable, Sendable {
 nonisolated enum InvestmentPortfolioGroup: String, CaseIterable, Identifiable, Sendable {
     case isp = "ISP", ibkr = "IBKR", indianMF = "Indian MF", cbq = "CBQ Investments"
     var id: String { rawValue }
-    static func group(for holding: InvestmentHolding) -> Self? {
-        guard let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding) else { return nil }
+    static func group(for holding: InvestmentHolding, container: InvestmentContainer? = nil) -> Self? {
+        // Container ownership does not depend on a qualified price mapping.
+        // This supplies no price and makes no claim that two instruments are aliases.
+        guard let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding) else {
+            return container?.id == holding.containerID && container?.institution == "CBQ"
+                && container?.identityKind == "fund-portfolio" ? .cbq : nil
+        }
         switch mapping.provider {
         case "fe": return .isp
         case "nasdaq": return .ibkr
@@ -82,6 +87,10 @@ nonisolated struct InvestmentOverviewScope: Equatable, Sendable {
         max(quotes.map { $0.age(at: now) }.max() ?? 0,
             fxDates.map { max(0, Int(now.timeIntervalSince($0) / 86_400)) }.max() ?? 0)
     }
+    func oldestFreshnessAge(at now: Date) -> Int {
+        max(quotes.map { $0.freshnessAge(at: now) }.max() ?? 0,
+            fxDates.map { Int(WeekdayFreshness.seconds(from: $0, to: now) / 86_400) }.max() ?? 0)
+    }
 }
 
 nonisolated struct InvestmentPortfolioSummary: Identifiable, Equatable, Sendable {
@@ -95,6 +104,8 @@ nonisolated struct InvestmentPortfolioSummary: Identifiable, Equatable, Sendable
 
 nonisolated struct InvestmentISPReportedSummary: Equatable, Sendable {
     let contributions: [InvestmentConvertedAmount]
+    let allocatedContributions: [InvestmentConvertedAmount]
+    let pendingAllocation: [InvestmentConvertedAmount]
     let growth: [InvestmentConvertedAmount]
     let vested: [InvestmentConvertedAmount]
     let vestedLabel: String
@@ -135,30 +146,99 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
     var allFunds: [InvestmentFundSummary] { portfolios.flatMap(\.funds) }
     let fxLegs: [AlDarCurrency: AlDarUnitReference]
     let ispReported: InvestmentISPReportedSummary?
+    /// Policy contributions enter once at portfolio level. Fund acquisition
+    /// costs and the original cost-backed scope remain unchanged.
+    let capitalPerformance: InvestmentOverviewScope?
+    let ispPerformance: InvestmentOverviewScope?
     static let empty = build(holdings: [], valuations: [:], legs: [:])
 
-    var capitalShareLabel: String { total.hasCompleteCost ? "Invested-capital share" : "Share of known invested cost" }
+    var performance: InvestmentOverviewScope { capitalPerformance ?? total }
+    var performanceBasis: String {
+        if capitalPerformance != nil, let isp = portfolios.first(where: { $0.group == .isp }) {
+            let pendingNote = ispReported?.pendingAllocation.isEmpty == false ? " Pending allocation is excluded from growth and current value." : ""
+            return "Baseline: reported cost for \(total.costCount) holdings plus allocated Zurich contributions for \(isp.scope.holdingCount) ISP holdings, counted once across 3 policies. Growth uses \(performance.gainCount) of \(total.holdingCount) valued holdings." + pendingNote
+        }
+        return "Cost and growth use \(total.gainCount) of \(total.holdingCount) holdings with reported cost and a price."
+    }
+
+    var capitalShareLabel: String { performance.hasCompleteCost ? "Invested-capital share" : "Share of known invested capital" }
     var profitShareLabel: String {
-        let loss = (total.usd?.gain?.numerator.sign ?? 0) < 0
-        return total.hasCompleteGain ? (loss ? "Share of net loss" : "Share of net P/L") : (loss ? "Share of known net loss" : "Share of known net P/L")
+        let loss = (performance.usd?.gain?.numerator.sign ?? 0) < 0
+        return performance.hasCompleteGain ? (loss ? "Share of net loss" : "Share of net P/L") : (loss ? "Share of known net loss" : "Share of known net P/L")
     }
 
     static func build(holdings: [InvestmentHolding], valuations: [String: InvestmentValuation],
                       legs: [AlDarCurrency: AlDarUnitReference],
+                      containers: [InvestmentContainer] = [],
                       ispAccount: ZurichISPAccountSnapshot? = nil) -> Self {
         let total = scope(holdings, valuations: valuations, legs: legs)
-        let grouped = Dictionary(grouping: holdings, by: { InvestmentPortfolioGroup.group(for: $0) })
+        let containersByID = Dictionary(uniqueKeysWithValues: containers.map { ($0.id, $0) })
+        let grouped = Dictionary(grouping: holdings, by: {
+            InvestmentPortfolioGroup.group(for: $0, container: containersByID[$0.containerID])
+        })
+        let ispMembers = grouped[.isp] ?? []
+        let capital = capitalScope(holdings, isp: ispMembers, valuations: valuations, containers: containersByID, account: ispAccount, legs: legs)
+        let ispCapital = capitalScope(ispMembers, isp: ispMembers, valuations: valuations, containers: containersByID, account: ispAccount, legs: legs)
         let portfolios = InvestmentPortfolioGroup.allCases.map { group in
             let members = grouped[group] ?? []
             let part = scope(members, valuations: valuations, legs: legs,
                              currencies: group == .cbq ? ["USD", "QAR"] : ["USD", "INR"])
+            let performancePart = group == .isp ? (ispCapital ?? part) : part
+            let performanceTotal = capital ?? total
             return InvestmentPortfolioSummary(group: group, scope: part,
-                capitalShare: share(part.usd?.cost, total.usd?.cost, partCount: part.costCount, totalCount: total.costCount, positive: true),
-                profitShare: share(part.usd?.gain, total.usd?.gain, partCount: part.gainCount, totalCount: total.gainCount, positive: false),
+                capitalShare: share(performancePart.usd?.cost, performanceTotal.usd?.cost, partCount: performancePart.costCount, totalCount: performanceTotal.costCount, positive: true),
+                profitShare: share(performancePart.usd?.gain, performanceTotal.usd?.gain, partCount: performancePart.gainCount, totalCount: performanceTotal.gainCount, positive: false),
                 funds: funds(members, portfolio: group, parent: part, valuations: valuations, legs: legs))
         }
         return .init(total: total, portfolios: portfolios, fxLegs: legs,
-                     ispReported: reportedSummary(ispAccount, legs: legs))
+                     ispReported: reportedSummary(ispAccount, legs: legs), capitalPerformance: capital, ispPerformance: ispCapital)
+    }
+
+    private static func capitalScope(_ holdings: [InvestmentHolding], isp: [InvestmentHolding],
+                                     valuations: [String: InvestmentValuation], containers: [String: InvestmentContainer],
+                                     account: ZurichISPAccountSnapshot?, legs: [AlDarCurrency: AlDarUnitReference]) -> InvestmentOverviewScope? {
+        guard !isp.isEmpty, let account, account.policies.count == 3,
+              Set(isp.compactMap { containers[$0.containerID]?.identity }) == account.policyIDs,
+              account.policies.allSatisfy({ policy in
+                  let members = isp.filter { containers[$0.containerID]?.identity == policy.policyID }
+                  let funds = policy.funds.filter { $0.units.value > 0 }
+                  return members.count == funds.count && members.allSatisfy { holding in
+                      containers[holding.containerID]?.zioSource == policy && funds.contains {
+                          $0.code == holding.zioFundCode && $0.currency == holding.currency && $0.units == holding.units
+                      }
+                  }
+              }) else { return nil }
+        let base = scope(holdings, valuations: valuations, legs: legs)
+        let ispIDs = Set(isp.map(\.id))
+        var costs = NativeAmounts(), gains = NativeAmounts(), gainCosts = NativeAmounts()
+        var costCount = 0, gainCount = 0
+        for holding in holdings where !ispIDs.contains(holding.id) {
+            let valuation = valuations[holding.id] ?? InvestmentValuation(holding: holding, quote: nil)
+            if let cost = valuation.supportedCost { costs.add(cost, currency: holding.currency); costCount += 1 }
+            if let gain = valuation.gain, let cost = valuation.supportedCost {
+                gains.add(gain, currency: holding.currency); gainCosts.add(cost, currency: holding.currency); gainCount += 1
+            }
+        }
+        for policy in account.policies {
+            let members = isp.filter { containers[$0.containerID]?.identity == policy.policyID }
+            guard let allocated = policy.allocatedContributions?.amount.value else { return nil }
+            costs.add(allocated, currency: policy.currency, count: members.count)
+            costCount += members.count
+            let values = members.compactMap { valuations[$0.id]?.currentValue }
+            guard values.count == members.count,
+                  let value = try? values.reduce(Decimal.zero, InvestmentArithmetic.add),
+                  let gain = try? InvestmentArithmetic.subtract(value, allocated) else { continue }
+            gains.add(gain, currency: policy.currency, count: members.count)
+            gainCosts.add(allocated, currency: policy.currency, count: members.count)
+            gainCount += members.count
+        }
+        let lines = base.lines.map { line in
+            InvestmentOverviewLine(currency: line.currency, cost: costs.converted(to: line.currency, legs: legs),
+                value: line.value, gain: gains.converted(to: line.currency, legs: legs),
+                gainCost: gainCosts.converted(to: line.currency, legs: legs))
+        }
+        return .init(holdingCount: base.holdingCount, priceCount: base.priceCount, costCount: costCount, gainCount: gainCount,
+            lines: lines, quotes: base.quotes, fxDates: base.fxDates, fxMissing: base.fxMissing)
     }
 
     private static func reportedSummary(_ account: ZurichISPAccountSnapshot?,
@@ -173,6 +253,14 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
                 return amount
             }
         }
+        var pending = NativeAmounts()
+        let pendingValues = account.policies.compactMap(\.pendingAllocation)
+        let hasPending = pendingValues.contains { $0 > 0 }
+        if hasPending, pendingValues.count == account.policies.count {
+            for (policy, value) in zip(account.policies, pendingValues) {
+                pending.add(value, currency: policy.currency)
+            }
+        }
         let vestedPolicies = account.policies.filter { $0.vestedValue != nil }
         let vestedLabel: String
         if vestedPolicies.count == account.policies.count { vestedLabel = "Vested value" }
@@ -180,6 +268,10 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
             vestedLabel = "Employer vested value"
         } else { vestedLabel = "Vested value (\(vestedPolicies.count) of \(account.policies.count) policies)" }
         return .init(contributions: amounts(account.policies.map(\.contributions)),
+                     allocatedContributions: amounts(account.policies.compactMap(\.allocatedContributions)),
+                     pendingAllocation: hasPending ? ["USD", "INR"].compactMap { currency in
+                         pending.converted(to: currency, legs: legs)?.covering(account.policies.count)
+                     } : [],
                      growth: amounts(account.policies.map(\.growth)),
                      vested: amounts(vestedPolicies.compactMap(\.vestedValue)), vestedLabel: vestedLabel,
                      valuationDays: Array(Set(account.policies.map(\.valuationDay))).sorted(),
@@ -189,18 +281,25 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
     private static func funds(_ holdings: [InvestmentHolding], portfolio: InvestmentPortfolioGroup,
                               parent: InvestmentOverviewScope, valuations: [String: InvestmentValuation],
                               legs: [AlDarCurrency: AlDarUnitReference]) -> [InvestmentFundSummary] {
-        let groups = Dictionary(grouping: holdings, by: { InvestmentPriceRegistry.confirmedMapping(for: $0)!.identity })
+        // Unmapped positions stay separate. Their source identity is not a
+        // license to merge positions across folios or assert a provider mapping.
+        let groups = Dictionary(grouping: holdings, by: {
+            InvestmentPriceRegistry.confirmedMapping(for: $0)?.identity ?? "holding:" + $0.id
+        })
         let names = ["N0USD": "iShares North America Index", "USDL3": "L&G WTW Global Equity Diversified Index",
                      "3UUSD": "iShares Emerging Markets Index USD", "B0280": "Qatar Airways ISP Conventional Blend"]
         return groups.keys.sorted().compactMap { key -> InvestmentFundSummary? in
-            guard let rows = groups[key], let first = rows.first,
-                  let mapping = InvestmentPriceRegistry.confirmedMapping(for: first) else { return nil }
+            guard let rows = groups[key], let first = rows.first else { return nil }
+            let mapping = InvestmentPriceRegistry.confirmedMapping(for: first)
             let part = scope(rows, valuations: valuations, legs: legs, currencies: parent.lines.map(\.currency))
             let units = try? rows.map { $0.units.value }.reduce(Decimal.zero, InvestmentArithmetic.add)
-            let identifier = mapping.provider == "fe" || mapping.provider == "nasdaq" ? mapping.code
-                : InvestmentPriceRegistry.definition(for: mapping)?.isin ?? mapping.code
-            return .init(id: portfolio.id + "|" + key, code: mapping.code, displayIdentifier: identifier,
-                name: mapping.provider == "fe" ? names[mapping.code] ?? first.displayName : first.displayName,
+            let identifier = mapping.map { mapping in
+                mapping.provider == "fe" || mapping.provider == "nasdaq" ? mapping.code
+                    : InvestmentPriceRegistry.definition(for: mapping)?.isin ?? mapping.code
+            } ?? "Price mapping unavailable"
+            let name = mapping.flatMap { $0.provider == "fe" ? names[$0.code] : nil } ?? first.displayName
+            return .init(id: portfolio.id + "|" + key, code: mapping?.code ?? first.instrumentIdentity, displayIdentifier: identifier,
+                name: name,
                 units: units, quote: valuations[first.id]?.quote,
                 holdingDates: Array(Set(rows.map(\.holdingsDate))).sorted(), holdingIDs: rows.map(\.id), scope: part,
                 capitalShareWithinPortfolio: share(part.usd?.cost, parent.usd?.cost, partCount: part.costCount, totalCount: parent.costCount, positive: true),
@@ -217,8 +316,8 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
         var amounts: [String: Decimal] = [:]
         var counts: [String: Int] = [:]
         var invalid: Set<String> = []
-        mutating func add(_ value: Decimal, currency: String) {
-            counts[currency, default: 0] += 1
+        mutating func add(_ value: Decimal, currency: String, count: Int = 1) {
+            counts[currency, default: 0] += count
             do { amounts[currency] = try InvestmentArithmetic.add(amounts[currency] ?? 0, value) }
             catch { invalid.insert(currency); amounts[currency] = nil }
         }

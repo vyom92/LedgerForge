@@ -3,17 +3,17 @@
 
 import Foundation
 
-public enum FinancialIdentifierStrength: String, Equatable {
+nonisolated public enum FinancialIdentifierStrength: String, Equatable, Sendable {
     case strong
     case weak
 }
 
-public enum FinancialIdentifierVerificationState: String, Equatable {
+nonisolated public enum FinancialIdentifierVerificationState: String, Equatable, Sendable {
     case verified
     case unverified
 }
 
-public enum FinancialIdentifierProvenance: String, Equatable {
+nonisolated public enum FinancialIdentifierProvenance: String, Equatable, Sendable {
     case userConfirmed = "user_confirmed"
     case institutionStructuredField = "institution_structured_field"
     case importedMetadata = "imported_metadata"
@@ -22,7 +22,7 @@ public enum FinancialIdentifierProvenance: String, Equatable {
     case administrative = "administrative"
 }
 
-public enum FinancialIdentifierKind: String, CaseIterable, Equatable {
+nonisolated public enum FinancialIdentifierKind: String, CaseIterable, Equatable, Sendable {
     case iban
     case institutionAccountId = "institution_account_id"
     case brokerAccountId = "broker_account_id"
@@ -44,7 +44,7 @@ public enum FinancialIdentifierKind: String, CaseIterable, Equatable {
     }
 }
 
-public enum FinancialIdentifierNormalizationError: Error, Equatable, LocalizedError {
+nonisolated public enum FinancialIdentifierNormalizationError: Error, Equatable, LocalizedError, Sendable {
     case emptyValue(kind: FinancialIdentifierKind)
     case invalidValue(kind: FinancialIdentifierKind, value: String)
 
@@ -58,7 +58,7 @@ public enum FinancialIdentifierNormalizationError: Error, Equatable, LocalizedEr
     }
 }
 
-public struct FinancialIdentifier: Equatable {
+nonisolated public struct FinancialIdentifier: Equatable, Sendable {
     public let kind: FinancialIdentifierKind
     public let normalizedValue: String
     public let strength: FinancialIdentifierStrength
@@ -76,7 +76,7 @@ public struct FinancialIdentifier: Equatable {
         self.provenance = provenance
     }
 
-    public func repositoryDTO(accountId: String, workspaceId: String, createdAtISO: String, id: String = UUID().uuidString) -> AccountIdentifierDTO {
+    @MainActor public func repositoryDTO(accountId: String, workspaceId: String, createdAtISO: String, id: String = UUID().uuidString) -> AccountIdentifierDTO {
         AccountIdentifierDTO(
             id: id,
             accountId: accountId,

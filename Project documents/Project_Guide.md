@@ -144,7 +144,7 @@ Chat verifies material claims and boundaries, distinguishing report-only claims,
 
 **Read:** Changed subject authorities, relevant current state/roadmap, ownership/order contract and Harness documentation validation.
 
-Preserve requirements, owner decisions, evidence, uncertainty and history while removing duplication. Update links and exact source consumers, preserve unrelated WIP, distinguish candidate from accepted product. Use one writer unless a prompt explicitly assigns safely disjoint writers; this authorized restructure requires one writer/no subagents. Return for Chat semantic review.
+Preserve requirements, owner decisions, evidence, uncertainty and history while removing duplication. Update links and exact source consumers, preserve unrelated WIP, distinguish implementation acceptance, publication and full-sprint completion, and record effective source-authority transitions in the owning state/decision documents. Use one writer unless a prompt explicitly assigns safely disjoint writers; this authorized restructure requires one writer/no subagents. Return for Chat semantic review.
 
 **Terminal:** `DOCS_RECONCILED`.
 

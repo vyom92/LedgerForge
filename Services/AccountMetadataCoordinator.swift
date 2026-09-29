@@ -15,9 +15,10 @@ enum AccountMetadataCoordinatorError: Error, Equatable {
 
 protocol AccountMetadataCoordinating: AnyObject {
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool
 }
 
-/// Coordinates the bounded account display-name write with canonical runtime
+/// Coordinates bounded owner account metadata writes with canonical runtime
 /// refresh. It never mutates runtime stores directly.
 final class AccountMetadataCoordinator: AccountMetadataCoordinating {
 
@@ -97,6 +98,43 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
         }
     }
 #endif
+
+    /// Records the owner's closed-and-settled decision without altering source
+    /// balances, due dates, transactions, or historical import eligibility.
+    @discardableResult
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
+        let lease: DatabaseActivityLease
+        do { lease = try DatabaseActivityGate.shared.begin(.repositoryWrite) }
+        catch { throw AccountMetadataCoordinatorError.saveFailed }
+        defer { lease.finish() }
+        let currentProvider = provider()
+#if DEBUG
+        do {
+            try acknowledgementGate.requireAuthorization(
+                for: .creditCardHistoryOnlyMutation,
+                providerGeneration: currentProvider.generationToken
+            )
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
+            throw AccountMetadataCoordinatorError.acknowledgementRequired(challenge)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            throw AccountMetadataCoordinatorError.staleDevelopmentProfile
+        } catch { throw AccountMetadataCoordinatorError.persistenceUnavailable }
+#endif
+        guard currentProvider.persistenceState.isUsable else {
+            throw AccountMetadataCoordinatorError.persistenceUnavailable
+        }
+        let changed: Bool
+        do {
+            changed = try currentProvider.accountRepo.markCreditCardHistoryOnly(
+                accountId: accountId, workspaceId: workspaceId,
+                markedAtISO: ISO8601DateFormatter().string(from: Date())
+            )
+        } catch { throw AccountMetadataCoordinatorError.saveFailed }
+        // Also refresh an idempotent retry after a previous refresh failure.
+        do { _ = try forcedHydration(currentProvider, workspaceId) }
+        catch { throw AccountMetadataCoordinatorError.savedButRefreshFailed }
+        return changed
+    }
 
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
         let lifecycleLease: DatabaseActivityLease

@@ -37,7 +37,7 @@ Implement a coherent boundary, compile/type-check, run focused falsification, in
 
 ## Financial correctness and source ownership
 
-[Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Financial proof outranks time/token efficiency. No generated statement or production-derived sole oracle; preserve exact native semantics, fail closed on financial ambiguity and prove zero accepted losing-path residue, provider parity and canonical hydration/reopen where relevant. The [owner's current source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older on-disk copy/oracle-artifact permissions; historical evidence is not current permission.
+[Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Financial proof outranks time/token efficiency. No generated statement or production-derived sole oracle; preserve exact native semantics, fail closed on financial ambiguity and prove zero accepted losing-path residue, provider parity and canonical hydration/reopen where relevant. The [owner's current source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older on-disk copy/oracle-artifact permissions; historical evidence is not current permission. If an intake foundation is accepted locally before its full sprint, record that boundary and any effective source-authority transition separately from publication, full-sprint readiness and adoption.
 
 <a id="parser--authentic-corpus-acceptance-policy"></a>
 ## Parser / Authentic-Corpus Acceptance Policy

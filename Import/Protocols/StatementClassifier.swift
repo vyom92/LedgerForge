@@ -9,7 +9,7 @@ public extension ImportFramework {
     }
 }
 
-public struct StatementClassification: Equatable, Sendable {
+nonisolated public struct StatementClassification: Equatable, Sendable {
     public let documentType: StatementDocumentType
     public let confidence: Double
     public let reasons: [String]
@@ -21,7 +21,7 @@ public struct StatementClassification: Equatable, Sendable {
     }
 }
 
-public enum StatementDocumentType: String, Equatable, Sendable {
+nonisolated public enum StatementDocumentType: String, Equatable, Sendable {
     case bankStatement
     case creditCardStatement
     case brokerageStatement

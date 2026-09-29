@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum AxisCreditCardPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum AxisCreditCardPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocument
     case changedHeader
     case malformedSourceEvidence
@@ -23,7 +23,7 @@ enum AxisCreditCardPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-enum AxisCreditCardParserSupport {
+nonisolated enum AxisCreditCardParserSupport {
     static let currency = try! CurrencyCode("INR")
 
     private static let fragmentConflictMarker = "__AXIS_FRAGMENT_CONFLICTS__"
@@ -135,7 +135,7 @@ enum AxisCreditCardParserSupport {
     }
 }
 
-final class AxisCreditCardPDFParser: StatementParser {
+nonisolated final class AxisCreditCardPDFParser: StatementParser {
     static let profileID = "axis.credit-card.pdf"
     static let profileVersion = "1"
     var name: String { "Axis Credit Card PDF" }

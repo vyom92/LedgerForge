@@ -57,6 +57,16 @@ final class AlDarReferenceSession: ObservableObject {
     private var feedbackExpiry: Task<Void, Never>?
     private var manualRefreshBaseline: [AlDarCurrency: AlDarUnitReference]?
     private var failureReasons: [AlDarCurrency: String] = [:]
+    var sharedRefresh: ((Bool) -> Void)?
+    var sharedRefreshAll: ((Bool) -> Void)?
+
+    func installShared(_ values: [AlDarCurrency: AlDarUnitReference], failures: Set<AlDarCurrency>, busy: Bool,
+                       busyCurrencies: Set<AlDarCurrency>? = nil) {
+        legs = values; self.failures = failures
+        refreshing = busy ? busyCurrencies ?? Set(AlDarCurrency.allCases) : []
+        cache.save(values)
+        if manualRefreshBaseline != nil, !busy { finishManualRefreshIfNeeded() }
+    }
 
     init(defaults: UserDefaults = .standard, enabled: Bool = true,
          now: @escaping @Sendable () -> Date = { Date() },
@@ -73,6 +83,7 @@ final class AlDarReferenceSession: ObservableObject {
     }
 
     func refresh(force: Bool = false) {
+        if let sharedRefresh { sharedRefresh(false); return }
         guard enabled, requests.isEmpty else { return }
         for currency in AlDarCurrency.allCases {
             guard requests[currency] == nil else { continue }
@@ -114,6 +125,7 @@ final class AlDarReferenceSession: ObservableObject {
         }
         if manualRefreshBaseline == nil { manualRefreshBaseline = legs }
         showFeedback(refreshing.isEmpty ? "Checking Al Dar…" : "Al Dar is already being checked…")
+        if let sharedRefresh { sharedRefresh(true); return }
         refresh(force: true)
     }
 

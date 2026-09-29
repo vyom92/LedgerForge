@@ -14,7 +14,7 @@
 
 import Foundation
 
-enum ColumnType: String, CaseIterable {
+nonisolated enum ColumnType: String, CaseIterable {
 
     case date
 

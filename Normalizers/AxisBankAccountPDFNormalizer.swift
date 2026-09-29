@@ -6,7 +6,7 @@
 
 import Foundation
 
-enum AxisBankAccountPDFColumn: Int, CaseIterable {
+nonisolated enum AxisBankAccountPDFColumn: Int, CaseIterable {
     case date
     case chequeReference
     case particulars
@@ -28,14 +28,14 @@ enum AxisBankAccountPDFColumn: Int, CaseIterable {
     ]
 }
 
-enum AxisBankAccountPDFTitleEvidenceError: Error, Equatable {
+nonisolated enum AxisBankAccountPDFTitleEvidenceError: Error, Equatable {
     case notTitle
     case malformedAccountIdentifier
     case malformedDeclaredPeriod
     case unconsumedFinancialPrefix
 }
 
-struct AxisBankAccountPDFTitleEvidence: Equatable {
+nonisolated struct AxisBankAccountPDFTitleEvidence: Equatable {
     let accountIdentifier: String
     let periodStartText: String
     let periodEndText: String
@@ -88,7 +88,7 @@ struct AxisBankAccountPDFTitleEvidence: Equatable {
     }
 }
 
-enum AxisBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     case missingTitle
     case malformedAccountIdentifier(sourceOrdinal: Int)
     case malformedDeclaredPeriod(sourceOrdinal: Int)
@@ -156,14 +156,14 @@ enum AxisBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct AxisBankAccountPDFNormalizationResult {
+nonisolated struct AxisBankAccountPDFNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow?
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class AxisBankAccountPDFNormalizer {
+nonisolated final class AxisBankAccountPDFNormalizer {
 
     private struct PhysicalLine {
         let index: Int
@@ -193,6 +193,7 @@ final class AxisBankAccountPDFNormalizer {
         let sourceCredit: String
         let collapsedAmount: String
         let balance: String
+        let literalBalance: String
         let branchCode: String
     }
 
@@ -406,9 +407,12 @@ final class AxisBankAccountPDFNormalizer {
                 transaction.branchCode
             ]
 
+            var sourceValues = values
+            sourceValues[AxisBankAccountPDFColumn.balance.rawValue] = transaction.literalBalance
             return NormalizedRow(
                 rowNumber: transaction.sourceOrdinal,
                 values: values,
+                rawValues: sourceValues,
                 sourcePage: transaction.sourcePage
             )
         }
@@ -1238,6 +1242,7 @@ final class AxisBankAccountPDFNormalizer {
         var debits: [String] = []
         var credits: [String] = []
         var balances: [String] = []
+        var literalBalances: [String] = []
         var branches: [String] = []
 
         for index in fragmentIndices {
@@ -1278,6 +1283,7 @@ final class AxisBankAccountPDFNormalizer {
                     )
                 }
                 balances.append(Self.canonicalMoneyText(text))
+                literalBalances.append(text)
             } else if center >= layout.creditLower {
                 guard center < layout.creditUpper,
                       Self.isMoneyText(text) else {
@@ -1365,6 +1371,7 @@ final class AxisBankAccountPDFNormalizer {
             sourceCredit: credits.first ?? "",
             collapsedAmount: "",
             balance: balances[0],
+            literalBalance: literalBalances[0],
             branchCode: branches[0]
         )
     }
@@ -1651,6 +1658,7 @@ final class AxisBankAccountPDFNormalizer {
             sourceCredit: sourceCredit,
             collapsedAmount: collapsedAmount,
             balance: Self.canonicalMoneyText(tokens[balanceIndex]),
+            literalBalance: tokens[balanceIndex],
             branchCode: branch
         )
     }
@@ -1784,11 +1792,11 @@ final class AxisBankAccountPDFNormalizer {
 }
 
 private extension String {
-    var collapsingWhitespace: String {
+    nonisolated var collapsingWhitespace: String {
         split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    func captures(
+    nonisolated func captures(
         matching pattern: String
     ) -> [String]? {
         guard let expression = try? NSRegularExpression(pattern: pattern),

@@ -1,6 +1,6 @@
 import Foundation
 
-enum AxisCreditCardXLSXNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum AxisCreditCardXLSXNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedDocumentContent
     case multipleVisibleSheets
     case missingHeader
@@ -24,14 +24,14 @@ enum AxisCreditCardXLSXNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct AxisCreditCardXLSXNormalizationResult {
+nonisolated struct AxisCreditCardXLSXNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class AxisCreditCardXLSXNormalizer {
+nonisolated final class AxisCreditCardXLSXNormalizer {
     static let logicalHeader = [
         "Transaction Date", "Transaction Details", "Amount (INR)",
         "Liability Effect", "Scope", "Section ID", "Reference",

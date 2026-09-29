@@ -336,17 +336,35 @@ public final class SQLiteRepositoryProvider {
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
     public let investmentRepo: InvestmentRepository
+    public let gmailInboxRepo: any GmailInboxRepository
+    public let netWorthMembershipRepo: any NetWorthMembershipRepository
+    public let intelligenceRepo: any FinancialIntelligenceRepository
+    let backgroundJobRepo: any BackgroundJobRepository
+    let backgroundPublicCacheRepo: any BackgroundPublicCacheRepository
+    let backgroundScheduleRepo: any BackgroundScheduleRepository
 
     private static func executionCause(_ error: Error) -> SQLiteExecutionError? {
         if case SQLiteDatabaseError.execution(let value) = error { return value }
         return nil
     }
 
+    static func openEnrolledExisting(path: String, expected: LedgerActivationStamp) throws -> SQLiteRepositoryProvider {
+        let authority = LedgerAccessCoordinator.shared(path: path)
+        return try authority.withAccess {
+            _ = try authority.validate(expected: expected, permit: nil)
+            guard expected.schemaVersion == allMigrations.count else { throw LedgerAccessError.incompatible }
+            let provider = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing,
+                requiredActivation: expected)
+            try provider.database.beginEnrolledExistingConnectionScope()
+            return provider
+        }
+    }
+
     public convenience init(path: String? = nil) throws {
         try self.init(path: path, migrations: allMigrations)
     }
 
-    init(path: String?, migrations: [Migration], access: SQLiteDatabase.Access = .createIfMissing, migrateExisting: Bool = false) throws {
+    init(path: String?, migrations: [Migration], access: SQLiteDatabase.Access = .createIfMissing, migrateExisting: Bool = false, lifecyclePermit: LedgerLifecyclePermit? = nil, requiredActivation: LedgerActivationStamp? = nil) throws {
         do {
             try MigrationChainValidator.validateRegistered(migrations)
         } catch let error as MigrationIntegrityError {
@@ -359,19 +377,22 @@ public final class SQLiteRepositoryProvider {
             dbPath = try Self.defaultDBPath()
         }
         self.databasePath = dbPath
-        let database = SQLiteDatabase(path: dbPath)
+        let database = SQLiteDatabase(path: dbPath, lifecyclePermit: lifecyclePermit, requiredActivation: requiredActivation, allowMigrationRecovery: requiredActivation == nil && (migrateExisting || access == .createIfMissing))
         do {
             try database.open(access: access)
         } catch {
             database.close()
             throw SQLiteRepositoryProviderError.databaseOpenFailed(Self.executionCause(error))
         }
+        let verifiedMigrationPrefix: [PersistedMigrationRecord]
         do {
             if access == .createIfMissing || (access == .existing && migrateExisting) {
                 try database.runMigrations(migrations)
-            } else {
-                _ = try database.validatedMigrationHistory(against: migrations, requiresCompleteChain: true)
             }
+            verifiedMigrationPrefix = try database.validatedMigrationHistory(
+                against: migrations,
+                requiresCompleteChain: true
+            )
         } catch let error as MigrationIntegrityError {
             database.close()
             throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
@@ -380,6 +401,7 @@ public final class SQLiteRepositoryProvider {
             throw SQLiteRepositoryProviderError.migrationFailed(Self.executionCause(error))
         }
         do {
+            if access != .readOnlySnapshot { try database.verifyAuthoritySchema(migrations.count) }
             try database.execute(sql: "PRAGMA foreign_keys = ON;")
         } catch {
             database.close()
@@ -399,16 +421,29 @@ public final class SQLiteRepositoryProvider {
             params: []
         ) { _ in true }.isEmpty == false) ?? false
         let supportsInvestments = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'investment_holdings';")) == 1
+        let supportsBankSections = verifiedMigrationPrefix.contains { $0.version == migrationV24.version }
+        self.intelligenceRepo = verifiedMigrationPrefix.contains { $0.version == migrationV28.version }
+            ? SQLiteFinancialIntelligenceRepository(db: database, supportsBalanceDates: migrations.contains { $0.version == 29 }) : UnavailableFinancialIntelligenceRepository()
+        self.netWorthMembershipRepo = verifiedMigrationPrefix.contains { $0.version == migrationV27.version }
+            ? SQLiteNetWorthMembershipRepository(db: database) : UnavailableNetWorthMembershipRepository()
         self.investmentRepo = supportsInvestments ? SQLiteInvestmentRepository(db: database, generationToken: generationToken) : EmptyInvestmentRepository()
+        self.gmailInboxRepo = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='gmail_inbox_state';")) == 1
+            ? SQLiteGmailInboxRepository(database: database) : UnavailableGmailInboxRepository()
+        self.backgroundJobRepo = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='background_update_receipts';")) == 1
+            ? SQLiteBackgroundJobRepository(database: database) : UnavailableBackgroundJobRepository()
+        self.backgroundPublicCacheRepo = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='background_al_dar_reference_cache';")) == 1
+            ? SQLiteBackgroundPublicCacheRepository(database: database) : UnavailableBackgroundPublicCacheRepository()
+        self.backgroundScheduleRepo = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='background_schedule_configuration';")) == 1
+            ? SQLiteBackgroundScheduleRepository(database: database) : UnavailableBackgroundScheduleRepository()
         self.database = database
         self.generationToken = generationToken
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
-        self.categoryRepo = SQLiteCategoryRepo(db: database)
-        self.accountRepo = SQLiteAccountRepo(db: database)
+        self.categoryRepo = SQLiteCategoryRepo(db: database, supportsAutomation: migrations.contains { $0.version == 28 })
+        self.accountRepo = SQLiteAccountRepo(db: database, supportsBankSections: supportsBankSections)
         self.cardRepo = supportsCards ? SQLiteCardRepo(db: database) : EmptyCardRepo()
-        self.importSessionRepo = SQLiteImportSessionRepo(db: database)
+        self.importSessionRepo = SQLiteImportSessionRepo(db: database, supportsBankSections: supportsBankSections)
         self.confirmedImportRepo = supportsConfirmedImport
             ? SQLiteConfirmedImportRepository(db: database, generationToken: generationToken)
             : PlaceholderConfirmedImportRepo()
@@ -416,7 +451,7 @@ public final class SQLiteRepositoryProvider {
             ? SQLiteSalaryRepository(db: database, generationToken: generationToken)
             : PlaceholderSalaryRepo()
         self.fundingPlanRepo = supportsSalary
-            ? SQLiteFundingPlanRepository(db: database)
+            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 })
             : PlaceholderFundingPlanRepo()
     }
 
@@ -703,10 +738,11 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
     }
     private var retainedInactiveProviders: [(SQLiteRepositoryProvider, DevelopmentDatabaseProfileTarget?)] = []
     private let activityGate: DevelopmentDatabaseActivityGate
-    private let injectedFailures: Set<DevelopmentDatabaseLifecycleFailurePoint>
+    var injectedFailures: Set<DevelopmentDatabaseLifecycleFailurePoint>
     private let preparedImportInvalidator: @MainActor (DevelopmentDatabasePreparedImportDrainPermit) -> DevelopmentPreparedImportInvalidationResult
     private let makeOwnershipID: () -> UUID
     private let migrationSandboxPrefixObserver: @MainActor ([Int]) -> Void
+    private let backgroundEnrollmentStore: BackgroundEnrollmentStore
 
     convenience init(identity: DevelopmentDatabaseIdentity) {
         self.init(identity: identity, activityGate: .shared, injectedFailures: [])
@@ -724,7 +760,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             ImportEngine.shared.invalidatePreparedImportsForProfileSwitch($0)
         },
         makeOwnershipID: @escaping () -> UUID = UUID.init,
-        migrationSandboxPrefixObserver: @escaping @MainActor ([Int]) -> Void = { _ in }
+        migrationSandboxPrefixObserver: @escaping @MainActor ([Int]) -> Void = { _ in },
+        backgroundEnrollmentStore: BackgroundEnrollmentStore = .init()
     ) {
         self.identity = identity
         self.activityGate = activityGate
@@ -732,6 +769,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         self.preparedImportInvalidator = preparedImportInvalidator
         self.makeOwnershipID = makeOwnershipID
         self.migrationSandboxPrefixObserver = migrationSandboxPrefixObserver
+        self.backgroundEnrollmentStore = backgroundEnrollmentStore
     }
 
     func loadRememberedSelection(from preferences: DevelopmentDatabaseProfilePreferenceAuthority) {
@@ -1030,7 +1068,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
     }
 
     private func prepareCandidate(
-        target: DevelopmentDatabaseProfileTarget
+        target: DevelopmentDatabaseProfileTarget,
+        lifecyclePermit: LedgerLifecyclePermit? = nil
     ) throws -> DevelopmentDatabasePreparedCandidate {
         var provider: SQLiteRepositoryProvider?
         do {
@@ -1075,7 +1114,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             }
 
             do {
-                provider = try SQLiteRepositoryProvider(path: target.databaseURL.path)
+                provider = try SQLiteRepositoryProvider(path: target.databaseURL.path, migrations: allMigrations, lifecyclePermit: lifecyclePermit)
             } catch SQLiteRepositoryProviderError.databaseOpenFailed {
                 throw DevelopmentDatabaseCandidatePreparationError.creation
             } catch {
@@ -1187,9 +1226,18 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             activityGate.finishExclusive(providerChanged: providerChanged)
         }
 
+        let permit: LedgerLifecyclePermit
+        do {
+            permit = try LedgerAccessCoordinator.shared(path: oldTarget.databaseURL.path).beginLifecycle()
+            oldProvider.database.lifecyclePermit = permit
+        } catch { return .publicationFailedBeforeCommit }
+        defer { permit.release() }
+
         do {
             try createAndVerifyBackup(from: oldProvider)
         } catch {
+            do { try completeResetAuthority(oldProvider, permit: permit, schemaVersion: allMigrations.count) }
+            catch { enterLifecycleUnavailable(); return .lifecycleUnavailable }
             return .candidateCreationFailed
         }
 
@@ -1199,13 +1247,16 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             }
             try oldProvider.database.checkpointAndClose()
         } catch {
+            do { try completeResetAuthority(oldProvider, permit: permit, schemaVersion: allMigrations.count) }
+            catch { enterLifecycleUnavailable(); return .lifecycleUnavailable }
             return .publicationFailedBeforeCommit
         }
         sqliteProvider = nil
 
         do {
-            try removeDatabaseSet(at: oldTarget.databaseURL)
-            let candidate = try prepareCandidate(target: oldTarget)
+            try removeDatabaseSet(at: oldTarget.databaseURL, permit: permit)
+            let candidate = try prepareCandidate(target: oldTarget, lifecyclePermit: permit)
+            try completeResetAuthority(candidate.sqliteProvider, permit: permit, schemaVersion: candidate.verifiedSchemaVersion)
 
             let descriptor = installCommittedRuntime(
                 sqliteProvider: candidate.sqliteProvider,
@@ -1225,14 +1276,14 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                 )
             )
         } catch let failure as DevelopmentDatabaseCandidatePreparationError {
-            guard restorePersistentDebugBackup(target: oldTarget) else {
+            guard restorePersistentDebugBackup(target: oldTarget, permit: permit) else {
                 enterLifecycleUnavailable()
                 return .lifecycleUnavailable
             }
             providerChanged = true
             return activationResult(for: failure)
         } catch {
-            guard restorePersistentDebugBackup(target: oldTarget) else {
+            guard restorePersistentDebugBackup(target: oldTarget, permit: permit) else {
                 enterLifecycleUnavailable()
                 return .lifecycleUnavailable
             }
@@ -1242,7 +1293,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
     }
 
     private func restorePersistentDebugBackup(
-        target: DevelopmentDatabaseProfileTarget
+        target: DevelopmentDatabaseProfileTarget,
+        permit: LedgerLifecyclePermit
     ) -> Bool {
         do {
             guard identity.authorizesPersistentDebugReset(at: target.databaseURL),
@@ -1252,9 +1304,9 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             if injectedFailures.contains(.recovery) {
                 throw SQLiteDatabaseError.backupFailed("injected-recovery")
             }
-            try removeDatabaseSet(at: target.databaseURL)
+            try removeDatabaseSet(at: target.databaseURL, permit: permit)
             try FileManager.default.copyItem(at: identity.backupURL, to: target.databaseURL)
-            let restored = try SQLiteRepositoryProvider(path: target.databaseURL.path)
+            let restored = try SQLiteRepositoryProvider(path: target.databaseURL.path, migrations: allMigrations, lifecyclePermit: permit)
             let version = try validateCompleteMigrationChain(in: restored)
             let runtimeProvider = makeRuntimeProvider(for: restored, profile: target.profile)
             let hydrator = RepositoryStoreHydrator(
@@ -1262,6 +1314,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                 participatesInLifecycleGate: false
             )
             let snapshot = try hydrator.stageHydration()
+            try completeResetAuthority(restored, permit: permit, schemaVersion: version)
 
             installCommittedRuntime(
                 sqliteProvider: restored,
@@ -1275,6 +1328,13 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         } catch {
             return false
         }
+    }
+
+    private func completeResetAuthority(_ provider: SQLiteRepositoryProvider, permit: LedgerLifecyclePermit, schemaVersion: Int) throws {
+        try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
+        let stamp = try permit.finish(schemaVersion: schemaVersion)
+        try provider.database.adoptCompletedLifecycle(stamp)
+        try? backgroundEnrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
     }
 
     private func validateCompleteMigrationChain(
@@ -1310,21 +1370,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             state = .intentionalNonDurable(.debugMigrationSandboxSQLite)
         }
 
-        return DatabaseProvider(
-            workspaceRepo: provider.workspaceRepo,
-            transactionRepo: provider.transactionRepo,
-            categoryRepo: provider.categoryRepo,
-            accountRepo: provider.accountRepo,
-            cardRepo: provider.cardRepo,
-            importSessionRepo: provider.importSessionRepo,
-            confirmedImportRepo: provider.confirmedImportRepo,
-            salaryRepo: provider.salaryRepo,
-            fundingPlanRepo: provider.fundingPlanRepo,
-            investmentRepo: provider.investmentRepo,
-            generationToken: provider.generationToken,
-            persistenceState: state,
-            protectsGeneration: true
-        )
+        return DatabaseProvider.sqlite(provider, persistenceState: state)
     }
 
     private func activationResult(
@@ -1427,7 +1473,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                 verification.close()
             }
         }
-        try verification.open()
+        try verification.open(access: .readOnlySnapshot)
         let records = try verification.validatedMigrationHistory(
             against: allMigrations,
             requiresCompleteChain: true
@@ -1451,7 +1497,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                 throw SQLiteDatabaseError.backupFailed("schema")
             }
         }
-        try verification.checkpointAndClose()
+        try verification.closeChecked()
         checkedClosed = true
     }
 
@@ -1466,11 +1512,13 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         activityGate.enterUnavailable()
     }
 
-    private func removeDatabaseSet(at url: URL) throws {
+    private func removeDatabaseSet(at url: URL, permit: LedgerLifecyclePermit? = nil) throws {
+        try LedgerAccessCoordinator.shared(path: url.path).withAccess(permit: permit) {
         for member in identity.databaseSet(at: url) {
             if FileManager.default.fileExists(atPath: member.path) {
                 try FileManager.default.removeItem(at: member)
             }
+        }
         }
     }
 }
@@ -1506,15 +1554,17 @@ fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
     }
 }
 
-fileprivate final class SQLiteCategoryRepo: CategoryRepository {
-    private let db: SQLiteDatabase
+final class SQLiteCategoryRepo: CategoryRepository {
+    let db: SQLiteDatabase
+    let automationSupported: Bool
 
-    init(db: SQLiteDatabase) {
+    init(db: SQLiteDatabase, supportsAutomation: Bool = true) {
         self.db = db
+        self.automationSupported = supportsAutomation
     }
 
     func categories(workspaceId: String) throws -> [CategoryDTO] {
-        try db.query(
+        return try db.query(
             sql: "SELECT id, workspace_id, name, normalized_name, is_archived, created_at, updated_at FROM categories WHERE workspace_id = ? ORDER BY normalized_name ASC, id ASC;",
             params: [workspaceId]
         ) { row in
@@ -1645,6 +1695,9 @@ fileprivate final class SQLiteCategoryRepo: CategoryRepository {
             ) == 0 else {
                 throw CategoryRepositoryError.categoryInUse
             }
+            if try supportsCategoryAutomation(), try count("SELECT COUNT(*) FROM category_rules WHERE category_id = ?;", [id]) > 0 {
+                throw CategoryAutomationError.ruleInUse
+            }
             try db.executePrepared(
                 sql: "DELETE FROM categories WHERE id = ? AND workspace_id = ?;",
                 params: [id, workspaceId]
@@ -1654,55 +1707,33 @@ fileprivate final class SQLiteCategoryRepo: CategoryRepository {
 
     func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
         try withImmediateTransaction {
-            guard try count(
-                "SELECT COUNT(*) FROM transactions WHERE id = ? AND workspace_id = ? AND is_trusted = 1;",
-                [transactionId, workspaceId]
-            ) == 1 else {
+            guard try count("SELECT COUNT(*) FROM transactions WHERE id = ? AND workspace_id = ? AND is_trusted = 1;", [transactionId, workspaceId]) == 1 else {
                 if try count("SELECT COUNT(*) FROM transactions WHERE id = ?;", [transactionId]) == 0 {
                     throw CategoryRepositoryError.transactionNotFound
                 }
                 throw CategoryRepositoryError.workspaceMismatch
             }
-
-            let existingCategoryID = try db.query(
-                sql: "SELECT category_id FROM transaction_category_assignments WHERE transaction_id = ?;",
-                params: [transactionId]
-            ) { $0.string(at: 0) ?? "" }.first
-
-            guard let categoryId else {
-                guard existingCategoryID != nil else { return false }
-                try db.executePrepared(
-                    sql: "DELETE FROM transaction_category_assignments WHERE transaction_id = ? AND workspace_id = ?;",
-                    params: [transactionId, workspaceId]
-                )
-                return true
+            if let categoryId {
+                guard let selected = try category(id: categoryId) else { throw CategoryRepositoryError.categoryNotFound }
+                guard selected.workspaceId == workspaceId else { throw CategoryRepositoryError.workspaceMismatch }
+                guard !selected.isArchived else { throw CategoryRepositoryError.categoryArchived }
             }
-
-            guard let selectedCategory = try category(id: categoryId) else {
-                throw CategoryRepositoryError.categoryNotFound
+            let existing = try db.query(sql: "SELECT category_id FROM transaction_category_assignments WHERE transaction_id = ?;", params: [transactionId]) { $0.string(at: 0) }.first ?? nil
+            let intent = CategoryIntent(kind: categoryId == nil ? .deliberatelyCleared : .manual, categoryID: categoryId, matches: [])
+            let hasAutomation = try supportsCategoryAutomation()
+            let previousIntent = hasAutomation ? try readIntent(transactionID: transactionId) : nil
+            if categoryId == existing && (!hasAutomation || previousIntent == intent) { return false }
+            try writeAssignment(categoryID: categoryId, transactionID: transactionId, workspaceID: workspaceId)
+            if hasAutomation {
+                try writeIntent(intent, transactionID: transactionId, workspaceID: workspaceId)
+                try db.executePrepared(sql: "UPDATE category_import_work SET outcome = 'protected', explanation = ? WHERE transaction_id = ?;",
+                    params: [categoryId == nil ? "You deliberately cleared this category." : "Your category choice is protected.", transactionId])
             }
-            guard selectedCategory.workspaceId == workspaceId else {
-                throw CategoryRepositoryError.workspaceMismatch
-            }
-            guard !selectedCategory.isArchived else {
-                throw CategoryRepositoryError.categoryArchived
-            }
-            guard existingCategoryID != categoryId else { return false }
-            try db.executePrepared(
-                sql: """
-                INSERT INTO transaction_category_assignments(workspace_id, transaction_id, category_id)
-                VALUES(?,?,?)
-                ON CONFLICT(transaction_id) DO UPDATE SET
-                  workspace_id = excluded.workspace_id,
-                  category_id = excluded.category_id;
-                """,
-                params: [workspaceId, transactionId, categoryId]
-            )
             return true
         }
     }
 
-    private func category(id: String) throws -> CategoryDTO? {
+    func category(id: String) throws -> CategoryDTO? {
         try db.query(
             sql: "SELECT id, workspace_id, name, normalized_name, is_archived, created_at, updated_at FROM categories WHERE id = ?;",
             params: [id]
@@ -1719,11 +1750,11 @@ fileprivate final class SQLiteCategoryRepo: CategoryRepository {
         }.first
     }
 
-    private func count(_ sql: String, _ params: [Any?]) throws -> Int {
+    func count(_ sql: String, _ params: [Any?]) throws -> Int {
         Int(try db.query(sql: sql, params: params) { $0.int64(at: 0) ?? 0 }.first ?? 0)
     }
 
-    private func withImmediateTransaction<T>(_ body: () throws -> T) throws -> T {
+    func withImmediateTransaction<T>(_ body: () throws -> T) throws -> T {
         return try db.withExclusiveAccess {
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
             do {
@@ -1738,17 +1769,22 @@ fileprivate final class SQLiteCategoryRepo: CategoryRepository {
     }
 }
 
-fileprivate final class SQLiteAccountRepo: AccountRepository {
+final class SQLiteAccountRepo: AccountRepository {
     private let db: SQLiteDatabase
-    init(db: SQLiteDatabase) { self.db = db }
+    private let supportsBankSections: Bool
+
+    init(db: SQLiteDatabase, supportsBankSections: Bool = true) {
+        self.db = db
+        self.supportsBankSections = supportsBankSections
+    }
 
     func upsertAccount(_ account: AccountDTO) throws -> String {
         try ensureInstitutionExists(id: account.institutionId, createdAtISO: account.createdAtISO)
 
         let now = account.createdAtISO
         let sql = """
-        INSERT INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at)
-        VALUES (?,?,?,?,?,?,?,?)
+        INSERT INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at)
+        VALUES (?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             workspace_id = excluded.workspace_id,
             name = excluded.name,
@@ -1756,10 +1792,31 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             account_type = excluded.account_type,
             native_currency = excluded.native_currency,
             description = excluded.description,
-            created_at = excluded.created_at;
+            created_at = excluded.created_at,
+            closed_at = COALESCE(accounts.closed_at, excluded.closed_at);
         """
-        try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now])
+        try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now, account.closedAtISO ?? NSNull()])
         return account.id
+    }
+
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+        try db.withExclusiveAccess {
+            guard ISO8601DateFormatter().date(from: markedAtISO) != nil else {
+                throw RepositoryError.relationshipViolation("History-only classification requires its recorded time.")
+            }
+            guard let existing = try account(id: accountId) else {
+                throw RepositoryError.recordNotFound("Account does not exist.")
+            }
+            guard existing.workspaceId == workspaceId, existing.accountType == "credit_card" else {
+                throw RepositoryError.relationshipViolation("History-only classification requires a credit card in this workspace.")
+            }
+            guard existing.closedAtISO == nil else { return false }
+            try db.executePrepared(
+                sql: "UPDATE accounts SET closed_at = ? WHERE id = ? AND workspace_id = ? AND closed_at IS NULL;",
+                params: [markedAtISO, accountId, workspaceId]
+            )
+            return true
+        }
     }
 
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
@@ -1785,7 +1842,7 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
     }
 
     func account(id: String) throws -> AccountDTO? {
-        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;"
+        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at FROM accounts WHERE id = ?;"
         return try db.query(sql: sql, params: [id]) { row in
             AccountDTO(
                 id: row.string(at: 0) ?? "",
@@ -1795,13 +1852,14 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
                 accountType: row.string(at: 4),
                 nativeCurrency: row.string(at: 5) ?? "",
                 description: row.string(at: 6),
-                createdAtISO: row.string(at: 7) ?? ""
+                createdAtISO: row.string(at: 7) ?? "",
+                closedAtISO: row.string(at: 8)
             )
         }.first
     }
 
     func accounts(workspaceId: String) throws -> [AccountDTO] {
-        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE workspace_id = ? ORDER BY name, id;"
+        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at FROM accounts WHERE workspace_id = ? ORDER BY name, id;"
         return try db.query(sql: sql, params: [workspaceId]) { row in
             AccountDTO(
                 id: row.string(at: 0) ?? "",
@@ -1811,7 +1869,8 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
                 accountType: row.string(at: 4),
                 nativeCurrency: row.string(at: 5) ?? "",
                 description: row.string(at: 6),
-                createdAtISO: row.string(at: 7) ?? ""
+                createdAtISO: row.string(at: 7) ?? "",
+                closedAtISO: row.string(at: 8)
             )
         }
     }
@@ -1901,9 +1960,21 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
     }
 
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] {
-        try db.query(
-            sql: "SELECT account_id, kind, pattern FROM cbq_source_identity_observations WHERE workspace_id = ? ORDER BY account_id, kind, pattern;",
-            params: [workspaceId]
+        guard supportsBankSections else {
+            return try db.query(
+                sql: "SELECT account_id, kind, pattern FROM cbq_source_identity_observations WHERE workspace_id = ? ORDER BY account_id, kind, pattern;",
+                params: [workspaceId]
+            ) { row in
+                CBQSourceIdentityRecordDTO(
+                    accountId: row.string(at: 0) ?? "",
+                    kind: row.string(at: 1) ?? "",
+                    pattern: row.string(at: 2) ?? ""
+                )
+            }
+        }
+        return try db.query(
+            sql: "SELECT account_id, kind, pattern FROM cbq_source_identity_observations WHERE workspace_id = ? UNION ALL SELECT s.account_id, i.kind, i.pattern FROM bank_section_identity_observations i JOIN bank_statement_sections s ON s.id = i.bank_statement_section_id WHERE s.workspace_id = ? AND i.kind IN ('cbq_masked_account_number','cbq_masked_iban') ORDER BY account_id, kind, pattern;",
+            params: [workspaceId, workspaceId]
         ) { row in
             CBQSourceIdentityRecordDTO(
                 accountId: row.string(at: 0) ?? "",
@@ -2001,9 +2072,72 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
     }
 }
 
-fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
+final class SQLiteImportSessionRepo: ImportSessionRepository {
     private let db: SQLiteDatabase
-    init(db: SQLiteDatabase) { self.db = db }
+    private let supportsBankSections: Bool
+
+    init(db: SQLiteDatabase, supportsBankSections: Bool = true) {
+        self.db = db
+        self.supportsBankSections = supportsBankSections
+    }
+
+    func bankSectionSnapshot(workspaceId: String) throws -> BankSectionRepositorySnapshotDTO {
+        guard supportsBankSections else { return .init(sections: []) }
+        let sections = try db.query(sql: """
+            SELECT id, account_id, parser_profile_id, parser_profile_version, native_currency,
+                   source_format_code, statement_boundary_date, statement_start_date,
+                   statement_end_date, opening_balance_minor, opening_balance_decimal,
+                   closing_balance_minor, closing_balance_decimal, source_range_start,
+                   source_range_end, product_label, document_id, import_session_id,
+                   normalized_document_id, section_ordinal, source_row_count, source_details_json
+            FROM bank_statement_sections WHERE workspace_id=? ORDER BY document_id, section_ordinal;
+            """, params: [workspaceId]) { row -> BankStatementSectionPlanDTO in
+            let id = row.string(at: 0) ?? ""
+            let identities = try self.db.query(sql: """
+                SELECT kind, pattern FROM bank_section_identity_observations
+                WHERE bank_statement_section_id=? ORDER BY kind;
+                """, params: [id]) {
+                    CBQSourceIdentityPatternDTO(kind: $0.string(at: 0) ?? "", pattern: $0.string(at: 1) ?? "")
+                }
+            let occurrences = try self.db.query(sql: """
+                SELECT o.canonical_transaction_id, o.normalized_row_id, o.source_ordinal, r.record_digest,
+                       o.posting_date, o.source_transaction_date, o.native_currency, o.signed_amount_minor,
+                       o.signed_amount_decimal, o.direction, o.running_balance_minor, o.running_balance_decimal,
+                       o.structured_reference_digest, o.value_date, o.literal_narration,
+                       o.literal_reference, o.literal_balance
+                FROM bank_transaction_occurrences o JOIN normalized_rows r ON r.id=o.normalized_row_id
+                WHERE o.bank_statement_section_id=? AND r.normalized_document_id=?
+                ORDER BY o.source_ordinal;
+                """, params: [id, row.string(at: 18) ?? ""]) { value in
+                    BankTransactionOccurrencePlanDTO(source: CBQSourceRowDTO(
+                        incomingTransactionId: value.string(at: 0) ?? "", normalizedRowId: value.string(at: 1) ?? "",
+                        sourceOrdinal: Int(value.int64(at: 2) ?? 0), normalizedRecordDigest: value.string(at: 3) ?? "",
+                        postingDateISO: value.string(at: 4) ?? "", sourceTransactionDateISO: value.string(at: 5),
+                        nativeCurrency: value.string(at: 6) ?? "", signedAmountMinor: value.int64(at: 7) ?? 0,
+                        signedAmountDecimal: value.string(at: 8) ?? "", direction: value.string(at: 9) ?? "",
+                        runningBalanceMinor: value.int64(at: 10) ?? 0, runningBalanceDecimal: value.string(at: 11) ?? "",
+                        structuredReferenceDigest: value.string(at: 12)), valueDateISO: value.string(at: 13),
+                        literalNarration: value.string(at: 14) ?? "", literalReference: value.string(at: 15),
+                        literalBalance: value.string(at: 16) ?? "")
+                }
+            guard row.int64(at: 20) == Int64(occurrences.count) else {
+                throw RepositoryError.relationshipViolation("Incomplete bank occurrence graph.")
+            }
+            return BankStatementSectionPlanDTO(id: id, accountId: row.string(at: 1) ?? "",
+                documentId: row.string(at: 16) ?? "", importSessionId: row.string(at: 17) ?? "",
+                normalizedDocumentId: row.string(at: 18) ?? "", sectionOrdinal: Int(row.int64(at: 19) ?? 0),
+                parserProfileId: row.string(at: 2) ?? "", parserProfileVersion: row.string(at: 3) ?? "",
+                nativeCurrency: row.string(at: 4) ?? "", sourceEvidence: CBQStatementSourceEvidenceDTO(
+                    sourceFormatCode: row.string(at: 5) ?? "", statementBoundaryDateISO: row.string(at: 6),
+                    statementStartDateISO: row.string(at: 7), statementEndDateISO: row.string(at: 8),
+                    openingBalanceMinor: row.int64(at: 9), openingBalanceDecimal: row.string(at: 10),
+                    closingBalanceMinor: row.int64(at: 11), closingBalanceDecimal: row.string(at: 12)),
+                identityPatterns: identities, sourceRangeStart: row.int64(at: 13).map(Int.init),
+                sourceRangeEnd: row.int64(at: 14).map(Int.init), productLabel: row.string(at: 15) ?? "", rows: occurrences,
+                sourceDetails: try row.string(at: 21).map { try JSONDecoder().decode(BankSectionSourceDetailsDTO.self, from: Data($0.utf8)) })
+        }
+        return .init(sections: sections)
+    }
 
     func createImportSession(_ payload: ImportSessionDTO) throws -> String {
         let sql = "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);"
@@ -2059,6 +2193,18 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
 
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
         try priorImportedStatementWithoutTransaction(algorithm: algorithm, fingerprint: fingerprint)
+    }
+
+    func successfulImportContainsFingerprint(algorithm: String, fingerprint: String) throws -> Bool {
+        let matches = try db.query(sql: """
+        SELECT EXISTS(
+          SELECT 1
+          FROM document_fingerprints df
+          INNER JOIN import_sessions s ON s.id = df.import_session_id
+          WHERE df.algorithm = ? AND df.fingerprint = ? AND s.validation_status = 'passed'
+        );
+        """, params: [algorithm, fingerprint]) { $0.int64(at: 0) ?? 0 }
+        return matches == [1]
     }
 
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
@@ -2273,6 +2419,13 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         }
     }
 
+    func cbqSourceCoveragePeriods(workspaceId: String) throws -> [StatementCoveragePeriodDTO] {
+        guard try db.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='statement_source_observations';") == 1 else { return [] }
+        return try db.query(sql: "SELECT DISTINCT account_id, statement_start_date, statement_end_date FROM statement_source_observations WHERE workspace_id = ? AND statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL ORDER BY account_id, statement_start_date, statement_end_date;", params: [workspaceId]) { row in
+            StatementCoveragePeriodDTO(accountID: row.string(at: 0) ?? "", startISO: row.string(at: 1) ?? "", endISO: row.string(at: 2) ?? "")
+        }
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         return try db.withExclusiveAccess {
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
@@ -2473,7 +2626,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
     }
 }
 
-fileprivate final class SQLiteTransactionRepo: TransactionRepository {
+final class SQLiteTransactionRepo: TransactionRepository {
     private let db: SQLiteDatabase
     init(db: SQLiteDatabase) { self.db = db }
 
@@ -2514,95 +2667,79 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
-        var sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE t.workspace_id = ?"
-        var params: [Any?] = [workspaceId]
-        if let importSessionId {
-            sql += " AND import_session_id = ?"
-            params.append(importSessionId)
-        }
-        sql += " ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
-
-        return try db.query(sql: sql, params: params) { row in
-            let transactionId = row.string(at: 0) ?? ""
-            let rawRows = try rawRows(for: transactionId)
-            return TransactionDTO(
-                id: transactionId,
-                workspaceId: row.string(at: 1) ?? "",
-                accountId: row.string(at: 2),
-                importSessionId: row.string(at: 3),
-                documentId: row.string(at: 4),
-                originalRowId: row.string(at: 5),
-                postedDateISO: row.string(at: 6) ?? "",
-                financialDateRole: row.string(at: 21) ?? "transaction_date",
-                statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
-                valueDateISO: row.string(at: 7),
-                description: row.string(at: 8),
-                payee: row.string(at: 9),
-                reference: row.string(at: 10),
-                nativeCurrency: row.string(at: 11) ?? "",
-                amountMinor: row.int64(at: 12) ?? 0,
-                amountDecimal: row.string(at: 13) ?? "",
-                direction: row.string(at: 14) ?? "",
-                runningBalanceMinor: row.int64(at: 15),
-                isReconciled: row.bool(at: 16),
-                isTrusted: row.bool(at: 17),
-                trustedAtISO: row.string(at: 18),
-                createdAtISO: row.string(at: 19) ?? "",
-                updatedAtISO: row.string(at: 20),
-                rawRows: rawRows
-            )
-        }
+        try loadTransactions(workspaceId: workspaceId, importSessionId: importSessionId, trustedOnly: false)
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
-        let sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE t.workspace_id = ? AND t.is_trusted = 1 ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
-        return try db.query(sql: sql, params: [workspaceId]) { row in
-            let transactionId = row.string(at: 0) ?? ""
-            let rawRows = try rawRows(for: transactionId)
-            return TransactionDTO(
-                id: transactionId,
-                workspaceId: row.string(at: 1) ?? "",
-                accountId: row.string(at: 2),
-                importSessionId: row.string(at: 3),
-                documentId: row.string(at: 4),
-                originalRowId: row.string(at: 5),
-                postedDateISO: row.string(at: 6) ?? "",
-                financialDateRole: row.string(at: 21) ?? "transaction_date",
-                statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
-                valueDateISO: row.string(at: 7),
-                description: row.string(at: 8),
-                payee: row.string(at: 9),
-                reference: row.string(at: 10),
-                nativeCurrency: row.string(at: 11) ?? "",
-                amountMinor: row.int64(at: 12) ?? 0,
-                amountDecimal: row.string(at: 13) ?? "",
-                direction: row.string(at: 14) ?? "",
-                runningBalanceMinor: row.int64(at: 15),
-                isReconciled: row.bool(at: 16),
-                isTrusted: row.bool(at: 17),
-                trustedAtISO: row.string(at: 18),
-                createdAtISO: row.string(at: 19) ?? "",
-                updatedAtISO: row.string(at: 20),
-                rawRows: rawRows
-            )
+        try loadTransactions(workspaceId: workspaceId, importSessionId: nil, trustedOnly: true)
+    }
+
+    private func loadTransactions(workspaceId: String, importSessionId: String?, trustedOnly: Bool) throws -> [TransactionDTO] {
+        var scope = "t.workspace_id = ?"
+        var params: [Any?] = [workspaceId]
+        if let importSessionId { scope += " AND t.import_session_id = ?"; params.append(importSessionId) }
+        if trustedOnly { scope += " AND t.is_trusted = 1" }
+
+        // Both reads share the existing connection/namespace gate. Batch source
+        // links once rather than re-entering that gate for every transaction.
+        return try db.withExclusiveAccess {
+            let rawSQL = """
+                SELECT trr.transaction_id, trr.id, trr.normalized_row_id, trr.contribution_type,
+                       nr.row_index, nr.record_digest, nr.normalized_document_id, nd.profile_id, nd.profile_version
+                FROM transaction_raw_rows trr
+                INNER JOIN transactions t ON t.id = trr.transaction_id
+                INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id
+                INNER JOIN normalized_documents nd ON nd.id = nr.normalized_document_id
+                WHERE \(scope)
+                ORDER BY trr.transaction_id ASC, nr.row_index ASC, trr.id ASC;
+                """
+            let links = try db.query(sql: rawSQL, params: params) { row in
+                (row.string(at: 0) ?? "", TransactionRawRowDTO(
+                    id: row.string(at: 1) ?? "",
+                    normalizedRowId: row.string(at: 2) ?? "",
+                    contributionType: row.string(at: 3),
+                    sourceOrdinal: row.int64(at: 4).map(Int.init),
+                    normalizedRecordDigest: row.string(at: 5),
+                    normalizedDocumentId: row.string(at: 6),
+                    parserProfileId: row.string(at: 7),
+                    parserProfileVersion: row.string(at: 8)
+                ))
+            }
+            var rawByTransaction: [String: [TransactionRawRowDTO]] = [:]
+            for (id, row) in links { rawByTransaction[id, default: []].append(row) }
+            let sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE \(scope) ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
+            return try db.query(sql: sql, params: params) { row in
+                let transactionId = row.string(at: 0) ?? ""
+                return TransactionDTO(
+                    id: transactionId,
+                    workspaceId: row.string(at: 1) ?? "",
+                    accountId: row.string(at: 2),
+                    importSessionId: row.string(at: 3),
+                    documentId: row.string(at: 4),
+                    originalRowId: row.string(at: 5),
+                    postedDateISO: row.string(at: 6) ?? "",
+                    financialDateRole: row.string(at: 21) ?? "transaction_date",
+                    statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
+                    valueDateISO: row.string(at: 7),
+                    description: row.string(at: 8),
+                    payee: row.string(at: 9),
+                    reference: row.string(at: 10),
+                    nativeCurrency: row.string(at: 11) ?? "",
+                    amountMinor: row.int64(at: 12) ?? 0,
+                    amountDecimal: row.string(at: 13) ?? "",
+                    direction: row.string(at: 14) ?? "",
+                    runningBalanceMinor: row.int64(at: 15),
+                    isReconciled: row.bool(at: 16),
+                    isTrusted: row.bool(at: 17),
+                    trustedAtISO: row.string(at: 18),
+                    createdAtISO: row.string(at: 19) ?? "",
+                    updatedAtISO: row.string(at: 20),
+                    rawRows: rawByTransaction[transactionId] ?? []
+                )
+            }
         }
     }
 
-    private func rawRows(for transactionId: String) throws -> [TransactionRawRowDTO] {
-        let sql = "SELECT trr.id, trr.normalized_row_id, trr.contribution_type, nr.row_index, nr.record_digest, nr.normalized_document_id, nd.profile_id, nd.profile_version FROM transaction_raw_rows trr INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id INNER JOIN normalized_documents nd ON nd.id = nr.normalized_document_id WHERE trr.transaction_id = ? ORDER BY nr.row_index ASC, trr.id ASC;"
-        return try db.query(sql: sql, params: [transactionId]) { row in
-            TransactionRawRowDTO(
-                id: row.string(at: 0) ?? "",
-                normalizedRowId: row.string(at: 1) ?? "",
-                contributionType: row.string(at: 2),
-                sourceOrdinal: row.int64(at: 3).map(Int.init),
-                normalizedRecordDigest: row.string(at: 4),
-                normalizedDocumentId: row.string(at: 5),
-                parserProfileId: row.string(at: 6),
-                parserProfileVersion: row.string(at: 7)
-            )
-        }
-    }
 }
 
 // MARK: - Utilities

@@ -9,7 +9,7 @@ struct DashboardInvestmentSnapshotCard: View {
     let overview: InvestmentOverview
     let openInvestments: () -> Void
 
-    private var scope: InvestmentOverviewScope { overview.total }
+    private var scope: InvestmentOverviewScope { overview.performance }
     private var usd: InvestmentOverviewLine? { scope.usd }
     private var inr: InvestmentOverviewLine? { scope.lines.first { $0.currency == "INR" } }
     private var valueTitle: String { scope.priceCount < scope.holdingCount ? "Priced holdings value" : "Current value" }
@@ -83,13 +83,13 @@ struct DashboardInvestmentSnapshotCard: View {
     private var compactPerformance: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: theme.spacing.controlGap) {
-                performanceMetric("Known cost", amount: usd?.cost?.covering(scope.costCount))
-                performanceMetric("Gain / loss", amount: usd?.gain?.covering(scope.gainCount), profit: true)
+                performanceMetric("Invested / contributed", amount: usd?.cost?.covering(scope.costCount))
+                performanceMetric("Growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
                 returnMetric
             }
             VStack(alignment: .leading, spacing: theme.spacing.small) {
-                performanceMetric("Known cost", amount: usd?.cost?.covering(scope.costCount))
-                performanceMetric("Gain / loss", amount: usd?.gain?.covering(scope.gainCount), profit: true)
+                performanceMetric("Invested / contributed", amount: usd?.cost?.covering(scope.costCount))
+                performanceMetric("Growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
                 returnMetric
             }
         }
@@ -121,28 +121,21 @@ struct DashboardInvestmentSnapshotCard: View {
 
     private var returnMetric: some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text("Return")
+            Text("Growth %")
                 .font(theme.typography.caption)
                 .foregroundStyle(theme.palette.secondaryText)
             Text(scope.returnPercent ?? "Unavailable")
                 .font(scope.returnPercent == nil ? theme.typography.caption : theme.typography.tableMoney)
                 .monospacedDigit()
-                .foregroundStyle(scope.returnPercent == nil ? theme.palette.secondaryText : theme.palette.primaryText)
+                .foregroundStyle(scope.returnPercent == nil ? theme.palette.secondaryText
+                                 : profitColor(scope.lines.first { $0.gain?.covering(scope.gainCount) != nil && $0.gainCost?.covering(scope.gainCount) != nil }?.gain?.numerator.sign ?? 0))
                 .fixedSize(horizontal: true, vertical: false)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var coverageTruth: some View {
-        Group {
-            if scope.costCount == 0 {
-                Text("Fund cost, gain and return are unavailable. ISP contributions are not fund acquisition cost.")
-            } else if scope.costCount == scope.holdingCount, scope.gainCount == scope.holdingCount {
-                Text("Cost, gain and return cover all \(scope.holdingCount) holdings.")
-            } else {
-                Text("Cost covers \(scope.costCount)/\(scope.holdingCount) holdings; gain and return cover \(scope.gainCount)/\(scope.holdingCount). ISP contributions are not fund acquisition cost.")
-            }
-        }
+        Text(overview.performanceBasis)
         .font(theme.typography.caption)
         .foregroundStyle(theme.palette.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
@@ -158,14 +151,14 @@ struct DashboardInvestmentSnapshotCard: View {
                     "Source quotes · \(scope.priceCount)/\(scope.holdingCount) priced · \(quoteAgeText(now: now))",
                     systemImage: "clock"
                 )
-                .foregroundStyle(freshnessColor(quoteAge(now: now)))
+                .foregroundStyle(freshnessColor(scope.quotes.map { $0.freshnessAge(at: now) }.max() ?? 0))
             }
             if scope.fxMissing {
                 Label("FX conversion unavailable for some totals", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(theme.palette.secondaryText)
             } else if !scope.fxDates.isEmpty {
                 Label("FX · \(fxAgeText(now: now))", systemImage: "arrow.left.arrow.right")
-                    .foregroundStyle(freshnessColor(fxAge(now: now)))
+                    .foregroundStyle(freshnessColor(scope.fxDates.map { Int(WeekdayFreshness.seconds(from: $0, to: now) / 86_400) }.max() ?? 0))
             }
         }
         .font(theme.typography.caption)
@@ -201,9 +194,7 @@ struct DashboardInvestmentSnapshotCard: View {
     }
 
     private func freshnessColor(_ days: Int) -> Color {
-        if days == 0 { return Color(nsColor: .systemGreen) }
-        let progress = CGFloat(min(3, max(0, days - 1))) / 3
-        return Color(nsColor: NSColor.systemYellow.blended(withFraction: progress, of: .systemRed) ?? .systemRed)
+        FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(days)))
     }
 
     private func profitColor(_ sign: Int) -> Color {

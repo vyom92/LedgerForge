@@ -6,7 +6,7 @@
 
 import Foundation
 
-struct NormalizedRow: Identifiable {
+nonisolated struct NormalizedRow: Identifiable, Sendable {
 
     let id = UUID()
 

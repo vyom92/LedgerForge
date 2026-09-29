@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum AxisCreditCardXLSXParserError: Error, Equatable, LocalizedError {
+nonisolated enum AxisCreditCardXLSXParserError: Error, Equatable, LocalizedError {
     case unsupportedDocument
     case changedHeader
     case malformedSourceEvidence
@@ -19,7 +19,7 @@ enum AxisCreditCardXLSXParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class AxisCreditCardXLSXParser: StatementParser {
+nonisolated final class AxisCreditCardXLSXParser: StatementParser {
     static let profileID = "axis.credit-card.xlsx"
     static let profileVersion = "1"
     var name: String { "Axis Credit Card XLSX" }

@@ -56,7 +56,7 @@ nonisolated struct StatementDate: Comparable, Equatable, Sendable, Hashable {
     var canonical: String { String(format: "%04d-%02d-%02d", year, month, day) }
     var presentation: String {
         let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return "\(day) \(names[month - 1]) \(String(format: "%02d", year % 100))"
+        return "\(String(format: "%02d", day)) \(names[month - 1]) \(String(format: "%02d", year % 100))"
     }
 
     static func < (lhs: StatementDate, rhs: StatementDate) -> Bool {
@@ -119,7 +119,7 @@ nonisolated struct SelectedStatementMonth: Equatable, Sendable, Hashable, Compar
     }
 }
 
-enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
+nonisolated enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
     case transactionDate = "transaction_date"
     case postingDate = "posting_date"
     case valueDate = "value_date"
@@ -128,7 +128,7 @@ enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
     case statementDate = "statement_date"
 }
 
-enum StatementTimezoneEvidence: Equatable, Sendable {
+nonisolated enum StatementTimezoneEvidence: Equatable, Sendable {
     enum PersistenceError: Error, Equatable {
         case malformedCode(String)
         case invalidIANAIdentifier(String)
@@ -154,7 +154,7 @@ enum StatementTimezoneEvidence: Equatable, Sendable {
 }
 
 /// Privacy-minimal link between a transaction and one normalized source record.
-struct TransactionSourceProvenance: Equatable, Sendable {
+nonisolated struct TransactionSourceProvenance: Equatable, Sendable {
     let normalizedDocumentID: String
     let normalizedRowID: String
     let sourceOrdinal: Int
@@ -171,6 +171,9 @@ struct TransactionSourceProvenance: Equatable, Sendable {
     /// Privacy-safe digest of a parser-recognized structured reference. Raw
     /// narrations and references are deliberately excluded from V11 lineage.
     let structuredReferenceDigest: String?
+    /// Exact printed balance token retained for the approved bank occurrence
+    /// observation graph. It never supplies or corrects canonical Money.
+    let literalRunningBalance: String?
 
     init(
         normalizedDocumentID: String,
@@ -181,7 +184,8 @@ struct TransactionSourceProvenance: Equatable, Sendable {
         parserProfileID: String,
         parserProfileVersion: String,
         sourceTransactionDate: StatementDate? = nil,
-        structuredReferenceDigest: String? = nil
+        structuredReferenceDigest: String? = nil,
+        literalRunningBalance: String? = nil
     ) {
         self.normalizedDocumentID = normalizedDocumentID
         self.normalizedRowID = normalizedRowID
@@ -192,11 +196,12 @@ struct TransactionSourceProvenance: Equatable, Sendable {
         self.parserProfileVersion = parserProfileVersion
         self.sourceTransactionDate = sourceTransactionDate
         self.structuredReferenceDigest = structuredReferenceDigest
+        self.literalRunningBalance = literalRunningBalance
     }
 }
 
 extension String {
-    static func normalizedRecordDigest(values: [String]) -> String {
+    nonisolated static func normalizedRecordDigest(values: [String]) -> String {
         let payload = values.map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
         return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
     }
@@ -220,12 +225,12 @@ nonisolated struct AxisUPITransactionEventEvidence: Equatable, Sendable {
 
 /// Credit-card liability movement. This is intentionally separate from the
 /// debit/credit vocabulary used by bank accounts.
-enum CardLiabilityEffect: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum CardLiabilityEffect: String, CaseIterable, Equatable, Sendable, Codable {
     case increasesAmountOwed = "card_increase_owed"
     case decreasesAmountOwed = "card_decrease_owed"
 }
 
-struct Transaction: Identifiable {
+nonisolated struct Transaction: Identifiable, Sendable {
 
     /// Runtime identity is stable for persisted transactions. New parser output
     /// receives an ephemeral UUID until the provider persists its durable ID.
@@ -253,7 +258,7 @@ struct Transaction: Identifiable {
     var amount: Decimal { money.amount }
     var balance: Decimal? { runningBalanceMoney?.amount }
     var currency: String { money.currency.code }
-    var signedAmountDisplay: String {
+    @MainActor var signedAmountDisplay: String {
         MoneyFormatting.signedDisplay(
             money,
             isCredit: cardLiabilityEffect == .decreasesAmountOwed || creditMoney != nil

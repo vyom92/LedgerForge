@@ -4,7 +4,7 @@
 
 import Foundation
 
-final class CSVAnalyzer {
+nonisolated final class CSVAnalyzer {
 
     func analyze(text: String, fileURL: URL) -> Document {
 

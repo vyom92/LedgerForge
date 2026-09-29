@@ -53,14 +53,14 @@ struct CardStatement: Identifiable, Equatable, Sendable {
     let summaryComponents: [CardStatementSummaryComponent]
     let sections: [CardStatementSection]
 
-    var newBalance: Money? {
+    nonisolated var newBalance: Money? {
         summaryComponents.first { $0.persistenceCode == "new_balance" }?.money
             ?? summaryComponents.first { $0.persistenceCode == "axis_total_payment_due" }?.money
     }
     var minimumAmountDue: Money? {
         summaryComponents.first { $0.persistenceCode == "minimum_amount_due" }?.money
     }
-    var dueDate: StatementDate? { summaryComponents.first { $0.persistenceCode == "due_date" }?.date }
+    nonisolated var dueDate: StatementDate? { summaryComponents.first { $0.persistenceCode == "due_date" }?.date }
 }
 
 struct CardStatementSection: Identifiable, Equatable, Sendable {

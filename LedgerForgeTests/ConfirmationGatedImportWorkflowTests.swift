@@ -58,11 +58,41 @@ struct ConfirmationGatedImportWorkflowTests {
             let firstBalance = try #require(model.plan.balances.first)
             let initialCaptureMatches = firstBalance.money == initialMoney && !firstBalance.included
             #expect(initialCaptureMatches)
+            #expect(firstBalance.financialBalanceDate == nil, "Opening a draft does not infer a date for a saved capture")
             if case .capturedAccountBalance = firstBalance.provenance {} else { Issue.record("Expected genuine captured provenance") }
+            model.captureAccountBalance(account)
+            let capturedDate = try #require(account.currentBalanceAsOfISO).prefix(10)
+            #expect(model.plan.balances.first?.financialBalanceDate?.canonical == String(capturedDate))
             model.setAccountIncluded(account, included: true)
             model.save()
             #expect(model.saveState == .saved)
             let saved = try provider.fundingPlanRepo.plans(workspaceId: workspace)
+            #expect(saved.first?.balances.first?.financialBalanceDateISO == String(capturedDate))
+            #expect(plans.plans.first?.balances.first?.financialBalanceDate?.canonical == String(capturedDate))
+            if let sqlite {
+                // The date belongs to the exact captured amount, and must survive
+                // the ordinary two-file backup, restoration and a fresh open.
+                DatabaseProvider.shared = provider
+                let backup = BackupRestoreCoordinator(testingAt: folder.appendingPathComponent("planning.sqlite"))
+                backup.installTestProvider(sqlite)
+                let destination = folder.appendingPathComponent("backups")
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+                await backup.createBackup(to: destination)
+                let package = try #require(backup.lastBackupURL)
+                let manifest = try BackupFiles.verifyPackage(package)
+                #expect(manifest.schemaVersion == 29)
+                let restoredURL = folder.appendingPathComponent("restored.sqlite")
+                _ = try BackupCompatibility.prepareCandidate(package: package, manifest: manifest, destination: restoredURL)
+                let restored = try SQLiteRepositoryProvider(path: restoredURL.path)
+                #expect(try restored.fundingPlanRepo.plans(workspaceId: workspace) == saved)
+                try restored.database.checkpointAndClose()
+                let reopened = try SQLiteRepositoryProvider(path: restoredURL.path, migrations: allMigrations, access: .existing)
+                defer { reopened.database.close() }
+                #expect(try reopened.fundingPlanRepo.plans(workspaceId: workspace) == saved)
+                let snapshot = try RepositoryStoreHydrator(databaseProvider: .verifiedSQLite(reopened), workspaceId: workspace,
+                    participatesInLifecycleGate: false).stageHydration()
+                #expect(snapshot.fundingPlans.first?.balances.first?.financialBalanceDate?.canonical == String(capturedDate))
+            }
             let savedDraft = model.plan
             model.refreshCapturedAccountBalances()
             let unchangedOpen = model.plan == savedDraft && !model.isDirty
@@ -78,6 +108,7 @@ struct ConfirmationGatedImportWorkflowTests {
             let refreshed = try #require(model.plan.balances.first)
             let refreshMatchesCurrent = refreshed.money == latest.currentBalanceMoney && refreshed.included && model.isDirty
             #expect(refreshMatchesCurrent)
+            #expect(refreshed.financialBalanceDate == nil, "Automatic changed-amount draft refresh requires explicit date recapture")
             let savedPlanUnchanged = try provider.fundingPlanRepo.plans(workspaceId: workspace) == saved
             #expect(savedPlanUnchanged)
 
@@ -91,6 +122,7 @@ struct ConfirmationGatedImportWorkflowTests {
             let manual = try #require(model.plan.balances.first)
             let manualPreserved = manual.provenance == .manual && manual.money?.amount == .zero && manual.included
             #expect(manualPreserved)
+            #expect(manual.financialBalanceDate == nil)
 
             let other = try await engine.prepareImport(from: root.appendingPathComponent("HDFC/HDFC NRO FY 25-26.pdf"))
             let otherResult = await engine.commitPreparedImport(other, accountChoice: .createNewAccount(displayName: "HDFC NRO"))

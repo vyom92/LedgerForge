@@ -22,8 +22,10 @@ final class BackupRestoreCoordinator: ObservableObject {
     private var targetChangeCounter: Int64?
     private var needsRelaunchConfirmation = false
     private(set) var ownsStartupGate = false
+    private(set) var ledgerLifecyclePermit: LedgerLifecyclePermit?
     private var task: Task<Void, Never>?
     private(set) var layout: RestoreLayout?
+    private var enrollmentStore = BackgroundEnrollmentStore()
 
 #if DEBUG
     enum FailurePoint: Hashable { case afterPreservation, candidateOpen, hydration, activationRecord, rollbackOpen, interruptBeforeCommit, interruptAfterCommit }
@@ -32,7 +34,10 @@ final class BackupRestoreCoordinator: ObservableObject {
     private var isIsolatedTest = false
     private var exitsOnInterruptionForTesting = false
     private var didRunProcessProbe = false
-    init(testingAt url: URL) { layout = RestoreLayout(current: url); isIsolatedTest = true }
+    init(testingAt url: URL, enrollmentStore: BackgroundEnrollmentStore? = nil) {
+        layout = RestoreLayout(current: url); isIsolatedTest = true
+        self.enrollmentStore = enrollmentStore ?? BackgroundEnrollmentStore(url: url.deletingLastPathComponent().appendingPathComponent("test-enrollment.json"))
+    }
     func installTestProvider(_ provider: SQLiteRepositoryProvider) { testProvider = provider }
     func closeTestProvider() throws {
         try testProvider?.database.checkpointAndClose()
@@ -153,7 +158,7 @@ final class BackupRestoreCoordinator: ObservableObject {
     }
 
     private func prepareRuntime(_ url: URL, readOnly: Bool) throws -> (SQLiteRepositoryProvider, DatabaseProvider, RepositoryStoreHydrator, RepositoryRuntimeSnapshot) {
-        let sqlite = try SQLiteRepositoryProvider(path: url.path, migrations: allMigrations, access: readOnly ? .readOnlySnapshot : .existing)
+        let sqlite = try SQLiteRepositoryProvider(path: url.path, migrations: allMigrations, access: readOnly ? .readOnlySnapshot : .existing, lifecyclePermit: readOnly ? nil : ledgerLifecyclePermit)
         do {
             let runtime = DatabaseProvider.verifiedSQLite(sqlite)
             let hydrator = RepositoryStoreHydrator(databaseProvider: runtime, participatesInLifecycleGate: false)
@@ -338,7 +343,7 @@ final class BackupRestoreCoordinator: ObservableObject {
             await discardCandidate(); message = BackupError.activeWork.localizedDescription; return
         }
         isBusy = true; isReplacing = true; canCancel = false; message = "Preserving the current ledger…"
-        defer { isBusy = false; isReplacing = false }
+        defer { isBusy = false; isReplacing = false; ledgerLifecyclePermit?.release(); ledgerLifecyclePermit = nil }
         var record: RestoreOperation?
         var installed: SQLiteRepositoryProvider?
         var activationDecisionAttempted = false
@@ -355,6 +360,11 @@ final class BackupRestoreCoordinator: ObservableObject {
                 catch { try? db.closeChecked(); throw error }
             }
             let current = try currentProvider()
+            ledgerLifecyclePermit = try LedgerAccessCoordinator.shared(path: layout.current.path).beginLifecycle()
+            current?.database.lifecyclePermit = ledgerLifecyclePermit
+            if let targetChangeCounter, let current {
+                guard try current.database.totalChangeCounter() == targetChangeCounter else { throw BackupError.candidateChanged }
+            }
             let priorUsable = current != nil && DatabaseProvider.shared.persistenceState.isUsable && targetChangeCounter != nil
             if let current {
                 let database = current.database
@@ -406,6 +416,12 @@ final class BackupRestoreCoordinator: ObservableObject {
             activationDecisionAttempted = true
             try await Self.work { try layout.write(activated) }
             record = activated
+            try SQLiteBackgroundJobRepository.reconcileRestore(database: prepared.0.database)
+            let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+            try prepared.0.database.adoptCompletedLifecycle(stamp)
+            // Failed external enrollment reconciliation leaves the old helper stamp refused.
+            try? enrollmentStore.reconcile(path: prepared.0.databasePath, activation: stamp)
+            ledgerLifecyclePermit = nil
             // From here the new database is durable authority. No throwing work
             // separates the final complete provider/store publication.
             publish(prepared)
@@ -443,6 +459,12 @@ final class BackupRestoreCoordinator: ObservableObject {
                     var rolledBack = pending; rolledBack.phase = .rolledBack
                     do { try layout.write(rolledBack) }
                     catch { try? prior.0.database.closeChecked(); throw error }
+                    try SQLiteBackgroundJobRepository.reconcileRestore(database: prior.0.database)
+                    let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+                    try prior.0.database.adoptCompletedLifecycle(stamp)
+                    // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                    try? enrollmentStore.reconcile(path: prior.0.databasePath, activation: stamp)
+                    ledgerLifecyclePermit = nil
                     publish(prior)
                     gate.finishExclusive(providerChanged: true)
                     candidateID = nil; candidateManifest = nil
@@ -454,7 +476,20 @@ final class BackupRestoreCoordinator: ObservableObject {
                 do {
                     if currentClosed {
                         let prior = try prepareRuntime(layout.current, readOnly: false)
+                        try SQLiteBackgroundJobRepository.reconcileRestore(database: prior.0.database)
+                        let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+                        try prior.0.database.adoptCompletedLifecycle(stamp)
+                        // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                        try? enrollmentStore.reconcile(path: prior.0.databasePath, activation: stamp)
+                        ledgerLifecyclePermit = nil
                         publish(prior)
+                    } else if let permit = ledgerLifecyclePermit, let current = try currentProvider() {
+                        try SQLiteBackgroundJobRepository.reconcileRestore(database: current.database)
+                        let stamp = try permit.finish(schemaVersion: allMigrations.count)
+                        try current.database.adoptCompletedLifecycle(stamp)
+                        // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                        try? enrollmentStore.reconcile(path: current.databasePath, activation: stamp)
+                        ledgerLifecyclePermit = nil
                     }
                     gate.finishExclusive(providerChanged: currentClosed)
                     await discardCandidate()
@@ -467,8 +502,28 @@ final class BackupRestoreCoordinator: ObservableObject {
     /// Invoked before any creating/migrating provider open. No receipt means a
     /// verified legacy database remains usable; absence is handled by bootstrap.
     func recoverBeforeStartup() throws {
-        guard let layout, let record = try layout.readReceipt() else { return }
+        guard let layout else { return }
+        guard let record = try layout.readReceipt() else {
+            let authority = LedgerAccessCoordinator.shared(path: layout.current.path)
+            if let stamp = try? authority.readStamp(), stamp.transitioning, stamp.transitionKind == "replacement" {
+                try BackupFiles.regularFile(layout.current)
+                guard DatabaseActivityGate.shared.beginExclusive(allowUnavailable: true) else { throw BackupError.activeWork }
+                ownsStartupGate = true
+                ledgerLifecyclePermit = try authority.beginLifecycle(recovering: true)
+            }
+            return
+        }
         try layout.validateOwnership()
+        let authority = LedgerAccessCoordinator.shared(path: layout.current.path)
+        if record.phase == .rolledBack || record.phase == .relaunchConfirmed {
+            if let stamp = try? authority.withAccess({ try authority.validate(expected: nil, permit: nil) }) {
+                // A previous process may have exited between durable activation
+                // and operational enrollment repair. Repeated repair is a no-op.
+                try? enrollmentStore.reconcile(path: layout.current.path, activation: stamp)
+                return
+            }
+        }
+        ledgerLifecyclePermit = try authority.beginLifecycle(recovering: true)
         switch record.phase {
         case .preserving, .preserved:
             guard DatabaseActivityGate.shared.beginExclusive(allowUnavailable: true) else { throw BackupError.activeWork }
@@ -482,11 +537,13 @@ final class BackupRestoreCoordinator: ObservableObject {
             restoredReceipt = record; needsRelaunchConfirmation = true
         case .rolledBack:
             try BackupFiles.regularFile(layout.current)
+            guard DatabaseActivityGate.shared.beginExclusive(allowUnavailable: true) else { throw BackupError.activeWork }
+            ownsStartupGate = true
         }
     }
 
     func startupDidFail() {
-        guard ownsStartupGate else { return }
+        guard ownsStartupGate || ledgerLifecyclePermit != nil else { return }
         ownsStartupGate = false
         enterUnavailable()
     }
@@ -497,16 +554,33 @@ final class BackupRestoreCoordinator: ObservableObject {
         isBusy = true; canCancel = false
         defer { isBusy = false }
         do {
-            guard var record = try layout.readReceipt() else { throw BackupError.recoveryUnavailable }
+            let optionalRecord = try layout.readReceipt()
             guard let provider = try currentProvider(), provider.generationToken == DatabaseProvider.shared.generationToken else {
                 throw BackupError.recoveryUnavailable
             }
             let db = provider.database
             try await Self.work { try BackupCompatibility.verifyDatabase(db) }
-            if record.phase == .preserved || record.phase == .preserving {
+            guard var record = optionalRecord else {
+                try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
+                let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+                try provider.database.adoptCompletedLifecycle(stamp)
+                // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
+                ledgerLifecyclePermit = nil
+                DatabaseActivityGate.shared.finishExclusive(providerChanged: true)
+                ownsStartupGate = false
+                return
+            }
+            if record.phase == .preserved || record.phase == .preserving || record.phase == .rolledBack {
                 record.phase = .rolledBack
                 let finished = record
                 try await Self.work { try layout.write(finished) }
+                try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
+                let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+                try provider.database.adoptCompletedLifecycle(stamp)
+                // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
+                ledgerLifecyclePermit = nil
                 DatabaseActivityGate.shared.finishExclusive(providerChanged: true)
                 ownsStartupGate = false
                 message = "The previous ledger was recovered after an interrupted restore."
@@ -514,6 +588,12 @@ final class BackupRestoreCoordinator: ObservableObject {
                 record.phase = .relaunchConfirmed
                 let finished = record
                 try await Self.work { try layout.write(finished) }
+                try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
+                let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
+                try provider.database.adoptCompletedLifecycle(stamp)
+                // Failed external enrollment reconciliation leaves the old helper stamp refused.
+                try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
+                ledgerLifecyclePermit = nil
                 restoredReceipt = record; needsRelaunchConfirmation = false
                 DatabaseActivityGate.shared.finishExclusive(providerChanged: true)
                 ownsStartupGate = false
@@ -535,6 +615,8 @@ final class BackupRestoreCoordinator: ObservableObject {
     }
 
     private func enterUnavailable() {
+        ledgerLifecyclePermit?.release()
+        ledgerLifecyclePermit = nil
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
         DatabaseActivityGate.shared.enterUnavailable()

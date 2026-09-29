@@ -50,7 +50,8 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
     let contents: String
     let exclusions: [String]
 
-    static let contentDescription = "Complete durable ledger, including stored provenance and import/validation records."
+    static let legacyContentDescription = "Complete durable ledger, including stored provenance and import/validation records."
+    static let contentDescription = "Complete durable ledger, provenance, import/validation records, and exact email originals with intake receipts."
     static let excluded = ["external_statement_files", "credentials_and_keychain", "runtime_diagnostic_logs",
                            "appearance_window_profile_preferences", "private_screenshots", "development_artifacts"]
 
@@ -60,20 +61,21 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
         guard database.file == "ledger.sqlite", database.byteSize > 0,
               database.sha256.count == 64, database.sha256.allSatisfy({ "0123456789abcdef".contains($0) }),
               ISO8601DateFormatter().date(from: createdAt) != nil,
-              contents == Self.contentDescription, exclusions == Self.excluded else { throw BackupError.damaged }
+              contents == (schemaVersion >= 23 ? Self.contentDescription : Self.legacyContentDescription),
+              exclusions == Self.excluded else { throw BackupError.damaged }
     }
 }
 
 /// This is the one backup compatibility policy. A future schema requires an
 /// explicit policy decision here; the migration registry alone does not grant it.
 nonisolated enum BackupCompatibility {
-    static let supportedSchemaVersion = 22
+    static let supportedSchemaVersion = 29
     static var migrationIdentities: [BackupManifest.MigrationIdentity] {
         allMigrations.map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
     }
     static func migrations(for version: Int) throws -> [Migration] {
-        guard [17, 18, 19, 20, 21, 22].contains(version), allMigrations.last?.version == 22,
-              allMigrations.map(\.version) == Array(1...22) else { throw BackupError.incompatible }
+        guard (17...supportedSchemaVersion).contains(version), allMigrations.last?.version == supportedSchemaVersion,
+              allMigrations.map(\.version) == Array(1...supportedSchemaVersion) else { throw BackupError.incompatible }
         return allMigrations.filter { $0.version <= version }
     }
     static func identities(for version: Int) throws -> [BackupManifest.MigrationIdentity] {
@@ -91,6 +93,13 @@ nonisolated enum BackupCompatibility {
     private static let v20Inventory = Result { try expectedInventory(version: 20) }
     private static let v21Inventory = Result { try expectedInventory(version: 21) }
     private static let v22Inventory = Result { try expectedInventory(version: 22) }
+    private static let v23Inventory = Result { try expectedInventory(version: 23) }
+    private static let v24Inventory = Result { try expectedInventory(version: 24) }
+    private static let v25Inventory = Result { try expectedInventory(version: 25) }
+    private static let v26Inventory = Result { try expectedInventory(version: 26) }
+    private static let v27Inventory = Result { try expectedInventory(version: 27) }
+    private static let v28Inventory = Result { try expectedInventory(version: 28) }
+    private static let v29Inventory = Result { try expectedInventory(version: 29) }
     private static func expectedInventory(version: Int) throws -> [SchemaObject] {
         // Empty, source-independent schema authority; no financial fixture/data.
         let schema = SQLiteDatabase(path: ":memory:")
@@ -107,17 +116,21 @@ nonisolated enum BackupCompatibility {
         }
     }
     static func checkContents(_ db: SQLiteDatabase) throws {
-        // The accepted current schema has one BLOB owner. Unknown/nonempty
-        // attachments require an owner content decision, never row deletion.
+        // Only V23's named inbox owns the newly approved original payloads.
+        // Unknown/nonempty legacy attachments still require a content decision.
         guard try db.queryInt("SELECT count(*) FROM attachments WHERE blob IS NOT NULL AND length(blob) > 0;") == 0 else {
             throw BackupError.excludedPayload
+        }
+        if try db.queryInt("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='gmail_originals';") == 1 {
+            do { try SQLiteGmailInboxRepository.verifyBackupContents(db) }
+            catch { throw BackupError.damaged }
         }
     }
     static func verifyDatabase(_ db: SQLiteDatabase, schemaVersion: Int = supportedSchemaVersion) throws {
         let chain = try migrations(for: schemaVersion)
         do { _ = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: true) }
         catch { throw BackupError.incompatible }
-        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : v22Inventory).get()
+        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : schemaVersion == 22 ? v22Inventory : schemaVersion == 23 ? v23Inventory : schemaVersion == 24 ? v24Inventory : schemaVersion == 25 ? v25Inventory : schemaVersion == 26 ? v26Inventory : schemaVersion == 27 ? v27Inventory : schemaVersion == 28 ? v28Inventory : v29Inventory).get()
         guard try schemaInventory(db) == inventory else { throw BackupError.incompatible }
         let integrity = try db.query(sql: "PRAGMA integrity_check;") { $0.string(at: 0) }
         guard integrity == ["ok"], try db.query(sql: "PRAGMA foreign_key_check;", map: { _ in true }).isEmpty else {
@@ -126,16 +139,16 @@ nonisolated enum BackupCompatibility {
         try checkContents(db)
     }
 
-    /// Receipt-owned startup and isolated V17/V18/V19/V20/V21 candidates share this exact
+    /// Receipt-owned startup and supported older candidates share this exact
     /// bridge. The caller must already own an existing open database.
     static func upgradeSupportedCandidateIfNeeded(_ db: SQLiteDatabase) throws {
-        let chain = try migrations(for: 22)
+        let chain = try migrations(for: supportedSchemaVersion)
         let history = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: false)
-        guard [17, 18, 19, 20, 21, 22].contains(history.count) else { throw BackupError.incompatible }
-        if history.count < 22 {
+        guard (17...supportedSchemaVersion).contains(history.count) else { throw BackupError.incompatible }
+        if history.count < supportedSchemaVersion {
             try verifyDatabase(db, schemaVersion: history.count)
             // runMigrations validates the immutable prefix and applies only
-            // its exact missing V18/V19/V20/V21/V22 tail inside SQLite migration ownership.
+            // its exact missing tail through V29 inside SQLite migration ownership.
             try db.runMigrations(chain)
         }
         try verifyDatabase(db)
@@ -149,7 +162,7 @@ nonisolated enum BackupCompatibility {
         try db.open(access: .existing)
         do {
             try verifyDatabase(db, schemaVersion: manifest.schemaVersion)
-            if manifest.schemaVersion < 22 { try upgradeSupportedCandidateIfNeeded(db) }
+            if manifest.schemaVersion < supportedSchemaVersion { try upgradeSupportedCandidateIfNeeded(db) }
             try db.checkpointAndClose()
         } catch { try? db.closeChecked(); throw error }
         return try BackupFiles.hash(destination).sha256

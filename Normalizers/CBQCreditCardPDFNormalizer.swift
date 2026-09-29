@@ -1,6 +1,6 @@
 import Foundation
 
-enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
     case unsupportedFamily
     case changedHeader
@@ -28,7 +28,7 @@ enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct CBQCreditCardPDFNormalizationResult {
+nonisolated struct CBQCreditCardPDFNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
@@ -39,7 +39,7 @@ struct CBQCreditCardPDFNormalizationResult {
 /// does not create decrypted files and does not interpret transactions beyond
 /// the source facts required by the parser (dates, money tail, section and
 /// exact reference line).
-final class CBQCreditCardPDFNormalizer {
+nonisolated final class CBQCreditCardPDFNormalizer {
     static let logicalHeader = [
         "Posting Date", "Purchase Date", "Description", "Reference",
         "Original Amount", "Original Currency", "Posted Amount",
@@ -132,6 +132,9 @@ final class CBQCreditCardPDFNormalizer {
         var sawTermination = false
         var terminationPageIndex: Int?
         var sourceOrdinal = 0
+        var inInstallmentPlan = false
+        var installmentPlanTotal = false
+        var installmentPlanRows = 0
         for (pageIndex, page) in pages.enumerated() {
             let lines = page.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             var index = 0
@@ -144,7 +147,7 @@ final class CBQCreditCardPDFNormalizer {
                     continue
                 }
                 if Self.isEndOfStatement(line) {
-                    guard currentSectionID == nil else { throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection }
+                    guard currentSectionID == nil, !inInstallmentPlan || installmentPlanTotal else { throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection }
                     guard !sawTermination else {
                         throw CBQCreditCardPDFNormalizationError.malformedNonFinancialPage(page: pageIndex + 1)
                     }
@@ -152,6 +155,50 @@ final class CBQCreditCardPDFNormalizer {
                     terminationPageIndex = pageIndex
                     index += 1
                     continue
+                }
+                // Source-owned future installment schedule, after the card
+                // transaction subtotals. Its one-date plan rows are not charges.
+                if line == "Installment Purchase Plan Details" {
+                    guard currentSectionID == nil, !installmentPlanTotal, index + 2 < lines.count,
+                          lines[index + 1] == "Description Date Purchase Tenure Monthly Installments Paid Remaining Balance",
+                          lines[index + 2] == "Amount Plan Installment Months Amount Months Amount" else {
+                        throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
+                    }
+                    inInstallmentPlan = true
+                    index += 3
+                    continue
+                }
+                if inInstallmentPlan {
+                    guard Self.rowStart(line) == nil, Self.sectionDescriptor(line: line) == nil,
+                          Self.subtotal(line: line) == nil else {
+                        throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
+                    }
+                    let money = #"[0-9]+(?:,[0-9]{3})*\.[0-9]{2}"#
+                    if Self.matches(#"^[0-9X*]{8,},\s+[0-9]{6}\s+\d{2}/\d{2}/\d{2}\s+\#(money)\s+[0-9]+\s+\#(money)\s+[0-9]+\s+\#(money)\s+[0-9]+\s+\#(money)$"#, in: line).count == 1 {
+                        guard !installmentPlanTotal else { throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1) }
+                        installmentPlanRows += 1
+                        index += 1
+                        continue
+                    }
+                    if Self.matches(#"^Total Amount in QAR(?:\s+\#(money)){4}$"#, in: line).count == 1 {
+                        guard installmentPlanRows > 0, !installmentPlanTotal else { throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1) }
+                        installmentPlanTotal = true
+                        index += 1
+                        continue
+                    }
+                    if line == "Continued on next page..." {
+                        guard !installmentPlanTotal, pageIndex + 1 < pages.count,
+                              pages[pageIndex + 1].contains("Installment Purchase Plan Details") else {
+                            throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
+                        }
+                        index += 1
+                        continue
+                    }
+                    // No unrecognized dated or monetary shape may disappear
+                    // into the companion table's descriptive/footer text.
+                    if Self.matches(#"\d{2}/\d{2}/\d{2}|[0-9]+\.[0-9]{2}"#, in: line).count > 0 {
+                        throw CBQCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
+                    }
                 }
                 if line == "Continued on next page..." {
                     guard currentSectionID != nil else { throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection }
@@ -258,7 +305,7 @@ final class CBQCreditCardPDFNormalizer {
                         next += 1
                     }
                     let effect = tail.isCredit ? CardLiabilityEffect.decreasesAmountOwed.rawValue : CardLiabilityEffect.increasesAmountOwed.rawValue
-                    let scope = description.hasPrefix("Paid using bankDirect") ? "account_level" : "instrument_level"
+                    let scope = Self.isAccountRepayment(description) ? "account_level" : "instrument_level"
                     rows.append(NormalizedRow(rowNumber: sourceOrdinal, values: [
                         start.postingDate, start.purchaseDate, description, reference ?? "",
                         tail.original ?? "", tail.originalCurrency ?? "", tail.posted, effect,
@@ -322,6 +369,10 @@ final class CBQCreditCardPDFNormalizer {
         )
     }
 
+    nonisolated static func isAccountRepayment(_ description: String) -> Bool {
+        description.hasPrefix("Paid using bankDirect") || description.hasPrefix("PAID BY ACCOUNT")
+    }
+
     private static func parseSections(pages: [String]) throws -> [Section] {
         var result: [Section] = []
         var nextID = 1
@@ -376,14 +427,9 @@ final class CBQCreditCardPDFNormalizer {
     }
 
     private static func sectionDescriptor(line: String) -> Descriptor? {
-        let label: String
-        if line.range(of: "Diners Club", options: .caseInsensitive) != nil {
-            label = "Diners Club"
-        } else if line.range(of: "Mastercard Platinum", options: .caseInsensitive) != nil {
-            label = "Mastercard Platinum"
-        } else {
-            return nil
-        }
+        // Longest labels first: Titanium is part of the printed product identity.
+        let labels = ["Diners Club Titanium", "Mastercard Titanium", "Mastercard Platinum", "Visa Platinum", "Diners Club"]
+        guard let label = labels.first(where: { line.range(of: $0, options: .caseInsensitive) != nil }) else { return nil }
         guard let card = maskedCard(in: line), let cardRange = line.range(of: card, options: .caseInsensitive),
               let labelRange = line.range(of: label, options: .caseInsensitive),
               cardRange.upperBound <= labelRange.lowerBound else {
@@ -434,6 +480,10 @@ final class CBQCreditCardPDFNormalizer {
                 posted: values[2],
                 isCredit: !values[1].isEmpty
             )
+        }
+        if let values = captures(#"^(Standing Order for Instalment # [0-9]+, .+?)\s+(\#(money))\s+([0-9]{6}(?:\s+,[0-9]+)?)$"#, in: description), values.count == 3 {
+            return Tail(description: values[0] + " " + values[2], original: nil,
+                originalCurrency: nil, posted: values[1], isCredit: false)
         }
         return nil
     }
@@ -690,7 +740,12 @@ final class CBQCreditCardPDFNormalizer {
         let candidates = text.components(separatedBy: .newlines).compactMap { rawLine -> String? in
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard line.range(of: label, options: [.anchored, .caseInsensitive]) != nil else { return nil }
-            let remainder = String(line.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            var remainder = String(line.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let qualifier = "(excluding installment balance)"
+            if ["Previous Outstanding Balance", "Current Outstanding Balance"].contains(label),
+               remainder.lowercased().hasPrefix(qualifier) {
+                remainder = String(remainder.dropFirst(qualifier.count)).trimmingCharacters(in: .whitespaces)
+            }
             if remainder.uppercased().hasPrefix("CR ") {
                 let amount = String(remainder.dropFirst(3)).trimmingCharacters(in: .whitespaces)
                 return isSummaryMoney(amount) ? "CR " + amount : nil

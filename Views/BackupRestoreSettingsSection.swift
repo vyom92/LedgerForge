@@ -39,7 +39,7 @@ private enum BackupFilePanel {
         let alert = NSAlert()
         alert.messageText = "Replace Current Ledger?"
         let date = ISO8601DateFormatter().date(from: manifest.createdAt)
-        let time = date?.formatted(date: .abbreviated, time: .shortened) ?? manifest.createdAt
+        let time = date.map { AppDateDisplay.timestamp($0) } ?? "Time unavailable"
         let version = manifest.application.version ?? "Version unavailable"
         let replacement = ApplicationAvailability.shared.permitsMutation
             ? "This replaces current ledger data with the selected backup. The previous ledger is retained until a successful relaunch."

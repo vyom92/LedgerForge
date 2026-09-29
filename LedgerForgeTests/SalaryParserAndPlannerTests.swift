@@ -213,7 +213,7 @@ struct SalaryParserAndPlannerTests {
         #expect(reloaded.qatarCommitments.first { $0.id == cardRow }?.fundingAccountID == "qar-card")
         #expect(reloaded.qatarCommitments.first { $0.id == cardRow }?.money == amount)
         #expect(reloaded.qatarCommitments.first { $0.id == bankRow }?.fundingAccountID == "bank")
-        #expect(viewModel.retainedCommitmentAccountLabel(id: "bank") == "Saved funding bank · bank")
+        #expect(viewModel.retainedCommitmentAccountLabel(id: "bank") == "Saved funding bank · bank · QAR")
         #expect(viewModel.plan.balances.isEmpty)
     }
 

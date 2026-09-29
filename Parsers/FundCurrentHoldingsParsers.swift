@@ -2,7 +2,7 @@ import Foundation
 
 /// Geometry is used only to recover printed cell relationships. Financial values
 /// always enter InvestmentDecimal from the original token, never from coordinates.
-private enum InvestmentPDFLayout {
+nonisolated private enum InvestmentPDFLayout {
     struct Token { let text: String; let x: Double; let y: Double; let ordinal: Int }
     struct Line { let text: String; let ordinal: Int; let tokens: [Token] }
     static func compact(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
@@ -41,7 +41,7 @@ private enum InvestmentPDFLayout {
     }
 }
 
-struct CASCurrentHoldingsParser {
+nonisolated struct CASCurrentHoldingsParser {
     func parse(_ source: RawDocument) throws -> InvestmentStatementEvidence {
         let text = InvestmentPDFLayout.compact(source.searchableText)
         if text.localizedCaseInsensitiveContains("Consolidated Account Summary") {
@@ -200,7 +200,7 @@ struct CASCurrentHoldingsParser {
     }
 }
 
-struct CBQCurrentHoldingsParser {
+nonisolated struct CBQCurrentHoldingsParser {
     func parse(_ source: RawDocument) throws -> InvestmentStatementEvidence {
         guard let pages = source.pdfPageTexts, let cover = pages.first else { throw InvestmentError.invalidEvidence }
         let text = InvestmentPDFLayout.compact(source.searchableText)
@@ -283,7 +283,7 @@ struct CBQCurrentHoldingsParser {
     }
 }
 
-struct CBQLegacyPortfolioHoldingsParser {
+nonisolated struct CBQLegacyPortfolioHoldingsParser {
     func parse(_ source: RawDocument) throws -> InvestmentStatementEvidence {
         guard source.pdfPageTexts?.count == 1,
               source.searchableText.localizedCaseInsensitiveContains("Investment Portfolio Holding Statement") else {

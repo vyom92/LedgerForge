@@ -19,6 +19,7 @@ struct ImportPersistenceResult: Equatable {
     let isSalaryImport: Bool
     let isInvestmentImport: Bool
     let accountOutcome: ImportAccountOutcome
+    let bankSections: [BankImportReceiptDTO.Section]
 
     init(
         persisted: Bool,
@@ -35,7 +36,8 @@ struct ImportPersistenceResult: Equatable {
         isEquivalentSupportingSource: Bool = false,
         isSalaryImport: Bool = false,
         isInvestmentImport: Bool = false,
-        accountOutcome: ImportAccountOutcome = .unavailable
+        accountOutcome: ImportAccountOutcome = .unavailable,
+        bankSections: [BankImportReceiptDTO.Section] = []
     ) {
         self.persisted = persisted
         self.workspaceId = workspaceId
@@ -52,6 +54,7 @@ struct ImportPersistenceResult: Equatable {
         self.isSalaryImport = isSalaryImport
         self.isInvestmentImport = isInvestmentImport
         self.accountOutcome = accountOutcome
+        self.bankSections = bankSections
     }
 
     static let skipped = ImportPersistenceResult(
@@ -223,6 +226,24 @@ enum ImportCardInstrumentChoice: Equatable {
     }
 }
 
+/// A document-owned bank section can either reuse one eligible bank account or
+/// propose a distinct account. It deliberately carries no transaction or
+/// overlap decision: parent occurrence publication remains a separate atomic
+/// operation.
+enum ImportBankSectionChoice: Equatable {
+    case useExistingAccount(accountId: String)
+    case createNewAccount(displayName: String)
+
+    var isComplete: Bool {
+        switch self {
+        case .useExistingAccount(let accountID):
+            return !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .createNewAccount(let displayName):
+            return !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+}
+
 enum ImportAccountChoice: Equatable {
     case useExistingAccount(accountId: String)
     case createNewAccount(displayName: String)
@@ -235,18 +256,33 @@ enum ImportAccountChoice: Equatable {
         accountId: String,
         sectionChoices: [String: ImportCardInstrumentChoice]
     )
+    /// Choices are keyed by a source-document-scoped bank section identifier.
+    /// A missing key represents a matched section or an unresolved user choice;
+    /// the review determines which before any future parent confirmation.
+    case bankSections([String: ImportBankSectionChoice])
 
     var proposedAccountDisplayName: String? {
         switch self {
         case .createNewAccount(let name), .createNewCardLiabilityAccountAndInstrument(let name):
             return name
+        case .bankSections:
+            return nil
         default:
             return nil
         }
     }
 }
 
-enum ImportIdentityReview: Equatable, Sendable {
+struct BankSectionIdentityReview: Equatable, Sendable {
+    let sectionID: String
+    let product: String
+    let sourceAccountLabel: String
+    let period: DeclaredStatementPeriod?
+    let transactionCount: Int
+    let identityReview: ImportIdentityReview
+}
+
+indirect enum ImportIdentityReview: Equatable, Sendable {
     case unavailable
     case matchedExisting(accountId: String)
     case choiceRequired(eligibleAccountIds: [String])
@@ -256,21 +292,34 @@ enum ImportIdentityReview: Equatable, Sendable {
     case liabilityAccountChoiceRequired(eligibleLiabilityAccountIds: [String])
     case ambiguous
     case conflict
-    case cardChoiceRequired(eligibleLiabilityAccountIds: [String])
+    case cardChoiceRequired(eligibleLiabilityAccountIds: [String], matchedLiabilityAccountId: String? = nil)
+    /// Relationship statements retain each source section's identity review.
+    /// The array breaks the recursive value graph; a section review itself must
+    /// never contain another bank-section aggregate.
+    case bankSections([BankSectionIdentityReview])
 
     var eligibleAccountIds: [String] {
         switch self {
         case .choiceRequired(let values),
                 .liabilityAccountChoiceRequired(let values),
-                .cardChoiceRequired(let values):
+                .cardChoiceRequired(let values, _):
             return values
+        case .bankSections:
+            return []
         default: return []
         }
+    }
+
+    var matchedCardLiabilityAccountId: String? {
+        if case .cardChoiceRequired(_, let accountID) = self { return accountID }
+        return nil
     }
 
     var requiresExplicitChoice: Bool {
         switch self {
         case .choiceRequired, .liabilityAccountChoiceRequired, .cardChoiceRequired: return true
+        case .bankSections(let sections):
+            return sections.contains { $0.identityReview.requiresExplicitChoice }
         default: return false
         }
     }
@@ -280,9 +329,16 @@ enum ImportIdentityReview: Equatable, Sendable {
         case .choiceRequired, .liabilityAccountChoiceRequired, .cardChoiceRequired,
                 .ambiguous, .conflict:
             return true
+        case .bankSections(let sections):
+            return sections.contains { $0.identityReview.blocksConfirmation }
         case .unavailable, .matchedExisting:
             return false
         }
+    }
+
+    var isBankSectionParent: Bool {
+        if case .bankSections = self { return true }
+        return false
     }
 
     /// Temporary Packet 1 compatibility for the existing SwiftUI account
@@ -631,6 +687,7 @@ extension ImportPersistenceCoordinating {
 }
 
 enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
+    case bankSourceHeld(BankImportHoldDTO)
     case resolvedAccountUnavailable
     case resolvedAccountWorkspaceMismatch
     case resolvedWorkspaceUnavailable
@@ -658,6 +715,9 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .bankSourceHeld(let hold):
+            let position = hold.sourceOrdinal.map { " at source row \($0)" } ?? ""
+            return "The whole bank statement is held\(position): \(hold.reason.replacingOccurrences(of: "_", with: " ")). No account section was imported."
         case .resolvedAccountUnavailable:
             return "Resolved identity references an unavailable account."
         case .resolvedAccountWorkspaceMismatch:
@@ -1025,6 +1085,61 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
     }
 
+    private func persistBankImport(provider: DatabaseProvider, financialDocument: FinancialDocument,
+                                   importSession: ImportSession, validation: ImportValidationResult,
+                                   fingerprintSet: PreparedDocumentFingerprintSet, accountChoice: ImportAccountChoice?,
+                                   providerGeneration: ProviderGenerationToken,
+                                   fingerprint: ExactStatementFingerprint) throws -> ImportPersistenceResult {
+        let review = try reviewValidatedImport(financialDocument: financialDocument, validation: validation)
+        let plan: BankImportPlanDTO
+        if financialDocument.bankStatementEvidence != nil {
+            plan = try mapper.bankImportPlan(financialDocument: financialDocument, importSession: importSession,
+                validation: validation, fingerprintSet: fingerprintSet, providerGeneration: providerGeneration,
+                review: review, accountChoice: accountChoice)
+        } else if let account = try standaloneBankOccurrenceAccount(financialDocument, validation: validation,
+                    accountChoice: accountChoice, provider: provider) {
+            plan = try mapper.standaloneBankImportPlan(financialDocument: financialDocument, importSession: importSession,
+                validation: validation, fingerprintSet: fingerprintSet, providerGeneration: providerGeneration, account: account)
+        } else {
+            throw ImportPersistenceCoordinationError.explicitChoiceRequired
+        }
+        let result: BankImportRepositoryResult
+        switch provider.confirmedImportRepo.reviewBankImport(plan) {
+        case .ready(let reviewed): result = provider.confirmedImportRepo.commitBankImport(reviewed)
+        case .exactDuplicate: result = .exactDuplicate
+        case .held(let hold): result = .held(hold)
+        case .staleProviderGeneration: result = .staleProviderGeneration
+        case .persistenceUnavailable: result = .persistenceUnavailable
+        }
+        switch result {
+        case .committed(let receipt):
+            return .init(persisted: true, workspaceId: mapper.workspaceId, accountId: nil,
+                importSessionId: receipt.importSessionID, transactionCount: receipt.importedCount,
+                importAttemptId: plan.history.successfulAttempt.id, sourceRowCount: receipt.sourceCount,
+                recognizedExistingRowCount: receipt.sourceCount-receipt.importedCount,
+                isEquivalentSupportingSource: receipt.importedCount == 0 && receipt.sourceCount > 0,
+                bankSections: receipt.sections)
+        case .exactDuplicate:
+            guard let previous = try provider.importSessionRepo.priorImportedStatement(algorithm: fingerprint.algorithm, fingerprint: fingerprint.digest) else {
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
+            let attemptID = recordAttempt(provider: provider, outcome: .exactStatementDuplicate,
+                coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .reviewPriorImport,
+                persistence: .rejectedRecorded, transactionCount: 0, relatedImportSessionId: previous.importSessionId)
+            return .init(persisted: false, workspaceId: mapper.workspaceId, accountId: nil,
+                importSessionId: previous.importSessionId, transactionCount: 0,
+                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID)
+        case .held(let hold):
+            let attemptID = recordAttempt(provider: provider, outcome: .bankSourceOverlapHeld,
+                coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .integrityReviewRequired,
+                persistence: .rejectedRecorded, transactionCount: 0)
+            throw ImportPersistenceCommitFailure(originalError: ImportPersistenceCoordinationError.bankSourceHeld(hold), importAttemptId: attemptID)
+        case .staleProviderGeneration: throw ImportPersistenceCoordinationError.staleProviderGeneration
+        case .retryableContention: throw ImportPersistenceCoordinationError.retryableContention
+        case .persistenceUnavailable: throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+    }
+
     private func makeConfirmedPlan(
         provider: DatabaseProvider,
         financialDocument: FinancialDocument,
@@ -1034,6 +1149,12 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> ConfirmedImportPlanDTO {
+        // A parent with several bank accounts must never enter the legacy
+        // single-account publication operation. The bank parent operation
+        // owns its later atomic confirmation boundary.
+        guard financialDocument.bankStatementEvidence == nil else {
+            throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+        }
         if financialDocument.cardStatementEvidence != nil {
             return try makeCardConfirmedPlan(
                 provider: provider,
@@ -1072,7 +1193,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     selectedAccountId = proposedID
                 case .createNewCardLiabilityAccountAndInstrument,
                      .useExistingCardLiabilityAccount,
-                     .useExistingCardLiabilityAccountSections:
+                     .useExistingCardLiabilityAccountSections,
+                     .bankSections:
                     confirmedChoice = .unspecified
                     selectedAccountId = proposedID
                 case nil:
@@ -1131,7 +1253,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     selectedAccountId = proposedID
                 case .createNewCardLiabilityAccountAndInstrument,
                      .useExistingCardLiabilityAccount,
-                     .useExistingCardLiabilityAccountSections:
+                     .useExistingCardLiabilityAccountSections,
+                     .bankSections:
                     confirmedChoice = .unspecified
                     selectedAccountId = proposedID
                 case nil:
@@ -1202,7 +1325,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 confirmedAccountChoice = .useExistingAccount(accountId: accountID)
             case .createNewCardLiabilityAccountAndInstrument,
                  .useExistingCardLiabilityAccount,
-                 .useExistingCardLiabilityAccountSections:
+                 .useExistingCardLiabilityAccountSections,
+                 .bankSections:
                 // Axis zero-section evidence has no instrument boundary. An
                 // instrument-oriented choice is invalid rather than being
                 // silently coerced into an account decision.
@@ -1230,7 +1354,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             return plan
         }
 
-        let isAccountOnlyAmexZero = contract == .amex &&
+        let isAccountOnlyAmexZero = contract.isAmex &&
             financialDocument.transactions.isEmpty &&
             financialDocument.zeroActivityEvidence != nil &&
             evidence.instrumentSections.isEmpty
@@ -1252,7 +1376,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
         let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
         let accountObservation = evidence.accountSourceIdentityObservations[0]
+        let eligibleAccountIDs = Set(try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
+            .filter {
+                $0.accountType == "credit_card" &&
+                    $0.nativeCurrency == evidence.nativeCurrency.code &&
+                    $0.institutionId == financialDocument.metadata.institution.rawValue
+            }.map(\.id))
         let accountCandidates = Set(snapshot.sourceObservations.filter {
+            eligibleAccountIDs.contains($0.subjectId) &&
             $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
             $0.associationAuthority == "user_confirmed" &&
             $0.observationKind == accountObservation.kind.rawValue &&
@@ -1336,6 +1467,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     }
                 }
             }
+        case .bankSections:
+            throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
         case nil where mappingsByAccount.filter({ _, mapping in
             let resolved = evidence.instrumentSections.compactMap {
                 mapping[$0.documentScopedSectionID]?.count == 1
@@ -1401,9 +1534,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     private func isCBQSourceObservationImport(_ document: FinancialDocument) -> Bool {
         guard document.metadata.institution == .cbq,
               document.metadata.documentType == .bankAccount,
-              document.bookedCurrency?.code == "QAR",
-              let profile = document.transactions.first?.sourceProvenance.first?.parserProfileID else { return false }
-        return [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID, CBQCurrentAccountPDFParser.monthlyProfileID].contains(profile)
+              ["QAR", "USD"].contains(document.bookedCurrency?.code),
+              document.parserProfileVersion == "1",
+              let profile = document.parserProfileID else { return false }
+        return ([CBQCurrentAccountXLSParser.profileID] + CBQCurrentAccountPDFParser.bankProfileIDs).contains(profile)
     }
 
     private func cbqCompatibleAccountIDs(provider: DatabaseProvider, financialDocument: FinancialDocument) throws -> [String] {
@@ -1417,7 +1551,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         var compatible = [String]()
         for account in try provider.accountRepo.accounts(workspaceId: mapper.workspaceId) {
             guard account.institutionId == Institution.cbq.rawValue,
-                  account.nativeCurrency == "QAR",
+                  account.nativeCurrency == financialDocument.bookedCurrency?.code,
                   account.accountType == "bank" else { continue }
             let strongAccounts = try provider.accountRepo.identifiers(accountId: account.id, workspaceId: mapper.workspaceId)
                 .filter { $0.scheme == FinancialIdentifierKind.institutionAccountId.rawValue && $0.identifier.count == 13 }
@@ -1435,11 +1569,13 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             if !incomingMasks.isEmpty {
                 let fullMatch = strongAccounts.contains { candidate in incomingMasks.allSatisfy { $0.isCompatible(withFullAccountNumber: candidate) } }
                 let maskMatch = Self.maskSetsCompatible(incomingMasks, durableMasks)
-                matches = fullMatch || maskMatch
+                matches = strongAccounts.isEmpty ? maskMatch :
+                    (fullMatch && strongAccounts.allSatisfy { candidate in incomingMasks.allSatisfy { $0.isCompatible(withFullAccountNumber: candidate) } })
             } else if let incomingFull {
                 let exactFull = strongAccounts.contains(incomingFull)
                 let maskedMatch = durableMasks.count >= 2 && durableMasks.allSatisfy { $0.isCompatible(withFullAccountNumber: incomingFull) }
-                matches = exactFull || maskedMatch
+                matches = strongAccounts.isEmpty ? maskedMatch :
+                    (exactFull && strongAccounts.allSatisfy { $0 == incomingFull })
             } else { matches = false }
             if matches { compatible.append(account.id) }
         }
@@ -1475,6 +1611,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard validation.passed else { return .unavailable }
 
         let provider = databaseProviderProvider()
+        if let evidence = financialDocument.bankStatementEvidence,
+           evidence.isAccountRelationshipStatement {
+            return try reviewBankStatementSections(
+                evidence,
+                financialDocument: financialDocument,
+                provider: provider
+            )
+        }
         if isCBQSourceObservationImport(financialDocument) {
             let candidates = try cbqCompatibleAccountIDs(provider: provider, financialDocument: financialDocument)
             switch candidates.count {
@@ -1511,12 +1655,22 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                   evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
                 return .unavailable
             }
+            let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
+                .filter {
+                    $0.accountType == "credit_card" &&
+                        $0.nativeCurrency == evidence.nativeCurrency.code &&
+                        $0.institutionId == financialDocument.metadata.institution.rawValue
+                }
+                .map(\.id).sorted()
+            let eligibleAccountIDs = Set(eligible)
             let accountIDs = Set(snapshot.sourceObservations.filter {
+                eligibleAccountIDs.contains($0.subjectId) &&
                 $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
                 $0.associationAuthority == "user_confirmed" &&
                 $0.observationKind == accountObservation.kind.rawValue &&
                 $0.sourceValue == accountObservation.value
             }.map(\.subjectId))
+            guard accountIDs.count <= 1 else { return .conflict }
             let exactlyMappedAccounts = accountIDs.filter { accountID in
                 let resolvedInstruments = evidence.instrumentSections.compactMap { incomingSection -> String? in
                     let incoming = incomingSection.sourceIdentityObservations[0]
@@ -1540,14 +1694,29 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             if exactlyMappedAccounts.count == 1, let accountID = exactlyMappedAccounts.first {
                 return .matchedExisting(accountId: accountID)
             }
-            let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
-                .filter {
-                    $0.accountType == "credit_card" &&
-                        $0.nativeCurrency == evidence.nativeCurrency.code &&
-                        $0.institutionId == financialDocument.metadata.institution.rawValue
-                }
-                .map(\.id).sorted()
+            if let accountID = accountIDs.first {
+                // An unresolved card section cannot erase the already confirmed
+                // liability owner and offer contradictory account destinations.
+                return .cardChoiceRequired(eligibleLiabilityAccountIds: [accountID],
+                    matchedLiabilityAccountId: accountID)
+            }
             return .cardChoiceRequired(eligibleLiabilityAccountIds: eligible)
+        }
+        if financialDocument.metadata.institution == .axis,
+           BankImportDecision.standaloneProfiles.contains(financialDocument.parserProfileID ?? ""),
+           financialDocument.parserProfileVersion == BankImportDecision.supportedVersion(for: financialDocument.parserProfileID ?? "") {
+            let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers)
+            let retained = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: mapper.workspaceId).sections
+            if identifiers.count == 1, identifiers[0].kind == .institutionAccountId,
+               identifiers[0].normalizedValue.range(of: #"^[0-9]{15}$"#, options: .regularExpression) != nil,
+               retained.contains(where: { $0.parserProfileId == "axis.relationship-bank.pdf" }) {
+                let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId).filter {
+                    $0.accountType == "bank" && $0.institutionId == Institution.axis.rawValue &&
+                        $0.nativeCurrency == financialDocument.bookedCurrency?.code
+                }
+                return try reviewAxisMaskedBankAccount(mask: identifiers[0].normalizedValue, eligibleAccounts: eligible,
+                    provider: provider, workspaceID: mapper.workspaceId, requiresMask: false)
+            }
         }
         let workspaceId = mapper.workspaceId
         let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
@@ -1590,6 +1759,168 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             .sorted()
         developerConsole?.info(.import, "Identity review available", metadata: ["eligibleAccounts": "\(eligibleAccountIds.count)"])
         return .choiceRequired(eligibleAccountIds: eligibleAccountIds)
+    }
+
+    private func reviewBankStatementSections(
+        _ evidence: BankStatementEvidence,
+        financialDocument: FinancialDocument,
+        provider: DatabaseProvider
+    ) throws -> ImportIdentityReview {
+        guard financialDocument.metadata.documentType == .bankAccount,
+              let currency = financialDocument.bookedCurrency,
+              financialDocument.metadata.institution == .axis || financialDocument.metadata.institution == .hdfc,
+              !evidence.sections.isEmpty else {
+            return .conflict
+        }
+
+        let workspaceID = mapper.workspaceId
+        let eligibleAccounts = try provider.accountRepo.accounts(workspaceId: workspaceID)
+            .filter {
+                $0.accountType == "bank" &&
+                    $0.nativeCurrency == currency.code &&
+                    $0.institutionId == financialDocument.metadata.institution.rawValue
+            }
+        let eligibleByID = Dictionary(uniqueKeysWithValues: eligibleAccounts.map { ($0.id, $0) })
+        let sectionReviews = try evidence.sections.sorted { $0.ordinal < $1.ordinal }.map { section in
+            let review: ImportIdentityReview
+            switch section.sourceIdentity {
+            case .fullAccountNumber:
+                let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
+                    workspaceId: workspaceID,
+                    identifiers: section.financialIdentifiers
+                )
+                switch resolution {
+                case .resolved(let accountID):
+                    review = eligibleByID[accountID] == nil ? .conflict : .matchedExisting(accountId: accountID)
+                case .ambiguous:
+                    review = .ambiguous
+                case .conflict:
+                    review = .conflict
+                case .noMatch:
+                    review = .choiceRequired(eligibleAccountIds: try eligibleUnidentifiedBankAccountIDs(
+                        eligibleAccounts,
+                        provider: provider,
+                        workspaceID: workspaceID
+                    ))
+                }
+            case .maskedAccountNumber(let mask):
+                review = try reviewAxisMaskedBankAccount(
+                    mask: mask,
+                    eligibleAccounts: eligibleAccounts,
+                    provider: provider,
+                    workspaceID: workspaceID
+                )
+            }
+            return BankSectionIdentityReview(
+                sectionID: section.id,
+                product: section.productLabel,
+                sourceAccountLabel: section.sourceIdentity.literal,
+                period: section.period,
+                transactionCount: section.transactionIDs.count,
+                identityReview: review
+            )
+        }
+
+        let matchedIDs = sectionReviews.compactMap { section -> String? in
+            guard case .matchedExisting(let accountID) = section.identityReview else { return nil }
+            return accountID
+        }
+        // Separate source accounts must retain separate destination ownership.
+        // A future parent commit repeats this against explicit choices.
+        guard Set(matchedIDs).count == matchedIDs.count else { return .conflict }
+        return .bankSections(sectionReviews)
+    }
+
+    private func eligibleUnidentifiedBankAccountIDs(
+        _ accounts: [AccountDTO],
+        provider: DatabaseProvider,
+        workspaceID: String
+    ) throws -> [String] {
+        try accounts.filter {
+            try provider.accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceID).isEmpty
+        }.map(\.id).sorted()
+    }
+
+    private func reviewAxisMaskedBankAccount(
+        mask: String,
+        eligibleAccounts: [AccountDTO],
+        provider: DatabaseProvider,
+        workspaceID: String,
+        requiresMask: Bool = true
+    ) throws -> ImportIdentityReview {
+        guard mask.count == 15,
+              mask.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == "X") }),
+              !requiresMask || mask.contains("X") else {
+            return .conflict
+        }
+        let retained = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID).sections
+        var matches = [String]()
+        for account in eligibleAccounts {
+            let identifiers = try provider.accountRepo.identifiers(accountId: account.id, workspaceId: workspaceID)
+            let strongNumbers = identifiers.filter {
+                $0.scheme == FinancialIdentifierKind.institutionAccountId.rawValue &&
+                    $0.strength == FinancialIdentifierStrength.strong.rawValue &&
+                    $0.verificationState == FinancialIdentifierVerificationState.verified.rawValue
+            }.map(\.identifier)
+            let observed = retained.filter { $0.accountId == account.id }.flatMap(\.identityPatterns)
+                .filter { $0.kind == "axis_masked_account_number" }
+            guard observed.allSatisfy({ BankImportDecision.mask(mask, matches: $0.pattern) }) else { continue }
+            if !strongNumbers.isEmpty {
+                // Contradictory strong identities cannot be overruled by an
+                // older compatible mask.
+                if strongNumbers.allSatisfy({ Self.axisMask(mask, isCompatibleWith: $0) }) { matches.append(account.id) }
+                continue
+            }
+            if !observed.isEmpty && observed.allSatisfy({ BankImportDecision.mask(mask, matches: $0.pattern) }) {
+                matches.append(account.id)
+            }
+        }
+        let sortedMatches = matches.sorted()
+        switch sortedMatches.count {
+        case 0:
+            return .choiceRequired(eligibleAccountIds: try eligibleUnidentifiedBankAccountIDs(
+                eligibleAccounts.filter { account in
+                    !retained.contains { $0.accountId == account.id && $0.identityPatterns.contains { $0.kind == "axis_masked_account_number" } }
+                },
+                provider: provider,
+                workspaceID: workspaceID
+            ))
+        case 1:
+            return .matchedExisting(accountId: sortedMatches[0])
+        default:
+            return .ambiguous
+        }
+    }
+
+    private static func axisMask(_ mask: String, isCompatibleWith candidate: String) -> Bool {
+        let normalized = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count == 15, normalized.allSatisfy({ $0.isASCII && $0.isNumber }) else { return false }
+        return zip(mask, normalized).allSatisfy { printed, full in printed == "X" || printed == full }
+    }
+
+    /// Select the occurrence path from durable same-account relationship
+    /// evidence, never from a loose date/amount resemblance. A held occurrence
+    /// decision cannot fall back to ordinary transaction creation.
+    private func standaloneBankOccurrenceAccount(_ document: FinancialDocument,
+            validation: ImportValidationResult, accountChoice: ImportAccountChoice?,
+            provider: DatabaseProvider) throws -> AccountDTO? {
+        guard BankImportDecision.standaloneProfiles.contains(document.parserProfileID ?? ""),
+              document.parserProfileVersion == BankImportDecision.supportedVersion(for: document.parserProfileID ?? "") else { return nil }
+        let review = try reviewValidatedImport(financialDocument: document, validation: validation)
+        let accountID: String
+        switch review {
+        case .matchedExisting(let id): accountID = id
+        case .choiceRequired(let eligible):
+            guard case .useExistingAccount(let id) = accountChoice, eligible.contains(id) else { return nil }
+            accountID = id
+        default: return nil
+        }
+        let sections = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: mapper.workspaceId).sections
+        guard sections.contains(where: { $0.accountId == accountID && BankImportDecision.relationshipProfiles.contains($0.parserProfileId) }) else { return nil }
+        guard let account = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId).first(where: { $0.id == accountID }) else {
+            throw ImportPersistenceCoordinationError.selectedAccountUnavailable
+        }
+        return account
     }
 
     func persistValidatedImport(
@@ -1716,6 +2047,13 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
         }
+        let standaloneOccurrenceAccount = try standaloneBankOccurrenceAccount(financialDocument,
+            validation: validation, accountChoice: accountChoice, provider: provider)
+        if financialDocument.bankStatementEvidence != nil || standaloneOccurrenceAccount != nil {
+            return try persistBankImport(provider: provider, financialDocument: financialDocument,
+                importSession: importSession, validation: validation, fingerprintSet: fingerprintSet,
+                accountChoice: accountChoice, providerGeneration: providerGeneration, fingerprint: fingerprint)
+        }
         let plan = try makeConfirmedPlan(
             provider: provider,
             financialDocument: financialDocument,
@@ -1726,7 +2064,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             providerGeneration: providerGeneration,
         )
         let repositoryResult: ConfirmedImportRepositoryResult
-        if !plan.cbqSourceRows.isEmpty {
+        if plan.bankStatementSectionPlan == nil, !plan.cbqSourceRows.isEmpty {
             switch provider.confirmedImportRepo.reviewCBQSourceOverlap(plan) {
             case .eligible(let reviewed):
                 repositoryResult = provider.confirmedImportRepo.commitReviewedCBQSourceOverlap(reviewed)
@@ -1784,10 +2122,16 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         providerGeneration: ProviderGenerationToken
     ) throws -> PartialImportReviewResult {
         guard validation.passed else { return .unsupportedEvidence }
+        // Parent sections need their own atomic occurrence operation. Do not
+        // construct a legacy single-account plan merely to ask about overlap.
+        if financialDocument.bankStatementEvidence != nil { return .ordinaryFullImport }
         try validate(fingerprintSet: fingerprintSet)
         let provider = databaseProviderProvider()
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+        if try standaloneBankOccurrenceAccount(financialDocument, validation: validation, accountChoice: accountChoice, provider: provider) != nil {
+            return .ordinaryFullImport
         }
         let plan = try makeConfirmedPlan(
             provider: provider,
@@ -1810,10 +2154,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         providerGeneration: ProviderGenerationToken
     ) throws -> StatementEquivalenceReviewResult {
         guard validation.passed else { return .notApplicable }
+        if financialDocument.bankStatementEvidence != nil { return .notApplicable }
         try validate(fingerprintSet: fingerprintSet)
         let provider = databaseProviderProvider()
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+        if try standaloneBankOccurrenceAccount(financialDocument, validation: validation, accountChoice: accountChoice, provider: provider) != nil {
+            return .notApplicable
         }
         let plan = try makeConfirmedPlan(
             provider: provider,

@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
     case unsupportedFamily
     case changedHeader
@@ -15,7 +15,7 @@ enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, Localized
     var errorDescription: String? {
         switch self {
         case .unsupportedNativeText: return "The Amex statement requires native selectable PDF text."
-        case .unsupportedFamily: return "The PDF is not the exact supported Amex Platinum QAR statement family."
+        case .unsupportedFamily: return "The PDF is not a supported Amex statement layout."
         case .changedHeader: return "The Amex statement header or layout changed."
         case .malformedSummary: return "The Amex statement summary is malformed."
         case .malformedTransaction(let ordinal): return "Amex financial row \(ordinal) is malformed."
@@ -27,14 +27,14 @@ enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, Localized
     }
 }
 
-struct AmericanExpressCreditCardPDFNormalizationResult {
+nonisolated struct AmericanExpressCreditCardPDFNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class AmericanExpressCreditCardPDFNormalizer {
+nonisolated final class AmericanExpressCreditCardPDFNormalizer {
     static let logicalHeader = [
         "Transaction Date", "Posting Date", "Details", "Reference",
         "Original Amount", "Original Currency", "Posted Amount",
@@ -68,7 +68,10 @@ final class AmericanExpressCreditCardPDFNormalizer {
         guard joined == text || Self.boundedWhitespace(joined) == Self.boundedWhitespace(text) else {
             throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
         }
-        guard joined.contains("The Platinum Card (QAR)"),
+        let isUSDZero = joined.contains("The American Express Card") && joined.contains("(USD)") &&
+            !joined.contains("The Platinum Card (QAR)")
+        let nativeCurrency = isUSDZero ? "USD" : "QAR"
+        guard (isUSDZero || joined.contains("The Platinum Card (QAR)")),
               joined.contains("Statement of Account"),
               joined.contains("AMEX (MIDDLE EAST) B.S.C. (C)"),
               joined.contains("Membership Number"),
@@ -80,8 +83,20 @@ final class AmericanExpressCreditCardPDFNormalizer {
         let membership = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+([0-9X-]+)\s+\d{2}/\d{2}/\d{2}\s+\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2}"#, in: joined)
         let statementDate = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+(\d{2}/\d{2}/\d{2})\s+\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2}"#, in: joined)
         let period = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+\d{2}/\d{2}/\d{2}\s+(\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2})"#, in: joined)
-        let summaryTable = try Self.summaryTable(pages: pages, evidence: pageEvidence)
+        let summaryTable = try Self.summaryTable(pages: pages, evidence: pageEvidence, currency: nativeCurrency)
         let summary = summaryTable.values
+        if isUSDZero {
+            // This selected USD layout has a carried balance and no row table.
+            // Its authentic source does not qualify USD transaction grammar.
+            let controls = try summary.prefix(4).map {
+                try Money(canonicalDecimal: $0.replacingOccurrences(of: ",", with: ""), currency: "USD")
+            }
+            guard controls[1].amount == .zero, controls[2].amount == .zero,
+                  controls[0] == controls[3] else {
+                throw AmericanExpressCreditCardPDFNormalizationError.unsupportedFamily
+            }
+            try Self.verifyUSDZeroRegions(pages: pages, evidence: pageEvidence, summary: summaryTable)
+        }
         let sectionPattern = #"^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"#
         // The source-only corpus audit found plain totals plus two totals with
         // an explicit CR suffix; DR is not part of this Amex layout contract.
@@ -106,6 +121,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
         var parsedSections: [ParsedSection] = []
         var rows: [NormalizedRow] = []
         for (pageIndex, page) in pages.enumerated() {
+            if isUSDZero { continue } // Every page was exhausted above.
             let pageNumber = pageIndex + 1
             // Nonfinancial pages are packaging, not required profile members.
             // Inert inserts may precede, follow or interrupt financial pages;
@@ -256,11 +272,12 @@ final class AmericanExpressCreditCardPDFNormalizer {
             .init(sourceOrdinal: 5, text: "NEW_CREDITS\t\(summary[1])"),
             .init(sourceOrdinal: 6, text: "NEW_DEBITS\t\(summary[2])"),
             .init(sourceOrdinal: 7, text: "NEW_BALANCE\t\(summary[3])"),
-            .init(sourceOrdinal: 8, text: "DUE_DATE\t\(summary[4])")
+            .init(sourceOrdinal: 8, text: "DUE_DATE\t\(summary[4])"),
+            .init(sourceOrdinal: 9, text: "NATIVE_CURRENCY\t\(nativeCurrency)")
         ]
         for (index, section) in parsedSections.enumerated() {
             fragments.append(.init(
-                sourceOrdinal: 9 + index,
+                sourceOrdinal: 10 + index,
                 text: "INSTRUMENT_SECTION\t\(section.id)\t\(section.account)\t\(section.holder)\t\(section.total)\t\(section.isCredit ? "CR" : "")"
             ))
         }
@@ -471,11 +488,44 @@ final class AmericanExpressCreditCardPDFNormalizer {
         let fragmentIndices: Set<Int>
     }
 
+    private static func verifyUSDZeroRegions(
+        pages: [String], evidence: [RawPDFPageEvidence]?, summary: SummaryTable
+    ) throws {
+        let financialToken = #"\d{1,2}[-/][A-Za-z0-9]{2,9}[-/]\d{2,4}|[0-9][0-9,]*\.[0-9]+|\([A-Z]{3}\)"#
+        for (index, page) in pages.enumerated() {
+            let lines = try financialLines(page,
+                evidence: evidence.flatMap { $0.indices.contains(index) ? $0[index] : nil },
+                pageNumber: index + 1,
+                summaryFragments: index == summary.pageIndex ? summary.fragmentIndices : [])
+            let text = lines.joined(separator: "\n")
+            let pattern = #"\bPage\s+(\d+)\s+of\s+(\d+)\b"#
+            let captures = allCaptures(pattern, in: text)
+            guard captures.count == 1, captures[0].count == 2,
+                  Int(captures[0][0]) == index + 1, Int(captures[0][1]) == pages.count,
+                  let pageLabel = text.range(of: pattern, options: .regularExpression),
+                  let footer = page.range(of: "This Card is issued by AMEX (Middle East)") else {
+                throw AmericanExpressCreditCardPDFNormalizationError.changedHeader
+            }
+            let body = String(text[pageLabel.upperBound...])
+            // This complete statutory notice is source prose. Its VAT acronym
+            // is not a booked currency marker or a transaction amount.
+            let financialBody = body.replacingOccurrences(
+                of: #"Value\s+Added\s+Tax\s+\(VAT\)\s+is\s+charged\s+at\s+[0-9]+(?:\.[0-9]+)?%\s+on\s+fees\s+and\s+charges\s+as\s+per\s+the\s+current\s+VAT\s+Law\s+of\s+the\s+Kingdom\s+of\s+Bahrain"#,
+                with: "", options: .regularExpression)
+            let footerText = String(page[footer.lowerBound...])
+            guard !containsUnresolvedFinancialStructure(financialBody),
+                  financialBody.range(of: financialToken, options: .regularExpression) == nil,
+                  footerText.range(of: financialToken, options: .regularExpression) == nil else {
+                throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: index + 1)
+            }
+        }
+    }
+
     /// The printed label columns own the amounts. PDFKit's string order may
     /// interleave operators, currency markers and values from this same row.
     /// Reconstruct only this Amex table; transaction/source order is untouched.
     private static func summaryTable(
-        pages: [String], evidence: [RawPDFPageEvidence]?
+        pages: [String], evidence: [RawPDFPageEvidence]?, currency: String
     ) throws -> SummaryTable {
         let labels = ["Previous", "Balance", "New", "Credits", "New", "Debits", "New", "Balance", "Due", "Date"]
         var summaries: [SummaryTable] = []
@@ -515,7 +565,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
                 let amounts = values.filter { fragments[$0].text.range(of: "^" + postedMoney + "$", options: .regularExpression) != nil }
                 let dates = values.filter { fragments[$0].text.range(of: #"^\d{2}/\d{2}/\d{2}$"#, options: .regularExpression) != nil }
                 let operators = values.filter { ["-", "+", "="].contains(fragments[$0].text) }
-                let currencies = values.filter { fragments[$0].text == "(QAR)" }
+                let currencies = values.filter { fragments[$0].text == "(\(currency))" }
                 guard values.count == 12, amounts.count == 4, dates.count == 1,
                       operators.map({ fragments[$0].text }) == ["-", "+", "="], currencies.count == 4 else {
                     throw AmericanExpressCreditCardPDFNormalizationError.malformedSummary
@@ -553,7 +603,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
                     let right = fragments[amounts[relation + 1]].geometry!
                     let op = fragments[operators[relation]].geometry!
                     let currency = fragments[currencies[relation + 1]].geometry!
-                    // The first QAR marker prefixes Previous Balance. Each
+                    // The first native-currency marker prefixes Previous Balance. Each
                     // remaining marker follows its adjacent operator between
                     // the corresponding amount cells. Other currencies,
                     // missing relations and competing tokens cannot be ignored.

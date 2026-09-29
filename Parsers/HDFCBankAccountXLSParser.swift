@@ -1,6 +1,6 @@
 import Foundation
 
-enum HDFCBankAccountXLSParserError: Error, Equatable, LocalizedError {
+nonisolated enum HDFCBankAccountXLSParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case missingHeader
     case changedHeader
@@ -89,7 +89,7 @@ enum HDFCBankAccountXLSParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class HDFCBankAccountXLSParser: StatementParser {
+nonisolated final class HDFCBankAccountXLSParser: StatementParser {
     static let profileID = "hdfc.bank-account.xls"
     static let profileVersion = "1"
 
@@ -308,7 +308,8 @@ final class HDFCBankAccountXLSParser: StatementParser {
                                 values: row.values
                             ),
                             parserProfileID: parserProfileID,
-                            parserProfileVersion: parserProfileVersion
+                            parserProfileVersion: parserProfileVersion,
+                            literalRunningBalance: row.rawValues?[6] ?? row.values[6]
                         )
                     ]
                 )
@@ -346,7 +347,7 @@ final class HDFCBankAccountXLSParser: StatementParser {
             ? try ZeroActivityStatementEvidence(
                 profileID: parserProfileID,
                 profileVersion: parserProfileVersion,
-                sourceFormatCode: fileFormat.rawValue,
+                sourceFormatCode: fileFormat.rawValue.lowercased(),
                 evidenceKind: .printedControls,
                 statementDate: period.end,
                 statementPeriod: period,
@@ -368,7 +369,7 @@ final class HDFCBankAccountXLSParser: StatementParser {
             transactions: transactions,
             financialIdentifiers: [identifier],
             sourceStatementEvidence: SourceStatementEvidence(
-                sourceFormatCode: fileFormat.rawValue,
+                sourceFormatCode: fileFormat.rawValue.lowercased(),
                 statementBoundaryDate: period.end,
                 period: period,
                 openingBalance: openingMoney,

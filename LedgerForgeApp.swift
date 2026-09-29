@@ -34,14 +34,22 @@ struct LedgerForgeApp: App {
         let environment = ProcessInfo.processInfo.environment
         if environment["LEDGERFORGE_TEST_HOST"] == "1" { return false }
 #if DEBUG
-        if environment["LEDGERFORGE_AL_DAR_NETWORK_DISABLED"] == "1" { return false }
+        if environment["LEDGERFORGE_AL_DAR_NETWORK_DISABLED"] == "1" || environment["LEDGERFORGE_BACKGROUND_NETWORK_DISABLED"] == "1" { return false }
 #endif
         return true
     }())
     @StateObject private var transactionViewModel = TransactionListViewModel()
-    @StateObject private var investmentPriceSession = InvestmentPriceSession(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
-    @StateObject private var onlineRefresh = OnlineRefreshCoordinator(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
-    @StateObject private var ispSyncSession = ZurichISPSyncSession(enabled: ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1")
+    @StateObject private var investmentPriceSession = InvestmentPriceSession(enabled: onlineServicesEnabled)
+    @StateObject private var onlineRefresh = OnlineRefreshCoordinator(enabled: onlineServicesEnabled)
+    @StateObject private var ispSyncSession = ZurichISPSyncSession(enabled: onlineServicesEnabled)
+    private static var onlineServicesEnabled: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["LEDGERFORGE_TEST_HOST"] == "1" { return false }
+#if DEBUG
+        if environment["LEDGERFORGE_BACKGROUND_NETWORK_DISABLED"] == "1" { return false }
+#endif
+        return true
+    }
     @State private var transactionAmountMeasurement = TransactionAmountWidthMeasurement()
 #if !DEBUG
     private static var sqliteProvider: SQLiteRepositoryProvider?
@@ -60,10 +68,12 @@ struct LedgerForgeApp: App {
             ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement,
                 alDarReferenceSession: alDarReferenceSession, investmentPriceSession: investmentPriceSession, ispSyncSession: ispSyncSession)
                 .task {
+                    CategoryAutomationSession.shared.start()
+                    SalaryAssistanceSession.shared.start()
                     investmentPriceSession.activate()
                     investmentPriceSession.observeRates(alDarReferenceSession)
-                    onlineRefresh.start(rates: alDarReferenceSession, prices: investmentPriceSession)
-                    ispSyncSession.start()
+                    BackgroundUpdatesSession.shared.start(rates: alDarReferenceSession, prices: investmentPriceSession,
+                        isp: ispSyncSession, online: onlineRefresh)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -167,11 +177,14 @@ struct LedgerForgeApp: App {
         // Production creation requires the explicit first-use Settings action.
         guard exists || (path != nil && usesIsolatedTestPersistence()) else { throw BackupError.recoveryUnavailable }
         if !parentExisted { try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true) }
+        let authority = LedgerAccessCoordinator.shared(path: target.path)
+        let priorStableActivation: LedgerActivationStamp? = exists && recovery.ledgerLifecyclePermit == nil
+            ? try? authority.withAccess { try authority.validate(expected: nil, permit: nil) } : nil
         // Resolve receipt ownership first, then permit only the explicitly
-        // approved exact V17/V18/V19→current existing-ledger bridge under the recovery gate.
+        // approved exact registered-prefix bridge under the recovery gate.
         let isRecoveryOpen = try recovery.layout?.readReceipt() != nil
         if isRecoveryOpen {
-            let database = SQLiteDatabase(path: target.path)
+            let database = SQLiteDatabase(path: target.path, lifecyclePermit: recovery.ledgerLifecyclePermit)
             try database.open(access: .existing)
             do {
                 try BackupCompatibility.upgradeSupportedCandidateIfNeeded(database)
@@ -179,7 +192,12 @@ struct LedgerForgeApp: App {
             } catch { try? database.closeChecked(); throw error }
         }
         let provider = try SQLiteRepositoryProvider(path: target.path, migrations: allMigrations,
-            access: exists ? .existing : .createIfMissing, migrateExisting: !isRecoveryOpen)
+            access: exists ? .existing : .createIfMissing, migrateExisting: !isRecoveryOpen, lifecyclePermit: recovery.ledgerLifecyclePermit)
+        if let priorStableActivation, let updated = try? provider.database.validatedActivationStamp() {
+            // Failure keeps the old helper refused; it does not undo a durable
+            // migration or prevent the foreground ledger from opening.
+            try? BackgroundEnrollmentStore().reconcileMigration(path: target.path, from: priorStableActivation, to: updated)
+        }
 #if DEBUG
         let coordinator = DevelopmentDatabaseLifecycleCoordinator.shared
         coordinator.loadRememberedSelection(from: DevelopmentDatabaseProfilePreferences())

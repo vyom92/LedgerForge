@@ -4,11 +4,11 @@
 
 import Foundation
 
-final class StatementParserSelector {
+nonisolated final class StatementParserSelector {
 
     private let registry: StatementParserRegistry
 
-    init(registry: StatementParserRegistry = .shared) {
+    init(registry: StatementParserRegistry = StatementParserRegistry()) {
         self.registry = registry
     }
 

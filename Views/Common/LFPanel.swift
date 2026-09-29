@@ -173,7 +173,7 @@ private struct LFMenuAction: ViewModifier {
         content
             .buttonStyle(.glass)
             .buttonBorderShape(.roundedRectangle(radius: theme.radius.control))
-            .tint(theme.palette.secondaryAction)
+            .tint(theme.palette.primaryText)
             .foregroundStyle(theme.palette.primaryText)
             .font(theme.typography.button)
     }

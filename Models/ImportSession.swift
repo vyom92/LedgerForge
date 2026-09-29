@@ -61,6 +61,9 @@ struct RepositoryImportSession: Identifiable, Equatable {
     let parserVersion: String?
     let partialImportSummary: RepositoryPartialImportSummary?
     let incomingRowDispositions: [RepositoryIncomingRowDisposition]
+    /// Account-local observations of this one parent, including zero activity
+    /// and supporting occurrences whose canonical transaction has an older source.
+    let bankAccountHistory: [String: RepositoryBankAccountHistory]
 
     init(
         id: String,
@@ -71,7 +74,8 @@ struct RepositoryImportSession: Identifiable, Equatable {
         validationStatus: String,
         parserVersion: String?,
         partialImportSummary: RepositoryPartialImportSummary? = nil,
-        incomingRowDispositions: [RepositoryIncomingRowDisposition] = []
+        incomingRowDispositions: [RepositoryIncomingRowDisposition] = [],
+        bankAccountHistory: [String: RepositoryBankAccountHistory] = [:]
     ) {
         self.id = id
         self.workspaceId = workspaceId
@@ -82,7 +86,15 @@ struct RepositoryImportSession: Identifiable, Equatable {
         self.parserVersion = parserVersion
         self.partialImportSummary = partialImportSummary
         self.incomingRowDispositions = incomingRowDispositions
+        self.bankAccountHistory = bankAccountHistory
     }
+}
+
+struct RepositoryBankAccountHistory: Equatable {
+    let sourceRowCount: Int
+    let importedTransactionCount: Int
+    let recognizedExistingRowCount: Int
+    let nativeCurrency: String
 }
 
 struct RepositoryPartialImportSummary: Equatable {

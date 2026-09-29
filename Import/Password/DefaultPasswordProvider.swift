@@ -35,7 +35,7 @@ enum StatementPasswordCredentialStoreError: Error, LocalizedError, Equatable {
 }
 
 final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentialStore, @unchecked Sendable {
-    nonisolated static let productionService = "com.ledgerforge.statement-password"
+    nonisolated static let productionService = LedgerCredentialIdentity.statementPasswords
     nonisolated static let axisInstitutionScope = "axis-bank"
     nonisolated static let axisAppPDFScope = "axis-bank.credit-card.app-pdf"
     nonisolated static let axisTraditionalPDFScope = "axis-bank.credit-card.traditional-pdf"
@@ -45,14 +45,17 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
 
     private let service: String
     private let legacyLabelsByInstitutionCode: [String: [String]]
+    private let interaction: CredentialInteractionPolicy
 
     init(
         service: String = productionService,
-        legacyLabelsByInstitutionCode: [String: [String]]? = nil
+        legacyLabelsByInstitutionCode: [String: [String]]? = nil,
+        interaction: CredentialInteractionPolicy = .foreground
     ) {
         self.service = service
         self.legacyLabelsByInstitutionCode = legacyLabelsByInstitutionCode
             ?? (service == Self.productionService ? Self.productionLegacyLabelsByInstitutionCode : [:])
+        self.interaction = interaction
     }
 
     func credentials(institutionCode: String) async throws -> [StatementPasswordStoredCredential] {
@@ -127,10 +130,10 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
             uniquenessQuery[kSecMatchLimit as String] = kSecMatchLimitAll
 
             var uniquenessResult: CFTypeRef?
-            let uniquenessStatus = SecItemCopyMatching(
-                uniquenessQuery as CFDictionary,
-                &uniquenessResult
-            )
+            let protectedQuery = interaction.applying(to: uniquenessQuery)
+            let uniquenessStatus = try interaction.perform {
+                SecItemCopyMatching(protectedQuery as CFDictionary, &uniquenessResult)
+            }
             if uniquenessStatus == errSecItemNotFound { return nil }
             guard uniquenessStatus == errSecSuccess else {
                 throw StatementPasswordCredentialStoreError.keychainFailure(uniquenessStatus)
@@ -159,7 +162,8 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
         }
 
         var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let protectedQuery = interaction.applying(to: query)
+        let status = try interaction.perform { SecItemCopyMatching(protectedQuery as CFDictionary, &result) }
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
             throw StatementPasswordCredentialStoreError.keychainFailure(status)
@@ -174,11 +178,10 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
         guard !password.isEmpty, let data = password.data(using: .utf8) else {
             throw StatementPasswordCredentialStoreError.invalidCredentialEncoding
         }
-        let query = baseQuery(institutionCode: institutionCode)
-        let updateStatus = SecItemUpdate(
-            query as CFDictionary,
-            [kSecValueData as String: data] as CFDictionary
-        )
+        let query = interaction.applying(to: baseQuery(institutionCode: institutionCode))
+        let updateStatus = try interaction.perform {
+            SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        }
         if updateStatus == errSecSuccess { return }
         guard updateStatus == errSecItemNotFound else {
             throw StatementPasswordCredentialStoreError.keychainFailure(updateStatus)
@@ -186,14 +189,15 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
         var item = query
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let addStatus = SecItemAdd(item as CFDictionary, nil)
+        let addStatus = try interaction.perform { SecItemAdd(item as CFDictionary, nil) }
         guard addStatus == errSecSuccess else {
             throw StatementPasswordCredentialStoreError.keychainFailure(addStatus)
         }
     }
 
     func delete(institutionCode: String) async throws {
-        let status = SecItemDelete(baseQuery(institutionCode: institutionCode) as CFDictionary)
+        let query = interaction.applying(to: baseQuery(institutionCode: institutionCode))
+        let status = try interaction.perform { SecItemDelete(query as CFDictionary) }
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw StatementPasswordCredentialStoreError.keychainFailure(status)
         }
@@ -286,32 +290,55 @@ struct StatementPasswordChallenge: Identifiable, Equatable {
 final class StatementPasswordChallengeController: ObservableObject {
     static let shared = StatementPasswordChallengeController()
 
-    @Published private(set) var challenge: StatementPasswordChallenge?
-    private var continuation: CheckedContinuation<String?, Error>?
+    @Published private(set) var challenges: [StatementPasswordChallenge] = []
+    private var continuations: [UUID: CheckedContinuation<String?, Error>] = [:]
+
+    var challenge: StatementPasswordChallenge? { challenges.first }
+
+    func challenge(for operationID: UUID) -> StatementPasswordChallenge? {
+        challenges.first { $0.id == operationID }
+    }
 
     func requestPassword(for request: ImportRequest) async throws -> String? {
-        guard continuation == nil, challenge == nil else {
-            throw ImportError.readerFailure(message: "Another secure statement-password challenge is active.")
-        }
-        challenge = StatementPasswordChallenge(id: request.id, fileName: request.fileName)
-        return try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
+        try Task.checkCancellation()
+        // Lookahead preparation can reach a locked PDF before the current item.
+        // Retain each request; presentation selects the current operation, not
+        // arrival order. One file's Skip must never fail a different request.
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: ImportError.cancelled)
+                    return
+                }
+                guard continuations[request.id] == nil else {
+                    continuation.resume(throwing: ImportError.readerFailure(message: "This statement already has a password request."))
+                    return
+                }
+                continuations[request.id] = continuation
+                challenges.append(.init(id: request.id, fileName: request.fileName))
+            }
+        } onCancel: { [weak self] in
+            Task { @MainActor in self?.cancel(challengeID: request.id) }
         }
     }
 
     func submit(_ password: String, challengeID: UUID) {
-        guard challenge?.id == challengeID, !password.isEmpty, let continuation else { return }
-        challenge = nil
-        self.continuation = nil
+        guard !password.isEmpty, let continuation = continuations.removeValue(forKey: challengeID) else { return }
+        challenges.removeAll { $0.id == challengeID }
         continuation.resume(returning: password)
     }
 
     func cancel(challengeID: UUID? = nil) {
-        guard challengeID == nil || challenge?.id == challengeID else { return }
-        let continuation = self.continuation
-        challenge = nil
-        self.continuation = nil
-        continuation?.resume(throwing: ImportError.cancelled)
+        if let challengeID {
+            let continuation = continuations.removeValue(forKey: challengeID)
+            challenges.removeAll { $0.id == challengeID }
+            continuation?.resume(throwing: ImportError.cancelled)
+        } else {
+            let pending = Array(continuations.values)
+            continuations.removeAll()
+            challenges.removeAll()
+            for continuation in pending { continuation.resume(throwing: ImportError.cancelled) }
+        }
     }
 }
 
@@ -333,17 +360,20 @@ private actor StatementPasswordSessionVault {
 
 struct DefaultPasswordProvider: ImportFramework.PasswordProvider {
     typealias Challenge = @Sendable (ImportRequest) async throws -> String?
+    typealias AdditionalRememberedCandidates = @Sendable (ImportRequest) async throws -> [StatementPasswordStoredCredential]
 
     private let credentialStore: any StatementPasswordCredentialStore
     private let supportedInstitutionCodes: [String]
     private let challenge: Challenge
     private let sessionVault: StatementPasswordSessionVault
+    private let additionalRememberedCandidates: AdditionalRememberedCandidates
 
     init(
         credentialStore: any StatementPasswordCredentialStore = KeychainStatementPasswordCredentialStore(),
         supportedInstitutionCodes: [String] = Institution.allCases
             .filter { $0 != .unknown }
             .map(\.statementPasswordCredentialScope),
+        additionalRememberedCandidates: @escaping AdditionalRememberedCandidates = { _ in [] },
         challenge: @escaping Challenge = { request in
             try await StatementPasswordChallengeController.shared.requestPassword(for: request)
         }
@@ -352,6 +382,7 @@ struct DefaultPasswordProvider: ImportFramework.PasswordProvider {
         self.supportedInstitutionCodes = supportedInstitutionCodes
         self.challenge = challenge
         self.sessionVault = StatementPasswordSessionVault()
+        self.additionalRememberedCandidates = additionalRememberedCandidates
     }
 
     func password(for request: ImportRequest) async throws -> String? {
@@ -376,6 +407,15 @@ struct DefaultPasswordProvider: ImportFramework.PasswordProvider {
                     candidateIndexByValue[stored.value] = candidates.count
                     candidates.append(.init(value: stored.value, origin: stored.origin))
                 }
+            }
+        }
+        for stored in try await additionalRememberedCandidates(request) where !stored.value.isEmpty {
+            if let index = candidateIndexByValue[stored.value] {
+                let existing = candidates[index]
+                candidates[index] = .init(value: existing.value, origins: existing.origins + [stored.origin])
+            } else {
+                candidateIndexByValue[stored.value] = candidates.count
+                candidates.append(.init(value: stored.value, origin: stored.origin))
             }
         }
         return candidates

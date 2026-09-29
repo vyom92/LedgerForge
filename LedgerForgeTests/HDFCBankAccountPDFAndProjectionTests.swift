@@ -212,6 +212,8 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         var createdAccounts = Set<String>()
         var authoritativeCarriers = Set<String>()
         for carrier in ordered {
+            let beforeIDs = Set(try provider.transactionRepo.trustedTransactions(workspaceId: workspace).map(\.id))
+            let beforeWork = try #require(try provider.categoryRepo.automationSnapshot(workspaceId: workspace)).work
             let createsAccount = createdAccounts.insert(carrier.account).inserted
             let result = try await prepareVerifyAndCommit(
                 carrier,
@@ -229,6 +231,14 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             expectSourceFact(result.previousImport == nil)
             expectSourceFact(result.isEquivalentSupportingSource == isSupporting)
             expectSourceFact(result.transactionCount == (isSupporting ? 0 : carrier.rows.count))
+            let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+            let metadata = try #require(try provider.categoryRepo.automationSnapshot(workspaceId: workspace))
+            let newIDs = Set(facts.map(\.id)).subtracting(beforeIDs)
+            #expect(Set(metadata.work.keys).subtracting(beforeWork.keys) == newIDs)
+            #expect(beforeWork.allSatisfy { metadata.work[$0.key] == $0.value })
+            let evaluation = CategoryEvaluation.evaluate(inputs: facts.filter { newIDs.contains($0.id) }.map(CategoryRuleInput.init),
+                snapshot: metadata, assignments: [:], activeCategoryIDs: [])
+            #expect(try provider.categoryRepo.applyCategoryEvaluation(evaluation, workspaceId: workspace, historical: false) == newIDs.count)
         }
 
         try verifyDurableAndHydratedState(
@@ -241,6 +251,7 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         )
 
         let stableCounts = try graphCounts(provider: provider, workspace: workspace)
+        let stableCategoryWork = try provider.categoryRepo.automationSnapshot(workspaceId: workspace)
         for carrier in ordered.reversed() {
             let prepared = try await engine.prepareImport(from: root.appendingPathComponent(carrier.carrier))
             defer { engine.cancelPreparedImport(prepared) }
@@ -254,6 +265,7 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             expectSourceFact(replay.transactionCount == priorImportedCount)
             expectSourceFact(replay.previousImport?.transactionCount == priorImportedCount)
             expectSourceFact(try graphCounts(provider: provider, workspace: workspace).withoutAttempts == stableCounts.withoutAttempts)
+            #expect(try provider.categoryRepo.automationSnapshot(workspaceId: workspace) == stableCategoryWork)
         }
         let afterReplay = try graphCounts(provider: provider, workspace: workspace)
         expectSourceFact(afterReplay.withoutAttempts == stableCounts.withoutAttempts)
@@ -1010,6 +1022,17 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         try sourceRequire(digest == carrier.sha256, "mixed queue original digest")
         return (url, digest, data.count, "hdfc|\(carrier.logicalStatementKey)", carrier.rows.count)
+    }
+
+    func standaloneComparisonsForRelationshipCampaign(root: URL) async throws -> [AuthenticStandaloneBankComparison] {
+        let password = try await sourceOraclePassword(ProcessInfo.processInfo.environment)
+        let oracle = try makeInMemorySourceOracle(root: root, password: password)
+        return try (oracle.carriers.pdf + oracle.carriers.xls).map { carrier in
+            let pdf = try #require(oracle.carriers.pdf.first { $0.logicalStatementKey == carrier.logicalStatementKey })
+            return AuthenticStandaloneBankComparison(url: root.appendingPathComponent(carrier.carrier),
+                sha256: carrier.sha256, equivalentPDFSHA: pdf.sha256, rowCount: carrier.rows.count,
+                compare: { try verifyPrepared($0, against: carrier) })
+        }
     }
 
     private func makeInMemorySourceOracle(root: URL, password: String) throws -> Oracle {

@@ -205,9 +205,19 @@ struct TransactionListView: View {
     private let categoryCoordinator: CategoryManaging
     private let generation: ProviderGenerationToken?
     private let availabilityState: ApplicationDataState
+    private let returnToPlanning: (() -> Void)?
 #if DEBUG
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
+    private struct RulePresentation: Identifiable {
+        let id = UUID()
+        let transactions: [Transaction]
+        var proposal: Transaction?
+    }
+    @State private var rulePresentation: RulePresentation?
+    @State private var spendingPresented = false
+    @State private var spendingLoaded = false
+    @State private var returnToSpendingFilter: (filter: TransactionPresentationFilterSpec, controls: TransactionPresentationControls)?
     @State private var detailsVisible = true
     @State private var narrowDetailsVisible = false
     @State private var moreFiltersVisible = false
@@ -276,7 +286,8 @@ struct TransactionListView: View {
         availabilityState: ApplicationDataState = .loading,
         categoryStore: CategoryStore? = nil,
         categoryCoordinator: CategoryManaging? = nil,
-        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil,
+        returnToPlanning: (() -> Void)? = nil
     ) {
         let resolvedStore = categoryStore ?? .shared
         self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
@@ -286,6 +297,7 @@ struct TransactionListView: View {
         self.acknowledgementGate = acknowledgementGate ?? .shared
         self.generation = generation
         self.availabilityState = availabilityState
+        self.returnToPlanning = returnToPlanning
     }
 #else
     @MainActor
@@ -295,7 +307,8 @@ struct TransactionListView: View {
         generation: ProviderGenerationToken? = nil,
         availabilityState: ApplicationDataState = .loading,
         categoryStore: CategoryStore? = nil,
-        categoryCoordinator: CategoryManaging? = nil
+        categoryCoordinator: CategoryManaging? = nil,
+        returnToPlanning: (() -> Void)? = nil
     ) {
         let resolvedStore = categoryStore ?? .shared
         self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
@@ -304,6 +317,7 @@ struct TransactionListView: View {
         self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
         self.generation = generation
         self.availabilityState = availabilityState
+        self.returnToPlanning = returnToPlanning
     }
 #endif
 
@@ -325,6 +339,40 @@ struct TransactionListView: View {
     }
 
     var body: some View {
+        ZStack {
+            VStack(alignment: .leading, spacing: 10) {
+                if let previous = returnToSpendingFilter {
+                    Button("Back to spending & movements", systemImage: "arrow.left") {
+                        viewModel.presentationFilter = previous.filter
+                        viewModel.presentationControls = previous.controls
+                        returnToSpendingFilter = nil; spendingPresented = true
+                    }.lfSecondaryAction()
+                        .accessibilityLabel("Back to spending & movements")
+                        .accessibilityIdentifier("transactions.backToSpending")
+                } else if let returnToPlanning {
+                    Button("Back to plan insights", systemImage: "arrow.left", action: returnToPlanning).lfSecondaryAction()
+                        .accessibilityLabel("Back to plan insights")
+                        .accessibilityIdentifier("transactions.backToPlanning")
+                }
+                transactionBody
+            }.opacity(spendingPresented ? 0 : 1).allowsHitTesting(!spendingPresented).accessibilityHidden(spendingPresented)
+            if spendingLoaded {
+                SpendingAndMovementView(model: viewModel.spendingAnalysis, generation: generation, availability: availabilityState,
+                    isActive: spendingPresented,
+                    onBack: { spendingPresented = false }, onTransactions: { ids in
+                        returnToSpendingFilter = (viewModel.presentationFilter, viewModel.presentationControls)
+                        clearFilters()
+                        viewModel.presentationFilter.canonicalTransactionIDs = ids
+                        spendingPresented = false
+                    }, onCategories: {
+                        rulePresentation = RulePresentation(transactions: viewModel.spendingAnalysis.projection?.rows.map(\.source.transaction) ?? [])
+                    })
+                    .opacity(spendingPresented ? 1 : 0).allowsHitTesting(spendingPresented).accessibilityHidden(!spendingPresented)
+            }
+        }
+    }
+
+    private var transactionBody: some View {
         GeometryReader { geometry in
             let narrow = geometry.size.width < 1120
             HStack(alignment: .top, spacing: 16) {
@@ -344,6 +392,9 @@ struct TransactionListView: View {
             .padding(theme.spacing.pagePadding)
             .onChange(of: narrow, initial: true) { _, constrained in
                 if constrained { detailsVisible = false }
+            }
+            .sheet(item: $rulePresentation) { selection in
+                CategoryRulesView(transactions: selection.transactions, proposal: selection.proposal)
             }
             .sheet(isPresented: $narrowDetailsVisible) {
                 inspector
@@ -456,12 +507,25 @@ struct TransactionListView: View {
                 }
             }
             HStack(spacing: 12) {
+                if let ids = viewModel.presentationFilter.canonicalTransactionIDs {
+                    Text("Chart detail · \(ids.count) transactions").font(theme.typography.caption)
+                    Button("Show all transactions") { viewModel.presentationFilter.canonicalTransactionIDs = nil }.buttonStyle(.borderless)
+                        .accessibilityLabel("Show all transactions")
+                        .accessibilityIdentifier("transactions.clearChartDetail")
+                }
                 if activeCriteriaCount > 0 {
                     Text("\(activeCriteriaCount) active criteria · all matching transactions")
                         .font(theme.typography.caption)
                         .foregroundStyle(secondary)
                 }
                 Spacer(minLength: 0)
+                Button("Spending & movements", systemImage: "chart.bar.xaxis") { spendingLoaded = true; spendingPresented = true }.lfSecondaryAction()
+                    .accessibilityLabel("Spending & movements").accessibilityIdentifier("transactions.spending")
+                    .help("Spending & movements")
+                Button("Category rules") {
+                    rulePresentation = RulePresentation(transactions: viewModel.transactionPresentationResult.rows.map(\.transaction))
+                }.lfSecondaryAction().accessibilityLabel("Category rules")
+                    .accessibilityIdentifier("transactions.categoryRules").help("Category rules")
                 Button("Clear filters", action: clearFilters)
                     .lfSecondaryAction()
                     .disabled(activeCriteriaCount == 0)
@@ -572,6 +636,7 @@ struct TransactionListView: View {
         } label: { Label("More filters", systemImage: "line.3.horizontal.decrease") }
             .lfSecondaryAction()
             .accessibilityLabel("More filters")
+            .help("More filters")
             .popover(isPresented: $moreFiltersVisible, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("More filters").font(theme.typography.formHeading)
@@ -777,8 +842,8 @@ struct TransactionListView: View {
     private var amountColumnWidth: CGFloat {
         let font = theme.typography.nativeFont(.tableMoney)
         return amountMeasurement.value(revision: viewModel.canonicalContentRevision, font: font) {
-            max(160, viewModel.allPresentationRows.reduce(CGFloat.zero) { width, row in
-                max(width, (MoneyFormatting.display(row.transaction.money) as NSString).size(withAttributes: [.font: font]).width + 24)
+            max(160, MoneyFormatting.display(viewModel.allPresentationRows.map(\.transaction.money)).reduce(CGFloat.zero) { width, value in
+                max(width, (value as NSString).size(withAttributes: [.font: font]).width + 24)
             })
         }
     }
@@ -985,6 +1050,18 @@ struct TransactionListView: View {
                             LFInfoRow(title: "Account", value: presentation.accountDisplayName, titleWidth: 100, verticalPadding: 0)
                             LFInfoRow(title: "Institution", value: presentation.institution, titleWidth: 100, verticalPadding: 0)
                             categoryPicker(for: selected, titleWidth: 100)
+                            if let id = selected.repositoryTransactionId {
+                                if let intent = categoryStore.snapshot.automation?.intents[id] {
+                                    Text(intent.kind == .automatic ? "Assigned by a saved rule" : intent.kind == .deliberatelyCleared ? "You cleared this category" : "Your category choice")
+                                        .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                                }
+                                if let work = categoryStore.snapshot.automation?.work[id] {
+                                    Text(work.explanation).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                                }
+                                Button("Make a future rule…") {
+                                    rulePresentation = RulePresentation(transactions: viewModel.transactionPresentationResult.rows.map(\.transaction), proposal: selected)
+                                }.lfSecondaryAction()
+                            }
                         }
 
                         detailSection("Import provenance") {

@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-enum HDFCBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum HDFCBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedDocumentContent
     case lockedDocument
     case unsupportedNativeText
@@ -33,14 +33,14 @@ enum HDFCBankAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct HDFCBankAccountPDFNormalizationResult {
+nonisolated struct HDFCBankAccountPDFNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class HDFCBankAccountPDFNormalizer {
+nonisolated final class HDFCBankAccountPDFNormalizer {
     private struct VisualLine {
         let pageIndex: Int
         let lineIndex: Int

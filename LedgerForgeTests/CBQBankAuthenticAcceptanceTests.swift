@@ -7,6 +7,99 @@ import Testing
 /// External authentic corpus and independently extracted source facts only.
 @MainActor
 struct CBQBankAuthenticAcceptanceTests {
+    func gmailComparison(bytes: Data, url: URL, password: String,
+                         balanceObservation: ((StatementDate, Decimal, Bool) -> Void)? = nil) throws -> (PreparedImport) throws -> Void {
+        let oracle = try independentMonthlyOracle(.init(carrier: url.lastPathComponent, url: url, bytes: bytes), password: password)
+        if oracle.rows.isEmpty {
+            balanceObservation?(date(oracle.statementDate.replacingOccurrences(of: " ", with: "-")), decimal(oracle.closingBalance), true)
+        } else if let last = oracle.rows.enumerated().max(by: {
+            (date($0.element.postingDate), $0.offset) < (date($1.element.postingDate), $1.offset)
+        }) {
+            balanceObservation?(date(last.element.postingDate), decimal(last.element.balance), false)
+        }
+        return { prepared in
+            let document = prepared.financialDocument
+            try self.recordCorrectionEvidenceIfRequested(oracle: oracle, prepared: prepared)
+            let checks = [
+                "byte-identity": prepared.sourceSnapshot.sourceByteFingerprint.digest == oracle.sha256,
+                "validation": prepared.validation.passed, "row-count": document.transactions.count == oracle.rows.count,
+                "opening": document.sourceStatementEvidence?.openingBalance?.amount == self.decimal(oracle.openingBalance),
+                "closing": document.sourceStatementEvidence?.closingBalance?.amount == self.decimal(oracle.closingBalance),
+                "boundary": document.sourceStatementEvidence?.statementBoundaryDate == self.date(oracle.statementDate.replacingOccurrences(of: " ", with: "-")),
+                "period-start": document.sourceStatementEvidence?.period?.start == (oracle.periodStart.isEmpty ? nil : self.date(oracle.periodStart)),
+                "profile": document.parserProfileID == oracle.expectedProfile,
+                "account-observation": document.cbqSourceIdentityObservations.contains(where: { self.compact($0.pattern) == self.compact(oracle.maskedAccount).replacingOccurrences(of: "-", with: "") }),
+                "iban-observation": document.cbqSourceIdentityObservations.contains(where: { self.compact($0.pattern) == self.compact(oracle.maskedIBAN) })
+            ]
+            guard checks.values.allSatisfy({ $0 }) else {
+                let fields = checks.filter { !$0.value }.keys.sorted().joined(separator: ", ")
+                Issue.record("CBQ Gmail envelope mismatch: \(fields)")
+                throw CBQOracleError.unregisteredSource
+            }
+            for (offset, pair) in zip(document.transactions, oracle.rows).enumerated() {
+                let (row, expected) = pair
+                let rowChecks = [
+                    "posting-date": row.statementDate == self.date(expected.postingDate),
+                    "amount": row.money.amount == self.decimal(expected.signedAmount), "currency": row.money.currency.code == oracle.nativeCurrency,
+                    "running-balance": row.runningBalanceMoney?.amount == self.decimal(expected.balance),
+                    "narration": self.compact(row.description) == self.compact(expected.description),
+                    "transaction-date": row.sourceProvenance.first?.sourceTransactionDate == (oracle.valueDateRole ? nil : self.date(expected.sourceTransactionDate)),
+                    "value-date": row.valueDate == (oracle.valueDateRole ? self.date(expected.sourceTransactionDate) : nil),
+                    "date-role": row.financialDateRole == .postingDate,
+                    "debit": row.debitMoney?.amount == (self.decimal(expected.signedAmount) < 0 ? -self.decimal(expected.signedAmount) : nil),
+                    "credit": row.creditMoney?.amount == (self.decimal(expected.signedAmount) > 0 ? self.decimal(expected.signedAmount) : nil),
+                    "source-page": row.sourceProvenance.first?.sourcePage == expected.sourcePage
+                ]
+                guard rowChecks.values.allSatisfy({ $0 }) else {
+                    let fields = rowChecks.filter { !$0.value }.keys.sorted().joined(separator: ", ")
+                    let includesFooter = row.description.contains("accrued interest")
+                        || row.description.contains("terms and conditions")
+                        || row.description.contains("statement is issued")
+                    let actualNarration = self.compact(row.description)
+                    let expectedNarration = self.compact(expected.description)
+                    let prefixCount = zip(actualNarration, expectedNarration).prefix(while: { $0 == $1 }).count
+                    Issue.record("CBQ Gmail source \(oracle.sha256.prefix(12)) occurrence \(offset + 1) page \(expected.sourcePage) mismatch at ordinal \(row.sourceProvenance.first?.sourceOrdinal ?? 0): \(fields); narration contains footer anchor=\(includesFooter); lengths actual/expected=\(actualNarration.count)/\(expectedNarration.count), sharedPrefix=\(prefixCount).")
+                    throw CBQOracleError.unregisteredSource
+                }
+            }
+        }
+    }
+
+    /// The separately approved CBQ correction packet explicitly requests this
+    /// owner-local before/after comparison. Other source campaigns remain RAM-only.
+    private func recordCorrectionEvidenceIfRequested(oracle: Carrier, prepared: PreparedImport) throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["LEDGERFORGE_CBQ_CORRECTION_SOURCE_SHA256"] == oracle.sha256,
+              let destination = environment["LEDGERFORGE_CBQ_CORRECTION_EVIDENCE_FILE"] else { return }
+        let url = URL(fileURLWithPath: destination).standardizedFileURL
+        guard url.path.contains("/LedgerForge/Development/Namespaces/s98-cbq-correction-"),
+              ["before.json", "after.json"].contains(url.lastPathComponent) else { throw CBQOracleError.unregisteredSource }
+        let actual = prepared.financialDocument
+        let rows: [[String: Any]] = zip(actual.transactions, oracle.rows).enumerated().map { index, pair in
+            let (row, expected) = pair
+            return ["sourceOccurrence": index + 1,
+                "sourceOrdinal": row.sourceProvenance.first?.sourceOrdinal ?? 0,
+                "expected": ["postingDate": expected.postingDate, "transactionDate": expected.sourceTransactionDate,
+                    "currency": "QAR", "signedAmount": expected.signedAmount, "runningBalance": expected.balance,
+                    "narration": expected.description, "physicalPage": expected.sourcePage] as [String: Any],
+                "actual": ["postingDate": row.statementDate?.canonical ?? "",
+                    "transactionDate": row.sourceProvenance.first?.sourceTransactionDate?.canonical ?? "",
+                    "currency": row.money.currency.code, "signedAmount": NSDecimalNumber(decimal: row.money.amount).stringValue,
+                    "runningBalance": row.runningBalanceMoney.map { NSDecimalNumber(decimal: $0.amount).stringValue } ?? "",
+                    "narration": row.description, "physicalPage": row.sourceProvenance.first?.sourcePage ?? 0,
+                    "parserProfile": row.sourceProvenance.first?.parserProfileID ?? "",
+                    "parserVersion": row.sourceProvenance.first?.parserProfileVersion ?? ""] as [String: Any]]
+        }
+        let record: [String: Any] = ["sourceSHA256": oracle.sha256,
+            "method": "Independent PDFKit glyph-column oracle built before ordinary preparation; no production region classifier used",
+            "sourceAccount": oracle.maskedAccount, "sourceIBAN": oracle.maskedIBAN,
+            "sourcePeriodStart": oracle.periodStart, "sourceStatementDate": oracle.statementDate,
+            "sourceOpeningBalance": oracle.openingBalance, "sourceClosingBalance": oracle.closingBalance,
+            "sourceRowCount": oracle.rows.count, "preparedRowCount": actual.transactions.count,
+            "validationPassed": prepared.validation.passed, "rows": rows]
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: record, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
+    }
     private struct Oracle: Decodable { let carriers: [Carrier] }
     private struct Carrier: Decodable {
         let carrier: String
@@ -18,6 +111,9 @@ struct CBQBankAuthenticAcceptanceTests {
         let openingBalance: String
         let closingBalance: String
         let rows: [Row]
+        var nativeCurrency = "QAR"
+        var valueDateRole = false
+        var expectedProfile = "cbq.current-account.monthly.pdf"
     }
     private struct Row: Decodable {
         let postingDate: String
@@ -256,10 +352,14 @@ struct CBQBankAuthenticAcceptanceTests {
     private func cbqSourceText(_ glyphs: [CBQSourceGlyph]) -> String {
         glyphs.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    private func cbqSourceColumns(_ line: CBQSourceLine) -> [String] {
+    private func cbqSourceColumns(_ line: CBQSourceLine, legacy: Bool = false) -> [String] {
         // Original source column roles: posting, narration, transaction date,
         // debit, credit and running balance. No production parser supplies these.
-        let edges: [Double] = [0, 75, 260, 340, 420, 505, 1000]
+        // The older table's six blue source header rectangles independently
+        // establish these cell edges. They are not production token boundaries.
+        let edges: [Double] = legacy
+            ? [0, 62.89, 256.39, 328.94, 401.50, 498.25, 1000]
+            : [0, 75, 260, 340, 420, 505, 1000]
         return (0..<6).map { index in
             cbqSourceText(line.glyphs.filter {
                 $0.x >= edges[index] && $0.x < edges[index + 1]
@@ -267,10 +367,46 @@ struct CBQBankAuthenticAcceptanceTests {
         }
     }
     private func cbqIsSourceDate(_ text: String) -> Bool {
-        text.range(of: #"^\d{2}-[A-Za-z]{3}-\d{2}$"#, options: .regularExpression) != nil
+        text.range(of: #"^(?:\d{2}-[A-Za-z]{3}-\d{2}|\d{2}[A-Za-z]{3}\d{2})$"#, options: .regularExpression) != nil
+    }
+    /// Independent source ownership: the available monthly originals paint the
+    /// transaction body grey. Inspect that original artwork, not production
+    /// token groups, closing-control geometry or any footer sentence. This is a
+    /// corpus oracle, not a new production requirement for unseen layouts.
+    private func cbqPaintedTableBottom(_ page: PDFPage, header: CBQSourceLine,
+                                     firstBodyLine: CBQSourceLine) throws -> Double {
+        let bounds = page.bounds(for: .mediaBox)
+        let scale = 2.0
+        let rendered = page.thumbnail(of: NSSize(width: bounds.width * scale, height: bounds.height * scale), for: .mediaBox)
+        guard let data = rendered.tiffRepresentation, let bitmap = NSBitmapImageRep(data: data),
+              let firstHeaderX = header.glyphs.filter({ !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }).map(\.x).min() else {
+            throw CBQOracleError.malformedRow("source-table-artwork-unavailable")
+        }
+        // Source-visible left padding between the painted table edge and the
+        // first header glyph avoids all transaction text. Pixel coordinates
+        // belong to the rendered original, with a top-left image origin.
+        let x = Int((firstHeaderX - 3 - bounds.minX) * Double(bitmap.pixelsWide) / bounds.width)
+        func shade(atPDFY y: Double) -> Double? {
+            let pixelY = Int((bounds.maxY - y) * Double(bitmap.pixelsHigh) / bounds.height)
+            guard x >= 0, x < bitmap.pixelsWide, pixelY >= 0, pixelY < bitmap.pixelsHigh,
+                  let color = bitmap.colorAt(x: x, y: pixelY)?.usingColorSpace(.deviceRGB),
+                  abs(color.redComponent - color.greenComponent) < 0.02,
+                  abs(color.redComponent - color.blueComponent) < 0.02 else { return nil }
+            return color.redComponent
+        }
+        guard let bodyShade = shade(atPDFY: firstBodyLine.y + 3), bodyShade > 0.5, bodyShade < 0.98 else {
+            throw CBQOracleError.malformedRow("source-table-artwork-unobserved")
+        }
+        let matching = stride(from: bounds.minY, through: header.y, by: 0.5).filter { y in
+            shade(atPDFY: y).map { abs($0 - bodyShade) < 0.02 } ?? false
+        }
+        guard let bottom = matching.first, bottom < firstBodyLine.y else {
+            throw CBQOracleError.malformedRow("source-table-artwork-boundary")
+        }
+        return bottom
     }
     private func cbqCheckSourceDate(_ text: String) throws {
-        let pieces = text.replacingOccurrences(of: " ", with: "-").split(separator: "-")
+        let pieces = cbqSeparatedDate(text).split(separator: "-")
         let months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
         guard pieces.count == 3,
               let day = Int(pieces[0]), let year = Int(pieces[2]),
@@ -298,11 +434,25 @@ struct CBQBankAuthenticAcceptanceTests {
             return try cbqSourceLines(page)
         }
         let source = pages.flatMap { $0.map { cbqSourceText($0.glyphs) } }.joined(separator: "\n")
-        let statementDate = try sourceControl(#"Statement Date:\s*(\d{2} [A-Za-z]{3} \d{2})"#, in: source)
+        let legacy = source.contains("Your Bank Statement")
+        let statementDate = try sourceControl(legacy
+            ? #"Stmt\. Date:\s*(\d{2} [A-Za-z]{3} \d{2})"#
+            : #"Statement Date:\s*(\d{2} [A-Za-z]{3} \d{2})"#, in: source)
+        let product = try sourceControl(#"Account Type:\s*([^\n]+)"#, in: source)
+        guard ["Current Account-Retail", "Savings Account", "E Savings Account"].contains(product),
+              !legacy || ["Current Account-Retail", "Savings Account"].contains(product) else {
+            throw CBQOracleError.ambiguousControl("product")
+        }
         let account = try sourceControl(#"Account No\.:\s*([0-9X-]+)"#, in: source)
         let iban = try sourceControl(#"IBAN:\s*([A-Z0-9]+)"#, in: source)
-        guard try sourceControl(#"Currency:\s*([^\n]+)"#, in: source) == "QATARI RIYAL" else {
-            throw CBQOracleError.ambiguousControl("currency")
+        let nativeCurrency: String
+        switch try sourceControl(#"Currency:\s*([^\n]+)"#, in: source) {
+        case "QATARI RIYAL": nativeCurrency = "QAR"
+        case "US DOLLARS": nativeCurrency = "USD"
+        default: throw CBQOracleError.ambiguousControl("currency")
+        }
+        guard nativeCurrency == "QAR" || (!legacy && product == "Current Account-Retail") else {
+            throw CBQOracleError.ambiguousControl("profile-currency")
         }
         try cbqCheckSourceDate(statementDate)
         var opening: Decimal?
@@ -329,53 +479,92 @@ struct CBQBankAuthenticAcceptanceTests {
         for (pageIndex, page) in pages.enumerated() {
             let headers = page.indices.filter {
                 let text = cbqSourceText(page[$0].glyphs)
-                return text.contains("Posting Date") && text.contains("Transaction Description")
-                    && text.contains("Transaction Date") && text.contains("Debit")
-                    && text.contains("Credit") && text.contains("Balance")
+                return (legacy
+                    ? text.contains("Post Date") && text.contains("Narrative") && text.contains("Value Date") && text.contains("Book Balance")
+                    : text.contains("Posting Date") && text.contains("Transaction Description") && text.contains("Transaction Date"))
+                    && text.contains("Debit") && text.contains("Credit") && text.contains("Balance")
             }
             guard headers.count <= 1 else { throw CBQOracleError.ambiguousControl("transaction-header") }
             guard let header = headers.first else {
                 // Empty/terms/advert pages are legitimate source pages. They must
                 // contain neither a financial row nor a statement control.
                 guard !page.contains(where: {
-                    let columns = cbqSourceColumns($0)
+                    let columns = cbqSourceColumns($0, legacy: legacy)
                     let text = cbqSourceText($0.glyphs)
                     return cbqIsSourceDate(columns[0]) || cbqIsSourceDate(columns[2])
-                        || text.contains("BROUGHT FORWARD") || text.contains("* CREDIT BALANCE")
+                        || text.contains("BROUGHT FORWARD") || text.contains("* CREDIT BALANCE") || text.contains("* BALANCE")
                 }) else { throw CBQOracleError.ambiguousControl("financial-page-without-header") }
                 continue
             }
             guard closing == nil else { throw CBQOracleError.ambiguousControl("financial-page-after-closing") }
+            guard let nativePage = pdf.page(at: pageIndex) else { throw CBQOracleError.unavailableOriginal }
+            let firstBodyLine = page.dropFirst(header + 1).first(where: {
+                let columns = cbqSourceColumns($0, legacy: legacy)
+                return cbqIsSourceDate(columns[0]) || (!columns[1].isEmpty
+                    && [0, 2, 3, 4, 5].allSatisfy({ columns[$0].isEmpty }))
+            })
+            let tableBottom = try (legacy ? nil : firstBodyLine).map {
+                try cbqPaintedTableBottom(nativePage, header: page[header], firstBodyLine: $0)
+            }
             for line in page.dropFirst(header + 1) {
                 let text = cbqSourceText(line.glyphs)
                 if text.isEmpty { continue }
-                let cells = cbqSourceColumns(line)
+                let cells = cbqSourceColumns(line, legacy: legacy)
                 // Numeric slash fragments also occur in authentic narration. Only
                 // the bottom-right source page counter is nonfinancial furniture.
                 if line.y < 40,
-                   cells.prefix(5).allSatisfy({ $0.isEmpty }), cells[5] == text,
-                   text.range(of: #"^\d+/\d+$"#, options: .regularExpression) != nil {
+                   (legacy || (cells.prefix(5).allSatisfy({ $0.isEmpty }) && cells[5] == text)),
+                   text.range(of: legacy ? #"^\d+$"# : #"^\d+/\d+$"#, options: .regularExpression) != nil {
                     continue
                 }
                 if cells[1] == "BROUGHT FORWARD" {
                     guard opening == nil, rows.isEmpty, pending == nil,
-                          cbqIsSourceDate(cells[0]),
+                          (cbqIsSourceDate(cells[0]) || ((legacy || nativeCurrency == "USD" || product != "Current Account-Retail") && cells[0].isEmpty)),
                           cells[2].isEmpty, cells[3].isEmpty, cells[4].isEmpty else {
                         throw CBQOracleError.ambiguousControl("brought-forward")
                     }
-                    try cbqCheckSourceDate(cells[0])
+                    if !cells[0].isEmpty { try cbqCheckSourceDate(cells[0]) }
                     let amount = try sourceDecimal(cells[5])
                     opening = amount
                     previous = amount
                     periodStart = cells[0]
                     continue
                 }
-                if text.hasPrefix("* CREDIT BALANCE") {
+                let neutralClosing = text.hasPrefix("* BALANCE")
+                if text.hasPrefix("* CREDIT BALANCE") || neutralClosing {
                     try finishPending()
                     guard closing == nil else { throw CBQOracleError.ambiguousControl("closing-balance") }
-                    let amount = try sourceDecimal(sourceControl(#"^\* CREDIT BALANCE\s+([0-9,.]+)\s*$"#, in: text))
+                    let amount = try sourceDecimal(sourceControl(#"^\* (?:CREDIT )?BALANCE\s+([0-9,.]+)\s*$"#, in: text))
+                    // A neutral closing label is only interpreted when the
+                    // original explicitly prints zero; direction is not inferred.
+                    guard !neutralClosing || amount == 0 else { throw CBQOracleError.ambiguousControl("neutral-closing") }
                     guard previous == amount else { throw CBQOracleError.failedEquation }
                     closing = amount
+                    continue
+                }
+                // A genuine available page repeats the header and carries only
+                // the final closing control. No table body is invented there.
+                if !legacy && tableBottom == nil { throw CBQOracleError.malformedRow("unowned-source-region-without-table-body") }
+                if let tableBottom, line.y < tableBottom {
+                    // The original artwork separates the table from page-wide
+                    // terms. An unexplained date/amount or narration-only line
+                    // outside it remains unresolved; no wording blacklist.
+                    guard !cbqIsSourceDate(cells[0]), !cbqIsSourceDate(cells[2]),
+                          text.rangeOfCharacter(from: .decimalDigits) == nil,
+                          ![0, 2, 3, 4, 5].allSatisfy({ cells[$0].isEmpty }) else {
+                        throw CBQOracleError.malformedRow("unowned-source-region-outside-table")
+                    }
+                    continue
+                }
+                if legacy, !cbqIsSourceDate(cells[0]), !cbqIsSourceDate(cells[2]),
+                   (cells[0].rangeOfCharacter(from: .letters) != nil ||
+                    (cells[1].isEmpty && cells[2...].contains(where: { $0.rangeOfCharacter(from: .letters) != nil }))),
+                   !cells[2...].contains(where: {
+                       $0.range(of: #"^-?[0-9,]+\.[0-9]{2}$"#, options: .regularExpression) != nil
+                   }) {
+                    // Original page-wide bilingual notes occupy several
+                    // financial columns and contain no table date/Money cells.
+                    // They cannot be a narration continuation.
                     continue
                 }
                 guard closing == nil else { throw CBQOracleError.malformedRow("financial-content-after-closing") }
@@ -388,7 +577,7 @@ struct CBQBankAuthenticAcceptanceTests {
                     try cbqCheckSourceDate(cells[0])
                     try cbqCheckSourceDate(cells[2])
                     let amount = try sourceDecimal(cells[3].isEmpty ? cells[4] : cells[3])
-                    let balance = try sourceDecimal(cells[5])
+                    let balance = try sourceDecimal(cells[5], legacyBookBalance: legacy && product == "Current Account-Retail")
                     let signed = cells[3].isEmpty ? amount : -amount
                     guard amount > 0, prior + signed == balance else { throw CBQOracleError.failedEquation }
                     pending = CBQPendingSourceRow(
@@ -400,7 +589,7 @@ struct CBQBankAuthenticAcceptanceTests {
                 } else {
                     guard pending != nil, !cells[1].isEmpty,
                           [0, 2, 3, 4, 5].allSatisfy({ cells[$0].isEmpty }) else {
-                        throw CBQOracleError.malformedRow("unowned-source-continuation")
+                        throw CBQOracleError.malformedRow("unowned-source-continuation page=\(pageIndex + 1) y=\(Int(line.y)) legacy=\(legacy) occupied=\(cells.map { !$0.isEmpty })")
                     }
                     pending!.description.append(cells[1])
                 }
@@ -418,7 +607,15 @@ struct CBQBankAuthenticAcceptanceTests {
             maskedAccount: account, maskedIBAN: iban,
             openingBalance: NSDecimalNumber(decimal: opening).stringValue,
             closingBalance: NSDecimalNumber(decimal: closing).stringValue,
-            rows: rows
+            rows: rows,
+            nativeCurrency: nativeCurrency,
+            valueDateRole: legacy,
+            expectedProfile: legacy ? (product == "Current Account-Retail"
+                ? "cbq.current-account.legacy.pdf" : "cbq.savings-account.legacy.pdf")
+                : product == "Savings Account" ? "cbq.savings-account.monthly.pdf"
+                : product == "E Savings Account" ? "cbq.e-savings-account.monthly.pdf"
+                : nativeCurrency == "USD" ? "cbq.current-account.usd-monthly.pdf"
+                : "cbq.current-account.monthly.pdf"
         )
     }
 
@@ -434,8 +631,13 @@ struct CBQBankAuthenticAcceptanceTests {
         guard let first = values.first, values.allSatisfy({ $0 == first }) else { throw CBQOracleError.ambiguousControl("header") }
         return first.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    private func sourceDecimal(_ value: String) throws -> Decimal {
-        let clean = value.replacingOccurrences(of: ",", with: "")
+    private func sourceDecimal(_ value: String, legacyBookBalance: Bool = false) throws -> Decimal {
+        var clean = value.replacingOccurrences(of: ",", with: "")
+        // Independently observed in the original Book Balance cell: its minus
+        // follows the digits. This is not a debit/credit amount convention.
+        if legacyBookBalance, clean.range(of: #"^[0-9]+\.[0-9]{2}-$"#, options: .regularExpression) != nil {
+            clean = "-" + clean.dropLast()
+        }
         guard clean.range(of: #"^-?[0-9]+(?:\.[0-9]{1,2})?$"#, options: .regularExpression) != nil,
               let decimal = Decimal(string: clean, locale: Locale(identifier: "en_US_POSIX")) else {
             throw CBQOracleError.malformedRow("decimal")
@@ -465,9 +667,15 @@ struct CBQBankAuthenticAcceptanceTests {
     private func compact(_ value: String) -> String { value.filter { !$0.isWhitespace } }
     private func decimal(_ value: String) -> Decimal { Decimal(string: value, locale: Locale(identifier: "en_US_POSIX"))! }
     private func date(_ value: String) -> StatementDate {
-        let p = value.split(separator: "-")
+        let p = cbqSeparatedDate(value).split(separator: "-")
         let months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
         return try! StatementDate(year: 2000 + Int(p[2])!, month: months.firstIndex(of: p[1].lowercased())! + 1, day: Int(p[0])!)
+    }
+    private func cbqSeparatedDate(_ value: String) -> String {
+        if value.range(of: #"^\d{2}[A-Za-z]{3}\d{2}$"#, options: .regularExpression) != nil {
+            return "\(value.prefix(2))-\(value.dropFirst(2).prefix(3))-\(value.suffix(2))"
+        }
+        return value.replacingOccurrences(of: " ", with: "-")
     }
     private func oracleKey(_ row: Row) -> String {
         [date(row.postingDate).canonical, decimal(row.signedAmount).description, decimal(row.balance).description,

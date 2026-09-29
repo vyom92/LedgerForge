@@ -5,7 +5,7 @@
 import CryptoKit
 import Foundation
 
-enum CBQSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable {
+nonisolated enum CBQSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable {
     case maskedAccountNumber = "cbq_masked_account_number"
     case maskedIBAN = "cbq_masked_iban"
 }
@@ -13,7 +13,7 @@ enum CBQSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable
 /// Typed, partial identity printed by an approved CBQ monthly statement. It is
 /// source evidence only: callers must never promote its pattern to a strong
 /// `FinancialIdentifier` or persist it in `account_identifiers`.
-struct CBQSourceIdentityObservation: Equatable, Sendable {
+nonisolated struct CBQSourceIdentityObservation: Equatable, Sendable {
     enum ValidationError: Error, Equatable {
         case unsupportedKind
         case malformedPattern
@@ -75,7 +75,7 @@ struct CBQSourceIdentityObservation: Equatable, Sendable {
     }
 }
 
-struct SourceStatementEvidence: Equatable, Sendable {
+nonisolated struct SourceStatementEvidence: Equatable, Sendable {
     let sourceFormatCode: String
     let statementBoundaryDate: StatementDate?
     let period: DeclaredStatementPeriod?
@@ -83,21 +83,21 @@ struct SourceStatementEvidence: Equatable, Sendable {
     let closingBalance: Money?
 }
 
-enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
     case liabilityMembershipNumber = "amex_membership_number"
     case instrumentCardAccountNumber = "amex_card_account_number"
     case cbqLiabilityAccountReference = "cbq_card_account_reference"
     case cbqInstrumentMaskedCardNumber = "cbq_masked_card_number"
 }
 
-enum CardSourceIdentitySubject: String, CaseIterable, Equatable, Sendable, Codable {
+nonisolated enum CardSourceIdentitySubject: String, CaseIterable, Equatable, Sendable, Codable {
     case liabilityAccount = "liability_account"
     case instrument
 }
 
 /// Exact parser-produced source observation. A masked value remains weak
 /// evidence and is never promoted to a `FinancialIdentifier`.
-struct CardSourceIdentityObservation: Equatable, Sendable {
+nonisolated struct CardSourceIdentityObservation: Equatable, Sendable {
     let kind: CardSourceIdentityObservationKind
     let subject: CardSourceIdentitySubject
     let value: String
@@ -130,7 +130,7 @@ struct CardSourceIdentityObservation: Equatable, Sendable {
     }
 }
 
-enum CardTransactionScope: Equatable, Sendable {
+nonisolated enum CardTransactionScope: Equatable, Sendable {
     case accountLevel
     case instrument
 
@@ -142,7 +142,7 @@ enum CardTransactionScope: Equatable, Sendable {
     }
 }
 
-struct CardInstrumentSectionEvidence: Equatable, Sendable {
+nonisolated struct CardInstrumentSectionEvidence: Equatable, Sendable {
     let documentScopedSectionID: String
     let sourceOrdinal: Int
     let holderLabel: String?
@@ -171,7 +171,7 @@ struct CardInstrumentSectionEvidence: Equatable, Sendable {
     }
 }
 
-struct CardTransactionAnnotation: Equatable, Sendable {
+nonisolated struct CardTransactionAnnotation: Equatable, Sendable {
     let parserTransactionID: UUID
     let financialScope: CardTransactionScope
     let documentScopedSectionID: String?
@@ -199,7 +199,7 @@ struct CardTransactionAnnotation: Equatable, Sendable {
     }
 }
 
-enum CardStatementSummaryComponent: Equatable, Sendable {
+nonisolated enum CardStatementSummaryComponent: Equatable, Sendable {
     case previousBalance(Money)
     case newCredits(Money)
     case newDebits(Money)
@@ -257,7 +257,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
     }
 }
 
-enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
+nonisolated enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
     case malformedIdentityObservation
     case duplicateTransactionAnnotation
     case duplicateSummaryComponent
@@ -273,8 +273,9 @@ enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
     }
 }
 
-struct CardStatementEvidence: Equatable, Sendable {
+nonisolated struct CardStatementEvidence: Equatable, Sendable {
     static let amexQARReconciliationRule = "amex.qar.previous-minus-credits-plus-debits.v1"
+    static let amexUSDZeroReconciliationRule = "amex.usd.zero.previous-equals-new-balance.v1"
     // Revision 2 requires the source's minimum due in addition to the
     // unchanged financial equation. Historical revision 1 is hydration-only.
     static let cbqV1QARReconciliationRule = "cbq.qar.v1.previous-plus-billed-minus-payment.v2"
@@ -353,7 +354,7 @@ struct CardStatementEvidence: Equatable, Sendable {
     }
 }
 
-struct FinancialDocument: Identifiable {
+nonisolated struct FinancialDocument: Identifiable, Sendable {
 
     let id: UUID
     let sourceDocument: Document
@@ -374,6 +375,7 @@ struct FinancialDocument: Identifiable {
     let cbqSourceIdentityObservations: [CBQSourceIdentityObservation]
     let sourceStatementEvidence: SourceStatementEvidence?
     let cardStatementEvidence: CardStatementEvidence?
+    let bankStatementEvidence: BankStatementEvidence?
     /// Parser-owned evidence for a source-proven zero-transaction statement.
     /// This is nil for ordinary statements and never inferred by persistence.
     let zeroActivityEvidence: ZeroActivityStatementEvidence?
@@ -398,6 +400,7 @@ struct FinancialDocument: Identifiable {
         cbqSourceIdentityObservations: [CBQSourceIdentityObservation] = [],
         sourceStatementEvidence: SourceStatementEvidence? = nil,
         cardStatementEvidence: CardStatementEvidence? = nil,
+        bankStatementEvidence: BankStatementEvidence? = nil,
         zeroActivityEvidence: ZeroActivityStatementEvidence? = nil,
         salaryStatementEvidence: SalaryStatementEvidence? = nil,
         investmentStatementEvidence: InvestmentStatementEvidence? = nil,
@@ -417,6 +420,7 @@ struct FinancialDocument: Identifiable {
         self.cbqSourceIdentityObservations = cbqSourceIdentityObservations
         self.sourceStatementEvidence = sourceStatementEvidence
         self.cardStatementEvidence = cardStatementEvidence
+        self.bankStatementEvidence = bankStatementEvidence
         self.zeroActivityEvidence = zeroActivityEvidence
         self.salaryStatementEvidence = salaryStatementEvidence
         self.investmentStatementEvidence = investmentStatementEvidence

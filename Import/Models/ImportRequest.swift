@@ -16,11 +16,11 @@ public struct ImportRequest: Equatable, Sendable {
         self.source = source
     }
 
-    public var fileName: String {
+    public nonisolated var fileName: String {
         fileURL.lastPathComponent
     }
 
-    public var fileExtension: String {
+    public nonisolated var fileExtension: String {
         fileURL.pathExtension.lowercased()
     }
 }

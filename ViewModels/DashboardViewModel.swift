@@ -28,9 +28,18 @@ struct DashboardAccountPosition: Identifiable, Equatable {
     /// Source period or source-selected month, preserved only when an exact
     /// source day is unavailable. It is never converted into an invented day.
     let sourceContext: String?
+    /// The printed period's end is available for statement-age presentation,
+    /// independently of the optional financial balance date above.
+    let sourcePeriodEnd: StatementDate?
 
-    static func asOfLabel(for date: StatementDate?) -> String {
-        date.map { "As of \($0.presentation)" } ?? "Date unavailable"
+    static func asOfLabel(for date: StatementDate?, today: StatementDate? = nil) -> String {
+        let current = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let day = today ?? (try? StatementDate(year: current.year ?? 0, month: current.month ?? 0, day: current.day ?? 0))
+        guard let date, let day, let age = FinancialCalendar.distance(date, day) else { return "Date unavailable" }
+        if age == 0 { return "Today" }
+        if age == 1 { return "1 day ago" }
+        if age > 1 { return "\(age) days ago" }
+        return age == -1 ? "In 1 day" : "In \(-age) days"
     }
 }
 
@@ -47,7 +56,7 @@ struct DashboardCurrencyPosition: Identifiable, Equatable {
 }
 
 /// Read-only presentation projection over the canonical hydrated runtime stores.
-/// It deliberately mirrors the accepted selectors in RepositoryStoreHydrator:
+/// Bank amounts and dates use the single accepted hydration selector:
 /// ADR-039 requires bank running-balance selection to fail closed on an
 /// ambiguous latest cross-document date, and ADR-044 assigns card chronology
 /// and liability semantics to the hydrated card graph.
@@ -59,20 +68,22 @@ enum DashboardPositionProjection {
         cardSnapshot: CardStoreSnapshot
     ) -> [DashboardCurrencyPosition] {
         let members = accounts
-            .filter { $0.type == .bank || $0.type == .creditCard }
+            .filter { ($0.type == .bank || $0.type == .creditCard) && !$0.isHistoryOnly }
             .sorted(by: accountOrdering)
 
         let bankPositions = members.compactMap { account -> (CurrencyCode, DashboardAccountPosition)? in
             guard account.type == .bank else { return nil }
-            let selected = selectedBankBalance(for: account, transactions: transactions)
-            let amount = selected?.money.currency == account.nativeCurrency ? selected?.money : nil
+            let date = account.currentBalanceAsOfISO.flatMap { try? StatementDate(canonical: $0) }
+            let amount = date != nil && account.currentBalanceMoney.currency == account.nativeCurrency
+                ? account.currentBalanceMoney : nil
             let position = DashboardAccountPosition(
                 id: positionID(for: account),
-                displayName: account.nickname ?? account.name,
-                institution: account.institution,
+                displayName: account.preferredDisplayName,
+                institution: account.institutionDisplayName,
                 amount: amount,
-                asOf: amount == nil ? nil : selected?.date,
-                sourceContext: nil
+                asOf: amount == nil ? nil : date,
+                sourceContext: nil,
+                sourcePeriodEnd: nil
             )
             return (account.nativeCurrency, position)
         }
@@ -92,13 +103,14 @@ enum DashboardPositionProjection {
             }
             let position = DashboardAccountPosition(
                 id: positionID(for: account),
-                displayName: account.nickname ?? account.name,
-                institution: account.institution,
+                displayName: account.preferredDisplayName,
+                institution: account.institutionDisplayName,
                 amount: amount,
                 asOf: amount == nil ? nil : selected?.statementDate,
                 sourceContext: amount == nil || selected?.statementDate != nil
                     ? nil
-                    : sourceContext(for: selected)
+                    : sourceContext(for: selected),
+                sourcePeriodEnd: amount == nil ? nil : selected?.period?.end
             )
             return (account.nativeCurrency, position)
         }
@@ -136,35 +148,6 @@ enum DashboardPositionProjection {
             return nil
         }
         return try? Money.aggregate(positions.compactMap(\.amount))
-    }
-
-    private static func selectedBankBalance(
-        for account: Account,
-        transactions: [Transaction]
-    ) -> (money: Money, date: StatementDate)? {
-        guard let accountID = account.repositoryAccountId else { return nil }
-        let dated = transactions.compactMap { transaction -> (transaction: Transaction, money: Money, date: StatementDate)? in
-            guard transaction.repositoryAccountId == accountID,
-                  let date = transaction.statementDate,
-                  let money = transaction.runningBalanceMoney else {
-                return nil
-            }
-            return (transaction, money, date)
-        }
-        guard let latestDate = dated.map(\.date).max() else { return nil }
-        let candidates = dated.filter { $0.date == latestDate }
-        let selected: (transaction: Transaction, money: Money, date: StatementDate)?
-        if let documentID = candidates.first?.transaction.documentScopedSourceOrder?.documentID,
-           candidates.allSatisfy({ $0.transaction.documentScopedSourceOrder?.documentID == documentID }) {
-            selected = candidates.max {
-                ($0.transaction.documentScopedSourceOrder?.ordinal ?? 0) <
-                ($1.transaction.documentScopedSourceOrder?.ordinal ?? 0)
-            }
-        } else {
-            selected = candidates.count == 1 ? candidates.first : nil
-        }
-        guard let selected, selected.money.currency == account.nativeCurrency else { return nil }
-        return (selected.money, selected.date)
     }
 
     private static func selectedCardStatement(
@@ -209,7 +192,7 @@ enum DashboardPositionProjection {
             return "Statement period \(period.start.presentation)–\(period.end.presentation)"
         }
         if let month = statement.selectedStatementMonth {
-            return "Statement month \(month.canonical)"
+            return "Statement month \(AppDateDisplay.month(month.canonical))"
         }
         return nil
     }
@@ -270,70 +253,16 @@ enum DashboardAttentionProjection {
     }
 }
 
-/// Read-only composition of the unrestricted Transactions presentation. Money
-/// comes directly from its accepted partitions; this adapter does not sum it.
-struct DashboardActivityComparison {
-    struct Series: Identifiable {
-        let effect: TransactionPresentationEffect
-        let amount: Money?
-        var id: TransactionPresentationEffect { effect }
-    }
-
-    struct Domain: Identifiable {
-        let domain: TransactionPresentationDomain
-        let series: [Series]
-        var id: TransactionPresentationDomain { domain }
-    }
-
-    struct Currency: Identifiable {
-        let currency: CurrencyCode
-        let domains: [Domain]
-        var id: String { currency.code }
-    }
-
-    let currencies: [Currency]
-    let recordCount: Int
-    let firstSourceDate: StatementDate?
-    let lastSourceDate: StatementDate?
-    let undatedRecordCount: Int
-    let withheldRecordCount: Int
-
-    init(result: TransactionPresentationResult) {
-        recordCount = result.rows.count
-        let dates = result.rows.compactMap(\.sourceCivilDate)
-        firstSourceDate = dates.min()
-        lastSourceDate = dates.max()
-        undatedRecordCount = recordCount - dates.count
-        withheldRecordCount = result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount
-        currencies = Set(result.rows.map { $0.transaction.money.currency })
-            .sorted { $0.code < $1.code }
-            .map { currency in
-                let recordedDomains = Set(result.rows.filter { $0.transaction.money.currency == currency }.map(\.domain))
-                let domains: [Domain] = [TransactionPresentationDomain.bank, .card].compactMap { domain in
-                    guard recordedDomains.contains(domain) else { return nil }
-                    let effects: [TransactionPresentationEffect] = domain == .bank
-                        ? [.credit, .debit] : [.increasesAmountOwed, .decreasesAmountOwed]
-                    return Domain(domain: domain, series: effects.map { effect in
-                        Series(effect: effect, amount: result.totals.partitions[.init(currency: currency, domain: domain, effect: effect)])
-                    })
-                }
-                return Currency(currency: currency, domains: domains)
-            }
-    }
-}
-
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var presentationState: DashboardPresentationState = .loading("Loading persisted dashboard...")
     @Published private(set) var positions: [DashboardCurrencyPosition] = []
-    @Published private(set) var recentActivity: [TransactionPresentationRow] = []
-    @Published private(set) var activityComparison: DashboardActivityComparison?
     @Published private(set) var accounts: [Account] = []
-    @Published private(set) var transactionCount = 0
+    @Published private(set) var storedTransactionCount = 0
     @Published private(set) var positionState: DashboardContentState = .loading
-    @Published private(set) var recentActivityState: DashboardContentState = .loading
     @Published private(set) var fundingState: DashboardContentState = .loading
     @Published private(set) var fundingCalculation: FundingPlanCalculation?
+    @Published private(set) var netWorthReport: NetWorthReport = .withdrawn(.loading)
 
     var fundingMonthTitle: String {
         Self.currentMonth(at: now()).map(SalaryWorkspaceViewModel.monthTitle) ?? "Month unavailable"
@@ -342,22 +271,32 @@ final class DashboardViewModel: ObservableObject {
     private let accountStore: AccountStore
     private let transactionStore: TransactionStore
     private let cardStore: CardStore
-    private let categoryStore: CategoryStore
     private let fundingPlanStore: FundingPlanStore
+    private let intelligenceStore: FinancialIntelligenceStore
+    private let investmentStore: InvestmentStore
+    private let membershipStore: NetWorthMembershipStore
+    private let reportingPreferences: ReportingCurrencyPreferences
+    private let reportingRates: AlDarReferenceSession?
+    private let reportingPrices: InvestmentPriceSession?
+    private let gmail: GmailIntakeSession
     private let availability: ApplicationAvailability
     private let now: () -> Date
     private let workspaceID: String
     private var cancellables = Set<AnyCancellable>()
     private var pendingRefreshID: UUID?
-    // Retains the existing bounded Dashboard display size; it is not a financial rule.
-    private let recentActivityLimit = 3
 
     init(
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         cardStore: CardStore = .shared,
-        categoryStore: CategoryStore = .shared,
         fundingPlanStore: FundingPlanStore = .shared,
+        intelligenceStore: FinancialIntelligenceStore = .shared,
+        investmentStore: InvestmentStore = .shared,
+        membershipStore: NetWorthMembershipStore = .shared,
+        reportingPreferences: ReportingCurrencyPreferences = .shared,
+        reportingRates: AlDarReferenceSession? = nil,
+        reportingPrices: InvestmentPriceSession? = nil,
+        gmail: GmailIntakeSession = .shared,
         availability: ApplicationAvailability = .shared,
         workspaceID: String = "default-workspace",
         now: @escaping () -> Date = Date.init
@@ -365,8 +304,14 @@ final class DashboardViewModel: ObservableObject {
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.cardStore = cardStore
-        self.categoryStore = categoryStore
         self.fundingPlanStore = fundingPlanStore
+        self.intelligenceStore = intelligenceStore
+        self.investmentStore = investmentStore
+        self.membershipStore = membershipStore
+        self.reportingPreferences = reportingPreferences
+        self.reportingRates = reportingRates
+        self.reportingPrices = reportingPrices
+        self.gmail = gmail
         self.availability = availability
         self.workspaceID = workspaceID
         self.now = now
@@ -376,11 +321,18 @@ final class DashboardViewModel: ObservableObject {
             accountStore.$accounts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             transactionStore.$transactions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             cardStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            fundingPlanStore.$plans.dropFirst().map { _ in () }.eraseToAnyPublisher()
+            fundingPlanStore.$plans.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            intelligenceStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            investmentStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            membershipStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            reportingPreferences.$currencies.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            gmail.$coverage.dropFirst().map { _ in () }.eraseToAnyPublisher()
         ])
         .sink { [weak self] in self?.requestPresentationRefresh() }
         .store(in: &cancellables)
+
+        reportingRates?.objectWillChange.sink { [weak self] _ in self?.requestPresentationRefresh() }.store(in: &cancellables)
+        reportingPrices?.objectWillChange.sink { [weak self] _ in self?.requestPresentationRefresh() }.store(in: &cancellables)
 
         // These stores publish on the main actor after installing their backing
         // values. One queued refresh reads that whole snapshot. Availability
@@ -438,11 +390,9 @@ final class DashboardViewModel: ObservableObject {
             ? .loading("Loading persisted dashboard...")
             : .failed("Dashboard load failed")
         positions = []
-        recentActivity = []
-        activityComparison = nil
         fundingCalculation = nil
+        netWorthReport = .withdrawn(loading ? .loading : .unavailable)
         positionState = loading ? .loading : .unavailable
-        recentActivityState = loading ? .loading : .unavailable
         fundingState = loading ? .loading : .unavailable
     }
 
@@ -453,6 +403,7 @@ final class DashboardViewModel: ObservableObject {
         let state = availability.state
         let isCurrent = state == .current || state == .empty
         accounts = accountStore.accounts
+        storedTransactionCount = transactionStore.transactions.count
         switch state {
         case .loading:
             presentationState = .loading("Loading persisted dashboard...")
@@ -469,29 +420,30 @@ final class DashboardViewModel: ObservableObject {
             cardSnapshot: cardStore.snapshot
         ) : []
         positionState = .resolve(availability: state, isEmpty: positions.isEmpty)
-
-        let category = categoryStore.snapshot
-        let activity = TransactionPresentationEngine.evaluate(
-            transactions: transactionStore.transactions,
-            accounts: accountStore.accounts,
-            categories: category.categories,
-            assignments: category.assignments,
-            filter: .empty,
-            sort: .init(),
-            availability: isCurrent ? .available : .unavailable
-        )
-        let rows = activity.rows
-        activityComparison = isCurrent ? DashboardActivityComparison(result: activity) : nil
-        transactionCount = transactionStore.transactions.count
-        recentActivity = Array(rows.prefix(recentActivityLimit))
-        recentActivityState = .resolve(availability: state, isEmpty: rows.isEmpty)
+        if !isCurrent {
+            netWorthReport = .withdrawn(state == .loading ? .loading : .unavailable)
+        } else if membershipStore.generation != availability.generation || investmentStore.generation != availability.generation {
+            netWorthReport = .withdrawn(.membershipUnavailable)
+        } else {
+            let coverage = gmail.coverage.flatMap { $0.generation == availability.generation ? $0 : nil }
+            netWorthReport = NetWorthProjection.make(accounts: accounts, positions: positions,
+                investments: investmentStore.snapshot, valuations: reportingPrices?.valuations ?? [:],
+                membership: membershipStore.snapshot, currencies: reportingPreferences.currencies,
+                legs: reportingRates?.legs ?? [:], rateFailures: reportingRates?.failures ?? [],
+                priceFailures: Set(reportingPrices?.failures.keys.map { $0 } ?? []),
+                scopeNotes: NetWorthProjection.scopeNotes(inbox: coverage?.inbox, importedSourceIDs: coverage?.importedSourceIDs ?? []),
+                now: now(), generation: availability.generation)
+        }
 
         let currentMonth = Self.currentMonth(at: now())
         let fundingIsCurrent = isCurrent && fundingPlanStore.generation == availability.generation
         let plan = fundingIsCurrent
             ? currentMonth.flatMap { fundingPlanStore.plan(for: $0, workspaceID: workspaceID) }
             : nil
-        fundingCalculation = plan.map(FundingPlanCalculator.calculate)
+        let intelligence = intelligenceStore
+        let excluded = intelligence.generation == availability.generation ? intelligence.snapshot?.preferences?.excludedPlanningAccountIDs ?? [] : []
+        fundingCalculation = plan.map { FundingPlanCalculator.calculate($0, excludingAccounts: excluded,
+            salaryReceipt: PayslipReceiptState.resolve(plan: $0, transactions: transactionStore.transactions, excludedAccounts: excluded)) }
         fundingState = .resolve(availability: state, isEmpty: plan == nil)
         if (isCurrent && !fundingIsCurrent) || fundingCalculation?.incompleteReasons.contains(.invalidCurrency) == true {
             fundingState = .unavailable

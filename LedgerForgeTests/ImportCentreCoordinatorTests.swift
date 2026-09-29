@@ -842,6 +842,184 @@ struct ImportCentreCoordinatorTests {
         #expect(coordinator.items.first?.completionDisposition == .committed)
     }
 
+    @Test func requiredReviewRemainsVisibleWhileLookAheadIsSuspended() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        probe.automaticCommitEligible = false
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.startConfirmedBatch([
+            URL(fileURLWithPath: "/opaque-mechanics/review-first"),
+            URL(fileURLWithPath: "/opaque-mechanics/suspended-next")
+        ], preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        probe.resumePreparation(at: 0, with: OpaqueImportCentrePreparation())
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+
+        #expect(coordinator.isPreparationDraining)
+        #expect(!coordinator.currentItemWillAutomaticallyCommit)
+        #expect(!coordinator.showsAutomaticBatchProgress)
+        #expect(probe.commitCallCount == 0)
+        coordinator.skipCurrent()
+        #expect(coordinator.currentItem?.id == coordinator.items[1].id)
+        #expect(coordinator.showsAutomaticBatchProgress)
+        coordinator.cancelBatch()
+        probe.resumeAllSuspendedPreparations()
+        await waitUntil { !coordinator.isPreparationDraining }
+        #expect(probe.commitCallCount == 0)
+    }
+
+    @Test func failedCurrentCanContinueWhileLookAheadIsSuspended() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.startConfirmedBatch([
+            URL(fileURLWithPath: "/opaque-mechanics/failed-first"),
+            URL(fileURLWithPath: "/opaque-mechanics/suspended-next")
+        ], preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        probe.failPreparation(at: 0, with: ImportError.readerFailure(message: "Opaque failure"))
+        await waitUntil { coordinator.currentItem?.phase == .failed }
+        #expect(coordinator.isPreparationDraining)
+        #expect(!coordinator.showsAutomaticBatchProgress)
+        #expect(coordinator.permitsContinue)
+        #expect(coordinator.continueAfterCurrent())
+        #expect(coordinator.currentItem?.id == coordinator.items[1].id)
+        coordinator.cancelBatch()
+        probe.resumeAllSuspendedPreparations()
+        await waitUntil { !coordinator.isPreparationDraining }
+        #expect(probe.commitCallCount == 0)
+    }
+
+    @Test func currentPasswordChallengeExposesReviewAndSkipDuringAutomaticPreparation() async throws {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        let coordinator = makeCoordinator(probe)
+        let source = URL(fileURLWithPath: "/opaque-mechanics/password-first")
+        #expect(coordinator.startConfirmedBatch([
+            source, URL(fileURLWithPath: "/opaque-mechanics/password-lookahead")
+        ], preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        let operationID = try #require(coordinator.currentItem?.preparationOperationID)
+        let controller = StatementPasswordChallengeController()
+        let request = Task {
+            try await controller.requestPassword(for: ImportRequest(id: operationID, fileURL: source))
+        }
+        await waitUntil { controller.challenge != nil }
+
+        #expect(coordinator.showsAutomaticBatchProgress(passwordChallengeID: nil))
+        #expect(coordinator.showsAutomaticBatchProgress(passwordChallengeID: UUID()))
+        #expect(!coordinator.showsAutomaticBatchProgress(passwordChallengeID: controller.challenge?.id))
+        #expect(coordinator.permitsSkip && coordinator.permitsCancellation)
+        #expect(probe.commitCallCount == 0)
+        controller.cancel(challengeID: operationID)
+        do {
+            _ = try await request.value
+            Issue.record("Cancelled password entry unexpectedly completed.")
+        } catch {
+            #expect(error as? ImportError == .cancelled)
+        }
+        coordinator.skipCurrent()
+        probe.resumePreparation(at: 0, with: OpaqueImportCentrePreparation())
+        await waitUntil { coordinator.currentItem?.id == coordinator.items[1].id }
+        #expect(coordinator.items[0].phase == .skipped)
+        #expect(coordinator.showsAutomaticBatchProgress(passwordChallengeID: operationID))
+        coordinator.cancelBatch()
+        probe.resumeAllSuspendedPreparations()
+        await waitUntil { !coordinator.isPreparationDraining }
+        #expect(probe.commitCallCount == 0)
+    }
+
+    @Test func parallelPasswordRequestsStaySeparateWhenLookaheadArrivesFirst() async throws {
+        let controller = StatementPasswordChallengeController()
+        let aheadID = UUID(), currentID = UUID()
+        let ahead = Task {
+            try await controller.requestPassword(for: .init(id: aheadID, fileURL: URL(fileURLWithPath: "/opaque-mechanics/ahead")))
+        }
+        await waitUntil { controller.challenges.count == 1 }
+        let current = Task {
+            try await controller.requestPassword(for: .init(id: currentID, fileURL: URL(fileURLWithPath: "/opaque-mechanics/current")))
+        }
+        await waitUntil { controller.challenges.count == 2 }
+        #expect(controller.challenge(for: currentID)?.id == currentID)
+        controller.cancel(challengeID: currentID)
+        do { _ = try await current.value; Issue.record("Skipped request completed") }
+        catch { #expect(error as? ImportError == .cancelled) }
+        #expect(controller.challenges.map(\.id) == [aheadID])
+        // A stale UI action cannot consume the next file's continuation.
+        controller.submit("opaque nonfinancial mechanics token", challengeID: currentID)
+        #expect(controller.challenge(for: aheadID) != nil)
+        controller.submit("opaque nonfinancial mechanics token", challengeID: aheadID)
+        #expect(try await ahead.value == "opaque nonfinancial mechanics token")
+        #expect(controller.challenges.isEmpty)
+    }
+
+    @Test func cancellingPasswordTaskRemovesOnlyItsOwnWaitingRequest() async throws {
+        let controller = StatementPasswordChallengeController()
+        let ids = [UUID(), UUID()]
+        let requests = ids.map { id in Task {
+            try await controller.requestPassword(for: .init(id: id, fileURL: URL(fileURLWithPath: "/opaque-mechanics/cancellation")))
+        } }
+        await waitUntil { controller.challenges.count == 2 }
+        requests[1].cancel()
+        do { _ = try await requests[1].value; Issue.record("Cancelled request completed") }
+        catch { #expect(error as? ImportError == .cancelled) }
+        #expect(controller.challenges.map(\.id) == [ids[0]])
+        controller.cancel()
+        do { _ = try await requests[0].value; Issue.record("Cancelled request completed") }
+        catch { #expect(error as? ImportError == .cancelled) }
+        #expect(controller.challenges.isEmpty)
+    }
+
+    @Test func confirmedBankBatchWaitsForEverySectionThenCommitsOneParent() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.nextIdentityReview = .bankSections([
+            BankSectionIdentityReview(
+                sectionID: "section-a",
+                product: "NRE Savings",
+                sourceAccountLabel: "XXXXXXXXXXX1001",
+                period: nil,
+                transactionCount: 0,
+                identityReview: .choiceRequired(eligibleAccountIds: ["eligible-a"])
+            ),
+            BankSectionIdentityReview(
+                sectionID: "section-b",
+                product: "NRO Savings",
+                sourceAccountLabel: "XXXXXXXXXXX2002",
+                period: nil,
+                transactionCount: 0,
+                identityReview: .choiceRequired(eligibleAccountIds: ["eligible-b"])
+            )
+        ])
+        let coordinator = makeCoordinator(probe)
+
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/tmp/opaque-bank-sections")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        coordinator.updateBankSectionChoice(
+            sectionID: "section-a",
+            choice: .useExistingAccount(accountId: "eligible-a")
+        )
+
+        #expect(coordinator.currentItem?.bankSectionDraftChoices == [
+            "section-a": .useExistingAccount(accountId: "eligible-a")
+        ])
+        #expect(coordinator.currentItem?.accountChoice == .bankSections([
+            "section-a": .useExistingAccount(accountId: "eligible-a")
+        ]))
+        await Task.yield()
+        #expect(probe.commitCallCount == 0)
+        coordinator.updateBankSectionChoice(
+            sectionID: "section-b",
+            choice: .useExistingAccount(accountId: "eligible-b")
+        )
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(probe.commitCallCount == 1)
+        #expect(coordinator.items.first?.phase == .completed)
+        #expect(coordinator.items.first?.accountChoice == .bankSections([
+            "section-a": .useExistingAccount(accountId: "eligible-a"),
+            "section-b": .useExistingAccount(accountId: "eligible-b")
+        ]))
+    }
+
     @Test func cancellationWithdrawsConsentAfterReviewBeforeQueuedAutomaticCommit() async {
         let probe = ImportCentreWorkflowProbe()
         probe.automaticCommitEligible = false
@@ -900,6 +1078,128 @@ struct ImportCentreCoordinatorTests {
         coordinator.cancelBatch()
     }
 
+    @Test func twoPreparationSlotsCommitInSourceOrderAndBoundOutstandingWork() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        let coordinator = makeCoordinator(probe)
+        let urls = ["first", "second", "third"].map { URL(fileURLWithPath: "/opaque-mechanics/\($0)") }
+        #expect(coordinator.startConfirmedBatch(urls, preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        #expect(probe.maximumConcurrentPreparationCount == 2)
+        let first = OpaqueImportCentrePreparation(), second = OpaqueImportCentrePreparation()
+        probe.resumePreparation(at: 1, with: second)
+        await waitUntil { coordinator.items[1].phase == .awaitingReview }
+        #expect(probe.commitCallCount == 0)
+        #expect(probe.prepareCallCount == 2)
+        probe.resumePreparation(at: 0, with: first)
+        await waitUntil { probe.prepareCallCount == 3 }
+        let third = OpaqueImportCentrePreparation()
+        probe.resumeNextPreparation(with: third)
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(probe.committedPreparationIDs == [first.id, second.id, third.id])
+        #expect(probe.maximumConcurrentPreparationCount == 2)
+    }
+
+    @Test(arguments: [false, true])
+    func failedLookAheadStopsInOrderUntilExplicitContinueOrRetry(retry: Bool) async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        let coordinator = makeCoordinator(probe)
+        let urls = ["first", "failing-second", "third"].map { URL(fileURLWithPath: "/opaque-mechanics/\($0)") }
+        #expect(coordinator.startConfirmedBatch(urls, preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        let failedID = coordinator.items[1].id
+        probe.failPreparation(at: 1, with: ImportError.readerFailure(message: "opaque worker failure"))
+        await waitUntil { coordinator.items[1].phase == .failed }
+        #expect(probe.prepareCallCount == 2)
+
+        let first = OpaqueImportCentrePreparation()
+        probe.resumePreparation(at: 0, with: first)
+        await waitUntil { probe.commitCallCount == 1 && coordinator.currentItem?.id != coordinator.items[0].id }
+        #expect(coordinator.currentItem?.id == failedID)
+        #expect(coordinator.presentedItem?.id == failedID)
+        #expect(coordinator.items[2].phase == .pending)
+        #expect(probe.prepareCallCount == 2)
+        guard coordinator.currentItem?.id == failedID else {
+            coordinator.cancelBatch()
+            await waitUntil {
+                probe.resumeAllSuspendedPreparations()
+                return !coordinator.isPreparationDraining
+            }
+            return
+        }
+        #expect(coordinator.permitsRetry)
+        #expect(coordinator.permitsContinue)
+        var expected = [first.id]
+        if retry {
+            #expect(coordinator.retryCurrent())
+            await waitUntil { probe.prepareCallCount == 3 }
+            #expect(coordinator.currentItem?.id == failedID)
+            #expect(coordinator.items[2].phase == .pending)
+            let retried = OpaqueImportCentrePreparation()
+            expected.append(retried.id)
+            probe.resumeNextPreparation(with: retried)
+            await waitUntil { probe.prepareCallCount == 4 }
+        } else {
+            #expect(coordinator.continueAfterCurrent())
+            await waitUntil { probe.prepareCallCount == 3 }
+            #expect(coordinator.items[1].phase == .failed)
+        }
+        let third = OpaqueImportCentrePreparation()
+        expected.append(third.id)
+        probe.resumeNextPreparation(with: third)
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(probe.committedPreparationIDs == expected)
+        #expect(probe.maximumConcurrentPreparationCount == 2)
+        #expect(!coordinator.isPreparationDraining)
+    }
+
+    @Test func resettingTwoWorkersDrainsAndDisposesLatePreparations() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/opaque/a"), URL(fileURLWithPath: "/opaque/b")], preparationLimit: 2))
+        await waitUntil { probe.prepareCallCount == 2 }
+        #expect(coordinator.reset())
+        #expect(!coordinator.permitsSourceSelection)
+        let first = OpaqueImportCentrePreparation(), second = OpaqueImportCentrePreparation()
+        probe.resumeNextPreparation(with: first)
+        probe.resumeNextPreparation(with: second)
+        await waitUntil { coordinator.permitsSourceSelection }
+        #expect(Set(probe.cancelledPreparationIDs) == [first.id, second.id])
+        #expect(probe.commitCallCount == 0)
+    }
+
+    @Test func detachingLastOwnerDuringCommitCancelsLookAheadPasswordChallengeAndDrains() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.suspendsPreparation = true
+        probe.suspendsCommit = true
+        let coordinator = makeCoordinator(probe)
+        let owner = UUID()
+        coordinator.attachPresentationOwner(owner)
+        #expect(coordinator.startConfirmedBatch(
+            [URL(fileURLWithPath: "/opaque/a"), URL(fileURLWithPath: "/opaque/b")],
+            preparationLimit: 2
+        ))
+        await waitUntil { probe.prepareCallCount == 2 }
+
+        probe.resumePreparation(at: 0, with: OpaqueImportCentrePreparation())
+        await waitUntil { probe.commitCallCount == 1 }
+        #expect(coordinator.currentItem?.phase == .committing)
+        #expect(coordinator.isPreparationDraining)
+
+        coordinator.detachPresentationOwner(owner)
+        #expect(probe.passwordCancellationCount == 0)
+        probe.resumeCommit()
+        await waitUntil { coordinator.items.isEmpty && probe.passwordCancellationCount == 1 }
+
+        let latePreparation = OpaqueImportCentrePreparation()
+        probe.resumeNextPreparation(with: latePreparation)
+        await waitUntil { !coordinator.isPreparationDraining }
+        #expect(probe.cancelledPreparationIDs == [latePreparation.id])
+        #expect(coordinator.permitsSourceSelection)
+    }
+
     private func makeCoordinator(
         _ probe: ImportCentreWorkflowProbe
     ) -> ImportCentreCoordinator<OpaqueImportCentrePreparation> {
@@ -918,7 +1218,7 @@ struct ImportCentreCoordinatorTests {
                     await probe.commit(preparation, choice: choice, plan: plan)
                 },
                 cancelPreparation: { probe.cancelPreparation($0) },
-                cancelPasswordChallenge: { probe.cancelPasswordChallenge() },
+                cancelPasswordChallenge: { _ in probe.cancelPasswordChallenge() },
                 failureSummary: { _ in
                     ImportFailureSummary(
                         stage: .documentPreparation,
@@ -931,6 +1231,9 @@ struct ImportCentreCoordinatorTests {
                 isAutomaticallyCommittable: { preparation, review in
                     probe.automaticCommitEligible && review.validationPassed
                         && preparation.id != probe.blockedPreparationID
+                        && (!review.identityReview.isBankSectionParent || ImportAccountConfirmationPolicy.allowsConfirmation(
+                            review: review.identityReview, choice: review.initialAccountChoice
+                        ))
                 }
             )
         )
@@ -976,6 +1279,7 @@ private final class ImportCentreWorkflowProbe {
     var nextPreparationError: Error?
     var nextCommitResult: ImportEngineResult?
     var automaticCommitEligible = true
+    var nextIdentityReview: ImportIdentityReview = .unavailable
     var blockedPreparationID: UUID?
     private(set) var prepareCallCount = 0
     private(set) var commitCallCount = 0
@@ -983,10 +1287,11 @@ private final class ImportCentreWorkflowProbe {
     private(set) var maximumConcurrentPreparationCount = 0
     private(set) var passwordCancellationCount = 0
     private(set) var cancelledPreparationIDs: [UUID] = []
+    private(set) var committedPreparationIDs: [UUID] = []
     private(set) var operationIDs: [UUID] = []
     private(set) var lastOperationID: UUID?
     private(set) var lastProgressCallback: ((ImportProgress) -> Void)?
-    private var preparationContinuations: [CheckedContinuation<OpaqueImportCentrePreparation, Never>] = []
+    private var preparationContinuations: [CheckedContinuation<OpaqueImportCentrePreparation, Error>] = []
     private var commitContinuation: CheckedContinuation<Void, Never>?
 
     func prepare(
@@ -1010,7 +1315,7 @@ private final class ImportCentreWorkflowProbe {
             throw error
         }
         if suspendsPreparation {
-            return await withCheckedContinuation { continuation in
+            return try await withCheckedThrowingContinuation { continuation in
                 preparationContinuations.append(continuation)
             }
         }
@@ -1036,9 +1341,29 @@ private final class ImportCentreWorkflowProbe {
         preparationContinuations.removeFirst().resume(returning: preparation)
     }
 
+    func resumePreparation(at index: Int, with preparation: OpaqueImportCentrePreparation) {
+        guard preparationContinuations.indices.contains(index) else {
+            Issue.record("No suspended preparation at the selected index."); return
+        }
+        preparationContinuations.remove(at: index).resume(returning: preparation)
+    }
+
+    func resumeAllSuspendedPreparations() {
+        let waiting = preparationContinuations
+        preparationContinuations.removeAll()
+        for continuation in waiting { continuation.resume(returning: OpaqueImportCentrePreparation()) }
+    }
+
+    func failPreparation(at index: Int, with error: Error) {
+        guard preparationContinuations.indices.contains(index) else {
+            Issue.record("No suspended preparation at the selected index."); return
+        }
+        preparationContinuations.remove(at: index).resume(throwing: error)
+    }
+
     func review(_ preparation: OpaqueImportCentrePreparation) -> ImportCentreReviewState {
         ImportCentreReviewState(
-            identityReview: .unavailable,
+            identityReview: nextIdentityReview,
             initialAccountChoice: nil,
             partialReview: .ordinaryFullImport,
             validationPassed: true
@@ -1058,6 +1383,7 @@ private final class ImportCentreWorkflowProbe {
         plan: ReviewedPartialImportPlanDTO?
     ) async -> ImportOutcomePresentation {
         commitCallCount += 1
+        committedPreparationIDs.append(preparation.id)
         if suspendsCommit {
             await withCheckedContinuation { continuation in
                 commitContinuation = continuation

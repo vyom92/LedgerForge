@@ -1,6 +1,6 @@
 import Foundation
 
-enum HDFCBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum HDFCBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedDocumentContent
     case unsupportedWorksheet
     case unexpectedColumnCount(Int)
@@ -44,7 +44,7 @@ enum HDFCBankAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct HDFCBankAccountXLSNormalizationResult {
+nonisolated struct HDFCBankAccountXLSNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
@@ -57,7 +57,7 @@ struct HDFCBankAccountXLSNormalizationResult {
 /// a unique semantic header, coherent HDFC/account-period evidence and the
 /// printed financial summary. This intentionally has no row-21/row-23 or
 /// fixed-trailer contract.
-final class HDFCBankAccountXLSNormalizer {
+nonisolated final class HDFCBankAccountXLSNormalizer {
     static let logicalHeader = [
         "Date",
         "Narration",

@@ -4,6 +4,7 @@ struct LiveFXSettingsView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject var rates: AlDarReferenceSession
     @ObservedObject var prices: InvestmentPriceSession
+    @ObservedObject var backgroundUpdates: BackgroundUpdatesSession
     private var refreshing: Bool { !rates.refreshing.isEmpty || !prices.refreshing.isEmpty }
 
     var body: some View {
@@ -23,10 +24,16 @@ struct LiveFXSettingsView: View {
                 }.buttonStyle(LFActionButtonStyle(kind: .primary)).disabled(refreshing)
                 .accessibilityIdentifier("liveFX.refreshAll")
             }
-            Text("At launch, then 00:00 · 06:00 · 12:00 · 18:00 UTC")
+            Text(backgroundUpdates.activeSchedule
+                 ? "Uses the schedule and enabled scopes saved in Background Updates."
+                 : "At launch, then 00:00 · 06:00 · 12:00 · 18:00 UTC")
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             Text("One retry after 60 seconds for failed sources. A missed slot is checked once on wake; manual refresh keeps the UTC schedule.")
                 .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            if let message = backgroundUpdates.message {
+                Text(message).font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             LFPanel(title: "Currency rates", systemImage: "arrow.left.arrow.right") {
                 Text("Al Dar · Shared UTC schedule")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
@@ -41,6 +48,11 @@ struct LiveFXSettingsView: View {
                             Text(currencyStatus(currency))
                             if let leg = rates.legs[currency] { successTime(leg.fetchedAt) }
                         }.font(theme.typography.secondary)
+                        refreshButton(busy: rates.refreshing.contains(currency),
+                                      label: "Refresh QAR to \(currency.rawValue)",
+                                      identifier: "liveFX.refresh.aldar.\(currency.rawValue)") {
+                            backgroundUpdates.refreshCurrency(currency)
+                        }
                     }
                 }
                 if let feedback = rates.refreshFeedback {
@@ -49,7 +61,7 @@ struct LiveFXSettingsView: View {
                 }
             }
             LFPanel(title: "Investment NAV / prices", systemImage: "chart.line.uptrend.xyaxis") {
-                Text("Shared UTC schedule · Refresh all also checks the latest available prices now.")
+                Text("Refresh a source on its own, or use Refresh all for every configured source.")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 if prices.rows.isEmpty {
@@ -58,8 +70,9 @@ struct LiveFXSettingsView: View {
                 } else {
                     ForEach(prices.configuredProviders, id: \.self) { provider in providerRow(provider) }
                     if prices.unmappedCount > 0 {
-                        Text("\(prices.unmappedCount) holdings need a confirmed price mapping.")
+                        Text("\(prices.unmappedCount) holdings have no confirmed price mapping. They are not included in the source results above or the valued total; refreshing cannot price them yet.")
                             .font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if let message = prices.mappingMessage {
@@ -88,6 +101,11 @@ struct LiveFXSettingsView: View {
                     if let fetched = cached.map(\.fetchedAt).max() {
                         successTime(fetched)
                     }
+                }
+                refreshButton(busy: isRefreshing,
+                              label: "Refresh \(InvestmentPriceRegistry.providerNames[provider] ?? provider)",
+                              identifier: "liveFX.refresh.\(provider)") {
+                    backgroundUpdates.refreshPrices(provider: provider)
                 }
             }
             if provider == "fe" {
@@ -118,11 +136,24 @@ struct LiveFXSettingsView: View {
         if isRefreshing { return "Refreshing…" }
         if hasErrors { return cached.isEmpty ? "Couldn’t update" : "Couldn’t update · previous prices retained" }
         if cached.isEmpty { return "No successful price yet" }
-        return cached.count == mappingCount ? "Prices available" : "Some prices available"
+        return "\(cached.count) of \(mappingCount) linked prices available"
+    }
+
+    private func refreshButton(busy: Bool, label: String, identifier: String,
+                               action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(busy ? "Refreshing…" : "Refresh", systemImage: "arrow.clockwise")
+                .fixedSize()
+        }
+        .buttonStyle(LFActionButtonStyle(kind: .secondary))
+        .disabled(busy || !backgroundUpdates.available)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+        .help(label)
     }
 
     private func successTime(_ date: Date) -> some View {
-        Text("Last successful update \(date.formatted(date: .abbreviated, time: .shortened))")
+        Text("Last successful update \(InvestmentPriceDates.fetchInstant(date))")
             .font(theme.typography.caption)
             .foregroundStyle(theme.palette.secondaryText)
     }

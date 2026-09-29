@@ -61,6 +61,19 @@ nonisolated public struct ZurichISPPolicyObservation: Codable, Equatable, Sendab
     let vestedValue: ZurichISPReportedAmount?
     let summaryFields: [String: String]
 
+    /// Zurich records a contribution before the purchased units settle. The
+    /// summary retains the contribution baseline belonging to its fund value.
+    /// Both figures already belong to the retained original observation.
+    var allocatedContributions: ZurichISPReportedAmount? {
+        guard let text = summaryFields["Total contributions"] else { return nil }
+        return try? ZurichISPReportedAmount(text, currency: currency)
+    }
+
+    var pendingAllocation: Decimal? {
+        guard let allocatedContributions else { return nil }
+        return try? InvestmentArithmetic.subtract(contributions.amount.value, allocatedContributions.amount.value)
+    }
+
     var displayName: String {
         switch label {
         case "(Employee Mandatory)": "ISP · Employee mandatory"
@@ -102,9 +115,11 @@ nonisolated public struct ZurichISPPolicyObservation: Codable, Equatable, Sendab
             _ = try StatementDate(canonical: strategy.effectiveDay)
             strategyTotal = try InvestmentArithmetic.add(strategyTotal, strategy.percentage.value)
         }
-        guard strategyTotal == 100, Self.cents(allocationTotal) == 100, contributions.amount.value >= 0,
+        guard let allocated = allocatedContributions, allocated.amount.value >= 0,
+              contributions.amount.value >= allocated.amount.value,
+              strategyTotal == 100, Self.cents(allocationTotal) == 100,
               Self.cents(total) == Self.cents(value.amount.value),
-              Self.cents(try InvestmentArithmetic.subtract(value.amount.value, contributions.amount.value)) == Self.cents(growth.amount.value),
+              Self.cents(try InvestmentArithmetic.subtract(value.amount.value, allocated.amount.value)) == Self.cents(growth.amount.value),
               [contributions.currency, value.currency, growth.currency].allSatisfy({ $0 == currency }) else {
             throw ZurichISPSnapshotError.invalidSource
         }
@@ -176,11 +191,14 @@ nonisolated public struct ZurichISPAccountSnapshot: Codable, Equatable, Sendable
             let contribution = try amount("Contributions", in: contributions)
             let value = try amount("Value", in: contributions), growth = try amount("Growth", in: contributions)
             let vested = try contributions["Vested value"].map { try ZurichISPReportedAmount($0, currency: currency) }
-            guard try amount("Total contributions", in: summary).amount.value == contribution.amount.value,
+            // A higher recorded contribution can await unit allocation. Only
+            // this direction is accepted; value/growth/vested figures and the
+            // complete fund rows must still reconcile with the policy summary.
+            guard try amount("Total contributions", in: summary).amount.value <= contribution.amount.value,
                   try amount("Value", in: summary).amount.value == value.amount.value,
                   try amount("Growth", in: summary).amount.value == growth.amount.value,
                   try summary["Vested value"].map({ try ZurichISPReportedAmount($0, currency: currency).amount.value }) == vested?.amount.value else {
-                throw ZurichISPSnapshotError.invalidSource
+                throw ZurichISPSnapshotError.inconsistentPolicyFigures
             }
             return .init(observationID: "", fetchedAt: source.fetchedAt, policyID: policy.policyID, label: policy.label,
                 currency: currency, valuationDateText: policy.valuationDateDisplay, valuationDay: day,
@@ -221,10 +239,11 @@ nonisolated public struct ZurichISPAccountSnapshot: Codable, Equatable, Sendable
 }
 
 nonisolated enum ZurichISPSnapshotError: Error, LocalizedError {
-    case invalidSource, stale, unavailable
+    case invalidSource, inconsistentPolicyFigures, stale, unavailable
     var errorDescription: String? {
         switch self {
         case .invalidSource: "The ISP response could not be verified. Previous holdings are retained."
+        case .inconsistentPolicyFigures: "Connected to Zurich, but its policy summary and contribution details do not agree. Previous holdings are retained."
         case .stale: "ISP holdings changed during this request, or the source is older. Previous holdings are retained."
         case .unavailable: "The ledger is unavailable. ISP holdings were not changed."
         }

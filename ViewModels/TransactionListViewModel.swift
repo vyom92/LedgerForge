@@ -122,6 +122,8 @@ nonisolated struct TransactionPresentationStatementDateRange: Equatable, Sendabl
 }
 
 nonisolated struct TransactionPresentationFilterSpec: Equatable, Sendable {
+    /// Exact chart drill-down; nil is unscoped, an empty set matches nothing.
+    var canonicalTransactionIDs: Set<String>?
     var searchText: String = ""
     var accountIDs: Set<String> = []
     var currencies: Set<CurrencyCode> = []
@@ -256,15 +258,29 @@ nonisolated enum TransactionPresentationText {
 }
 
 nonisolated enum TransactionPresentationEngine {
-    static func row(
+    private struct AccountPresentation {
+        let type: AccountType
+        let displayName: String
+        let institutionDisplayName: String
+        let identityDisplay: String
+
+        init(_ account: Account) {
+            type = account.type
+            displayName = account.preferredDisplayName
+            institutionDisplayName = account.institutionDisplayName
+            identityDisplay = account.identitySummaries.map(\.redactedValue).sorted().joined(separator: ", ")
+        }
+    }
+
+    private static func row(
         for transaction: Transaction,
-        accountsByID: [String: Account],
+        accountsByID: [String: AccountPresentation],
         categoriesByID: [String: Category],
         assignments: [String: String]
     ) -> TransactionPresentationRow {
         let account = transaction.repositoryAccountId.flatMap { accountsByID[$0] }
-        let accountDisplayName = account?.name ?? "Unavailable"
-        let institutionDisplayName = account?.institution ?? "Unavailable"
+        let accountDisplayName = account?.displayName ?? "Unavailable"
+        let institutionDisplayName = account?.institutionDisplayName ?? "Unavailable"
         let categoryID = transaction.repositoryTransactionId.flatMap { assignments[$0] }
         let category = categoryID.flatMap { categoriesByID[$0] }
         let categoryChoice = categoryID.map(TransactionPresentationCategoryChoice.categoryID) ?? .uncategorized
@@ -310,7 +326,7 @@ nonisolated enum TransactionPresentationEngine {
             stableID: stableID,
             accountID: transaction.repositoryAccountId,
             accountDisplayName: accountDisplayName,
-            accountIdentityDisplay: account?.identitySummaries.map(\.redactedValue).sorted().joined(separator: ", ") ?? "",
+            accountIdentityDisplay: account?.identityDisplay ?? "",
             institutionDisplayName: institutionDisplayName,
             currentCategory: categoryChoice,
             currentCategoryDisplayName: categoryDisplayName,
@@ -326,8 +342,13 @@ nonisolated enum TransactionPresentationEngine {
         categories: [Category],
         assignments: [String: String]
     ) -> [TransactionPresentationRow] {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.transactionRows, count: transactions.count)
+        defer { GmailQualificationTiming.end(.transactionRows, started: timing, count: transactions.count) }
+#endif
+        // Resolve shared display strings once per account, not once per transaction.
         let accountsByID = Dictionary(uniqueKeysWithValues: accounts.compactMap { account in
-            account.repositoryAccountId.map { ($0, account) }
+            account.repositoryAccountId.map { ($0, AccountPresentation(account)) }
         })
         let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
         return transactions.map {
@@ -364,6 +385,10 @@ nonisolated enum TransactionPresentationEngine {
         sort: TransactionPresentationSortSpec,
         availability: TransactionPresentationAvailability
     ) -> TransactionPresentationResult {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.transactionQuery, count: allRows.count)
+        defer { GmailQualificationTiming.end(.transactionQuery, started: timing, count: allRows.count) }
+#endif
         guard availability == .available else { return .unavailable }
         guard filter.amountRange?.isValid ?? true else {
             return invalid(.invalidAmountRange)
@@ -390,16 +415,19 @@ nonisolated enum TransactionPresentationEngine {
         var matching = [TransactionPresentationRow]()
 
         for row in allRows {
-            let searchable = [
-                row.transaction.description,
-                row.accountDisplayName,
-                row.institutionDisplayName,
-                row.currentCategoryDisplayName
-            ]
-            .map(TransactionPresentationText.normalized)
-            .joined(separator: " ")
-            guard searchTokens.allSatisfy({ searchable.contains($0) }) else {
-                exclusions.search += 1; continue
+            guard filter.canonicalTransactionIDs.map({ $0.contains(row.transaction.repositoryTransactionId ?? "") }) ?? true else { continue }
+            if !searchTokens.isEmpty {
+                let searchable = [
+                    row.transaction.description,
+                    row.accountDisplayName,
+                    row.institutionDisplayName,
+                    row.currentCategoryDisplayName
+                ]
+                .map(TransactionPresentationText.normalized)
+                .joined(separator: " ")
+                guard searchTokens.allSatisfy({ searchable.contains($0) }) else {
+                    exclusions.search += 1; continue
+                }
             }
             guard filter.accountIDs.isEmpty || row.accountID.map(filter.accountIDs.contains) == true else {
                 exclusions.account += 1; continue
@@ -444,7 +472,21 @@ nonisolated enum TransactionPresentationEngine {
             matching.append(row)
         }
 
-        matching.sort { comparison($0, $1, sort: sort) == .orderedAscending }
+        // Text normalization is invariant for this query. Compute it once per
+        // row, not on every comparison in an O(n log n) column sort.
+        let normalizedSortText: [String: String]? = switch sort.key {
+        case .description, .account, .category:
+            Dictionary(matching.map { row in
+                let text = switch sort.key {
+                case .description: row.transaction.description
+                case .account: row.accountDisplayName
+                default: row.currentCategoryDisplayName
+                }
+                return (row.stableID, TransactionPresentationText.normalized(text))
+            }, uniquingKeysWith: { first, _ in first })
+        default: nil
+        }
+        matching.sort { comparison($0, $1, sort: sort, normalizedSortText: normalizedSortText) == .orderedAscending }
         let totals = totals(for: matching)
         return TransactionPresentationResult(
             state: matching.isEmpty ? .validEmpty : .ready,
@@ -461,6 +503,12 @@ nonisolated enum TransactionPresentationEngine {
         _ rhs: TransactionPresentationRow,
         sort: TransactionPresentationSortSpec
     ) -> ComparisonResult {
+        comparison(lhs, rhs, sort: sort, normalizedSortText: nil)
+    }
+
+    private static func comparison(_ lhs: TransactionPresentationRow, _ rhs: TransactionPresentationRow,
+                                   sort: TransactionPresentationSortSpec,
+                                   normalizedSortText: [String: String]?) -> ComparisonResult {
         guard lhs.stableID != rhs.stableID else { return .orderedSame }
 
         let ordered: ComparisonResult
@@ -469,15 +517,20 @@ nonisolated enum TransactionPresentationEngine {
         case .statementDate:
             ordered = compareOptionalDate(lhs.sourceCivilDate, rhs.sourceCivilDate)
             keepsUnknownLast = lhs.sourceCivilDate == nil || rhs.sourceCivilDate == nil
-        case .description:
-            ordered = compareOptionalText(lhs.transaction.description, rhs.transaction.description)
-            keepsUnknownLast = isUnknownText(lhs.transaction.description) || isUnknownText(rhs.transaction.description)
-        case .account:
-            ordered = compareOptionalText(lhs.accountDisplayName, rhs.accountDisplayName)
-            keepsUnknownLast = isUnknownText(lhs.accountDisplayName) || isUnknownText(rhs.accountDisplayName)
-        case .category:
-            ordered = compareOptionalText(lhs.currentCategoryDisplayName, rhs.currentCategoryDisplayName)
-            keepsUnknownLast = isUnknownText(lhs.currentCategoryDisplayName) || isUnknownText(rhs.currentCategoryDisplayName)
+        case .description, .account, .category:
+            let leftField = sort.key == .description ? lhs.transaction.description
+                : sort.key == .account ? lhs.accountDisplayName : lhs.currentCategoryDisplayName
+            let rightField = sort.key == .description ? rhs.transaction.description
+                : sort.key == .account ? rhs.accountDisplayName : rhs.currentCategoryDisplayName
+            let left = normalizedSortText?[lhs.stableID] ?? TransactionPresentationText.normalized(leftField)
+            let right = normalizedSortText?[rhs.stableID] ?? TransactionPresentationText.normalized(rightField)
+            let leftUnknown = left.isEmpty || left == "unavailable"
+            let rightUnknown = right.isEmpty || right == "unavailable"
+            if leftUnknown && rightUnknown { ordered = .orderedSame }
+            else if leftUnknown { ordered = .orderedDescending }
+            else if rightUnknown { ordered = .orderedAscending }
+            else { ordered = left.compare(right, options: [], range: nil, locale: Locale(identifier: "en_US_POSIX")) }
+            keepsUnknownLast = leftUnknown || rightUnknown
         case .nativeAmount:
             let currencyOrder = lhs.transaction.money.currency.code.compare(rhs.transaction.money.currency.code)
             ordered = currencyOrder == .orderedSame
@@ -519,9 +572,9 @@ nonisolated enum TransactionPresentationEngine {
         let currencies = Set(rows.map { $0.transaction.money.currency })
         guard filter.currencies.isSubset(of: currencies) else { return false }
 
-        let institutions = Set(rows.compactMap { row -> String? in
-            guard row.accountID != nil else { return nil }
-            let normalized = TransactionPresentationText.normalized(row.institutionDisplayName)
+        let institutionNames = Set(rows.filter { $0.accountID != nil }.map(\.institutionDisplayName))
+        let institutions = Set(institutionNames.compactMap { name -> String? in
+            let normalized = TransactionPresentationText.normalized(name)
             return normalized.isEmpty || normalized == "unavailable" ? nil : normalized
         })
         let selectedInstitutions = Set(filter.institutionDisplayNames.map(TransactionPresentationText.normalized))
@@ -570,25 +623,6 @@ nonisolated enum TransactionPresentationEngine {
         }
     }
 
-    private static func compareOptionalText(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        let normalizedLeft = TransactionPresentationText.normalized(lhs)
-        let normalizedRight = TransactionPresentationText.normalized(rhs)
-        let left = isUnknownText(lhs) ? nil : normalizedLeft
-        let right = isUnknownText(rhs) ? nil : normalizedRight
-        switch (left, right) {
-        case (nil, nil): return .orderedSame
-        case (nil, .some): return .orderedDescending
-        case (.some, nil): return .orderedAscending
-        case let (.some(left), .some(right)):
-            return left.compare(right, options: [], range: nil, locale: Locale(identifier: "en_US_POSIX"))
-        }
-    }
-
-    private static func isUnknownText(_ value: String) -> Bool {
-        let normalized = TransactionPresentationText.normalized(value)
-        return normalized.isEmpty || normalized == "unavailable"
-    }
-
     private static func reverse(_ result: ComparisonResult) -> ComparisonResult {
         switch result {
         case .orderedAscending: return .orderedDescending
@@ -619,6 +653,8 @@ nonisolated enum TransactionPresentationEngine {
 }
 
 final class TransactionListViewModel: ObservableObject {
+    let spendingAnalysis = SpendingAnalysisModel()
+
 
     @Published private(set) var transactions: [Transaction] = []
 
@@ -638,6 +674,7 @@ final class TransactionListViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var cachedCanonicalRows: [TransactionPresentationRow]?
     private var cachedPresentationResult: TransactionPresentationResult?
+    private var pendingRefreshID: UUID?
     /// Advances for every relevant input publication, including same-count
     /// metadata changes and provider/availability replacement.
     private(set) var canonicalContentRevision: UInt64 = 0
@@ -680,16 +717,15 @@ final class TransactionListViewModel: ObservableObject {
         accounts = accountStore.accounts
         categorySnapshot = categoryStore.snapshot
 
-        transactionStore.$transactions
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] tx in
-                guard let self else { return }
-                self.transactions = tx
-                self.invalidateCanonicalProjection()
-                self.reconcilePresentationSelection()
-            }
-            .store(in: &cancellables)
+        // Hydration installs all canonical stores before publishing them on the
+        // main actor. Read that complete snapshot once per publication batch.
+        Publishers.MergeMany([
+            transactionStore.$transactions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            accountStore.$accounts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher()
+        ])
+        .sink { [weak self] in self?.requestCanonicalRefresh() }
+        .store(in: &cancellables)
 
         importSessionStore.$importSessions
             .dropFirst()
@@ -701,29 +737,25 @@ final class TransactionListViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        accountStore.$accounts
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] accounts in
-                guard let self else { return }
-                self.objectWillChange.send()
-                self.accounts = accounts
-                self.invalidateCanonicalProjection()
-                self.reconcilePresentationSelection()
-            }
-            .store(in: &cancellables)
+    }
 
-        categoryStore.$snapshot
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] snapshot in
-                guard let self else { return }
-                self.objectWillChange.send()
-                self.categorySnapshot = snapshot
-                self.invalidateCanonicalProjection()
-                self.reconcilePresentationSelection()
-            }
-            .store(in: &cancellables)
+    private func requestCanonicalRefresh() {
+        guard pendingRefreshID == nil else { return }
+        let requestID = UUID()
+        pendingRefreshID = requestID
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.pendingRefreshID == requestID else { return }
+            self.refreshCanonicalSnapshot()
+        }
+    }
+
+    private func refreshCanonicalSnapshot() {
+        pendingRefreshID = nil
+        accounts = accountStore.accounts
+        categorySnapshot = categoryStore.snapshot
+        transactions = transactionStore.transactions
+        invalidateCanonicalProjection()
+        reconcilePresentationSelection()
     }
 
     /// Root-owned application availability is passed in after canonical
@@ -745,8 +777,9 @@ final class TransactionListViewModel: ObservableObject {
         }
         synchronizedGeneration = generation
         presentationAvailability = availability
-        invalidateCanonicalProjection()
-        reconcilePresentationSelection()
+        // A generation/availability transition consumes any queued refresh now,
+        // so old rows cannot be exposed under the new provider generation.
+        refreshCanonicalSnapshot()
     }
 
     private func invalidateCanonicalProjection() {
@@ -865,7 +898,7 @@ final class TransactionListViewModel: ObservableObject {
         let importedAt = matchingSession.flatMap { session in
             strictISO8601Date(session.completedAtISO ?? session.startedAtISO)
         }
-        let importedAtText = importedAt?.formatted(date: .abbreviated, time: .shortened) ?? unavailable
+        let importedAtText = importedAt.map { AppDateDisplay.timestamp($0) } ?? unavailable
         let validation = matchingSession.flatMap {
             TransactionValidationPresentation(validationStatus: $0.validationStatus)
         }
@@ -1018,4 +1051,64 @@ private extension ISO8601DateFormatter {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
+}
+
+@MainActor
+final class SpendingAnalysisModel: ObservableObject {
+    @Published private(set) var projection: SpendingProjection?
+    @Published private(set) var comparison: SpendingComparison?
+    @Published private(set) var sourceRows: [SpendingSourceRow] = []
+    @Published private(set) var isWorking = false
+    private var sequence: UInt64 = 0
+    private var task: Task<Void, Never>?
+    private var worker: Task<(SpendingProjection, SpendingComparison?, [SpendingSourceRow], [MovementSuggestion]), Error>?
+    private var cached: (ProviderGenerationToken, UInt64, [SpendingSourceRow], [MovementSuggestion])?
+
+    private struct Query: Equatable {
+        let generation: ProviderGenerationToken
+        let revision: UInt64
+        let currency: String, accountID: String
+        let start: StatementDate?, end: StatementDate?
+        let baselineStart: StatementDate?, baselineEnd: StatementDate?
+    }
+    private var query: Query?
+    func cancel() { sequence &+= 1; task?.cancel(); worker?.cancel(); isWorking = false }
+    func clear() { sequence &+= 1; task?.cancel(); worker?.cancel(); projection = nil; comparison = nil; sourceRows = []; isWorking = false }
+    func refresh(generation: ProviderGenerationToken?, currency: String, accountID: String, start: StatementDate?, end: StatementDate?, baselineStart: StatementDate? = nil, baselineEnd: StatementDate? = nil) {
+        guard let generation, let metadata = FinancialIntelligenceStore.shared.snapshot,
+              FinancialIntelligenceStore.shared.generation == generation else { clear(); query = nil; return }
+        let revision = FinancialIntelligenceStore.shared.revision
+        let requested = Query(generation: generation, revision: revision, currency: currency, accountID: accountID, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd)
+        guard query != requested || (projection == nil && !isWorking) else { return }
+        clear(); query = requested
+        let current = sequence
+        let source = FinancialIntelligenceStore.shared.sources
+        let transactions = TransactionStore.shared.transactions
+        let categories = CategoryStore.shared.snapshot
+        let cards = CardStore.shared.snapshot
+        let cached = self.cached.flatMap { $0.0 == generation && $0.1 == revision ? $0 : nil }
+        isWorking = true
+        let worker = Task.detached(priority: .userInitiated) {
+            let rows = try cached?.2 ?? SpendingIntelligence.rows(transactions: transactions, sources: source, cards: cards, categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+            let suggestions = try cached?.3 ?? SpendingIntelligence.suggestions(rows: rows, metadata: metadata, sources: source)
+            let selectedAccounts: Set<String> = accountID.isEmpty ? [] : [accountID]
+            let projection = try SpendingIntelligence.project(rows: rows, metadata: metadata, sources: source, currency: currency,
+                accountIDs: selectedAccounts, start: start, end: end, allSuggestions: suggestions)
+            let comparison: SpendingComparison?
+            if let start, let end, let baselineStart, let baselineEnd {
+                comparison = try SpendingIntelligence.compare(analysis: projection, rows: rows, metadata: metadata, sources: source,
+                    currency: currency, accountIDs: selectedAccounts, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd)
+            } else { comparison = nil }
+            return (projection, comparison, rows, suggestions)
+        }
+        self.worker = worker
+        task = Task { [weak self] in
+            guard let (projection, comparison, rows, suggestions) = try? await worker.value else { return }
+            guard let self, !Task.isCancelled, self.sequence == current,
+                  FinancialIntelligenceStore.shared.generation == generation,
+                  FinancialIntelligenceStore.shared.revision == revision else { return }
+            self.sourceRows = rows; self.projection = projection; self.comparison = comparison; self.isWorking = false
+            self.cached = (generation, revision, rows, suggestions)
+        }
+    }
 }

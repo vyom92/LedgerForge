@@ -58,7 +58,7 @@ nonisolated struct CurrencyDefinition: Hashable, Sendable {
 }
 
 nonisolated struct CurrencyCatalog: Sendable {
-    static let version = "ledgerforge.currency-catalog.v2"
+    static let version = "ledgerforge.currency-catalog.v3"
     static let shared = CurrencyCatalog()
 
     private let definitionsByCode: [CurrencyCode: CurrencyDefinition]
@@ -92,7 +92,20 @@ nonisolated struct CurrencyCatalog: Sendable {
     /// with a numeric minor unit after excluding the ten codes explicitly
     /// classified as funds by current List Two. Codes whose List One minor unit
     /// is "N.A." are not currencies with a representable transaction scale.
-    private static let defaultDefinitions: [CurrencyDefinition] = [
+    private static let defaultDefinitions: [CurrencyDefinition] = activeDefinitions + historicalDefinitions
+
+    // Exact historical ordinary currencies required by retained originals.
+    // SIX ISO 4217 amendment 180 moves BGN to historical currency on 2026-01-01;
+    // its two-digit minor unit is retained, never converted to EUR.
+    // https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/amendments/dl-currency-iso-amendment-180.pdf
+    private static let historicalDefinitions: [CurrencyDefinition] = [
+        definition("BGN", 2),
+        // SIX amendment 174: historical HRK (191), minor unit 2.
+        // https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/amendments/dl-currency-iso-amendment-174.pdf
+        definition("HRK", 2)
+    ]
+
+    private static let activeDefinitions: [CurrencyDefinition] = [
         definition("AED", 2),
         definition("AFN", 2),
         definition("ALL", 2),

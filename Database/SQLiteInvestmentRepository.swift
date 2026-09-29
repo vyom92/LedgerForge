@@ -73,7 +73,9 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
     }
 
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult {
-        db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
             do {
                 try plan.validate()
@@ -108,10 +110,14 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 return .repositoryIntegrityConflict
             }
         }
+
+        } catch { return .repositoryIntegrityConflict }
     }
 
     func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult {
-        db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard supportsDirectSources else { return .unavailable }
             guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
             do {
@@ -123,6 +129,10 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                     try replace(container, holdings: updated.holdings.filter { $0.containerID == container.id })
                 }
                 guard try snapshot(workspaceID: plan.workspace.id) == updated else { throw InvestmentError.invalidPersistedState }
+                if let job = plan.backgroundJob {
+                    try SQLiteBackgroundJobRepository.finishWithinTransaction(database: db, record: job,
+                        outcome: .committedCurrentHoldings, now: Date())
+                }
                 try db.execute(sql: "COMMIT;")
                 return .saved
             } catch {
@@ -133,6 +143,8 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 return .unavailable
             }
         }
+
+        } catch { return .unavailable }
     }
 
     private func replace(_ container: InvestmentContainer, holdings: [InvestmentHolding]) throws {
@@ -159,7 +171,9 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
     }
 
     func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult {
-        db.withExclusiveAccess {
+        do {
+
+        return try db.withExclusiveAccess {
             guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
             do {
                 try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
@@ -179,6 +193,8 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                 return .unavailable
             }
         }
+
+        } catch { return .unavailable }
     }
 
     private func duplicate(_ plan: InvestmentImportPlan) throws -> PriorImportedStatementDTO? {

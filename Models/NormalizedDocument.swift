@@ -15,7 +15,7 @@
 import CryptoKit
 import Foundation
 
-struct NormalizedDocument {
+nonisolated struct NormalizedDocument: Sendable {
 
     nonisolated enum SourceEvidenceError: Error, Equatable {
         case malformedFinancialRegion
@@ -121,7 +121,7 @@ struct NormalizedDocument {
         }
     }
 
-    struct SourceFragment {
+    nonisolated struct SourceFragment: Sendable {
 
         let sourceOrdinal: Int
 
@@ -129,7 +129,7 @@ struct NormalizedDocument {
 
     }
 
-    struct SourceContext {
+    nonisolated struct SourceContext: Sendable {
 
         let preTransactionFragments: [SourceFragment]
 
@@ -138,17 +138,20 @@ struct NormalizedDocument {
         let exhaustedFinancialRegion: ExhaustedFinancialRegionEvidence?
 
         let printedBankStatementControls: PrintedBankStatementControls?
+        let bankAccountSections: [NormalizedBankAccountSection]
 
         init(
             preTransactionFragments: [SourceFragment],
             postTransactionFragments: [SourceFragment] = [],
             exhaustedFinancialRegion: ExhaustedFinancialRegionEvidence? = nil,
-            printedBankStatementControls: PrintedBankStatementControls? = nil
+            printedBankStatementControls: PrintedBankStatementControls? = nil,
+            bankAccountSections: [NormalizedBankAccountSection] = []
         ) {
             self.preTransactionFragments = preTransactionFragments
             self.postTransactionFragments = postTransactionFragments
             self.exhaustedFinancialRegion = exhaustedFinancialRegion
             self.printedBankStatementControls = printedBankStatementControls
+            self.bankAccountSections = bankAccountSections
         }
 
         static let empty = SourceContext(preTransactionFragments: [])

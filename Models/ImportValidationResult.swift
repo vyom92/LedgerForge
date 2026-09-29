@@ -7,14 +7,14 @@
 
 import Foundation
 
-enum ValidationSeverity {
+nonisolated enum ValidationSeverity: Sendable {
     case info
     case warning
     case error
 }
 
 /// Represents a validation issue discovered during import.
-struct ValidationIssue: Identifiable {
+nonisolated struct ValidationIssue: Identifiable, Sendable {
     let id = UUID()
     let severity: ValidationSeverity
     let rowNumber: Int?
@@ -22,7 +22,7 @@ struct ValidationIssue: Identifiable {
 }
 
 /// Represents the overall outcome of validating an imported statement.
-struct ImportValidationResult {
+nonisolated struct ImportValidationResult: Sendable {
 
     let rowsRead: Int
     let transactionsParsed: Int

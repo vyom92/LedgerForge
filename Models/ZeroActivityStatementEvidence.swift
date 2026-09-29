@@ -121,19 +121,26 @@ nonisolated struct ZeroActivityProfileBinding: Equatable, Sendable, Hashable {
         // CBQ current-account profiles
         .init(profileID: "cbq.current-account.history.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.current-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .statementDate),
         .init(profileID: "cbq.current-account.monthly.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.current-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
+        .init(profileID: "cbq.current-account.legacy.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.current-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .statementDate),
+        .init(profileID: "cbq.current-account.usd-monthly.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.current-account", expectedNativeCurrencyCode: "USD", temporalEvidenceKind: .period),
+        .init(profileID: "cbq.savings-account.legacy.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.savings-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .statementDate),
+        .init(profileID: "cbq.savings-account.monthly.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.savings-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
+        .init(profileID: "cbq.e-savings-account.monthly.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.e-savings-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
         .init(profileID: "cbq.current-account.xls", profileVersion: "1", sourceFormatCode: "xls", institutionCode: "cbq", statementFamilyCode: "cbq.current-account", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
         // Credit-card statement profiles
         .init(profileID: "amex.credit-card.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "amex", statementFamilyCode: "amex.credit-card", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
+        .init(profileID: "amex.credit-card.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "amex", statementFamilyCode: "amex.credit-card", expectedNativeCurrencyCode: "USD", temporalEvidenceKind: .period),
         .init(profileID: "cbq.credit-card.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "cbq", statementFamilyCode: "cbq.credit-card", expectedNativeCurrencyCode: "QAR", temporalEvidenceKind: .period),
         .init(profileID: "axis.credit-card.pdf", profileVersion: "1", sourceFormatCode: "pdf", institutionCode: "axis", statementFamilyCode: "axis.credit-card", expectedNativeCurrencyCode: "INR", temporalEvidenceKind: .periodOrSelectedStatementMonth),
         .init(profileID: "axis.credit-card.xlsx", profileVersion: "1", sourceFormatCode: "xlsx", institutionCode: "axis", statementFamilyCode: "axis.credit-card", expectedNativeCurrencyCode: "INR", temporalEvidenceKind: .selectedStatementMonth)
     ]
 
-    static func resolve(profileID: String, profileVersion: String, sourceFormatCode: String) -> Self? {
+    static func resolve(profileID: String, profileVersion: String, sourceFormatCode: String, nativeCurrencyCode: String) -> Self? {
         all.first {
             $0.profileID == profileID &&
             $0.profileVersion == profileVersion &&
-            $0.sourceFormatCode == sourceFormatCode
+            $0.sourceFormatCode == sourceFormatCode &&
+            $0.expectedNativeCurrencyCode == nativeCurrencyCode
         }
     }
 }
@@ -213,7 +220,8 @@ nonisolated struct ZeroActivityStatementEvidence: Equatable, Sendable {
         guard let binding = ZeroActivityProfileBinding.resolve(
             profileID: profileID,
             profileVersion: profileVersion,
-            sourceFormatCode: sourceFormatCode
+            sourceFormatCode: sourceFormatCode,
+            nativeCurrencyCode: nativeCurrency.code
         ) else {
             throw ZeroActivityStatementEvidenceError.unsupportedProfileBinding
         }
@@ -294,6 +302,11 @@ nonisolated struct ZeroActivityStatementEvidence: Equatable, Sendable {
                   let cardPreviousBalance,
                   let cardTotalPaymentDue,
                   cardPreviousBalance == cardTotalPaymentDue,
+                  cardPaymentDueDate != nil else {
+                throw ZeroActivityStatementEvidenceError.missingPrintedControl
+            }
+        } else if binding.statementFamilyCode == "amex.credit-card", nativeCurrency.code == "USD" {
+            guard evidenceKind == .printedControls, cardControls.isEmpty,
                   cardPaymentDueDate != nil else {
                 throw ZeroActivityStatementEvidenceError.missingPrintedControl
             }
@@ -464,8 +477,8 @@ nonisolated struct ZeroActivityStatementEvidence: Equatable, Sendable {
     }
 }
 
-#if !SUBPROCESS_PROBE
-enum ZeroActivityStatementValidator {
+#if !SUBPROCESS_PROBE && !BACKGROUND_WORKER
+nonisolated enum ZeroActivityStatementValidator {
     /// Validation at the parser/validator boundary. A zero evidence payload is
     /// never accepted solely because `rows` is empty: the parser must attach a
     /// typed evidence object, and no normalized financial row may remain.
@@ -478,7 +491,8 @@ enum ZeroActivityStatementValidator {
               let binding = ZeroActivityProfileBinding.resolve(
                   profileID: evidence.profileID,
                   profileVersion: evidence.profileVersion,
-                  sourceFormatCode: evidence.sourceFormatCode
+                  sourceFormatCode: evidence.sourceFormatCode,
+                  nativeCurrencyCode: evidence.nativeCurrency.code
               ),
               evidence.hasValidDigest(),
               financialDocument.bookedCurrency == evidence.nativeCurrency,
@@ -552,7 +566,7 @@ enum ZeroActivityStatementValidator {
     ) -> Bool {
         if let sourceEvidence = financialDocument.sourceStatementEvidence {
             return evidence.selectedStatementMonth == nil &&
-                actualSourceFormatCode(for: sourceEvidence.sourceFormatCode) == evidence.sourceFormatCode &&
+                actualSourceFormatCode(for: sourceEvidence.sourceFormatCode, profileID: evidence.profileID) == evidence.sourceFormatCode &&
                 sourceEvidence.period == evidence.statementPeriod &&
                 sourceEvidence.statementBoundaryDate == evidence.statementDate &&
                 sourceEvidence.openingBalance == evidence.openingBalance &&
@@ -573,6 +587,11 @@ enum ZeroActivityStatementValidator {
                     cardEvidence.summary(code: "axis_total_payment_due")?.money == evidence.cardTotalPaymentDue &&
                     cardEvidence.summary(code: "due_date")?.date == evidence.cardPaymentDueDate
             }
+            if evidence.statementFamilyCode == "amex.credit-card", evidence.nativeCurrency.code == "USD" {
+                return evidence.cardPreviousBalance == nil && evidence.cardTotalPaymentDue == nil &&
+                    evidence.cardPaymentDueDate != nil &&
+                    cardEvidence.summary(code: "due_date")?.date == evidence.cardPaymentDueDate
+            }
             return evidence.cardPreviousBalance == nil &&
                 evidence.cardTotalPaymentDue == nil && evidence.cardPaymentDueDate == nil
         }
@@ -583,9 +602,11 @@ enum ZeroActivityStatementValidator {
     /// zero-activity contract made actual format codes durable.  Accept those
     /// labels only as a compatibility read; newly persisted controls always
     /// carry the actual `pdf`/`xls` code.
-    private static func actualSourceFormatCode(for sourceFormatCode: String) -> String? {
+    private static func actualSourceFormatCode(for sourceFormatCode: String, profileID: String) -> String? {
         switch sourceFormatCode.lowercased() {
         case "pdf", "monthly-pdf", "history-pdf": return "pdf"
+        case "legacy-pdf":
+            return ["cbq.current-account.legacy.pdf", "cbq.savings-account.legacy.pdf"].contains(profileID) ? "pdf" : nil
         case "xls", "history-xls": return "xls"
         case "csv": return "csv"
         case "xlsx": return "xlsx"

@@ -74,6 +74,14 @@ final class InvestmentPriceSession: ObservableObject {
     private var rateObservation: AnyCancellable?
     private var gateObservation: AnyCancellable?
     private weak var rates: AlDarReferenceSession?
+    var sharedRefresh: (() -> Void)?
+
+    func installShared(_ values: [String: InvestmentQuote], failures: [String: InvestmentPriceError], busy: Bool,
+                       busyProviders: Set<String>? = nil) {
+        quotes = values; self.failures = failures
+        refreshing = busy ? (busyProviders ?? Set(configuredProviders)).intersection(configuredProviders) : []
+        cache.save(values); rebuild(); objectWillChange.send()
+    }
 
     init(defaults: UserDefaults = .standard, enabled: Bool = true,
          now: @escaping @Sendable () -> Date = { Date() }, client: InvestmentPriceClient = .init(),
@@ -113,6 +121,7 @@ final class InvestmentPriceSession: ObservableObject {
             guard let self, self.fxLegs != legs else { return }
             self.fxLegs = legs
             self.overview = .build(holdings: self.rows, valuations: self.valuations, legs: legs,
+                                   containers: self.snapshot.containers,
                                    ispAccount: self.snapshot.latestZioAccount)
             self.objectWillChange.send()
         }
@@ -173,6 +182,7 @@ final class InvestmentPriceSession: ObservableObject {
 
     func refreshManually() {
         guard enabled else { return }
+        if let sharedRefresh { persistConfirmedMappings(); sharedRefresh(); return }
         refreshRequested = true
         startRequestedRefreshIfReady()
     }
@@ -284,6 +294,7 @@ final class InvestmentPriceSession: ObservableObject {
             return subtotal(id: key, title: portfolioNames[first.containerID] ?? "Portfolio", rows: rows)
         }
         overview = .build(holdings: rows, valuations: valuations, legs: fxLegs,
+                          containers: snapshot.containers,
                           ispAccount: snapshot.latestZioAccount)
         revision += 1
     }
@@ -306,6 +317,7 @@ struct LiveFXRefreshService {
     let currencyRates: AlDarReferenceSession
     let investmentPrices: InvestmentPriceSession
     func refreshAll(manual: Bool = true) {
+        if let shared = currencyRates.sharedRefreshAll { shared(manual); return }
         guard currencyRates.refreshing.isEmpty, investmentPrices.refreshing.isEmpty else { return }
         if manual { currencyRates.refreshManually() } else { currencyRates.refresh(force: true) }
         investmentPrices.refreshManually()

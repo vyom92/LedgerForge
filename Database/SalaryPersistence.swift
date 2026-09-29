@@ -77,6 +77,7 @@ public struct FundingPlanBalanceDTO: nonisolated Equatable, Sendable {
     public let provenanceCode: String
     public let carriedSourcePlanId: String?
     public let capturedAtISO: String?
+    public var financialBalanceDateISO: String? = nil
 }
 
 public struct FundingPlanCommitmentDTO: nonisolated Equatable, Sendable {
@@ -205,6 +206,7 @@ public struct FundingPlanDTO: nonisolated Equatable, Sendable {
     public var referenceMode: String? = nil
     public var deductions: [FundingPlanDeductionDTO] = []
     public var effectiveReference: FundingPlanEffectiveReferenceDTO? = nil
+    public var assistance: PlanAssistance? = nil
 }
 
 public protocol FundingPlanRepository {
@@ -336,6 +338,12 @@ nonisolated enum SalaryPersistenceDTOValidator {
                 throw RepositoryError.relationshipViolation("Funding plan balance relationship is invalid.")
             }
             _ = try optionalMoney(balance.amountDecimal, balance.amountMinor, balance.amountCurrency, expectedCurrency: balance.nativeCurrency)
+            if let financialDate = balance.financialBalanceDateISO {
+                _ = try StatementDate(canonical: financialDate)
+                guard balance.amountMinor != nil, balance.provenanceCode != "manual" else {
+                    throw RepositoryError.relationshipViolation("A financial balance date requires a retained source balance.")
+                }
+            }
             let provenanceValid = (balance.provenanceCode == "manual" && balance.carriedSourcePlanId == nil && balance.capturedAtISO == nil)
                 || (balance.provenanceCode == "carried" && plan.rolloverSourcePlanId != nil && balance.carriedSourcePlanId == plan.rolloverSourcePlanId && balance.capturedAtISO == nil)
                 || (balance.provenanceCode == "captured_account_balance" && balance.carriedSourcePlanId == nil && balance.capturedAtISO != nil)
@@ -414,6 +422,17 @@ nonisolated enum SalaryPersistenceDTOValidator {
         }
         let source = existing.first { $0.id == plan.rolloverSourcePlanId && $0.workspaceId == plan.workspaceId && $0.planMonthISO < plan.planMonthISO }
         let saved = existing.first { $0.id == plan.id && $0.workspaceId == plan.workspaceId && $0.rolloverSourcePlanId == plan.rolloverSourcePlanId }
+        for row in plan.balances where row.provenanceCode == "carried" && row.financialBalanceDateISO != nil {
+            func matches(_ other: FundingPlanBalanceDTO) -> Bool {
+                other.accountId == row.accountId && other.nativeCurrency == row.nativeCurrency
+                    && other.amountCurrency == row.amountCurrency && other.amountMinor == row.amountMinor
+                    && other.amountDecimal == row.amountDecimal && other.financialBalanceDateISO == row.financialBalanceDateISO
+            }
+            let retained = saved?.balances.contains { $0.id == row.id && $0.carriedSourcePlanId == row.carriedSourcePlanId && matches($0) } == true
+            guard retained || source?.balances.contains(where: matches) == true else {
+                throw RepositoryError.relationshipViolation("Carried balance date does not belong to the retained amount.")
+            }
+        }
         for row in plan.commitments {
             if let sourceID = row.carriedSourceRowId {
                 let retained = saved?.commitments.contains { $0.id == row.id && $0.carriedSourceRowId == sourceID && $0.regionCode == row.regionCode && $0.amountCurrency == row.amountCurrency } == true

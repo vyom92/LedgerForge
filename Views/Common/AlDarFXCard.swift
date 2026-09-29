@@ -90,15 +90,7 @@ struct DashboardLiveFXHeaderAccessory: View {
     }
 
     private func freshnessColor(_ age: AlDarReferenceAge) -> Color {
-        let position = age.colorPosition
-        let first = (position <= 1 ? NSColor.systemGreen : NSColor.systemYellow).usingColorSpace(.deviceRGB)!
-        let second = (position <= 1 ? NSColor.systemYellow : NSColor.systemRed).usingColorSpace(.deviceRGB)!
-        let progress = CGFloat(position <= 1 ? position : position - 1)
-        return Color(
-            red: Double(first.redComponent + (second.redComponent - first.redComponent) * progress),
-            green: Double(first.greenComponent + (second.greenComponent - first.greenComponent) * progress),
-            blue: Double(first.blueComponent + (second.blueComponent - first.blueComponent) * progress)
-        )
+        FreshnessTint.color(position: age.colorPosition)
     }
 }
 
@@ -143,7 +135,7 @@ struct AlDarFXCard: View {
                     Text("For estimates. Al Dar returns INR and USD for QAR 1. Cross and reversed pairs are calculated from those references; they are not separate transfer quotes. Al Dar does not supply a market timestamp.")
                     ForEach(AlDarCurrency.allCases, id: \.self) { currency in
                         if let leg = session.legs[currency] {
-                            Text("1 QAR → \(leg.returned.rawToken) \(currency.rawValue) · fetched \(leg.fetchedAtISO)")
+                            Text("1 QAR → \(leg.returned.rawToken) \(currency.rawValue) · fetched \(AppDateDisplay.timestamp(leg.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
                         }
                     }
                 }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText).textSelection(.enabled)
@@ -197,7 +189,13 @@ struct AlDarFXCard: View {
     }
 
     private func freshnessColor(_ age: AlDarReferenceAge) -> Color {
-        let position = age.colorPosition
+        FreshnessTint.color(position: age.colorPosition)
+    }
+}
+
+/// Shared native freshness scale; callers supply weekday age, never displayed age.
+enum FreshnessTint {
+    static func color(position: Double) -> Color {
         let first = (position <= 1 ? NSColor.systemGreen : NSColor.systemYellow).usingColorSpace(.deviceRGB)!
         let second = (position <= 1 ? NSColor.systemYellow : NSColor.systemRed).usingColorSpace(.deviceRGB)!
         let progress = CGFloat(position <= 1 ? position : position - 1)

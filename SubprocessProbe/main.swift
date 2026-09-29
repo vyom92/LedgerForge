@@ -13,6 +13,33 @@ private struct ProbeResult: Codable {
 struct LedgerForgeSubprocessProbe {
     static func run() {
         let slot = CommandLine.arguments.count >= 5 ? CommandLine.arguments[4] : "unknown"
+        if CommandLine.arguments.count == 5, CommandLine.arguments[2] == "background-lease" {
+            do {
+                guard let lease = try BackgroundJobLease.acquire(path: CommandLine.arguments[1], kind: .publicReferences) else {
+                    exit(slot: slot, with: "contention")
+                }
+                withExtendedLifetime(lease) {
+                    writeLine("READY")
+                    guard readLine() == "GO" else { exit(slot: slot, with: "rejected") }
+                    // Deliberately exit with the lease live. The kernel, rather
+                    // than a Swift deinitializer or expiry guess, releases it.
+                    exit(slot: slot, with: "exited-with-lease")
+                }
+            } catch { exit(slot: slot, with: "unavailable") }
+        }
+        if CommandLine.arguments.count == 5, CommandLine.arguments[2] == "authority-lock" {
+            let fd = Darwin.open(CommandLine.arguments[1] + ".access.lock", O_RDWR | O_NOFOLLOW)
+            guard fd >= 0 else { exit(slot: slot, with: "unavailable") }
+            let obtained = flock(fd, LOCK_EX | LOCK_NB) == 0
+            Darwin.close(fd)
+            exit(slot: slot, with: obtained ? "acquired" : "contention")
+        }
+        if CommandLine.arguments.count == 5, CommandLine.arguments[2] == "authority-open" {
+            let database = SQLiteDatabase(path: CommandLine.arguments[1])
+            do { try database.open(access: .existing); database.close(); exit(slot: slot, with: "opened") }
+            catch LedgerAccessError.transitionPending { exit(slot: slot, with: "pending") }
+            catch { exit(slot: slot, with: "unavailable") }
+        }
         guard CommandLine.arguments.count == 5,
               CommandLine.arguments[2] == "unique" else {
             exit(slot: slot, with: "unavailable")
@@ -26,7 +53,7 @@ struct LedgerForgeSubprocessProbe {
         writeLine("READY")
         guard readLine() == "GO" else { exit(slot: slot, with: "rejected") }
 
-        let result: String = database.withExclusiveAccess {
+        let result: String = (try? database.withExclusiveAccess {
             do {
                 try database.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
                 try database.executePrepared(
@@ -52,7 +79,7 @@ struct LedgerForgeSubprocessProbe {
                 try? database.execute(sql: "ROLLBACK;")
                 return "rejected"
             }
-        }
+        }) ?? "retryable-contention"
         database.close()
         exit(slot: slot, with: result)
     }

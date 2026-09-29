@@ -212,6 +212,13 @@ public protocol TransactionRepository {
 }
 
 public protocol CategoryRepository {
+    /// Nil means a historical schema predates this feature; a current read failure throws.
+    func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot?
+    func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws
+    func deleteRule(id: String, workspaceId: String, version: Int) throws
+    @discardableResult
+    func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int
+
     func categories(workspaceId: String) throws -> [CategoryDTO]
     func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO]
     @discardableResult
@@ -225,10 +232,19 @@ public protocol CategoryRepository {
     func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool
 }
 
+public extension CategoryRepository {
+    func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot? { nil }
+    func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws { throw CategoryAutomationError.unavailable }
+    func deleteRule(id: String, workspaceId: String, version: Int) throws { throw CategoryAutomationError.unavailable }
+    func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int { throw CategoryAutomationError.unavailable }
+}
+
 public protocol AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String
     @discardableResult
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool
+    @discardableResult
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool
     func account(id: String) throws -> AccountDTO?
     func accounts(workspaceId: String) throws -> [AccountDTO]
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String
@@ -251,6 +267,9 @@ public protocol ImportSessionRepository {
     func importSession(id: String) throws -> ImportSessionRecordDTO?
     func importedDocument(id: String) throws -> ImportedDocumentDTO?
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO?
+    /// True when the active ledger has a successful import carrying this exact
+    /// fingerprint, whether or not that fingerprint is the format's duplicate authority.
+    func successfulImportContainsFingerprint(algorithm: String, fingerprint: String) throws -> Bool
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO]
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO]
@@ -262,10 +281,15 @@ public protocol ImportSessionRepository {
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO]
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO]
     func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO]
+    func cbqSourceCoveragePeriods(workspaceId: String) throws -> [StatementCoveragePeriodDTO]
+    func bankSectionSnapshot(workspaceId: String) throws -> BankSectionRepositorySnapshotDTO
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
 }
 
 public extension ImportSessionRepository {
+    func successfulImportContainsFingerprint(algorithm: String, fingerprint: String) throws -> Bool {
+        try priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) != nil
+    }
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { nil }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { [] }
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { [] }
@@ -274,11 +298,15 @@ public extension ImportSessionRepository {
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { [] }
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { [] }
     func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { [] }
+    func cbqSourceCoveragePeriods(workspaceId: String) throws -> [StatementCoveragePeriodDTO] { [] }
+    func bankSectionSnapshot(workspaceId: String) throws -> BankSectionRepositorySnapshotDTO { .init() }
 }
 
 /// This deliberately does not expose a generic transaction closure. Providers
 /// own the full accepted-import graph and may only return bounded outcomes.
 public protocol ConfirmedImportRepository {
+    func reviewBankImport(_ plan: BankImportPlanDTO) -> BankImportReviewResult
+    func commitBankImport(_ plan: ReviewedBankImportPlanDTO) -> BankImportRepositoryResult
     func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult
@@ -288,6 +316,9 @@ public protocol ConfirmedImportRepository {
 }
 
 public extension ConfirmedImportRepository {
+    func reviewBankImport(_ plan: BankImportPlanDTO) -> BankImportReviewResult { .persistenceUnavailable }
+    func commitBankImport(_ plan: ReviewedBankImportPlanDTO) -> BankImportRepositoryResult { .persistenceUnavailable }
+
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
         .notApplicable
     }
@@ -328,7 +359,11 @@ public final class DatabaseProvider {
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
     public let investmentRepo: InvestmentRepository
+    public let gmailInboxRepo: any GmailInboxRepository
+    public let netWorthMembershipRepo: any NetWorthMembershipRepository
+    public let intelligenceRepo: any FinancialIntelligenceRepository
     private let generationValidity: ProviderGenerationValidity?
+    private(set) var sqliteProvider: SQLiteRepositoryProvider?
 
     public init(
         workspaceRepo: WorkspaceRepository,
@@ -341,6 +376,9 @@ public final class DatabaseProvider {
         salaryRepo: SalaryRepository? = nil,
         fundingPlanRepo: FundingPlanRepository? = nil,
         investmentRepo: InvestmentRepository? = nil,
+        gmailInboxRepo: (any GmailInboxRepository)? = nil,
+        netWorthMembershipRepo: (any NetWorthMembershipRepository)? = nil,
+        intelligenceRepo: (any FinancialIntelligenceRepository)? = nil,
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         protectsGeneration: Bool = false,
@@ -353,6 +391,9 @@ public final class DatabaseProvider {
         let resolvedSalaryRepo = salaryRepo ?? EmptySalaryRepo()
         let resolvedFundingPlanRepo = fundingPlanRepo ?? EmptyFundingPlanRepo()
         let resolvedInvestmentRepo = investmentRepo ?? EmptyInvestmentRepository()
+        let resolvedGmailInboxRepo = gmailInboxRepo ?? UnavailableGmailInboxRepository()
+        let resolvedMembershipRepo = netWorthMembershipRepo ?? UnavailableNetWorthMembershipRepository()
+        let resolvedIntelligenceRepo = intelligenceRepo ?? UnavailableFinancialIntelligenceRepository()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
@@ -366,6 +407,9 @@ public final class DatabaseProvider {
             self.salaryRepo = GenerationCheckedSalaryRepository(base: resolvedSalaryRepo, validity: validity)
             self.fundingPlanRepo = GenerationCheckedFundingPlanRepository(base: resolvedFundingPlanRepo, validity: validity)
             self.investmentRepo = GenerationCheckedInvestmentRepository(base: resolvedInvestmentRepo, validity: validity)
+            self.gmailInboxRepo = GenerationCheckedGmailInboxRepository(base: resolvedGmailInboxRepo, validity: validity)
+            self.netWorthMembershipRepo = GenerationCheckedNetWorthMembershipRepository(base: resolvedMembershipRepo, validity: validity)
+            self.intelligenceRepo = GenerationCheckedFinancialIntelligenceRepository(base: resolvedIntelligenceRepo, validity: validity)
             return
         }
         self.generationValidity = nil
@@ -379,6 +423,9 @@ public final class DatabaseProvider {
         self.salaryRepo = resolvedSalaryRepo
         self.fundingPlanRepo = resolvedFundingPlanRepo
         self.investmentRepo = resolvedInvestmentRepo
+        self.gmailInboxRepo = resolvedGmailInboxRepo
+        self.netWorthMembershipRepo = resolvedMembershipRepo
+        self.intelligenceRepo = resolvedIntelligenceRepo
     }
 
     /// Convenience initializer for an isolated in-memory provider. This is
@@ -396,6 +443,9 @@ public final class DatabaseProvider {
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
             investmentRepo: provider.investmentRepo,
+            gmailInboxRepo: provider.gmailInboxRepo,
+            netWorthMembershipRepo: provider.netWorthMembershipRepo,
+            intelligenceRepo: provider.intelligenceRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(.testMemory),
             protectsGeneration: true
@@ -432,6 +482,9 @@ public final class DatabaseProvider {
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
             investmentRepo: provider.investmentRepo,
+            gmailInboxRepo: provider.gmailInboxRepo,
+            netWorthMembershipRepo: provider.netWorthMembershipRepo,
+            intelligenceRepo: provider.intelligenceRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(purpose),
             protectsGeneration: true
@@ -439,7 +492,11 @@ public final class DatabaseProvider {
     }
 
     static func verifiedSQLite(_ provider: SQLiteRepositoryProvider, protectsGeneration: Bool = true) -> DatabaseProvider {
-        DatabaseProvider(
+        sqlite(provider, persistenceState: .verifiedSQLite, protectsGeneration: protectsGeneration)
+    }
+
+    static func sqlite(_ provider: SQLiteRepositoryProvider, persistenceState: PersistenceState, protectsGeneration: Bool = true) -> DatabaseProvider {
+        let result = DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
             categoryRepo: provider.categoryRepo,
@@ -450,10 +507,28 @@ public final class DatabaseProvider {
             salaryRepo: provider.salaryRepo,
             fundingPlanRepo: provider.fundingPlanRepo,
             investmentRepo: provider.investmentRepo,
+            gmailInboxRepo: provider.gmailInboxRepo,
+            netWorthMembershipRepo: provider.netWorthMembershipRepo,
+            intelligenceRepo: provider.intelligenceRepo,
             generationToken: provider.generationToken,
-            persistenceState: .verifiedSQLite,
+            persistenceState: persistenceState,
             protectsGeneration: protectsGeneration
         )
+        result.sqliteProvider = provider
+        return result
+    }
+
+    /// Read one coherent canonical snapshot. Keep the established lock order:
+    /// provider validity, then the shared ledger gate, then repository reads.
+    func withConsistentSnapshot<T>(_ read: () throws -> T) throws -> T {
+        if let generationValidity {
+            return try generationValidity.withValidOperation {
+                if let sqlite = sqliteProvider { return try sqlite.database.withExclusiveAccess(read) }
+                return try read()
+            }
+        }
+        if let sqlite = sqliteProvider { return try sqlite.database.withExclusiveAccess(read) }
+        return try read()
     }
 
     func invalidateGeneration() {
@@ -485,6 +560,51 @@ nonisolated final class ProviderGenerationValidity: @unchecked Sendable {
     }
 }
 
+private struct GenerationCheckedFinancialIntelligenceRepository: FinancialIntelligenceRepository {
+    let base: any FinancialIntelligenceRepository
+    let validity: ProviderGenerationValidity
+    func snapshot(workspaceID: String) throws -> FinancialIntelligenceSnapshot? {
+        try validity.withValidOperation { try base.snapshot(workspaceID: workspaceID) }
+    }
+    func saveMovement(_ event: MovementEvent, replacing expected: MovementEvent?) throws {
+        try validity.withValidOperation { try base.saveMovement(event, replacing: expected) }
+    }
+    func removeMovement(_ event: MovementEvent) throws {
+        try validity.withValidOperation { try base.removeMovement(event) }
+    }
+    func applyPlanning(_ edit: PlanningMetadataEdit) throws {
+        try validity.withValidOperation { try base.applyPlanning(edit) }
+    }
+}
+
+private struct GenerationCheckedNetWorthMembershipRepository: NetWorthMembershipRepository {
+    let base: any NetWorthMembershipRepository
+    let validity: ProviderGenerationValidity
+    func snapshot(workspaceID: String) throws -> NetWorthMembershipSnapshot {
+        try validity.withValidOperation { try base.snapshot(workspaceID: workspaceID) }
+    }
+    func setIncluded(_ included: Bool, member: NetWorthMemberID, workspaceID: String) throws -> Bool {
+        try validity.withValidOperation { try base.setIncluded(included, member: member, workspaceID: workspaceID) }
+    }
+}
+
+nonisolated private struct GenerationCheckedGmailInboxRepository: GmailInboxRepository {
+    let base: any GmailInboxRepository
+    let validity: ProviderGenerationValidity
+    func storedAccounts() throws -> [String] {
+        try validity.withValidOperation { try base.storedAccounts() }
+    }
+    func load(account: String) throws -> GmailInboxState {
+        try validity.withValidOperation { try base.load(account: account) }
+    }
+    func save(_ state: GmailInboxState, originals: [String: Data], expectedRevision: Int64) throws -> GmailInboxState {
+        try validity.withValidOperation { try base.save(state, originals: originals, expectedRevision: expectedRevision) }
+    }
+    func original(sha256: String, byteCount: Int) throws -> Data {
+        try validity.withValidOperation { try base.original(sha256: sha256, byteCount: byteCount) }
+    }
+}
+
 private struct GenerationCheckedWorkspaceRepository: WorkspaceRepository {
     let base: WorkspaceRepository
     let validity: ProviderGenerationValidity
@@ -503,6 +623,10 @@ private struct GenerationCheckedTransactionRepository: TransactionRepository {
 private struct GenerationCheckedCategoryRepository: CategoryRepository {
     let base: CategoryRepository
     let validity: ProviderGenerationValidity
+    func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot? { try validity.withValidOperation { try base.automationSnapshot(workspaceId: workspaceId) } }
+    func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws { try validity.withValidOperation { try base.saveRule(rule, previousVersion: previousVersion) } }
+    func deleteRule(id: String, workspaceId: String, version: Int) throws { try validity.withValidOperation { try base.deleteRule(id: id, workspaceId: workspaceId, version: version) } }
+    func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int { try validity.withValidOperation { try base.applyCategoryEvaluation(evaluation, workspaceId: workspaceId, historical: historical) } }
     func categories(workspaceId: String) throws -> [CategoryDTO] { return try validity.withValidOperation { try base.categories(workspaceId: workspaceId) } }
     func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { return try validity.withValidOperation { try base.assignments(workspaceId: workspaceId) } }
     func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { return try validity.withValidOperation { try base.createCategory(category) } }
@@ -517,6 +641,7 @@ private struct GenerationCheckedAccountRepository: AccountRepository {
     let validity: ProviderGenerationValidity
     func upsertAccount(_ account: AccountDTO) throws -> String { return try validity.withValidOperation { try base.upsertAccount(account) } }
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { return try validity.withValidOperation { try base.updateAccountDisplayName(accountId: accountId, workspaceId: workspaceId, displayName: displayName) } }
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.markCreditCardHistoryOnly(accountId: accountId, workspaceId: workspaceId, markedAtISO: markedAtISO) } }
     func account(id: String) throws -> AccountDTO? { return try validity.withValidOperation { try base.account(id: id) } }
     func accounts(workspaceId: String) throws -> [AccountDTO] { return try validity.withValidOperation { try base.accounts(workspaceId: workspaceId) } }
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { return try validity.withValidOperation { try base.attachIdentifier(identifier) } }
@@ -541,6 +666,7 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func importSession(id: String) throws -> ImportSessionRecordDTO? { return try validity.withValidOperation { try base.importSession(id: id) } }
     func importedDocument(id: String) throws -> ImportedDocumentDTO? { return try validity.withValidOperation { try base.importedDocument(id: id) } }
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? { return try validity.withValidOperation { try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) } }
+    func successfulImportContainsFingerprint(algorithm: String, fingerprint: String) throws -> Bool { return try validity.withValidOperation { try base.successfulImportContainsFingerprint(algorithm: algorithm, fingerprint: fingerprint) } }
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { return try validity.withValidOperation { try base.transactionEventOwners(keys: keys) } }
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { return try validity.withValidOperation { try base.recordImportAttempt(payload) } }
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { return try validity.withValidOperation { try base.importAttempts(workspaceId: workspaceId) } }
@@ -552,10 +678,21 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { return try validity.withValidOperation { try base.statementEquivalenceMembers(workspaceId: workspaceId) } }
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { return try validity.withValidOperation { try base.preferredTransactionSources(workspaceId: workspaceId) } }
     func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { return try validity.withValidOperation { try base.cbqSourceObservationSummaries(workspaceId: workspaceId) } }
+    func cbqSourceCoveragePeriods(workspaceId: String) throws -> [StatementCoveragePeriodDTO] { try validity.withValidOperation { try base.cbqSourceCoveragePeriods(workspaceId: workspaceId) } }
+    func bankSectionSnapshot(workspaceId: String) throws -> BankSectionRepositorySnapshotDTO { try validity.withValidOperation { try base.bankSectionSnapshot(workspaceId: workspaceId) } }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { return try validity.withValidOperation { try base.commitImportHistory(payload) } }
 }
 
 private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportRepository {
+    func reviewBankImport(_ plan: BankImportPlanDTO) -> BankImportReviewResult {
+        do { return try validity.withValidOperation { base.reviewBankImport(plan) } }
+        catch { return .staleProviderGeneration }
+    }
+    func commitBankImport(_ plan: ReviewedBankImportPlanDTO) -> BankImportRepositoryResult {
+        do { return try validity.withValidOperation { base.commitBankImport(plan) } }
+        catch { return .staleProviderGeneration }
+    }
+
     let base: ConfirmedImportRepository
     let validity: ProviderGenerationValidity
 
@@ -700,6 +837,9 @@ struct EmptyCategoryRepo: CategoryRepository {
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
+    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+        throw RepositoryError.persistenceUnavailable
+    }
     func upsertAccount(_ account: AccountDTO) throws -> String {
         throw RepositoryError.persistenceUnavailable
     }

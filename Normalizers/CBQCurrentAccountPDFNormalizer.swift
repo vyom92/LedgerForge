@@ -2,19 +2,29 @@ import Foundation
 import CoreGraphics
 import CryptoKit
 
-enum CBQCurrentAccountPDFFamily: String, Equatable, Sendable {
+nonisolated enum CBQCurrentAccountPDFFamily: String, Equatable, Sendable {
     case history
+    case legacyCurrent
     case monthly
+    case usdMonthly
+    case savingsLegacy
+    case savingsMonthly
+    case eSavingsMonthly
 
     var profileID: String {
         switch self {
         case .history: return "cbq.current-account.history.pdf"
+        case .legacyCurrent: return "cbq.current-account.legacy.pdf"
         case .monthly: return "cbq.current-account.monthly.pdf"
+        case .usdMonthly: return "cbq.current-account.usd-monthly.pdf"
+        case .savingsLegacy: return "cbq.savings-account.legacy.pdf"
+        case .savingsMonthly: return "cbq.savings-account.monthly.pdf"
+        case .eSavingsMonthly: return "cbq.e-savings-account.monthly.pdf"
         }
     }
 }
 
-enum CBQCurrentAccountPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCurrentAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
     case lockedDocument
     case ambiguousFamily
@@ -24,6 +34,7 @@ enum CBQCurrentAccountPDFNormalizationError: Error, Equatable, LocalizedError {
     case noTransactions
     case malformedTransaction(sourceOrdinal: Int)
     case unconsumedFinancialPage(page: Int)
+    case unresolvedNarrationRegion(page: Int, sourceOrdinal: Int)
 
     var errorDescription: String? {
         switch self {
@@ -36,11 +47,13 @@ enum CBQCurrentAccountPDFNormalizationError: Error, Equatable, LocalizedError {
         case .noTransactions: return "The CBQ current-account PDF contains no accepted transaction rows."
         case .malformedTransaction(let ordinal): return "CBQ PDF transaction at source position \(ordinal) is incomplete or ambiguous."
         case .unconsumedFinancialPage(let page): return "CBQ PDF page \(page) contains unconsumed financial-table evidence."
+        case .unresolvedNarrationRegion(let page, let ordinal):
+            return "CBQ PDF page \(page), source position \(ordinal), has text whose transaction ownership is unresolved."
         }
     }
 }
 
-struct CBQCurrentAccountPDFNormalizationResult {
+nonisolated struct CBQCurrentAccountPDFNormalizationResult {
     let family: CBQCurrentAccountPDFFamily
     let document: Document
     let rows: [NormalizedRow]
@@ -53,10 +66,11 @@ struct CBQCurrentAccountPDFNormalizationResult {
 /// Password handling remains at `PDFDocumentReader`.  The monthly profile
 /// consumes native page text and positioned fragments from that reader instead
 /// of reopening encrypted source bytes.
-final class CBQCurrentAccountPDFNormalizer {
+nonisolated final class CBQCurrentAccountPDFNormalizer {
     static let logicalHeader = ["Posting Date", "Description", "Source Transaction Date", "Signed Amount", "Balance"]
     private static let historyDatePattern = #"^[0-9]{2}/[0-9]{2}/[0-9]{4}$"#
     private static let monthlyDatePattern = #"^[0-9]{2}-[A-Za-z]{3}-[0-9]{2}$"#
+    private static let legacyDatePattern = #"^[0-9]{2}[A-Za-z]{3}[0-9]{2}$"#
     private static let moneyPattern = #"^-?[0-9]+(?:,[0-9]{3})*\.[0-9]{2}$"#
     private static let monthlyHeader = "Posting Date Transaction Description Transaction Date Debit Credit Balance"
 
@@ -100,6 +114,35 @@ final class CBQCurrentAccountPDFNormalizer {
         var lines: [VisualLine]
     }
 
+    private struct LegacyLayout {
+        let postX: CGFloat
+        let narrativeX: CGFloat
+        let valueX: CGFloat
+        let debitX: CGFloat
+        let creditX: CGFloat
+        let balanceX: CGFloat
+
+        var postBoundary: CGFloat { (postX + narrativeX) / 2 }
+        var narrativeBoundary: CGFloat { valueX - 1 }
+        var valueBoundary: CGFloat { (valueX + debitX) / 2 }
+        var debitBoundary: CGFloat { (debitX + creditX) / 2 }
+        var creditBoundary: CGFloat { (creditX + balanceX) / 2 }
+    }
+
+    private struct LegacyBlock {
+        let pageIndex: Int
+        let start: Token
+        let layout: LegacyLayout
+        var lines: [VisualLine]
+    }
+
+    /// Transient, statement-owned geometry learned from prose after its final
+    /// closing control. It is neither a fixed page margin nor a sentence list.
+    private struct MonthlyFurnitureBand {
+        let lowerY: CGFloat
+        let upperY: CGFloat
+    }
+
     private let now: () -> Date
 
     init(now: @escaping () -> Date = Date.init) { self.now = now }
@@ -124,14 +167,39 @@ final class CBQCurrentAccountPDFNormalizer {
             && bounded.range(of: #"\bCURRENT ACCOUNT-RETAIL\b"#, options: [.caseInsensitive, .regularExpression]) != nil
         let isMonthly = bounded.range(of: #"\bACCOUNT STATEMENT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
             && bounded.range(of: #"\bAccount Type:\s*Current Account-Retail\b"#, options: [.caseInsensitive, .regularExpression]) != nil
-        guard isHistory != isMonthly else { throw CBQCurrentAccountPDFNormalizationError.ambiguousFamily }
+        let isSavingsMonthly = bounded.range(of: #"\bACCOUNT STATEMENT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bAccount Type:\s*Savings Account\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+        let isESavingsMonthly = bounded.range(of: #"\bACCOUNT STATEMENT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bAccount Type:\s*E Savings Account\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+        let isLegacyCurrent = bounded.range(of: #"\bYOUR BANK STATEMENT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bCURRENT ACCOUNT-RETAIL\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bPOST DATE\s+NARRATIVE\s+VALUE DATE\s+DEBIT\s+CREDIT\s+BOOK BALANCE\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+        let isSavingsLegacy = bounded.range(of: #"\bYOUR BANK STATEMENT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bSAVINGS ACCOUNT\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+            && bounded.range(of: #"\bPOST DATE\s+NARRATIVE\s+VALUE DATE\s+DEBIT\s+CREDIT\s+BOOK BALANCE\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+        let isUSDMonthly = isMonthly &&
+            bounded.range(of: #"\bCurrency:\s*US DOLLARS\b"#, options: [.caseInsensitive, .regularExpression]) != nil
+        let isQARMonthly = isMonthly && !isUSDMonthly
+        guard [isHistory, isQARMonthly, isUSDMonthly, isSavingsMonthly, isESavingsMonthly, isLegacyCurrent, isSavingsLegacy].filter({ $0 }).count == 1 else {
+            throw CBQCurrentAccountPDFNormalizationError.ambiguousFamily
+        }
         guard let pageEvidence, pageEvidence.count == pages.count else {
             throw CBQCurrentAccountPDFNormalizationError.unsupportedNativeText
         }
         if isHistory {
             return try normalizeHistory(pages: pages, evidence: pageEvidence, fileURL: fileURL, boundedText: bounded)
         }
-        return try normalizeMonthly(pages: pages, evidence: pageEvidence, fileURL: fileURL, boundedText: bounded)
+        if isLegacyCurrent || isSavingsLegacy {
+            return try normalizeLegacy(pages: pages, evidence: pageEvidence, fileURL: fileURL, boundedText: bounded,
+                                       family: isLegacyCurrent ? .legacyCurrent : .savingsLegacy,
+                                       product: isLegacyCurrent ? "Current Account-Retail" : "Savings Account")
+        }
+        let family: CBQCurrentAccountPDFFamily = isUSDMonthly ? .usdMonthly : isQARMonthly ? .monthly : isSavingsMonthly ? .savingsMonthly : .eSavingsMonthly
+        let product = (isQARMonthly || isUSDMonthly) ? "Current Account-Retail" : isSavingsMonthly ? "Savings Account" : "E Savings Account"
+        return try normalizeMonthly(pages: pages, evidence: pageEvidence, fileURL: fileURL, boundedText: bounded,
+                                    family: family, product: product,
+                                    currencyLiteral: isUSDMonthly ? "US DOLLARS" : "QATARI RIYAL",
+                                    currencyCode: isUSDMonthly ? "USD" : "QAR")
     }
 
     // MARK: History profile
@@ -221,17 +289,188 @@ final class CBQCurrentAccountPDFNormalizer {
 
     // MARK: Monthly profile
 
+    private func normalizeLegacy(
+        pages: [String], evidence: [RawPDFPageEvidence], fileURL: URL, boundedText: String,
+        family: CBQCurrentAccountPDFFamily, product: String
+    ) throws -> CBQCurrentAccountPDFNormalizationResult {
+        guard let account = Self.uniqueCapture(#"\bAccount No\.?\s*:\s*([0-9Xx*-]+)"#, in: boundedText),
+              let iban = Self.uniqueCapture(#"\bIBAN\s*:\s*([A-Za-z0-9Xx*]+)"#, in: boundedText),
+              let boundary = Self.uniqueCapture(#"\bStmt\.\s*Date\s*:\s*([0-9]{2} [A-Za-z]{3} [0-9]{2})\b"#, in: boundedText),
+              boundedText.range(of: #"\b"# + NSRegularExpression.escapedPattern(for: product) + #"\b"#, options: [.caseInsensitive, .regularExpression]) != nil,
+              boundedText.range(of: #"\bCurrency\s*:\s*QATARI RIYAL\b"#, options: [.caseInsensitive, .regularExpression]) != nil else {
+            throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
+        }
+        let pageTokens = evidence.enumerated().map {
+            Self.tokens(from: $0.element, pageIndex: $0.offset, usesPositionOrderedText: true)
+        }
+        let totalTokens = pageTokens.reduce(0) { $0 + $1.count }
+        guard totalTokens > 0 else { throw CBQCurrentAccountPDFNormalizationError.unsupportedNativeText }
+        let pageLines = pageTokens.map(Self.lines)
+        var layouts: [Int: LegacyLayout] = [:]
+        var headers: [Int: VisualLine] = [:]
+        var canonicalLayout: LegacyLayout?
+        for (pageIndex, lines) in pageLines.enumerated() {
+            let matches = lines.filter { Self.normalizedHeaderText($0.text) == "Post Date Narrative Value Date Debit Credit Book Balance" }
+            guard matches.count <= 1 else { throw CBQCurrentAccountPDFNormalizationError.changedHeader }
+            if let header = matches.first {
+                let layout = try Self.legacyLayout(from: header)
+                canonicalLayout = canonicalLayout ?? layout
+                layouts[pageIndex] = layout
+                headers[pageIndex] = header
+            }
+        }
+        guard let canonicalLayout else { throw CBQCurrentAccountPDFNormalizationError.missingHeader }
+
+        var blocks: [LegacyBlock] = []
+        var current: LegacyBlock?
+        var closingBalance: String?
+        var closingOrdinal: Int?
+        var closingRegionEnd: Int?
+        var sawClosing = false
+        var openingBalance: String?
+        var openingOrdinal: Int?
+        var periodStart: String?
+        for (pageIndex, lines) in pageLines.enumerated() {
+            let layout = layouts[pageIndex] ?? canonicalLayout
+            for line in lines {
+                if let header = headers[pageIndex], line.midY > header.midY + 3 { continue }
+                if Self.normalizedHeaderText(line.text) == "Post Date Narrative Value Date Debit Credit Book Balance" { continue }
+                if Self.isLegacyPageMarker(line, layout: layout) { continue }
+                let narrative = Self.boundedWhitespace(line.tokens.filter {
+                    $0.bounds.minX >= layout.postBoundary && $0.bounds.minX < layout.narrativeBoundary
+                }.map(\.text).joined(separator: " "))
+                // Position-ordered PDF fragments may retain the two literal
+                // words as adjacent fragments. Treat only this exact source
+                // label equivalently; no transaction narration is inferred.
+                let normalizedNarrative = narrative.replacingOccurrences(of: " ", with: "").uppercased()
+                let sourceLineLabel = line.text.replacingOccurrences(of: #"\s+"#, with: "", options: .regularExpression).uppercased()
+                if normalizedNarrative == "BROUGHTFORWARD" || sourceLineLabel.contains("BROUGHTFORWARD") {
+                    let balances = line.tokens.filter {
+                        $0.bounds.minX >= layout.creditBoundary && Self.matches($0.text, Self.moneyPattern)
+                    }
+                    guard openingBalance == nil, current == nil, blocks.isEmpty,
+                          !sawClosing, balances.count == 1,
+                          !line.tokens.contains(where: {
+                              $0.bounds.minX >= layout.narrativeBoundary && $0.bounds.minX < layout.creditBoundary &&
+                                  (Self.matches($0.text, Self.moneyPattern) || Self.matches($0.text, Self.legacyDatePattern))
+                          }) else { throw CBQCurrentAccountPDFNormalizationError.malformedPreamble }
+                    openingBalance = balances[0].text
+                    openingOrdinal = line.tokens.first?.sourceOrdinal
+                    // Five retained older originals print this opening date;
+                    // the earliest source leaves it absent. Preserve both shapes.
+                    periodStart = Self.legacyPostingDate(in: line, layout: layout)?.text
+                    continue
+                }
+                if let footer = Self.legacyClosingBalance(in: line, layout: layout) {
+                    if let current { blocks.append(current) }
+                    current = nil
+                    guard !sawClosing, !footer.isNeutral || Self.decimal(footer.money) == .zero else {
+                        throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
+                    }
+                    closingBalance = footer.money
+                    closingOrdinal = line.tokens.first?.sourceOrdinal
+                    closingRegionEnd = line.tokens.map(\.sourceOrdinal).max()
+                    sawClosing = true
+                    continue
+                }
+                if let posting = Self.legacyPostingDate(in: line, layout: layout) {
+                    guard openingBalance != nil, !sawClosing else { throw CBQCurrentAccountPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1) }
+                    if let current { blocks.append(current) }
+                    current = .init(pageIndex: pageIndex, start: posting, layout: layout, lines: [line])
+                } else if current != nil, Self.isLegacyContinuation(line, layout: layout) {
+                    current!.lines.append(line)
+                } else if current != nil, Self.containsLegacyFinancialValue(line, layout: layout) {
+                    throw CBQCurrentAccountPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
+                }
+            }
+        }
+        if let current { blocks.append(current) }
+        guard sawClosing, let closingBalance, let openingBalance, let openingOrdinal else {
+            throw CBQCurrentAccountPDFNormalizationError.noTransactions
+        }
+
+        var rows: [NormalizedRow] = []
+        var previousBalance = Self.decimal(openingBalance)
+        var previousPosting = periodStart
+        for block in blocks {
+            let tokens = block.lines.flatMap(\.tokens)
+            let layout = block.layout
+            let narration = Self.boundedWhitespace(Self.readingOrder(tokens.filter {
+                $0.bounds.minX >= layout.postBoundary && $0.bounds.minX < layout.narrativeBoundary
+            }).map(\.text).joined(separator: " "))
+            let valueDates = tokens.filter {
+                $0.bounds.minX >= layout.narrativeBoundary && $0.bounds.minX < layout.valueBoundary && Self.matches($0.text, Self.legacyDatePattern)
+            }
+            let debits = tokens.filter {
+                $0.bounds.minX >= layout.valueBoundary && $0.bounds.minX < layout.debitBoundary && Self.matches($0.text, Self.moneyPattern)
+            }
+            let credits = tokens.filter {
+                $0.bounds.minX >= layout.debitBoundary && $0.bounds.minX < layout.creditBoundary && Self.matches($0.text, Self.moneyPattern)
+            }
+            let balances = tokens.filter { $0.bounds.minX >= layout.creditBoundary && Self.legacyBalanceText($0.text, family: family) != nil }
+            guard !narration.isEmpty, valueDates.count == 1, (debits.count == 1) != (credits.count == 1), balances.count == 1,
+                  let amount = Self.decimal(debits.first?.text ?? credits.first!.text), amount > .zero,
+                  let balanceText = Self.legacyBalanceText(balances[0].text, family: family),
+                  let balance = Self.decimal(balanceText) else {
+                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
+            }
+            let signed = debits.count == 1 ? -abs(amount) : abs(amount)
+            if let previousBalance, previousBalance + signed != balance {
+                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
+            }
+            if let previousPosting, let previous = Self.legacyDateKey(previousPosting), let current = Self.legacyDateKey(block.start.text), current < previous {
+                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
+            }
+            previousBalance = balance
+            previousPosting = block.start.text
+            rows.append(.init(rowNumber: block.start.sourceOrdinal,
+                              values: [block.start.text, narration, valueDates[0].text,
+                                       debits.count == 1 ? "-\(debits[0].text)" : credits[0].text, balanceText],
+                              rawValues: [block.start.text, narration, valueDates[0].text,
+                                          debits.count == 1 ? "-\(debits[0].text)" : credits[0].text, balances[0].text],
+                              sourcePage: block.pageIndex + 1))
+        }
+        let terminalBalance = rows.last.flatMap { Self.decimal($0.values.last ?? "") } ?? Self.decimal(openingBalance)
+        guard let closingOrdinal, let closingRegionEnd,
+              terminalBalance == Self.decimal(closingBalance),
+              let headerPage = headers.keys.min(), let headerOrdinal = headers[headerPage]?.tokens.first?.sourceOrdinal else {
+            throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
+        }
+        func fieldOrdinal(_ label: String) -> Int? {
+            pageLines.flatMap { $0 }.first(where: { $0.text.range(of: label, options: .caseInsensitive) != nil })?.tokens.first?.sourceOrdinal
+        }
+        guard let accountOrdinal = fieldOrdinal("Account No"), let ibanOrdinal = fieldOrdinal("IBAN"), let boundaryOrdinal = fieldOrdinal("Stmt.") else {
+            throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
+        }
+        return result(family: family, fileURL: fileURL, rows: rows, totalTokens: totalTokens, headerSourceOrdinal: headerOrdinal,
+                      preamble: [.init(sourceOrdinal: accountOrdinal, text: "MASKED_ACCOUNT\t\(account)"),
+                                 .init(sourceOrdinal: ibanOrdinal, text: "MASKED_IBAN\t\(iban)"),
+                                 .init(sourceOrdinal: boundaryOrdinal, text: "STATEMENT_BOUNDARY\t\(boundary)"),
+                                 .init(sourceOrdinal: boundaryOrdinal, text: "PRODUCT\t\(product)"),
+                                 .init(sourceOrdinal: openingOrdinal, text: "OPENING_BALANCE\t\(openingBalance)"),
+                                 .init(sourceOrdinal: closingOrdinal, text: "CLOSING_BALANCE\t\(closingBalance)"),
+                                 .init(sourceOrdinal: headerOrdinal, text: "FINANCIAL_REGION_START\t\(headerOrdinal)"),
+                                 .init(sourceOrdinal: closingOrdinal, text: "FINANCIAL_REGION_END\t\(closingRegionEnd)"),
+                                 .init(sourceOrdinal: headerOrdinal, text: "FINANCIAL_REGION_SIGNATURE\t\(Self.financialRegionSignature(pageTokens, start: headerOrdinal, end: closingRegionEnd))")]
+                        + (periodStart.map { [.init(sourceOrdinal: openingOrdinal, text: "PERIOD_START\t\($0)")] } ?? []))
+    }
+
     private func normalizeMonthly(
         pages: [String],
         evidence: [RawPDFPageEvidence],
         fileURL: URL,
-        boundedText: String
+        boundedText: String,
+        family: CBQCurrentAccountPDFFamily,
+        product: String,
+        currencyLiteral: String,
+        currencyCode: String
     ) throws -> CBQCurrentAccountPDFNormalizationResult {
+        let productPattern = #"\bAccount Type:\s*"# + NSRegularExpression.escapedPattern(for: product) + #"\b"#
         guard let account = Self.uniqueCapture(#"\bAccount No\.:\s*([0-9Xx* -]+)\s+Statement Date:"#, in: boundedText),
               let iban = Self.uniqueCapture(#"\bIBAN:\s*([A-Za-z0-9Xx* -]+)\s+Account No\."#, in: boundedText),
               let boundary = Self.uniqueCapture(#"\bStatement Date:\s*([0-9]{2} [A-Za-z]{3} [0-9]{2})\b"#, in: boundedText),
-              boundedText.range(of: #"\bAccount Type:\s*Current Account-Retail\b"#, options: [.caseInsensitive, .regularExpression]) != nil,
-              boundedText.range(of: #"\bCurrency:\s*QATARI RIYAL\b"#, options: [.caseInsensitive, .regularExpression]) != nil else {
+              boundedText.range(of: productPattern, options: [.caseInsensitive, .regularExpression]) != nil,
+              boundedText.range(of: #"\bCurrency:\s*"# + NSRegularExpression.escapedPattern(for: currencyLiteral) + #"\b"#, options: [.caseInsensitive, .regularExpression]) != nil else {
             throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
         }
         let pageTokens = evidence.enumerated().map { Self.tokens(from: $0.element, pageIndex: $0.offset) }
@@ -252,6 +491,9 @@ final class CBQCurrentAccountPDFNormalizer {
             }
         }
         guard let canonicalLayout else { throw CBQCurrentAccountPDFNormalizationError.missingHeader }
+        let furnitureBand = Self.monthlyFurnitureBand(
+            pageLines: pageLines, evidence: evidence, layouts: layouts, headers: headersByPage
+        )
 
         var blocks: [MonthlyBlock] = []
         var current: MonthlyBlock?
@@ -260,6 +502,7 @@ final class CBQCurrentAccountPDFNormalizer {
         var closingRegionEndOrdinal: Int?
         var sawClosingFooter = false
         var sawTable = false
+        var undatedOpening: (balance: String, ordinal: Int)?
         for (pageIndex, lines) in pageLines.enumerated() {
             let layout = layouts[pageIndex] ?? canonicalLayout
             for line in lines {
@@ -277,14 +520,41 @@ final class CBQCurrentAccountPDFNormalizer {
                 if Self.isPageMarker(line, layout: layout) {
                     continue
                 }
-                if let footerMoney = Self.creditBalance(in: line, layout: layout) {
+                if let furnitureBand, headersByPage[pageIndex] != nil,
+                   Self.isMonthlyPageFurniture(line, layout: layout, band: furnitureBand,
+                                               pageBounds: evidence[pageIndex].bounds) {
+                    // A page-local footer does not finish the transaction or
+                    // the statement. A verified next-page table may continue it.
+                    continue
+                }
+                if let footer = Self.closingBalance(in: line, layout: layout) {
                     if let current { blocks.append(current) }
                     current = nil
                     guard !sawClosingFooter else { throw CBQCurrentAccountPDFNormalizationError.malformedPreamble }
-                    closingBalance = footerMoney
+                    guard !footer.isNeutral || Self.decimal(footer.money) == .zero else {
+                        throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
+                    }
+                    closingBalance = footer.money
                     closingSourceOrdinal = line.tokens.first?.sourceOrdinal
                     closingRegionEndOrdinal = line.tokens.map(\.sourceOrdinal).max()
                     sawClosingFooter = true
+                    continue
+                }
+                if family != .monthly, Self.postingDateToken(in: line, layout: layout) == nil,
+                   Self.boundedWhitespace(line.tokens.filter {
+                       $0.bounds.minX >= layout.postingBoundary && $0.bounds.minX < layout.descriptionBoundary
+                   }.map(\.text).joined(separator: " ")) == "BROUGHT FORWARD" {
+                    let balances = line.tokens.filter {
+                        $0.bounds.minX >= layout.creditBoundary && Self.matches($0.text, Self.moneyPattern)
+                    }
+                    guard sawTable, !sawClosingFooter, blocks.isEmpty, current == nil,
+                          undatedOpening == nil, balances.count == 1,
+                          let ordinal = line.tokens.first?.sourceOrdinal,
+                          !line.tokens.contains(where: {
+                              $0.bounds.minX >= layout.descriptionBoundary && $0.bounds.minX < layout.creditBoundary &&
+                                  (Self.matches($0.text, Self.monthlyDatePattern) || Self.matches($0.text, Self.moneyPattern))
+                          }) else { throw CBQCurrentAccountPDFNormalizationError.malformedPreamble }
+                    undatedOpening = (balances[0].text, ordinal)
                     continue
                 }
                 if let posting = Self.postingDateToken(in: line, layout: layout) {
@@ -295,6 +565,14 @@ final class CBQCurrentAccountPDFNormalizer {
                     current = MonthlyBlock(pageIndex: pageIndex, start: posting, layout: layout, lines: [line])
                 } else if current != nil, Self.isContinuationLine(line, layout: layout) {
                     current!.lines.append(line)
+                } else if current != nil, line.tokens.contains(where: {
+                    $0.bounds.minX >= layout.postingBoundary && $0.bounds.minX < layout.descriptionBoundary
+                }) {
+                    // Horizontal overlap alone cannot assign cross-column
+                    // prose to an otherwise complete transaction.
+                    throw CBQCurrentAccountPDFNormalizationError.unresolvedNarrationRegion(
+                        page: pageIndex + 1, sourceOrdinal: line.tokens.first?.sourceOrdinal ?? 0
+                    )
                 } else if sawTable, Self.containsFinancialColumnValue(line, layout: layout) {
                     throw CBQCurrentAccountPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
                 }
@@ -306,10 +584,10 @@ final class CBQCurrentAccountPDFNormalizer {
         }
 
         var normalizedRows: [NormalizedRow] = []
-        var openingBalance: String?
-        var previousBalance: Decimal?
+        var openingBalance = undatedOpening?.balance
+        var previousBalance = undatedOpening.flatMap { Self.decimal($0.balance) }
         var previousPostingDate: String?
-        var openingSourceOrdinal: Int?
+        var openingSourceOrdinal = undatedOpening?.ordinal
         for block in blocks {
             let layout = block.layout
             let blockTokens = block.lines.flatMap(\.tokens)
@@ -395,13 +673,13 @@ final class CBQCurrentAccountPDFNormalizer {
               let ibanOrdinal = fieldOrdinal("IBAN:"),
               let boundaryOrdinal = fieldOrdinal("Statement Date:"),
               let headerPage = headersByPage.keys.min(),
-              let headerOrdinal = headersByPage[headerPage]?.tokens.first?.sourceOrdinal,
-              let periodStart = Self.periodStart(for: openingSourceOrdinal, in: blocks) else {
+              let headerOrdinal = headersByPage[headerPage]?.tokens.first?.sourceOrdinal else {
             throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
         }
+        let periodStart = Self.periodStart(for: openingSourceOrdinal, in: blocks)
 
         return result(
-            family: .monthly,
+            family: family,
             fileURL: fileURL,
             rows: normalizedRows,
             totalTokens: totalTokens,
@@ -409,14 +687,15 @@ final class CBQCurrentAccountPDFNormalizer {
             preamble: [
                 .init(sourceOrdinal: accountOrdinal, text: "MASKED_ACCOUNT\t\(account)"),
                 .init(sourceOrdinal: ibanOrdinal, text: "MASKED_IBAN\t\(iban)"),
+                .init(sourceOrdinal: accountOrdinal, text: "PRODUCT\t\(product)"),
+                .init(sourceOrdinal: accountOrdinal, text: "CURRENCY_CODE\t\(currencyCode)"),
                 .init(sourceOrdinal: boundaryOrdinal, text: "STATEMENT_BOUNDARY\t\(boundary)"),
-                .init(sourceOrdinal: openingSourceOrdinal, text: "PERIOD_START\t\(periodStart)"),
                 .init(sourceOrdinal: openingSourceOrdinal, text: "OPENING_BALANCE\t\(openingBalance)"),
                 .init(sourceOrdinal: closingSourceOrdinal, text: "CLOSING_BALANCE\t\(closingBalance)"),
                 .init(sourceOrdinal: headerOrdinal, text: "FINANCIAL_REGION_START\t\(headerOrdinal)"),
                 .init(sourceOrdinal: closingSourceOrdinal, text: "FINANCIAL_REGION_END\t\(closingRegionEndOrdinal)"),
                 .init(sourceOrdinal: headerOrdinal, text: "FINANCIAL_REGION_SIGNATURE\t\(Self.financialRegionSignature(pageTokens, start: headerOrdinal, end: closingRegionEndOrdinal))")
-            ]
+            ] + (periodStart.map { [.init(sourceOrdinal: openingSourceOrdinal, text: "PERIOD_START\t\($0)")] } ?? [])
         )
     }
 
@@ -429,7 +708,8 @@ final class CBQCurrentAccountPDFNormalizer {
         return SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func tokens(from evidence: RawPDFPageEvidence, pageIndex: Int) -> [Token] {
+    private static func tokens(from evidence: RawPDFPageEvidence, pageIndex: Int,
+                               usesPositionOrderedText: Bool = false) -> [Token] {
         var values: [(text: String, bounds: CGRect)] = []
         for fragment in evidence.fragments {
             let geometry = fragment.geometry
@@ -438,7 +718,7 @@ final class CBQCurrentAccountPDFNormalizer {
             let y = CGFloat(geometry?.baselineY ?? fragment.y)
             guard minX.isFinite, maxX.isFinite, y.isFinite, maxX >= minX else { continue }
             let bounds = CGRect(x: minX, y: y - 0.5, width: max(0.5, maxX - minX), height: 1)
-            values.append((fragment.text, bounds))
+            values.append((usesPositionOrderedText ? (fragment.positionOrderedText ?? fragment.text) : fragment.text, bounds))
         }
         var groups: [(midY: CGFloat, values: [(String, CGRect)])] = []
         for value in values {
@@ -486,25 +766,130 @@ final class CBQCurrentAccountPDFNormalizer {
         )
     }
 
+    private static func legacyLayout(from header: VisualLine) throws -> LegacyLayout {
+        let tokens = header.tokens.sorted { $0.bounds.minX < $1.bounds.minX }
+        guard tokens.map({ $0.text.lowercased() }) ==
+            ["post", "date", "narrative", "value", "date", "debit", "credit", "book", "balance"] else {
+            throw CBQCurrentAccountPDFNormalizationError.changedHeader
+        }
+        let starts = tokens.map(\.bounds.minX)
+        guard starts == starts.sorted() else { throw CBQCurrentAccountPDFNormalizationError.changedHeader }
+        return .init(postX: starts[0], narrativeX: starts[2], valueX: starts[3],
+                     debitX: starts[5], creditX: starts[6], balanceX: starts[7])
+    }
+
     private static func postingDateToken(in line: VisualLine, layout: MonthlyLayout) -> Token? {
         line.tokens.first { $0.bounds.minX < layout.postingBoundary && matches($0.text, monthlyDatePattern) }
     }
 
-    private static func creditBalance(in line: VisualLine, layout: MonthlyLayout) -> String? {
-        guard boundedWhitespace(line.text).uppercased().hasPrefix("* CREDIT BALANCE") else { return nil }
+    private static func legacyPostingDate(in line: VisualLine, layout: LegacyLayout) -> Token? {
+        line.tokens.first { $0.bounds.minX < layout.postBoundary && matches($0.text, legacyDatePattern) }
+    }
+
+    private struct ClosingBalance {
+        let money: String
+        let isNeutral: Bool
+    }
+
+    private static func closingBalance(in line: VisualLine, layout: MonthlyLayout) -> ClosingBalance? {
+        let label = boundedWhitespace(line.text).uppercased()
+        let isCredit = label.hasPrefix("* CREDIT BALANCE")
+        let isNeutral = label.hasPrefix("* BALANCE")
+        guard isCredit || isNeutral else { return nil }
         let values = line.tokens.filter {
             $0.bounds.minX >= layout.creditBoundary && matches($0.text, moneyPattern)
         }
         guard values.count == 1 else { return nil }
-        return values[0].text
+        return .init(money: values[0].text, isNeutral: isNeutral)
+    }
+
+    private static func legacyClosingBalance(in line: VisualLine, layout: LegacyLayout) -> ClosingBalance? {
+        let label = boundedWhitespace(line.text).uppercased()
+        let isCredit = label.hasPrefix("* CREDIT BALANCE")
+        let isNeutral = label.hasPrefix("* BALANCE")
+        guard isCredit || isNeutral else { return nil }
+        let values = line.tokens.filter { $0.bounds.minX >= layout.creditBoundary && matches($0.text, moneyPattern) }
+        guard values.count == 1 else { return nil }
+        return .init(money: values[0].text, isNeutral: isNeutral)
     }
 
     private static func isContinuationLine(_ line: VisualLine, layout: MonthlyLayout) -> Bool {
         guard !line.tokens.isEmpty else { return false }
         if isPageMarker(line, layout: layout) { return false }
-        return line.tokens.contains {
+        // A wrapped narration/reference may contain any words, digits or dates.
+        // Its source tokens must belong to the narrative column, not merely
+        // overlap it as one part of a page-wide prose line. A long unbroken
+        // reference keeps its complete token even when its rectangle extends.
+        return line.tokens.allSatisfy {
             $0.bounds.minX >= layout.postingBoundary && $0.bounds.minX < layout.descriptionBoundary
         }
+    }
+
+    private static func isLegacyContinuation(_ line: VisualLine, layout: LegacyLayout) -> Bool {
+        guard !line.tokens.isEmpty, !isLegacyPageMarker(line, layout: layout) else { return false }
+        return line.tokens.allSatisfy {
+            $0.bounds.minX >= layout.postBoundary && $0.bounds.minX < layout.narrativeBoundary
+        }
+    }
+
+    private static func monthlyFurnitureBand(
+        pageLines: [[VisualLine]], evidence: [RawPDFPageEvidence],
+        layouts: [Int: MonthlyLayout], headers: [Int: VisualLine]
+    ) -> MonthlyFurnitureBand? {
+        let closingControls = headers.keys.sorted().flatMap { page -> [(Int, VisualLine)] in
+            guard let layout = layouts[page], let header = headers[page] else { return [] }
+            return pageLines[page].filter {
+                $0.midY < header.midY && closingBalance(in: $0, layout: layout) != nil
+            }.map { (page, $0) }
+        }
+        guard closingControls.count == 1, let (page, closing) = closingControls.first,
+              page == headers.keys.max(), let layout = layouts[page],
+              let bounds = usablePageBounds(evidence[page].bounds) else { return nil }
+        let prose = pageLines[page].filter {
+            $0.midY < closing.midY - 3 && !isPageMarker($0, layout: layout)
+        }
+        guard !prose.isEmpty,
+              prose.contains(where: { hasProseOutsideNarration($0, layout: layout) }),
+              prose.allSatisfy({ !hasMonthlyFinancialSignature($0, layout: layout) }),
+              let bottom = prose.map(\.midY).min(), let top = prose.map(\.midY).max() else { return nil }
+        // The three-point allowance is the existing visual-line grouping
+        // tolerance, relative to this source page; no bottom-of-page cutoff.
+        // The unique control's amount and position still must pass the ordinary
+        // complete running-balance/closing checks before any result is returned.
+        return .init(lowerY: (bottom - bounds.minY - 3) / bounds.height,
+                     upperY: (top - bounds.minY + 3) / bounds.height)
+    }
+
+    private static func isMonthlyPageFurniture(
+        _ line: VisualLine, layout: MonthlyLayout, band: MonthlyFurnitureBand, pageBounds: CGRect?
+    ) -> Bool {
+        guard let bounds = usablePageBounds(pageBounds) else { return false }
+        let y = (line.midY - bounds.minY) / bounds.height
+        return y >= band.lowerY && y <= band.upperY
+            && hasProseOutsideNarration(line, layout: layout)
+            && !hasMonthlyFinancialSignature(line, layout: layout)
+    }
+
+    private static func hasProseOutsideNarration(_ line: VisualLine, layout: MonthlyLayout) -> Bool {
+        line.tokens.contains {
+            ($0.bounds.minX < layout.postingBoundary || $0.bounds.minX >= layout.descriptionBoundary)
+                && $0.text.rangeOfCharacter(from: .letters) != nil
+        }
+    }
+
+    private static func hasMonthlyFinancialSignature(_ line: VisualLine, layout: MonthlyLayout) -> Bool {
+        normalizedHeaderText(line.text) == monthlyHeader
+            || postingDateToken(in: line, layout: layout) != nil
+            || closingBalance(in: line, layout: layout) != nil
+            || containsFinancialColumnValue(line, layout: layout)
+            || boundedWhitespace(line.text).contains("BROUGHT FORWARD")
+    }
+
+    private static func usablePageBounds(_ bounds: CGRect?) -> CGRect? {
+        guard let bounds, bounds.minX.isFinite, bounds.minY.isFinite,
+              bounds.width.isFinite, bounds.height.isFinite,
+              bounds.width > 0, bounds.height > 0 else { return nil }
+        return bounds
     }
 
     private static func containsFinancialColumnValue(_ line: VisualLine, layout: MonthlyLayout) -> Bool {
@@ -514,7 +899,26 @@ final class CBQCurrentAccountPDFNormalizer {
         }
     }
 
+    private static func containsLegacyFinancialValue(_ line: VisualLine, layout: LegacyLayout) -> Bool {
+        line.tokens.contains {
+            ($0.bounds.minX >= layout.narrativeBoundary && $0.bounds.minX < layout.valueBoundary && matches($0.text, legacyDatePattern)) ||
+                ($0.bounds.minX >= layout.valueBoundary && matches($0.text, moneyPattern)) ||
+                ($0.bounds.minX >= layout.creditBoundary && legacyBalanceText($0.text, family: .legacyCurrent) != nil)
+        }
+    }
+
+    /// The retained legacy Book Balance column prints a trailing minus for an
+    /// overdraft. Normalize only that numeric role; rawValues retain its literal.
+    private static func legacyBalanceText(_ source: String, family: CBQCurrentAccountPDFFamily) -> String? {
+        CBQLegacyBookBalanceLiteral.canonicalText(source, profileID: family.profileID, version: "1")
+    }
+
     private static func isPageMarker(_ line: VisualLine, layout: MonthlyLayout) -> Bool {
+        line.tokens.count == 1 && line.tokens[0].bounds.minX >= layout.creditBoundary &&
+            line.text.range(of: #"^[0-9]+/[0-9]+$"#, options: .regularExpression) != nil
+    }
+
+    private static func isLegacyPageMarker(_ line: VisualLine, layout: LegacyLayout) -> Bool {
         line.tokens.count == 1 && line.tokens[0].bounds.minX >= layout.creditBoundary &&
             line.text.range(of: #"^[0-9]+/[0-9]+$"#, options: .regularExpression) != nil
     }
@@ -534,6 +938,11 @@ final class CBQCurrentAccountPDFNormalizer {
               let month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].firstIndex(where: { $0.caseInsensitiveCompare(String(values[1])) == .orderedSame }),
               let year = Int(values[2]) else { return nil }
         return (2000 + year) * 10_000 + (month + 1) * 100 + day
+    }
+
+    private static func legacyDateKey(_ source: String) -> Int? {
+        guard matches(source, legacyDatePattern) else { return nil }
+        return monthlyDateKey("\(source.prefix(2))-\(source.dropFirst(2).prefix(3))-\(source.suffix(2))")
     }
 
     private static func decimal(_ source: String) -> Decimal? {
@@ -564,7 +973,9 @@ final class CBQCurrentAccountPDFNormalizer {
             document: document,
             rows: rows,
             header: NormalizedRow(rowNumber: headerSourceOrdinal, values: Self.logicalHeader),
-            sourceContext: .init(preTransactionFragments: preamble, postTransactionFragments: [])
+            sourceContext: .init(preTransactionFragments: preamble + ([.legacyCurrent, .savingsLegacy].contains(family)
+                ? [.init(sourceOrdinal: headerSourceOrdinal, text: "SOURCE_SECOND_DATE_ROLE\tvalue_date")]
+                : []), postTransactionFragments: [])
         )
     }
 

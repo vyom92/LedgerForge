@@ -3,7 +3,20 @@ import Foundation
 
 @MainActor
 final class SalaryWorkspaceViewModel: ObservableObject {
+    let planningAnalysis = PlanningAnalysisModel()
+
     enum MoneyField: String, CaseIterable { case fixed, variable, deductions, fee, investment, reserve }
+    struct InsightSelection {
+        var section = "Cash runway"
+        var accountID = ""
+        var currency = "INR"
+        var scenario = PlanningScenario()
+        var scenarioIncome = ""
+        var scenarioCost = ""
+        var scenarioContribution = ""
+    }
+    @Published var destinationSection = "This Month"
+    @Published var insightSelection = InsightSelection()
 
     @Published private(set) var plan: FundingPlan
     @Published private(set) var calculation: FundingPlanCalculation
@@ -24,6 +37,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private var baseDraftPlan: FundingPlan?
     private var subscription: AnyCancellable?
     private var calendarSubscription: AnyCancellable?
+    private var planningPreferenceSubscription: AnyCancellable?
     private let now: () -> Date
     private let refresh: (DatabaseProvider) throws -> Void
     private let requiresApplicationAvailability: Bool
@@ -170,13 +184,18 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     private static func seed(_ previous: FundingPlan, for month: SelectedStatementMonth) -> FundingPlan {
         var result = emptyPlan(month: month, workspaceID: previous.workspaceID)
+        result.assistance?.salaryCycle = SalaryFundingCycle.expected(month: month, day: previous.assistance?.salaryCycle?.expectedDay ?? 25)
+        if let prior = previous.assistance?.salaryCycle,
+           String(prior.payday.prefix(7)) == String(result.assistance?.salaryCycle?.previousPayday.prefix(7) ?? "") {
+            result.assistance?.salaryCycle?.previousPayday = prior.payday
+        }
         let source = previous.id
         result.rolloverSourcePlanID = source
         result.expectedFixedEarnings = previous.expectedFixedEarnings; result.expectedFixedProvenance = .carried(sourcePlanID: source)
         result.expectedVariableEarnings = previous.expectedVariableEarnings; result.expectedVariableProvenance = .carried(sourcePlanID: source)
         result.configuredTransferFee = previous.configuredTransferFee; result.configuredTransferFeeProvenance = .carried(sourcePlanID: source)
         result.keepInCBQ = previous.keepInCBQ ?? zeroQAR
-        result.balances = previous.balances.map { .init(id: UUID().uuidString, accountID: $0.accountID, nativeCurrency: $0.nativeCurrency, included: $0.included, money: $0.money, provenance: .carried(sourcePlanID: source)) }
+        result.balances = previous.balances.map { .init(id: UUID().uuidString, accountID: $0.accountID, nativeCurrency: $0.nativeCurrency, included: $0.included, money: $0.money, provenance: .carried(sourcePlanID: source), financialBalanceDate: $0.financialBalanceDate) }
         func rows(_ values: [FundingPlanCommitment]) -> [FundingPlanCommitment] {
             values.filter(\.recurs).map { .init(id: UUID().uuidString, label: $0.label, money: $0.temporaryCarryBasis ?? $0.money,
                 included: $0.included, fundingAccountID: $0.fundingAccountID, provenance: .carried(sourcePlanID: source),
@@ -184,6 +203,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 dueDate: $0.dueDate) }
         }
         result.qatarCommitments = rows(previous.qatarCommitments); result.indiaCommitments = rows(previous.indiaCommitments)
+        let carriedDates = Dictionary(uniqueKeysWithValues: (result.qatarCommitments + result.indiaCommitments).compactMap { row in
+            result.nextRecurringDate(for: row).map { (row.id, $0.canonical) }
+        })
+        result.assistance?.carriedBillDates = carriedDates
         result.deductions = previous.deductions.filter(\.recurs).map { .init(id: UUID().uuidString, label: $0.label, money: $0.money, recurs: true, carriedSourceRowID: $0.id) }
         if previous.calculationVersion == .legacy, previous.expectedDeductions.amount > 0 {
             // Preserve the known prior total without inventing component names
@@ -227,6 +250,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private let transactionStore: TransactionStore
     private let salaryStore: SalaryStore
     private let fundingPlanStore: FundingPlanStore
+    private let intelligenceStore: FinancialIntelligenceStore
 
     init(
         month: SelectedStatementMonth? = nil,
@@ -236,6 +260,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         transactionStore: TransactionStore? = nil,
         salaryStore: SalaryStore? = nil,
         fundingPlanStore: FundingPlanStore? = nil,
+        intelligenceStore: FinancialIntelligenceStore? = nil,
         locale: Locale = .current,
         now: @escaping () -> Date = { Date() },
         refresh: ((DatabaseProvider) throws -> Void)? = nil
@@ -258,15 +283,23 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         self.transactionStore = transactionStore ?? .shared
         self.salaryStore = resolvedSalaryStore
         self.fundingPlanStore = resolvedFundingPlanStore
+        self.intelligenceStore = intelligenceStore ?? .shared
         let canonicalIsCurrent = resolvedFundingPlanStore.generation == self.baseGeneration
         let initial = (canonicalIsCurrent ? resolvedFundingPlanStore.plan(for: resolvedMonth, workspaceID: workspaceID) : nil) ?? Self.emptyPlan(month: resolvedMonth, workspaceID: workspaceID)
         self.baseCanonical = canonicalIsCurrent ? resolvedFundingPlanStore.plan(for: resolvedMonth, workspaceID: workspaceID) : nil
         self.saveState = canonicalIsCurrent ? .ready : .providerChanged
         self.plan = initial
-        self.calculation = FundingPlanCalculator.calculate(initial)
+        let exclusions = self.intelligenceStore.generation == self.baseGeneration ? self.intelligenceStore.snapshot?.preferences?.excludedPlanningAccountIDs ?? [] : []
+        self.calculation = FundingPlanCalculator.calculate(initial, excludingAccounts: exclusions,
+            salaryReceipt: PayslipReceiptState.resolve(plan: initial, transactions: self.transactionStore.transactions, excludedAccounts: exclusions))
         syncDraft()
         captureDraftBase()
         self.subscription = resolvedFundingPlanStore.$plans.sink { [weak self] _ in self?.canonicalDidPublish() }
+        self.planningPreferenceSubscription = self.intelligenceStore.$snapshot.dropFirst().sink { [weak self] _ in
+            guard let self else { return }
+            for id in self.excludedPlanningAccountIDs { self.fieldErrors["balance.\(id)"] = nil }
+            self.recalculate()
+        }
         // Reuse the accepted Dashboard delivery boundary. Only the available
         // month controls advance; an active draft never switches automatically.
         self.calendarSubscription = NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
@@ -289,19 +322,58 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     var statements: [SalaryStatement] { salaryStore.statements }
+    /// Discovery only. Repeated hydration offers the same source once, and
+    /// neither opens another month nor changes a saved or unsaved draft.
+    var payslipProposals: [SalaryStatement] {
+        guard fundingPlanStore.generation == baseGeneration,
+              intelligenceStore.generation == baseGeneration,
+              intelligenceStore.snapshot?.preferences?.salaryAssistanceEnabled == true else { return [] }
+        let linked = Set(([plan] + fundingPlanStore.plans + monthDrafts.values.map(\.plan))
+            .compactMap { $0.assistance?.payslipFunding?.statementID })
+        let regular = statements.filter {
+            $0.workspaceID == workspaceID && $0.evidence.kind == .regularSalary &&
+                $0.evidence.financialPeriod == currentPlanningMonth
+        }
+        // Two different regular slips for one pay period require source review.
+        return regular.count == 1 ? regular.filter { !linked.contains($0.id) } : []
+    }
+    var payslipReceiptState: PayslipReceiptState? {
+        guard fundingPlanStore.generation == baseGeneration, intelligenceStore.generation == baseGeneration else {
+            return plan.assistance?.payslipFunding == nil ? nil : .needsReview
+        }
+        return PayslipReceiptState.resolve(plan: plan, transactions: transactionStore.transactions, excludedAccounts: excludedPlanningAccountIDs)
+    }
+    var canAcknowledgePayslipBalance: Bool {
+        guard canEdit, let link = plan.assistance?.payslipFunding,
+              let balance = plan.balances.first(where: { $0.accountID == link.accountID && $0.included }),
+              balance.money != nil, let date = balance.financialBalanceDate,
+              let payday = plan.assistance?.salaryCycle?.recurringStart,
+              date >= payday, !excludedPlanningAccountIDs.contains(link.accountID) else { return false }
+        if case .bankCredit(_, let creditDate, _) = payslipReceiptState, date < creditDate { return false }
+        if case .capturedAccountBalance = balance.provenance { return true }
+        return false
+    }
     var planMonthTitle: String { Self.monthTitle(plan.month) }
 
     static func monthTitle(_ month: SelectedStatementMonth) -> String {
-        let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return "\(names[month.month - 1]) \(month.year)"
+        AppDateDisplay.month(month.canonical)
     }
     var eligibleAccounts: [Account] { plannerAccounts(type: .bank) }
     var eligibleCommitmentAccounts: [Account] { plannerAccounts(type: .creditCard) }
+    var availablePlanningAccounts: [Account] {
+        accountStore.accounts.filter { $0.status == .active && [.bank, .creditCard].contains($0.type) && $0.repositoryAccountId != nil }
+            .sorted { ($0.nativeCurrency.code, $0.preferredDisplayName, $0.repositoryAccountId ?? "") < ($1.nativeCurrency.code, $1.preferredDisplayName, $1.repositoryAccountId ?? "") }
+    }
+    var excludedPlanningAccountIDs: Set<String> {
+        guard intelligenceStore.generation == baseGeneration else { return [] }
+        return intelligenceStore.snapshot?.preferences?.excludedPlanningAccountIDs ?? []
+    }
 
     func retainedCommitmentAccountLabel(id: String) -> String {
         guard let account = accountStore.accounts.first(where: { $0.repositoryAccountId == id }) else { return "Saved account unavailable" }
+        if excludedPlanningAccountIDs.contains(id) { return "Removed from planning · \(account.selectionTitle) · add back or choose another account" }
         let role = account.type == .bank ? "Saved funding bank" : "Saved account"
-        return "\(role) · \(account.nickname ?? account.name)"
+        return "\(role) · \(account.selectionTitle)"
     }
 
     var currentMonthActual: Money? {
@@ -419,12 +491,12 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func captureAccountBalance(_ account: Account) {
         guard canEdit else { return }
-        guard let money = currentBankBalance(account) else {
+        guard let balance = currentBankBalance(account) else {
             if let id = account.repositoryAccountId { unavailableCurrentBalanceAccountIDs.insert(id) }
             errorMessage = "The current bank balance is unavailable. You can enter a planning balance manually."
             return
         }
-        captureAccountBalance(account, money: money, capturedAt: ISO8601DateFormatter().string(from: Date()))
+        captureAccountBalance(account, money: balance.money, financialDate: balance.date, capturedAt: ISO8601DateFormatter().string(from: Date()))
         recalculate()
     }
 
@@ -446,31 +518,40 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             if let existing, existing.money != nil {
                 guard case .capturedAccountBalance = existing.provenance else { continue }
             }
-            guard let money = currentBankBalance(account) else {
+            guard let balance = currentBankBalance(account) else {
                 unavailableCurrentBalanceAccountIDs.insert(id)
                 continue
             }
             // An unchanged value keeps its truthful earlier capture time and
             // does not create an unsaved change merely from reopening a tab.
-            guard existing?.money != money else { continue }
-            captureAccountBalance(account, money: money, capturedAt: capturedAt)
+            guard existing?.money != balance.money else { continue }
+            // Automatic draft refresh is not the owner's explicit date capture.
+            captureAccountBalance(account, money: balance.money, financialDate: nil, capturedAt: capturedAt)
             changed = true
         }
         if changed { recalculate() }
     }
 
-    private func currentBankBalance(_ account: Account) -> Money? {
+    private func currentBankBalance(_ account: Account) -> (money: Money, date: StatementDate)? {
         guard let id = account.repositoryAccountId,
-              account.type == .bank else { return nil }
-        // Reuse canonical bank source selection; Account's zero fallback is
-        // not evidence that an unavailable balance is actually zero.
-        return try? RepositoryStoreHydrator.latestRunningBalance(
-            from: transactionStore.transactions.filter { $0.repositoryAccountId == id },
-            currency: account.nativeCurrency.code
-        )
+              account.type == .bank,
+              let dateISO = account.currentBalanceAsOfISO,
+              let date = try? StatementDate(canonical: String(dateISO.prefix(10))),
+              account.currentBalanceMoney.currency == account.nativeCurrency else { return nil }
+        let applied = Set(plan.assistance?.appliedSalaryIDs ?? [])
+        if !applied.isEmpty {
+            let salaries = transactionStore.transactions.filter { $0.repositoryTransactionId.map(applied.contains) == true && $0.repositoryAccountId == id }
+            guard salaries.allSatisfy({ salary in
+                guard let date = salary.statementDate else { return false }
+                return account.currentBalanceAsOfISO.map { String($0.prefix(10)) >= date.canonical } == true
+            }) else { return nil }
+        }
+        // Canonical hydration owns this exact amount/date pair, including
+        // statement closing controls. An undated zero fallback is unavailable.
+        return (account.currentBalanceMoney, date)
     }
 
-    private func captureAccountBalance(_ account: Account, money: Money, capturedAt: String) {
+    private func captureAccountBalance(_ account: Account, money: Money, financialDate: StatementDate?, capturedAt: String) {
         guard let id = account.repositoryAccountId else { return }
         unavailableCurrentBalanceAccountIDs.remove(id)
         markEdited()
@@ -479,8 +560,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].money = money
             plan.balances[index].provenance = .capturedAccountBalance(capturedAtISO: capturedAt)
+            plan.balances[index].financialBalanceDate = financialDate
         } else {
-            plan.balances.append(FundingPlanBalance(id: UUID().uuidString, accountID: id, nativeCurrency: account.nativeCurrency, included: false, money: money, provenance: .capturedAccountBalance(capturedAtISO: capturedAt)))
+            plan.balances.append(FundingPlanBalance(id: UUID().uuidString, accountID: id, nativeCurrency: account.nativeCurrency, included: false, money: money, provenance: .capturedAccountBalance(capturedAtISO: capturedAt), financialBalanceDate: financialDate))
         }
     }
 
@@ -500,6 +582,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].money = money
             plan.balances[index].provenance = .manual
+            plan.balances[index].financialBalanceDate = nil
         } else {
             plan.balances.append(FundingPlanBalance(id: UUID().uuidString, accountID: id, nativeCurrency: account.nativeCurrency, included: false, money: money, provenance: .manual))
         }
@@ -571,12 +654,21 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         for key in ["label.\(id)", "amount.\(id)"] { rawText[key] = nil; fieldErrors[key] = nil; untouchedZeroFields.remove(key) }
         if region == "qatar" { plan.qatarCommitments.removeAll { $0.id == id } }
         else { plan.indiaCommitments.removeAll { $0.id == id } }
+        for occurrenceID in plan.assistance?.appliedRecurringIDs.filter({ $0.value == id }).map(\.key) ?? [] {
+            plan.assistance?.appliedRecurringIDs[occurrenceID] = nil
+            plan.assistance?.appliedRecurringPaid?[occurrenceID] = nil
+        }
+        plan.assistance?.billFundingAccounts?[id] = nil
+        plan.assistance?.carriedBillDates?[id] = nil
+        for index in plan.assistance?.datedAdjustments.indices ?? 0..<0 {
+            if plan.assistance?.datedAdjustments[index].replacesCommitmentID == id { plan.assistance?.datedAdjustments[index].replacesCommitmentID = nil }
+        }
         recalculate()
     }
 
     func billDatePickerValue(for row: FundingPlanCommitment, timeZone: TimeZone = .current) -> Date {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
-        let selected = row.dueDate(in: month) ?? row.dueDate
+        let selected = plan.dueDate(for: row)
         return calendar.date(from: DateComponents(year: selected?.year ?? month.year, month: selected?.month ?? month.month, day: selected?.day ?? 1, hour: 12))!
     }
 
@@ -595,6 +687,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             due = valid
         }
         rows[index].dueDate = due
+        plan.assistance?.carriedBillDates?[id] = nil
         if region == "qatar" { plan.qatarCommitments = rows } else { plan.indiaCommitments = rows }
         markEdited(); recalculate()
     }
@@ -802,19 +895,164 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     func provenanceText(_ value: FundingPlanValueProvenance) -> String {
         switch value {
         case .manual: return "Your estimate"
-        case .capturedAccountBalance(let time): return "Captured from account · \(time)"
+        case .capturedAccountBalance(let time): return "Captured \(AppDateDisplay.isoTimestamp(time))"
         case .carried(let id): return fundingPlanStore.plans.first(where: { $0.id == id }).map { "Copied from \(Self.monthTitle($0.month))" } ?? "Copied from an earlier plan"
         }
+    }
+
+    func balanceProvenanceText(_ balance: FundingPlanBalance) -> String {
+        if case .manual = balance.provenance { return "Your estimate" }
+        let financial = balance.financialBalanceDate.map { "Statement balance as of \($0.presentation)" } ?? "Statement balance date not retained"
+        return financial + " · " + provenanceText(balance.provenance)
+    }
+
+    var generation: ProviderGenerationToken { baseGeneration }
+
+    func updateAssistance(_ value: PlanAssistance) {
+        guard canEdit, value.workspaceID == plan.workspaceID, value.month == month.canonical else { return }
+        plan.assistance = value
+        markEdited(); recalculate()
+    }
+
+    /// Date changes are an explicit draft edit; neither changing the expected
+    /// payday nor observing a salary saves or silently removes a bill.
+    @discardableResult
+    func setSalaryCycle(_ cycle: SalaryFundingCycle) -> Bool {
+        var cycle = cycle
+        if let previous = cycle.previousSavedPayday(in: intelligenceStore.snapshot) { cycle.previousPayday = previous }
+        guard canEdit, (try? cycle.validated(month: month.canonical)) != nil else { return false }
+        var assistance = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: month.canonical)
+        guard assistance.appliedRecurringIDs.keys.allSatisfy({ id in
+            (try? StatementDate(canonical: String(id.suffix(10)))).map { cycle.includesRecurring(dueOn: $0) } == true
+        }) else {
+            errorMessage = "A linked recurring payment falls outside these dates. Review and remove that row from this draft before changing the salary cycle."
+            return false
+        }
+        if assistance.salaryCycle == nil {
+            assistance.carriedBillDates = Dictionary(uniqueKeysWithValues: (plan.qatarCommitments + plan.indiaCommitments).compactMap { row in
+                plan.dueDate(for: row).map { (row.id, $0.canonical) }
+            })
+        }
+        assistance.salaryCycle = cycle
+        plan.assistance = assistance
+        markEdited(); recalculate()
+        return true
+    }
+
+    /// Explicit review action. It never saves the plan and never changes the
+    /// recurring template when a monthly row is edited later.
+    func applyRecurring(_ payments: [RecurringPaymentProjection]) {
+        guard canEdit else { return }
+        var assistance = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: month.canonical)
+        for payment in payments where plan.includesRecurring(payment.date) && !excludedPlanningAccountIDs.contains(payment.definition.accountID) {
+            let region = payment.currency == "QAR" ? "qatar" : "india"
+            guard ["QAR", "INR"].contains(payment.currency), let money = try? Money(amount: payment.remaining, currency: payment.currency) else { continue }
+            let id = assistance.appliedRecurringIDs[payment.id] ?? UUID().uuidString
+            let row = FundingPlanCommitment(id: id, label: payment.definition.title, money: money, included: !payment.isWaived,
+                fundingAccountID: payment.definition.accountID, provenance: .manual, recurs: false,
+                remark: "Confirmed recurring commitment; remaining amount funded by this salary plan.", dueDate: payment.date)
+            if region == "qatar" { plan.qatarCommitments.removeAll { $0.id == id }; plan.qatarCommitments.append(row) }
+            else { plan.indiaCommitments.removeAll { $0.id == id }; plan.indiaCommitments.append(row) }
+            assistance.appliedRecurringIDs[payment.id] = id
+            assistance.carriedBillDates?[id] = nil
+            if assistance.appliedRecurringPaid == nil { assistance.appliedRecurringPaid = [:] }
+            assistance.appliedRecurringPaid?[payment.id] = try? PlanningAmount(Money(amount: payment.paid, currency: payment.currency))
+            rawText["label.\(id)"] = row.label
+            rawText["amount.\(id)"] = (try? money.canonicalDecimalString()).map(localized) ?? ""
+        }
+        plan.assistance = assistance
+        markEdited(); recalculate()
+    }
+
+    /// Received net pay is cash already recorded, never another forecast income.
+    /// A source anchor predating the credit cannot be treated as post-salary cash.
+    func applySalary(_ proposal: SalaryAssistance, source: SpendingSourceRow) {
+        guard canEdit, proposal.targetMonth == month.canonical,
+              source.id == proposal.transactionID, source.isRegularSalary, source.currency == "QAR",
+              intelligenceStore.generation == baseGeneration,
+              intelligenceStore.snapshot?.salaries.contains(proposal) == true,
+              !excludedPlanningAccountIDs.contains(source.accountID) else { return }
+        var assistance = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: month.canonical)
+        if proposal.planningBasis == .creditMonth {
+            var cycle = assistance.salaryCycle ?? SalaryFundingCycle.expected(month: month)!
+            cycle.payday = proposal.financialDate; cycle.receivedSalaryID = proposal.id
+            guard setSalaryCycle(cycle) else { return }
+            assistance = plan.assistance!
+        }
+        if !assistance.appliedSalaryIDs.contains(proposal.id) { assistance.appliedSalaryIDs.append(proposal.id) }
+        plan.assistance = assistance
+        plan.expectedFixedEarnings = Self.zeroQAR; plan.expectedVariableEarnings = Self.zeroQAR
+        plan.expectedDeductions = Self.zeroQAR; plan.deductions = []
+        plan.expectedFixedProvenance = .manual; plan.expectedVariableProvenance = .manual; plan.expectedDeductionsProvenance = .manual
+        if let account = eligibleAccounts.first(where: { $0.repositoryAccountId == source.accountID }) {
+            captureAccountBalance(account)
+            if let index = plan.balances.firstIndex(where: { $0.accountID == source.accountID }) {
+                plan.balances[index].included = true
+                if account.currentBalanceAsOfISO.map({ String($0.prefix(10)) >= proposal.financialDate }) != true {
+                    plan.balances[index].money = nil
+                    plan.balances[index].financialBalanceDate = nil
+                    unavailableCurrentBalanceAccountIDs.insert(source.accountID)
+                }
+            }
+        }
+        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil }
+        for key in Array(rawText.keys) where key.hasPrefix("deduction.") { rawText[key] = nil; fieldErrors[key] = nil }
+        if let balance = plan.balances.first(where: { $0.accountID == source.accountID }) {
+            rawText["balance.\(source.accountID)"] = (try? balance.money?.canonicalDecimalString()).map(localized) ?? ""
+        }
+        markEdited(); recalculate()
+    }
+
+    @discardableResult
+    func applyPayslip(_ statement: SalaryStatement, accountID: String) -> Bool {
+        guard canEdit, payslipProposals.contains(statement),
+              statement.evidence.financialPeriod == month,
+              let account = eligibleAccounts.first(where: { $0.repositoryAccountId == accountID && $0.nativeCurrency.code == "QAR" }),
+              let net = try? PlanningAmount(statement.evidence.printedNet) else { return false }
+        var assistance = plan.assistance ?? .init(workspaceID: workspaceID, month: month.canonical)
+        assistance.salaryCycle = assistance.salaryCycle ?? SalaryFundingCycle.expected(month: month)
+        assistance.payslipFunding = .init(statementID: statement.id, fingerprintAlgorithm: statement.fingerprintAlgorithm,
+            fingerprintDigest: statement.fingerprintDigest, accountID: accountID, net: net)
+        plan.assistance = assistance
+        // The reviewed source net already includes payroll deductions. Keep it
+        // separate from the owner's additional income and expense estimates.
+        plan.expectedFixedEarnings = Self.zeroQAR; plan.expectedVariableEarnings = Self.zeroQAR
+        plan.expectedDeductions = Self.zeroQAR; plan.deductions = []
+        plan.expectedFixedProvenance = .manual; plan.expectedVariableProvenance = .manual; plan.expectedDeductionsProvenance = .manual
+        if !plan.balances.contains(where: { $0.accountID == accountID }) { captureAccountBalance(account) }
+        if let index = plan.balances.firstIndex(where: { $0.accountID == accountID }) { plan.balances[index].included = true }
+        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil }
+        for key in Array(rawText.keys) where key.hasPrefix("deduction.") { rawText[key] = nil; fieldErrors[key] = nil }
+        markEdited(); recalculate()
+        return true
+    }
+
+    func acknowledgePayslipInCapturedBalance() {
+        guard canAcknowledgePayslipBalance, let link = plan.assistance?.payslipFunding,
+              let balance = plan.balances.first(where: { $0.accountID == link.accountID && $0.included }),
+              let money = balance.money, let amount = try? PlanningAmount(money), let date = balance.financialBalanceDate else { return }
+        plan.assistance?.payslipFunding?.balanceAcknowledgement = .init(balanceID: balance.id, amount: amount, financialDate: date.canonical)
+        markEdited(); recalculate()
+    }
+
+    func removePayslipEstimate() {
+        guard canEdit else { return }
+        plan.assistance?.payslipFunding = nil
+        markEdited(); recalculate()
     }
 
     func dismissError() { errorMessage = nil }
 
     private func recalculate() {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.fundingCalculation)
+        defer { GmailQualificationTiming.end(.fundingCalculation, started: timing) }
+#endif
         if hasOpenedPlanner, canEdit, fieldErrors.isEmpty, plan.calculationVersion == .budgetV1, plan.referenceMode == .alDar,
            provider().generationToken == baseGeneration, fundingPlanStore.generation == baseGeneration {
             plan.effectiveAlDarReference = sharedINRReference.flatMap { try? $0.planningQuote() }
         }
-        calculation = FundingPlanCalculator.calculate(plan)
+        calculation = FundingPlanCalculator.calculate(plan, excludingAccounts: excludedPlanningAccountIDs, salaryReceipt: payslipReceiptState)
         if saveState != .committedNeedsRefresh { isDirty = rawText != baseRawText || plan != baseDraftPlan }
     }
 
@@ -834,14 +1072,15 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                            configuredTransferFee: fee, configuredTransferFeeProvenance: .manual,
                            planningFX: nil, plannedInvestment: zero, plannedInvestmentProvenance: .manual,
                            updatedAtISO: ISO8601DateFormatter().string(from: Date()),
-                           calculationVersion: .budgetV1, keepInCBQ: zero)
+                           calculationVersion: .budgetV1, keepInCBQ: zero,
+                           assistance: .init(workspaceID: workspaceID, month: month.canonical, salaryCycle: SalaryFundingCycle.expected(month: month)))
     }
 
     private func plannerAccounts(type: AccountType) -> [Account] {
         // Native currency and typed role own eligibility; names and institution do not establish a subtype.
         accountStore.accounts.filter {
             guard let repositoryID = $0.repositoryAccountId, !repositoryID.isEmpty else { return false }
-            return $0.status == .active && $0.type == type && ["QAR", "INR"].contains($0.nativeCurrency.code)
+            return $0.status == .active && $0.type == type && ["QAR", "INR"].contains($0.nativeCurrency.code) && !excludedPlanningAccountIDs.contains(repositoryID)
         }.sorted { ($0.nativeCurrency.code, $0.name, $0.repositoryAccountId ?? "") < ($1.nativeCurrency.code, $1.name, $1.repositoryAccountId ?? "") }
     }
 
@@ -861,7 +1100,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             let p = provenance(value.provenance)
             return FundingPlanBalanceDTO(id: value.id, planId: plan.id, sourceOrdinal: index + 1, accountId: value.accountID, nativeCurrency: value.nativeCurrency.code, included: value.included,
                                          amountCurrency: value.money?.currency.code, amountMinor: try value.money?.minorUnits(), amountDecimal: try value.money?.canonicalDecimalString(),
-                                         provenanceCode: p.code, carriedSourcePlanId: p.carried, capturedAtISO: p.captured)
+                                         provenanceCode: p.code, carriedSourcePlanId: p.carried, capturedAtISO: p.captured, financialBalanceDateISO: value.financialBalanceDate?.canonical)
         }
         func commitmentDTOs(_ values: [FundingPlanCommitment], region: String) throws -> [FundingPlanCommitmentDTO] {
             try values.enumerated().map { index, value in
@@ -897,7 +1136,67 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             effectiveReference: try plan.effectiveAlDarReference.map {
                 guard $0.submittedQAR.currency.code == "QAR", $0.submittedQAR.amount == 1 else { throw AlDarReferenceError.invalidBinding }
                 return FundingPlanEffectiveReferenceDTO(planId: plan.id, rawINR: $0.returnedINR.rawToken, fetchedAtISO: $0.fetchedAtISO)
-            }
+            },
+            assistance: plan.assistance
         )
+    }
+}
+
+@MainActor
+final class PlanningAnalysisModel: ObservableObject {
+    @Published private(set) var projection: PlanningProjection?
+    @Published private(set) var rows: [SpendingSourceRow] = []
+    @Published private(set) var isWorking = false
+    private var task: Task<Void, Never>?
+    private var sequence = 0
+    private var cachedGeneration: ProviderGenerationToken?
+    private var cachedRevision: UInt64?
+
+    private struct Query: Equatable {
+        let generation: ProviderGenerationToken
+        let revision: UInt64
+        let plan: FundingPlan
+        let scenario: PlanningScenario
+        let today: StatementDate
+    }
+    private var query: Query?
+    func cancel() {
+        // An interrupted request has not produced the displayed projection.
+        // Revisiting that plan must restart it, even when an older result exists.
+        if isWorking { query = nil }
+        sequence += 1; task?.cancel(); isWorking = false
+    }
+    func refresh(plan: FundingPlan, scenario: PlanningScenario) {
+        let store = FinancialIntelligenceStore.shared
+        guard let generation = store.generation, let metadata = store.snapshot, generation == DatabaseProvider.shared.generationToken else {
+            cancel(); query = nil; projection = nil; rows = []; return
+        }
+        let today = FinancialCalendar.statement(Date())!
+        let requested = Query(generation: generation, revision: store.revision, plan: plan, scenario: scenario, today: today)
+        guard query != requested || (projection == nil && !isWorking) else { return }
+        cancel(); query = requested
+        if cachedGeneration != generation || cachedRevision != store.revision { projection = nil }
+        let revision = store.revision, source = store.sources, categories = CategoryStore.shared.snapshot, cards = CardStore.shared.snapshot
+        let transactions = TransactionStore.shared.transactions
+        let anchors = AccountStore.shared.accounts.compactMap { account -> PlanningAccountAnchor? in
+            guard let id = account.repositoryAccountId else { return nil }
+            let date = account.currentBalanceAsOfISO.flatMap { try? StatementDate(canonical: String($0.prefix(10))) }
+            return .init(id: id, title: account.preferredDisplayName, currency: account.currencyCode, domain: account.type == .bank ? "bank" : "credit_card",
+                amount: date == nil ? nil : account.currentBalance, date: date, historyOnly: account.isHistoryOnly)
+        }
+        let cached = cachedGeneration == generation && cachedRevision == revision ? rows : nil
+        let request = sequence
+        isWorking = true
+        task = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(160)) } catch { return }
+            let work = Task.detached(priority: .userInitiated) {
+                let rows = try cached ?? SpendingIntelligence.rows(transactions: transactions, sources: source, cards: cards, categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+                return (rows, try PlanningIntelligence.project(plan: plan, anchors: anchors, rows: rows, metadata: metadata, sources: source, cards: cards, today: today, scenario: scenario))
+            }
+            guard let (rows, projection) = try? await withTaskCancellationHandler(operation: { try await work.value }, onCancel: { work.cancel() }) else { return }
+            guard let self, !Task.isCancelled, self.sequence == request, store.generation == generation, store.revision == revision else { return }
+            self.cachedGeneration = generation; self.cachedRevision = revision
+            self.rows = rows; self.projection = projection; self.isWorking = false
+        }
     }
 }

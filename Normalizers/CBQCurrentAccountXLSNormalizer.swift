@@ -1,6 +1,6 @@
 import Foundation
 
-enum CBQCurrentAccountXLSNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum CBQCurrentAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedDocumentContent
     case unsupportedWorksheet
     case unexpectedColumnCount(Int)
@@ -53,14 +53,14 @@ enum CBQCurrentAccountXLSNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct CBQCurrentAccountXLSNormalizationResult {
+nonisolated struct CBQCurrentAccountXLSNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
     let sourceContext: NormalizedDocument.SourceContext
 }
 
-final class CBQCurrentAccountXLSNormalizer {
+nonisolated final class CBQCurrentAccountXLSNormalizer {
     static let logicalHeader = ["Date", "Details", "Amount", "", "", "", "Balance"]
 
     private static let headerSourceRow = 7

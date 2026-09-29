@@ -6,7 +6,7 @@
 
 import Foundation
 
-enum AxisBankAccountPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankAccountPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case missingNormalizedHeader
     case changedNormalizedLayout
@@ -101,7 +101,7 @@ enum AxisBankAccountPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class AxisBankAccountPDFParser: StatementParser {
+nonisolated final class AxisBankAccountPDFParser: StatementParser {
 
     static let profileID = "axis.bank-account.pdf"
     static let profileVersion = "1"
@@ -123,6 +123,9 @@ final class AxisBankAccountPDFParser: StatementParser {
     func parse(
         document: NormalizedDocument
     ) throws -> FinancialDocument {
+        if !document.sourceContext.bankAccountSections.isEmpty {
+            return try BankRelationshipPDFParser.parse(document)
+        }
         guard document.metadata.fileFormat == .pdf,
               document.document.fileType.caseInsensitiveCompare(
                   FileFormat.pdf.rawValue
@@ -337,7 +340,8 @@ final class AxisBankAccountPDFParser: StatementParser {
                             ),
                             parserProfileID: Self.profileID,
                             parserProfileVersion: Self.profileVersion,
-                            structuredReferenceDigest: reference.digest
+                            structuredReferenceDigest: reference.digest,
+                            literalRunningBalance: row.rawValues?[AxisBankAccountPDFColumn.balance.rawValue] ?? value(.balance, in: row)
                         )
                     ],
                     verifiedAxisUPIEventEvidence:

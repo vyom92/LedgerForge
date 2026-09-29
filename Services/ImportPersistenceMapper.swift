@@ -335,6 +335,159 @@ struct ImportPersistenceMapper {
         )
     }
 
+    func bankImportPlan(financialDocument: FinancialDocument, importSession: ImportSession,
+                        validation: ImportValidationResult, fingerprintSet: PreparedDocumentFingerprintSet,
+                        providerGeneration: ProviderGenerationToken, review: ImportIdentityReview,
+                        accountChoice: ImportAccountChoice?) throws -> BankImportPlanDTO {
+        guard let evidence = financialDocument.bankStatementEvidence,
+              case .bankSections(let reviews) = review, !evidence.sections.isEmpty else {
+            throw ImportPersistenceCoordinationError.conflictingIdentity
+        }
+        let choices: [String: ImportBankSectionChoice]
+        if case .bankSections(let values) = accountChoice { choices = values }
+        else if accountChoice == nil { choices = [:] }
+        else { throw ImportPersistenceCoordinationError.explicitChoiceRequired }
+        guard ImportAccountConfirmationPolicy.bankSectionChoicesAreComplete(sections: reviews, choices: choices),
+              Set(reviews.map(\.sectionID)) == Set(evidence.sections.map(\.id)) else {
+            throw ImportPersistenceCoordinationError.explicitChoiceRequired
+        }
+        var decisions = [String: (id: String, choice: ConfirmedImportAccountChoiceDTO, name: String?)]()
+        for section in reviews {
+            switch section.identityReview {
+            case .matchedExisting(let id): decisions[section.sectionID] = (id, .useExistingAccount(accountId: id), nil)
+            case .choiceRequired:
+                switch choices[section.sectionID] {
+                case .useExistingAccount(let id): decisions[section.sectionID] = (id, .useExistingAccount(accountId: id), nil)
+                case .createNewAccount(let name): decisions[section.sectionID] = (UUID().uuidString, .createProposedAccount, name)
+                case nil: throw ImportPersistenceCoordinationError.explicitChoiceRequired
+                }
+            default: throw ImportPersistenceCoordinationError.conflictingIdentity
+            }
+        }
+        guard let first = decisions[evidence.sections[0].id] else { throw ImportPersistenceError.missingTransactionProvenance }
+        // Reuse parent document/fingerprint/normalized-row and native Money
+        // mapping once. The account template is replaced for each real section;
+        // the accepted parent attempt deliberately has no account owner.
+        let payload = try payload(financialDocument: financialDocument, importSession: importSession,
+            validation: validation, accountId: first.id, fingerprintSet: fingerprintSet,
+            proposedAccountDisplayName: first.name)
+        let indexes = Dictionary(uniqueKeysWithValues: financialDocument.transactions.enumerated().map { ($0.element.id, $0.offset) })
+        let sections = try evidence.sections.map { section -> BankImportSectionDTO in
+            guard let decision = decisions[section.id] else { throw ImportPersistenceError.missingTransactionProvenance }
+            let account = try accountDTO(financialDocument: financialDocument, importSession: importSession,
+                accountId: decision.id, createdAtISO: payload.completedAtISO, proposedDisplayName: decision.name)
+            let rows = try section.transactionIDs.map { id -> BankTransactionOccurrencePlanDTO in
+                guard let index = indexes[id], index < payload.transactions.count else { throw ImportPersistenceError.conflictingTransactionProvenance }
+                let source = financialDocument.transactions[index]
+                let transaction = payload.transactions[index]
+                guard source.sourceProvenance.count == 1, let provenance = source.sourceProvenance.first,
+                      let raw = transaction.rawRows.first, let balance = source.runningBalanceMoney,
+                      let literalBalance = provenance.literalRunningBalance else { throw ImportPersistenceError.missingTransactionProvenance }
+                return BankTransactionOccurrencePlanDTO(source: CBQSourceRowDTO(incomingTransactionId: transaction.id,
+                    normalizedRowId: raw.normalizedRowId, sourceOrdinal: provenance.sourceOrdinal,
+                    normalizedRecordDigest: provenance.normalizedRecordDigest, postingDateISO: transaction.postedDateISO,
+                    sourceTransactionDateISO: provenance.sourceTransactionDate?.canonical, nativeCurrency: source.money.currency.code,
+                    signedAmountMinor: transaction.amountMinor, signedAmountDecimal: transaction.amountDecimal, direction: transaction.direction,
+                    runningBalanceMinor: try balance.minorUnits(), runningBalanceDecimal: try balance.canonicalDecimalString(),
+                    structuredReferenceDigest: provenance.structuredReferenceDigest), valueDateISO: transaction.valueDateISO,
+                    literalNarration: source.description, literalReference: source.reference, literalBalance: literalBalance)
+            }
+            let identities = FinancialIdentityResolver.strongVerifiedIdentifiers(from: section.financialIdentifiers).map {
+                ConfirmedImportIdentifierCandidateDTO(scheme: $0.kind.rawValue, normalizedValue: $0.normalizedValue, provenanceCode: $0.provenance.rawValue)
+            }
+            let pattern: CBQSourceIdentityPatternDTO
+            switch section.sourceIdentity {
+            case .fullAccountNumber(let number): pattern = .init(kind: "hdfc_account_number", pattern: number)
+            case .maskedAccountNumber(let mask): pattern = .init(kind: "axis_masked_account_number", pattern: mask)
+            }
+            let opening = section.controls.first(where: { $0.kind == .openingBalance })?.money
+            let closing = section.controls.last(where: { $0.kind == .closingBalance })?.money
+            let source = BankStatementSectionPlanDTO(id: "bank-section-\(payload.document.id)-\(section.ordinal)",
+                accountId: decision.id, documentId: payload.document.id, importSessionId: payload.importSession.id,
+                normalizedDocumentId: payload.normalizedDocument.id, sectionOrdinal: section.ordinal,
+                parserProfileId: payload.normalizedDocument.profileId, parserProfileVersion: payload.normalizedDocument.profileVersion,
+                nativeCurrency: section.nativeCurrency.code, sourceEvidence: .init(sourceFormatCode: "pdf",
+                    statementStartDateISO: section.period.start.canonical, statementEndDateISO: section.period.end.canonical,
+                    openingBalanceMinor: try opening?.minorUnits(), openingBalanceDecimal: try opening?.canonicalDecimalString(),
+                    closingBalanceMinor: try closing?.minorUnits(), closingBalanceDecimal: try closing?.canonicalDecimalString()),
+                identityPatterns: [pattern], sourceRangeStart: section.firstSourceOrdinal, sourceRangeEnd: section.lastSourceOrdinal,
+                productLabel: section.productLabel, rows: rows,
+                sourceDetails: .init(firstPage: section.firstPage, lastPage: section.lastPage,
+                    regionDescriptor: section.exhaustedRegion.descriptor, regionSignature: section.exhaustedRegion.signature,
+                    recognizedRowCount: section.exhaustedRegion.recognizedFinancialRowCount,
+                    controls: section.controls.map { .init(kind: $0.kind.rawValue, label: $0.label, literal: $0.literal,
+                        sourceOrdinal: $0.sourceOrdinal, sourcePage: $0.sourcePage) }))
+            return .init(proposedAccount: account, accountChoice: decision.choice, identifiers: identities, source: source)
+        }
+        let attempt = ImportAttemptDTO(workspaceId: workspaceId, createdAtISO: payload.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue, guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue, transactionCount: payload.transactions.count,
+            accountId: nil, importSessionId: payload.importSession.id, documentId: payload.document.id,
+            sourceRowCount: payload.transactions.count, importedTransactionCount: payload.transactions.count, recognizedExistingRowCount: 0, blockedRowCount: 0)
+        return .init(providerGeneration: providerGeneration, workspace: payload.workspace,
+            history: .init(document: payload.document, fingerprints: payload.fingerprints, importSession: payload.importSession,
+                completedAtISO: payload.completedAtISO, successfulAttempt: attempt, normalizedDocument: payload.normalizedDocument,
+                normalizedRows: payload.normalizedRows), sections: sections, transactions: payload.transactions)
+    }
+
+    /// A genuine standalone original becomes one account-owned observation
+    /// section when that account already has relationship-statement evidence.
+    /// Source controls stay optional; no relationship geometry is fabricated.
+    func standaloneBankImportPlan(financialDocument: FinancialDocument, importSession: ImportSession,
+            validation: ImportValidationResult, fingerprintSet: PreparedDocumentFingerprintSet,
+            providerGeneration: ProviderGenerationToken, account: AccountDTO) throws -> BankImportPlanDTO {
+        guard let profile = financialDocument.parserProfileID, BankImportDecision.standaloneProfiles.contains(profile),
+              let version = BankImportDecision.supportedVersion(for: profile), financialDocument.parserProfileVersion == version,
+              let source = financialDocument.sourceStatementEvidence,
+              let period = source.period else { throw ImportPersistenceError.missingTransactionProvenance }
+        let identities = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).map {
+            ConfirmedImportIdentifierCandidateDTO(scheme: $0.kind.rawValue, normalizedValue: $0.normalizedValue, provenanceCode: $0.provenance.rawValue)
+        }
+        guard identities.count == 1 else { throw ImportPersistenceCoordinationError.conflictingIdentity }
+        let payload = try payload(financialDocument: financialDocument, importSession: importSession,
+            validation: validation, accountId: account.id, fingerprintSet: fingerprintSet,
+            proposedAccountDisplayName: account.name)
+        let rows = try zip(financialDocument.transactions, payload.transactions).map { source, transaction in
+            guard source.sourceProvenance.count == 1, let provenance = source.sourceProvenance.first,
+                  let raw = transaction.rawRows.first, let balance = source.runningBalanceMoney,
+                  let literalBalance = provenance.literalRunningBalance else { throw ImportPersistenceError.missingTransactionProvenance }
+            return BankTransactionOccurrencePlanDTO(source: CBQSourceRowDTO(incomingTransactionId: transaction.id,
+                normalizedRowId: raw.normalizedRowId, sourceOrdinal: provenance.sourceOrdinal,
+                normalizedRecordDigest: provenance.normalizedRecordDigest, postingDateISO: transaction.postedDateISO,
+                sourceTransactionDateISO: provenance.sourceTransactionDate?.canonical, nativeCurrency: source.money.currency.code,
+                signedAmountMinor: transaction.amountMinor, signedAmountDecimal: transaction.amountDecimal, direction: transaction.direction,
+                runningBalanceMinor: try balance.minorUnits(), runningBalanceDecimal: try balance.canonicalDecimalString(),
+                structuredReferenceDigest: provenance.structuredReferenceDigest), valueDateISO: transaction.valueDateISO,
+                literalNarration: source.description, literalReference: source.reference, literalBalance: literalBalance)
+        }
+        let section = BankStatementSectionPlanDTO(id: "bank-section-\(payload.document.id)-1", accountId: account.id,
+            documentId: payload.document.id, importSessionId: payload.importSession.id,
+            normalizedDocumentId: payload.normalizedDocument.id, sectionOrdinal: 1,
+            parserProfileId: profile, parserProfileVersion: version, nativeCurrency: account.nativeCurrency,
+            sourceEvidence: .init(sourceFormatCode: source.sourceFormatCode,
+                statementBoundaryDateISO: source.statementBoundaryDate?.canonical,
+                statementStartDateISO: period.start.canonical, statementEndDateISO: period.end.canonical,
+                openingBalanceMinor: try source.openingBalance?.minorUnits(), openingBalanceDecimal: try source.openingBalance?.canonicalDecimalString(),
+                closingBalanceMinor: try source.closingBalance?.minorUnits(), closingBalanceDecimal: try source.closingBalance?.canonicalDecimalString()),
+            identityPatterns: [.init(kind: profile.hasPrefix("axis.") ? "axis_account_number" : "hdfc_account_number", pattern: identities[0].normalizedValue)],
+            sourceRangeStart: rows.map(\.sourceOrdinal).min() ?? financialDocument.zeroActivityEvidence?.financialRegionStartOrdinal,
+            sourceRangeEnd: rows.map(\.sourceOrdinal).max() ?? financialDocument.zeroActivityEvidence?.financialRegionEndOrdinal,
+            productLabel: "Bank account", rows: rows)
+        let attempt = ImportAttemptDTO(workspaceId: workspaceId, createdAtISO: payload.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue, guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue, transactionCount: payload.transactions.count,
+            accountId: nil, importSessionId: payload.importSession.id, documentId: payload.document.id,
+            sourceRowCount: payload.transactions.count, importedTransactionCount: payload.transactions.count, recognizedExistingRowCount: 0, blockedRowCount: 0)
+        return .init(providerGeneration: providerGeneration, workspace: payload.workspace,
+            history: .init(document: payload.document, fingerprints: payload.fingerprints, importSession: payload.importSession,
+                completedAtISO: payload.completedAtISO, successfulAttempt: attempt, normalizedDocument: payload.normalizedDocument,
+                normalizedRows: payload.normalizedRows),
+            sections: [.init(proposedAccount: account, accountChoice: .useExistingAccount(accountId: account.id), identifiers: identities, source: section)],
+            transactions: payload.transactions, zeroActivityControl: payload.zeroActivityControl)
+    }
+
     func confirmedImportPlan(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -450,11 +603,11 @@ struct ImportPersistenceMapper {
         )
         let cbqRows: [CBQSourceRowDTO]
         let cbqStatementEvidence: CBQStatementSourceEvidenceDTO?
-        let isCBQCurrentAccount = financialDocument.metadata.institution == .cbq &&
+        let isCBQBankSection = financialDocument.metadata.institution == .cbq &&
             financialDocument.metadata.documentType == .bankAccount &&
-            [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID, CBQCurrentAccountPDFParser.monthlyProfileID]
+            ([CBQCurrentAccountXLSParser.profileID] + CBQCurrentAccountPDFParser.bankProfileIDs)
                 .contains(payload.normalizedDocument.profileId)
-        if isCBQCurrentAccount {
+        if isCBQBankSection {
             cbqRows = try financialDocument.transactions.enumerated().map { index, source in
                 guard source.sourceProvenance.count == 1,
                       index < payload.transactions.count,
@@ -496,6 +649,41 @@ struct ImportPersistenceMapper {
         } else {
             cbqRows = []
             cbqStatementEvidence = nil
+        }
+        let bankSectionPlan: BankStatementSectionPlanDTO?
+        switch payload.normalizedDocument.profileId {
+        case "cbq.current-account.legacy.pdf", "cbq.current-account.usd-monthly.pdf", "cbq.savings-account.legacy.pdf", "cbq.savings-account.monthly.pdf", "cbq.e-savings-account.monthly.pdf":
+            guard let evidence = cbqStatementEvidence else { throw ImportPersistenceError.missingTransactionProvenance }
+            bankSectionPlan = BankStatementSectionPlanDTO(
+                id: "bank-section-\(payload.document.id)",
+                accountId: selectedAccountId,
+                documentId: payload.document.id, importSessionId: payload.importSession.id,
+                normalizedDocumentId: payload.normalizedDocument.id, sectionOrdinal: 1,
+                parserProfileId: payload.normalizedDocument.profileId,
+                parserProfileVersion: payload.normalizedDocument.profileVersion,
+                nativeCurrency: financialDocument.bookedCurrency?.code ?? "",
+                sourceEvidence: evidence,
+                identityPatterns: financialDocument.cbqSourceIdentityObservations.map { CBQSourceIdentityPatternDTO(kind: $0.kind.rawValue, pattern: $0.pattern) },
+                sourceRangeStart: cbqRows.map(\.sourceOrdinal).min(), sourceRangeEnd: cbqRows.map(\.sourceOrdinal).max(),
+                productLabel: payload.normalizedDocument.profileId == "cbq.e-savings-account.monthly.pdf" ? "E Savings Account" : payload.normalizedDocument.profileId.hasPrefix("cbq.current-account.") ? "Current Account-Retail" : "Savings Account",
+                rows: zip(cbqRows, financialDocument.transactions).map { row, transaction in BankTransactionOccurrencePlanDTO(source: row, valueDateISO: transaction.valueDate?.canonical, literalNarration: transaction.description, literalReference: transaction.reference, literalBalance: transaction.sourceProvenance.first?.literalRunningBalance ?? "") }
+            )
+        case "cbq.current-account.monthly.pdf" where payload.zeroActivityControl != nil:
+            guard let evidence = cbqStatementEvidence else { throw ImportPersistenceError.missingTransactionProvenance }
+            bankSectionPlan = BankStatementSectionPlanDTO(
+                id: "bank-section-\(payload.document.id)",
+                accountId: selectedAccountId,
+                documentId: payload.document.id, importSessionId: payload.importSession.id,
+                normalizedDocumentId: payload.normalizedDocument.id, sectionOrdinal: 1,
+                parserProfileId: payload.normalizedDocument.profileId,
+                parserProfileVersion: payload.normalizedDocument.profileVersion,
+                nativeCurrency: financialDocument.bookedCurrency?.code ?? "",
+                sourceEvidence: evidence,
+                identityPatterns: financialDocument.cbqSourceIdentityObservations.map { CBQSourceIdentityPatternDTO(kind: $0.kind.rawValue, pattern: $0.pattern) },
+                sourceRangeStart: nil, sourceRangeEnd: nil, productLabel: "Current Account-Retail", rows: []
+            )
+        default:
+            bankSectionPlan = nil
         }
         let cardPlan = try cardImportPlan(
             financialDocument: financialDocument,
@@ -539,6 +727,7 @@ struct ImportPersistenceMapper {
             cbqSourceRows: cbqRows,
             cbqStatementSourceEvidence: cbqStatementEvidence,
             cardImportPlan: cardPlan,
+            bankStatementSectionPlan: bankSectionPlan,
             zeroActivityControl: payload.zeroActivityControl
         )
     }
@@ -557,7 +746,8 @@ struct ImportPersistenceMapper {
     ) throws -> ConfirmedCardImportPlanDTO? {
         guard let evidence = financialDocument.cardStatementEvidence else { return nil }
         let isAmex = financialDocument.metadata.institution == .amex &&
-            evidence.reconciliationRuleIdentifier == CardStatementEvidence.amexQARReconciliationRule &&
+            [CardStatementEvidence.amexQARReconciliationRule, CardStatementEvidence.amexUSDZeroReconciliationRule]
+                .contains(evidence.reconciliationRuleIdentifier) &&
             payload.normalizedDocument.profileId == "amex.credit-card.pdf" &&
             payload.normalizedDocument.profileVersion == "1"
         let isCBQ = financialDocument.metadata.institution == .cbq &&

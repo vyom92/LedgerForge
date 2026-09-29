@@ -65,6 +65,7 @@ struct ConfirmedImportAtomicityTests {
         #expect(try provider.workspaceRepo.workspace(id: plan.workspace.id) == nil)
         #expect(try provider.accountRepo.account(id: plan.proposedAccount.id) == nil)
         #expect(try provider.importSessionRepo.importAttempts(workspaceId: plan.workspace.id).isEmpty)
+        #expect(try provider.categoryRepo.automationSnapshot(workspaceId: plan.workspace.id)?.work.isEmpty == true)
         #expect(try provider.importSessionRepo.priorImportedStatement(
             algorithm: plan.historyTemplate.fingerprint.algorithm,
             fingerprint: plan.historyTemplate.fingerprint.fingerprint
@@ -97,8 +98,12 @@ struct ConfirmedImportAtomicityTests {
 
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .committed(receipt(for: sqlitePlan)))
         #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .committed(receipt(for: memoryPlan)))
+        let sqliteWork = try sqlite.categoryRepo.automationSnapshot(workspaceId: sqlitePlan.workspace.id)
+        let memoryWork = try memory.categoryRepo.automationSnapshot(workspaceId: memoryPlan.workspace.id)
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .exactDuplicate)
         #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .exactDuplicate)
+        #expect(try sqlite.categoryRepo.automationSnapshot(workspaceId: sqlitePlan.workspace.id) == sqliteWork)
+        #expect(try memory.categoryRepo.automationSnapshot(workspaceId: memoryPlan.workspace.id) == memoryWork)
     }
 
     private func receipt(for plan: ConfirmedImportPlanDTO) -> ConfirmedImportReceiptDTO {

@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import PDFKit
 import Testing
 @testable import LedgerForge
 
@@ -153,6 +154,731 @@ struct SalaryAuthenticCorpusAcceptanceTests {
                 order: "all",
                 field: "authentic source bytes changed"
             )
+        }
+    }
+
+    /// Gmail qualification has no file-backed source oracle.  It builds the two
+    /// regular-payslip expectations from the exact original bytes in RAM using
+    /// PDFKit's native text plus positioned word selections.  It deliberately
+    /// does not invoke PDFDocumentReader, RawDocument, a normalizer, or a
+    /// production parser while deriving those expectations.
+    func qualifyGmailOriginals(
+        _ originals: [(source: GmailInboxSource, bytes: Data)]
+    ) async throws {
+        guard !originals.isEmpty else {
+            throw AcceptanceError.campaign(
+                provider: "gmail",
+                order: "source-only",
+                field: "observed regular payslip selection"
+            )
+        }
+
+        // Build every source-only expectation before constructing an engine or
+        // beginning any production preparation.
+        let expected = try originals.map {
+            try GmailSalarySourceOracle.statement(source: $0.source, bytes: $0.bytes)
+        }
+        guard Set(expected.map(\.sourceSha256)).count == expected.count else {
+            throw AcceptanceError.campaign(
+                provider: "gmail",
+                order: "source-only",
+                field: "distinct original byte identities"
+            )
+        }
+
+        for (original, statement) in zip(originals, expected) {
+            for providerKind in ProviderKind.allCases {
+                try await qualifyGmailOriginal(
+                    original,
+                    expected: statement,
+                    providerKind: providerKind
+                )
+            }
+        }
+    }
+
+    /// Opaque source-bound comparisons for the mixed Gmail cohort. The private
+    /// source model stays here; only actual production output reaches the hooks.
+    func gmailCohortComparisons(source: GmailInboxSource, bytes: Data) throws -> (
+        prepared: (PreparedImport) throws -> Void,
+        persisted: (DatabaseProvider, RepositoryRuntimeSnapshot, String) throws -> Void
+    ) {
+        let expected = try GmailSalarySourceOracle.statement(source: source, bytes: bytes)
+        return ({ prepared in
+            try self.verifyPrepared(prepared, against: expected)
+        }, { provider, hydrated, sessionID in
+            let rows = try provider.salaryRepo.snapshot(workspaceId: "default-workspace").statements
+                .filter { $0.importSessionId == sessionID }
+            guard rows.count == 1, let row = rows.first,
+                  let document = try provider.importSessionRepo.importedDocument(id: row.documentId),
+                  document.importSessionId == sessionID,
+                  let session = try provider.importSessionRepo.importSession(id: sessionID), session.validationStatus == "passed",
+                  row.components.allSatisfy({ $0.salaryStatementId == row.id }),
+                  let published = hydrated.salaryStatements.first(where: { $0.id == row.id }),
+                  published.documentID == row.documentId, published.importSessionID == sessionID else {
+                throw AcceptanceError.mismatch(sourceToken: expected.sourceToken, field: "cohort salary relationships")
+            }
+            try self.verifyPersisted(row, against: expected)
+            try self.verifyEvidence(published.evidence, against: expected)
+        })
+    }
+
+    private func qualifyGmailOriginal(
+        _ original: (source: GmailInboxSource, bytes: Data),
+        expected: Statement,
+        providerKind: ProviderKind
+    ) async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForge-Gmail-Salary-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let databaseURL = folder.appendingPathComponent("gmail-salary.sqlite")
+        let sqlite = providerKind == .sqlite
+            ? try SQLiteRepositoryProvider(path: databaseURL.path)
+            : nil
+        defer { sqlite?.database.close() }
+        let provider = sqlite.map {
+            DatabaseProvider.verifiedSQLite($0, protectsGeneration: false)
+        } ?? DatabaseProvider(inMemory: true)
+        let workspace = "gmail-salary-\(providerKind.rawValue)-\(UUID().uuidString)"
+        let stores = SalaryAcceptanceRuntimeStores()
+        let hydrator = makeHydrator(provider: provider, workspace: workspace, stores: stores)
+
+        let source = original.source
+        let digest = GmailInboxSource.digest(original.bytes)
+        guard source.family == .salary,
+              source.fileExtension == "pdf",
+              source.acquisition == .available,
+              source.expectedByteCount == original.bytes.count,
+              source.sha256 == digest,
+              digest == expected.sourceSha256,
+              let sourceURL = source.importURL else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "Gmail original receipt/locator"
+            )
+        }
+
+        var inbox = try provider.gmailInboxRepo.load(account: source.account)
+        guard inbox.sources[source.id] == nil else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "fresh Gmail inbox source state"
+            )
+        }
+        inbox.sources[source.id] = source
+        _ = try provider.gmailInboxRepo.save(
+            inbox,
+            originals: [digest: original.bytes],
+            expectedRevision: inbox.revision
+        )
+        try verifyGmailOriginal(
+            source: source,
+            bytes: original.bytes,
+            repository: provider.gmailInboxRepo,
+            sourceToken: expected.sourceToken
+        )
+
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(readerRegistry: DefaultReaderRegistry()),
+            sourceSnapshotAcquirer: { url in
+                try GmailImportSource.acquireSnapshot(from: url, repository: provider.gmailInboxRepo)
+            },
+            importPersistenceCoordinator: DefaultImportPersistenceCoordinator(
+                databaseProvider: provider,
+                mapper: ImportPersistenceMapper(
+                    workspaceId: workspace,
+                    workspaceName: "Gmail salary authentic acceptance"
+                )
+            ),
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            forcedHydration: {
+                try hydrator.hydrateIfNeeded(forceRefresh: true)
+            },
+            rejectedAttemptHydration: {
+                try hydrator.hydrateImportAttempts()
+            },
+            developmentProfileAcknowledgementGate:
+                DevelopmentProfileAcknowledgementGate(stateProvider: { nil })
+        )
+
+        let cancelled = try await engine.prepareImport(from: sourceURL)
+        defer { engine.cancelPreparedImport(cancelled) }
+        try verifyPrepared(cancelled, against: expected)
+        engine.cancelPreparedImport(cancelled)
+        try verifyNoAcceptedResidue(provider: provider, workspace: workspace)
+
+        let prepared = try await engine.prepareImport(from: sourceURL)
+        defer { engine.cancelPreparedImport(prepared) }
+        try verifyPrepared(prepared, against: expected)
+        let result = await engine.commitPreparedImport(prepared)
+        guard result.persisted,
+              result.validationPassed,
+              result.isSalaryImport,
+              result.transactionCount == 0,
+              result.previousImport == nil,
+              result.errorMessage == nil,
+              result.hydrationOutcome == .committedAndHydrated else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "ordinary Gmail salary confirmation result"
+            )
+        }
+        try verifyGmailPersistedAndHydrated(
+            provider: provider,
+            workspace: workspace,
+            stores: stores,
+            expected: expected,
+            expectedAttemptCount: 1
+        )
+        let stableSalaryProjection = try provider.salaryRepo.snapshot(workspaceId: workspace)
+
+        let replayPrepared = try await engine.prepareImport(from: sourceURL)
+        defer { engine.cancelPreparedImport(replayPrepared) }
+        try verifyPrepared(replayPrepared, against: expected)
+        guard replayPrepared.advisoryPreviousImport != nil else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "Gmail exact replay advisory"
+            )
+        }
+        let replay = await engine.commitPreparedImport(replayPrepared)
+        guard !replay.persisted,
+              replay.validationPassed,
+              replay.isSalaryImport,
+              replay.transactionCount == 0,
+              replay.previousImport != nil,
+              replay.hydrationOutcome == .notRequired else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "Gmail exact replay result"
+            )
+        }
+        guard try provider.salaryRepo.snapshot(workspaceId: workspace) == stableSalaryProjection else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "Gmail exact replay changed salary source projection"
+            )
+        }
+        try verifyGmailPersistedAndHydrated(
+            provider: provider,
+            workspace: workspace,
+            stores: stores,
+            expected: expected,
+            expectedAttemptCount: 2
+        )
+
+        guard let sqlite else { return }
+        try sqlite.database.checkpointAndClose()
+        let reopenedSQLite = try SQLiteRepositoryProvider(path: databaseURL.path)
+        defer { reopenedSQLite.database.close() }
+        try BackupCompatibility.verifyDatabase(reopenedSQLite.database)
+        let reopenedProvider = DatabaseProvider.verifiedSQLite(
+            reopenedSQLite,
+            protectsGeneration: false
+        )
+        try verifyGmailOriginal(
+            source: source,
+            bytes: original.bytes,
+            repository: reopenedProvider.gmailInboxRepo,
+            sourceToken: expected.sourceToken
+        )
+        let reopenedStores = SalaryAcceptanceRuntimeStores()
+        try verifyGmailPersistedAndHydrated(
+            provider: reopenedProvider,
+            workspace: workspace,
+            stores: reopenedStores,
+            expected: expected,
+            expectedAttemptCount: 2
+        )
+        try reopenedSQLite.database.checkpointAndClose()
+    }
+
+    private func verifyGmailOriginal(
+        source: GmailInboxSource,
+        bytes: Data,
+        repository: any GmailInboxRepository,
+        sourceToken: String
+    ) throws {
+        guard let digest = source.sha256,
+              try repository.original(sha256: digest, byteCount: source.expectedByteCount) == bytes,
+              GmailInboxSource.digest(bytes) == digest else {
+            throw AcceptanceError.mismatch(sourceToken: sourceToken, field: "stored Gmail original bytes")
+        }
+        guard let sourceURL = source.importURL else {
+            throw AcceptanceError.mismatch(sourceToken: sourceToken, field: "Gmail snapshot locator")
+        }
+        let snapshot = try GmailImportSource.acquireSnapshot(
+            from: sourceURL,
+            repository: repository
+        )
+        defer { snapshot.invalidate() }
+        guard snapshot.byteCount == Int64(bytes.count),
+              try snapshot.recomputedSourceByteFingerprint().digest == digest else {
+            throw AcceptanceError.mismatch(sourceToken: sourceToken, field: "Gmail snapshot integrity")
+        }
+    }
+
+    private func verifyGmailPersistedAndHydrated(
+        provider: DatabaseProvider,
+        workspace: String,
+        stores: SalaryAcceptanceRuntimeStores,
+        expected: Statement,
+        expectedAttemptCount: Int
+    ) throws {
+        let persisted = try provider.salaryRepo.snapshot(workspaceId: workspace)
+        guard persisted.statements.count == 1,
+              let actual = persisted.statements.first else {
+            throw AcceptanceError.mismatch(sourceToken: expected.sourceToken, field: "sole Gmail salary DTO")
+        }
+        try verifyPersisted(actual, against: expected)
+        guard actual.workspaceId == workspace,
+              !actual.id.isEmpty,
+              !actual.documentId.isEmpty,
+              !actual.importSessionId.isEmpty,
+              !actual.normalizedDocumentId.isEmpty,
+              actual.components.allSatisfy({ $0.salaryStatementId == actual.id }),
+              let session = try provider.importSessionRepo.importSession(id: actual.importSessionId),
+              session.workspaceId == workspace,
+              session.validationStatus == "passed",
+              let document = try provider.importSessionRepo.importedDocument(id: actual.documentId),
+              document.workspaceId == workspace,
+              document.importSessionId == actual.importSessionId,
+              try provider.importSessionRepo.successfulImportContainsFingerprint(
+                algorithm: actual.sourceFingerprintAlgorithm,
+                fingerprint: actual.sourceFingerprintDigest
+              ) else {
+            throw AcceptanceError.mismatch(
+                sourceToken: expected.sourceToken,
+                field: "salary/session/document/source-fingerprint relationship"
+            )
+        }
+
+        let hydrator = makeHydrator(provider: provider, workspace: workspace, stores: stores)
+        let staged = try hydrator.stageHydration()
+        guard staged.accounts.isEmpty,
+              staged.transactions.isEmpty,
+              staged.salaryStatements.count == 1,
+              staged.importSessions.count == 1,
+              staged.importAttempts.count == expectedAttemptCount,
+              let hydrated = staged.salaryStatements.first,
+              hydrated.workspaceID == workspace,
+              hydrated.documentID == actual.documentId,
+              hydrated.importSessionID == actual.importSessionId,
+              hydrated.fingerprintDigest == expected.sourceSha256 else {
+            throw AcceptanceError.mismatch(sourceToken: expected.sourceToken, field: "staged Gmail salary hydration")
+        }
+        try verifyEvidence(hydrated.evidence, against: expected)
+        hydrator.publish(staged)
+        guard stores.accounts.accounts.isEmpty,
+              stores.transactions.transactions.isEmpty,
+              stores.salaries.statements.count == 1,
+              stores.sessions.importSessions.count == 1,
+              stores.attempts.attempts.count == expectedAttemptCount,
+              let published = stores.salaries.statements.first,
+              published == hydrated else {
+            throw AcceptanceError.mismatch(sourceToken: expected.sourceToken, field: "published Gmail salary hydration")
+        }
+    }
+
+    /// Independent, source-only PDFKit decoder for the two observed regular
+    /// Gmail payslips.  Its output exists only as a RAM expectation and it does
+    /// not construct any LedgerForge import/document/parser carrier.
+    private enum GmailSalarySourceOracle {
+        private struct Word {
+            let text: String
+            let x: Double
+            let baselineY: Double
+        }
+
+        private struct MutableComponent {
+            var label: String
+            let amount: String
+        }
+
+        static func statement(source: GmailInboxSource, bytes: Data) throws -> Statement {
+            let digest = GmailInboxSource.digest(bytes)
+            guard source.family == .salary,
+                  source.fileExtension == "pdf",
+                  source.expectedByteCount == bytes.count,
+                  source.sha256 == digest,
+                  let document = PDFDocument(data: bytes),
+                  !document.isLocked,
+                  (1...2).contains(document.pageCount),
+                  let firstPage = document.page(at: 0),
+                  let firstText = firstPage.string else {
+                throw failure(digest, "source/original PDF shape")
+            }
+            let pages = try (0..<document.pageCount).map { index in
+                guard let page = document.page(at: index) else { throw failure(digest, "source page") }
+                return page
+            }
+            let printText: String
+            if pages.count == 2, let text = pages[1].string, let marker = text.range(of: "Printed by:") {
+                let prefix = normalized(String(text[..<marker.lowerBound]))
+                // Independently observed medical-notice continuations only;
+                // no financial line may be ignored on the second page.
+                let end = "Alkoot Health Insurance) and on Alkoot website: www.alkoot.com.qa"
+                let form = "The Claim form and Treatment Guarantee form are available on Intranet (Human Resources; Forms; " + end
+                let notice = "To avoid any delay in settlement of your medical claims, please mention employee IBAN number while completing Alkoot Medical Claims. " + form
+                guard ["", end, form, notice].map(normalized).contains(prefix) else {
+                    throw failure(digest, "unowned content on second page")
+                }
+                printText = String(text[marker.lowerBound...])
+            }
+            else if let marker = firstText.range(of: "Printed by:") { printText = String(firstText[marker.lowerBound...]) }
+            else { throw failure(digest, "printed-by record") }
+            let pageWords = try pages.map(words(on:))
+            guard pageWords.allSatisfy({ !$0.isEmpty }) else {
+                throw failure(digest, "positioned native source text")
+            }
+            guard normalized(printText).contains("printed by:"),
+                  !normalized(printText).contains("total earnings"),
+                  !normalized(printText).contains("payment details") else {
+                throw failure(digest, "page-two nonfinancial print record")
+            }
+
+            let identity = try sourceIdentity(firstText, digest: digest)
+            let title = try monthlyTitle(firstText, digest: digest)
+            let printRecord = try printedBy(printText, digest: digest)
+            let printDate = printRecord.date
+            guard printRecord.name == identity.employeeName, printRecord.number == identity.employeeNumber else {
+                throw failure(digest, "repeated identity and period controls")
+            }
+            if title.kind == "monthlySalary" {
+                guard let netPeriod = captures(#"Net pay for the month of ([A-Za-z]+) ([0-9]{4})"#, in: firstText),
+                      netPeriod.count == 2, monthNumber(netPeriod[0]) == title.month, Int(netPeriod[1]) == title.year else {
+                    throw failure(digest, "repeated financial period")
+                }
+            }
+            let table = try components(from: pageWords[0], digest: digest)
+            let controls = try printedControls(
+                firstText,
+                rows: rows(from: pageWords[0]),
+                digest: digest
+            )
+
+            guard sum(table.earnings) == controls.totalEarnings,
+                  sum(table.deductions) == (controls.totalDeductions ?? "0.00"),
+                  (controls.totalDeductions != nil || table.deductions.isEmpty),
+                  subtract(controls.totalEarnings, controls.totalDeductions ?? "0.00") == controls.net,
+                  controls.payment == controls.net else {
+                throw failure(digest, "independent printed-control reconciliation")
+            }
+            let period = try SelectedStatementMonth(year: title.year, month: title.month)
+            _ = try StatementDate(
+                year: printDate.year,
+                month: printDate.month,
+                day: printDate.day
+            )
+            let sourceText = pages.compactMap(\.string).joined(separator: "\n")
+            return Statement(
+                sourceBasename: source.originalFilename,
+                sourceSha256: digest,
+                sourceSize: bytes.count,
+                pageCount: document.pageCount,
+                encrypted: document.isLocked,
+                extractedTextSha256: sha256(sourceText.data(using: .utf8) ?? Data()),
+                extractedBboxSha256: sha256(geometryBytes(pageWords)),
+                sourceIdentity: identity,
+                documentTitle: title.rendered,
+                period: period.canonical,
+                printDate: printRecord.literalDate,
+                kind: title.kind,
+                currency: "QAR",
+                earnings: table.earnings.enumerated().map {
+                    Component(ordinal: $0.offset, label: $0.element.label, amount: $0.element.amount)
+                },
+                deductions: table.deductions.enumerated().map {
+                    Component(ordinal: $0.offset, label: $0.element.label, amount: $0.element.amount)
+                },
+                printedControls: .init(
+                    totalEarnings: controls.totalEarnings,
+                    totalDeductions: controls.totalDeductions,
+                    netPay: controls.net,
+                    paymentTotal: controls.payment
+                ),
+                reconciliation: .init(
+                    earningsSumMatches: true,
+                    deductionsSumMatchesOrAbsent: true,
+                    netMatchesEarningsLessDeductions: true,
+                    paymentTotalMatchesNet: true
+                )
+            )
+        }
+
+        private static func sourceIdentity(_ text: String, digest: String) throws -> SourceIdentity {
+            guard normalized(text).contains("ispadmin@qatarairways.com.qa"),
+                  let name = capture(#"Name\s*:?\s*(.+?)\s*Employee\s+Number"#, in: text),
+                  let number = capture(#"Employee\s+Number\s*:?\s*(.+?)\s*Department"#, in: text),
+                  let position = capture(#"Position\s*:?\s*(.+?)\s*Grade"#, in: text),
+                  let payment = capture(#"\b(QA[0-9]{2}[A-Z0-9]{25})\b"#, in: text),
+                  !name.isEmpty, !number.isEmpty, !position.isEmpty, !payment.isEmpty else {
+                throw failure(digest, "required page-one identity/payment headers")
+            }
+            return SourceIdentity(
+                employer: "Qatar Airways",
+                employeeName: name,
+                employeeNumber: number,
+                position: position,
+                paymentIban: payment
+            )
+        }
+
+        private static func monthlyTitle(_ text: String, digest: String) throws -> (rendered: String, month: Int, year: Int, kind: String) {
+            let titles = [
+                ("monthlySalary", #"((?:Payslip|Salary)\s+for\s+the\s+month\s+of\s+([A-Za-z]+)\s+([0-9]{4}))"#),
+                ("adhocPayment", #"(Adhoc\s+Payment\s*-\s*([A-Za-z]+)\s+([0-9]{4}))"#)
+            ]
+            let matches = titles.compactMap { kind, pattern -> (String, [String])? in
+                captures(pattern, in: text).map { (kind, $0) }
+            }
+            guard matches.count == 1, let (kind, values) = matches.first, values.count == 3,
+                  let month = monthNumber(values[1]), let year = Int(values[2]) else {
+                throw failure(digest, "observed salary document title")
+            }
+            return (values[0], month, year, kind)
+        }
+
+        private static func printedBy(_ text: String, digest: String) throws -> (name: String, number: String, literalDate: String, date: (year: Int, month: Int, day: Int)) {
+            guard let values = captures(#"^\s*Printed\s+by:\s*(.*?)\s*\(([0-9]+)\)\s*([0-9]{2}-[A-Za-z]{3}-[0-9]{4})\s*$"#, in: text),
+                  values.count == 3, let date = calendarDate(values[2]) else {
+                throw failure(digest, "page-two printed-by date")
+            }
+            return (name: values[0], number: values[1], literalDate: values[2], date: date)
+        }
+
+        private static func components(
+            from words: [Word],
+            digest: String
+        ) throws -> (earnings: [MutableComponent], deductions: [MutableComponent]) {
+            let sourceRows = rows(from: words)
+            let headers = sourceRows.indices.filter {
+                contains($0, in: sourceRows, phrase: "Earning Amount (QAR)")
+            }
+            let totals = sourceRows.indices.filter {
+                contains($0, in: sourceRows, phrase: "Total Earnings")
+            }
+            guard headers.count == 1, totals.count == 1,
+                  let header = headers.first, let total = totals.first, header < total else {
+                throw failure(digest, "positioned earnings/deductions table ownership")
+            }
+            let deductionX = sourceRows[header].first(where: { $0.text == "Deduction" })?.x ?? .greatestFiniteMagnitude
+
+            var earnings: [MutableComponent] = []
+            var deductions: [MutableComponent] = []
+            var pendingEarning: [String] = []
+            var pendingDeduction: [String] = []
+            for row in sourceRows[(header + 1)..<total] {
+                try consume(
+                    row.filter { $0.x < deductionX },
+                    components: &earnings,
+                    pending: &pendingEarning,
+                    digest: digest
+                )
+                try consume(
+                    row.filter { $0.x >= deductionX },
+                    components: &deductions,
+                    pending: &pendingDeduction,
+                    digest: digest
+                )
+            }
+            guard !earnings.isEmpty,
+                  pendingEarning.isEmpty, pendingDeduction.isEmpty else {
+                throw failure(digest, "complete positioned salary components")
+            }
+            return (earnings, deductions)
+        }
+
+        private static func consume(
+            _ words: [Word],
+            components: inout [MutableComponent],
+            pending: inout [String],
+            digest: String
+        ) throws {
+            guard !words.isEmpty else { return }
+            let amounts = words.compactMap { word -> (Word, String)? in
+                canonicalMoney(word.text).map { (word, $0) }
+            }
+            guard amounts.count <= 1 else { throw failure(digest, "ambiguous positioned amount") }
+            let labels = words.filter { canonicalMoney($0.text) == nil }.map(\.text)
+            if let (_, amount) = amounts.first {
+                let label = (pending + labels).joined(separator: " ")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !label.isEmpty, decimal(amount) > .zero else {
+                    throw failure(digest, "component label/value")
+                }
+                components.append(.init(label: label, amount: amount))
+                pending = []
+                return
+            }
+            let continuation = labels.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !continuation.isEmpty else { return }
+            if components.isEmpty {
+                pending.append(continuation)
+            } else {
+                components[components.count - 1].label += " " + continuation
+            }
+        }
+
+        private static func printedControls(
+            _ text: String,
+            rows: [[Word]],
+            digest: String
+        ) throws -> (totalEarnings: String, totalDeductions: String?, net: String, payment: String) {
+            guard normalized(text).contains("payment details"),
+                  normalized(text).contains("bank name"),
+                  normalized(text).contains("account number"),
+                  text.range(of: #"Amount\s+Transferred\s*\(QAR\)"#, options: [.regularExpression, .caseInsensitive]) != nil,
+                  let totalEarnings = amount(after: "Total\\s+Earnings", in: text),
+                  let net = amount(after: "Net\\s+pay.*?\\(QAR\\)", in: text),
+                  let payment = amount(after: "Total\\s+Amount", in: text) else {
+                throw failure(digest, "printed payroll/payment controls")
+            }
+            let totalDeductions = amount(after: "Total\\s+Deductions", in: text)
+            guard !normalized(text).contains("total deductions") || totalDeductions != nil else {
+                throw failure(digest, "printed deduction control")
+            }
+            let paymentHeaders = rows.indices.filter { contains($0, in: rows, phrase: "Payment Details") }
+            let paymentTotals = rows.indices.filter { contains($0, in: rows, phrase: "Total Amount") }
+            guard paymentHeaders.count == 1, paymentTotals.count == 1,
+                  let header = paymentHeaders.first, let total = paymentTotals.first, header < total else {
+                throw failure(digest, "single payment table")
+            }
+            let paymentRows = rows[(header + 1)..<total]
+            let transferred = paymentRows.flatMap { $0.compactMap { canonicalMoney($0.text) } }
+            guard transferred.count == 1, transferred[0] == payment else {
+                throw failure(digest, "one transferred payment matching total")
+            }
+            return (totalEarnings, totalDeductions, net, payment)
+        }
+
+        private static func words(on page: PDFPage) throws -> [Word] {
+            guard let text = page.string,
+                  let expression = try? NSRegularExpression(pattern: #"\S+"#) else {
+                throw AcceptanceError.campaign(provider: "gmail", order: "source-only", field: "PDFKit native text")
+            }
+            return try expression.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
+                guard let range = Range(match.range, in: text),
+                      let selection = page.selection(for: match.range) else {
+                    throw AcceptanceError.campaign(provider: "gmail", order: "source-only", field: "PDFKit positioned word")
+                }
+                let bounds = selection.bounds(for: page)
+                guard bounds.width > 0, bounds.height > 0 else {
+                    throw AcceptanceError.campaign(provider: "gmail", order: "source-only", field: "PDFKit positioned word bounds")
+                }
+                return Word(text: String(text[range]), x: bounds.minX, baselineY: bounds.midY)
+            }
+        }
+
+        private static func rows(from words: [Word]) -> [[Word]] {
+            let ordered = words.sorted {
+                if abs($0.baselineY - $1.baselineY) > 1.5 { return $0.baselineY > $1.baselineY }
+                return $0.x < $1.x
+            }
+            var result: [[Word]] = []
+            var currentY: Double?
+            for word in ordered {
+                if let currentY, abs(currentY - word.baselineY) <= 1.5 {
+                    result[result.count - 1].append(word)
+                } else {
+                    result.append([word])
+                    currentY = word.baselineY
+                }
+            }
+            return result.map { $0.sorted { $0.x < $1.x } }
+        }
+
+        private static func contains(_ index: Int, in rows: [[Word]], phrase: String) -> Bool {
+            normalized(rows[index].map(\.text).joined(separator: " ")).contains(normalized(phrase))
+        }
+
+        private static func captures(_ pattern: String, in text: String) -> [String]? {
+            guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]),
+                  let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else {
+                return nil
+            }
+            return (1..<match.numberOfRanges).compactMap { index in
+                guard let range = Range(match.range(at: index), in: text) else { return nil }
+                return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        private static func capture(_ pattern: String, in text: String) -> String? {
+            captures(pattern, in: text)?.first
+        }
+
+        private static func amount(after prefix: String, in text: String) -> String? {
+            capture(prefix + #"\s*:?\s*([0-9][0-9,]*\.[0-9]{2})"#, in: text).flatMap(canonicalMoney)
+        }
+
+        private static func canonicalMoney(_ value: String) -> String? {
+            guard value.range(of: #"^[0-9]+(?:,[0-9]{3})*\.[0-9]{2}$"#, options: .regularExpression) != nil else {
+                return nil
+            }
+            let canonical = value.replacingOccurrences(of: ",", with: "")
+            guard decimal(canonical) >= .zero else { return nil }
+            return canonical
+        }
+
+        private static func decimal(_ value: String) -> Decimal {
+            Decimal(string: value, locale: Locale(identifier: "en_US_POSIX")) ?? .zero
+        }
+
+        private static func sum(_ components: [MutableComponent]) -> String {
+            let total = components.reduce(Decimal.zero) { $0 + decimal($1.amount) }
+            return canonicalTwoDecimal(total)
+        }
+
+        private static func subtract(_ left: String, _ right: String) -> String {
+            let value = decimal(left) - decimal(right)
+            return canonicalTwoDecimal(value)
+        }
+
+        private static func canonicalTwoDecimal(_ value: Decimal) -> String {
+            let rendered = NSDecimalNumber(decimal: value).stringValue
+            guard let decimalPoint = rendered.firstIndex(of: ".") else { return rendered + ".00" }
+            let fractionalCount = rendered[rendered.index(after: decimalPoint)...].count
+            guard fractionalCount <= 2 else { return rendered }
+            return rendered + String(repeating: "0", count: 2 - fractionalCount)
+        }
+
+        private static func calendarDate(_ value: String) -> (year: Int, month: Int, day: Int)? {
+            let pieces = value.split(separator: "-")
+            guard pieces.count == 3,
+                  let day = Int(pieces[0]),
+                  let month = monthNumber(String(pieces[1])),
+                  let year = Int(pieces[2]) else { return nil }
+            return (year, month, day)
+        }
+
+        private static func monthNumber(_ value: String) -> Int? {
+            let names = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+            let normalized = value.lowercased()
+            if let exact = names.firstIndex(of: normalized) { return exact + 1 }
+            return names.firstIndex(where: { $0.hasPrefix(normalized) }).map { $0 + 1 }
+        }
+
+        private static func normalized(_ value: String) -> String {
+            value.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+        }
+
+        private static func geometryBytes(_ pages: [[Word]]) -> Data {
+            Data(pages.flatMap { page in
+                page.map { "\($0.text)|\($0.x)|\($0.baselineY)" }
+            }.joined(separator: "\n").utf8)
+        }
+
+        private static func sha256(_ data: Data) -> String {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
+
+        private static func failure(_ digest: String, _ field: String) -> AcceptanceError {
+            .mismatch(sourceToken: String(digest.prefix(12)), field: "Gmail source-only \(field)")
         }
     }
 

@@ -10,6 +10,40 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct AxisCreditCardAuthenticAcceptanceTests {
+    /// The retained Gmail nomination is the traditional PDF variant. This uses
+    /// the existing independent glyph-column oracle, without borrowing fixed
+    /// monthly row counts or production normalization as expected values.
+    static func gmailTraditionalComparison(bytes: Data, password: String) throws -> (PreparedImport) throws -> Void {
+        guard let pdf = PDFDocument(data: bytes), !pdf.isLocked || pdf.unlock(withPassword: password) else {
+            throw AuthenticAcceptanceError.sourceUnreadable
+        }
+        let pages = try (0..<pdf.pageCount).map { index -> [Int: [SourceGlyph]] in
+            guard let page = pdf.page(at: index) else { throw AuthenticAcceptanceError.sourceUnreadable }
+            return try sourceGlyphLines(page)
+        }
+        guard let top = pages.first else { throw AuthenticAcceptanceError.sourceUnreadable }
+        var rows: [OracleRow] = []
+        for lines in pages {
+            for y in lines.keys.sorted(by: >) {
+                guard let glyphs = lines[y] else { throw AuthenticAcceptanceError.sourceUnreadable }
+                let date = sourceColumn(glyphs, 0, 85)
+                guard date.range(of: #"^\d{2}/\d{2}/\d{4}$"#, options: .regularExpression) != nil else { continue }
+                let amount = try sourceCapture(#"^([0-9,.]+)\s*(Dr|Cr)$"#, sourceColumn(glyphs, 505, 650))
+                rows.append(try sourceOracleRow(date: date, narration: sourceColumn(glyphs, 85, 505),
+                    amount: amount[0], direction: amount[1], retainsOriginalMoney: true))
+            }
+        }
+        let controls = try sourceGmailTraditionalControls(top)
+        guard let cycle = controls["statement_period_end"].map({ String($0.prefix(7)) }), !rows.isEmpty else {
+            throw AuthenticAcceptanceError.oracleMismatch
+        }
+        let expected = OracleRecord(sourceSHA256: sha256Hex(bytes), format: .traditionalPDF,
+            cycle: cycle, rowCount: rows.count, rows: rows, controls: controls)
+        return { prepared in
+            try require(prepared.sourceSnapshot.sourceByteFingerprint.digest == expected.sourceSHA256, error: .oracleMismatch)
+            try assertProduction(prepared.financialDocument, matches: expected)
+        }
+    }
     private static let rootKey = "LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY"
 
     @MainActor private static var completedPhases = Set<String>()
@@ -137,6 +171,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         case sourceUnreadable
         case oracleUnavailable
         case oracleMismatch
+        case gmailControlRole(String, count: Int)
         case appCredentialUnavailable
         case traditionalCredentialUnavailable
         case unexpectedPasswordChallenge
@@ -415,6 +450,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         let evidence = try #require(document.cardStatementEvidence)
         try assertControls(
             controls(
+                statementDate: evidence.statementDate,
                 period: evidence.declaredStatementPeriod,
                 month: evidence.selectedStatementMonth,
                 summary: evidence.summaryComponents
@@ -577,9 +613,9 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }
     }
 
-    /// The frozen oracle retains all printed controls. Statement Generation
-    /// Date is source provenance, not a substitute for a financial statement
-    /// day/period in the accepted Axis domain; do not invent that mapping.
+    /// Traditional Axis statements publish their statement date as Statement
+    /// Generation Date. Compare that printed field independently of the period
+    /// and payment due date; app exports retain their selected-month evidence.
     private static func assertControls(
         _ actual: [String: String], matches oracle: OracleRecord
     ) throws {
@@ -589,7 +625,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             "payment_due_date", "statement_generation_date"
         ]
         try require(Set(oracle.controls.keys).isSubset(of: knownKeys), error: .oracleMismatch)
-        let expected = oracle.controls.filter { $0.key != "statement_generation_date" }
+        let expected = oracle.controls
         #expect(actual == expected, "Complete authentic Axis summary-control projection")
         guard actual == expected else {
             throw AuthenticAcceptanceError.sourceProjectionMismatch(
@@ -600,11 +636,13 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     }
 
     private static func controls(
+        statementDate: StatementDate?,
         period: DeclaredStatementPeriod?,
         month: SelectedStatementMonth?,
         summary: [CardStatementSummaryComponent]
     ) throws -> [String: String] {
         var result: [String: String] = [:]
+        result["statement_generation_date"] = statementDate?.canonical
         result["statement_period_start"] = period?.start.canonical
         result["statement_period_end"] = period?.end.canonical
         result["selected_statement_month"] = month?.canonical
@@ -1004,6 +1042,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             }
             let summary = card.summaryComponents.filter { $0.cardStatementId == persisted.id }
             var persistedControls: [String: String] = [:]
+            persistedControls["statement_generation_date"] = persisted.statementDateISO
             persistedControls["statement_period_start"] = persisted.statementStartDateISO
             persistedControls["statement_period_end"] = persisted.statementEndDateISO
             persistedControls["selected_statement_month"] = persisted.selectedStatementMonthISO
@@ -1022,7 +1061,8 @@ struct AxisCreditCardAuthenticAcceptanceTests {
                 $0.importSessionID == prior.importSessionId
             })
             try assertControls(
-                controls(period: visible.period, month: visible.selectedStatementMonth,
+                controls(statementDate: visible.statementDate,
+                         period: visible.period, month: visible.selectedStatementMonth,
                          summary: visible.summaryComponents),
                 matches: source.oracle
             )
@@ -1058,12 +1098,10 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     private static func makePasswordProvider(
         challengeProbe: ChallengeInvocationProbe
     ) async throws -> DefaultPasswordProvider {
-        let appPassword = try await sourceOraclePassword("axis-bank.credit-card.app-pdf")
-        let traditionalPassword = try await sourceOraclePassword("axis-bank.credit-card.traditional-pdf")
-        let store = InMemoryStatementPasswordCredentialStore(passwords: [
-            KeychainStatementPasswordCredentialStore.axisAppPDFScope: appPassword,
-            KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope: traditionalPassword
-        ])
+        let credentials = try await sourceOracleCredentials()
+        let store = InMemoryStatementPasswordCredentialStore(
+            passwords: Dictionary(uniqueKeysWithValues: credentials)
+        )
         return DefaultPasswordProvider(
             credentialStore: store,
             supportedInstitutionCodes: [Institution.axis.statementPasswordCredentialScope],
@@ -1208,6 +1246,23 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         return password
     }
 
+    private static func sourceOracleCredentials() async throws -> [(String, String)] {
+        var credentials = [
+            (KeychainStatementPasswordCredentialStore.axisAppPDFScope,
+             try await sourceOraclePassword(KeychainStatementPasswordCredentialStore.axisAppPDFScope)),
+            (KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope,
+             try await sourceOraclePassword(KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope))
+        ]
+        // Preserve the product's registered institution/legacy unlock fallback.
+        // Confirmation writes stay in the isolated in-memory credential store.
+        if let compatibility = try await KeychainStatementPasswordCredentialStore().password(
+            institutionCode: KeychainStatementPasswordCredentialStore.axisInstitutionScope
+        ), !compatibility.isEmpty {
+            credentials.append((KeychainStatementPasswordCredentialStore.axisInstitutionScope, compatibility))
+        }
+        return credentials
+    }
+
     private static func constructSourceOracle(
         root: URL,
         tagged: (URL, Data, String) async throws -> [RawPDFTaggedTableEvidence],
@@ -1219,8 +1274,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }
         let files = try regularFinancialFiles(under: root)
         guard files.count == 32 else { throw AuthenticAcceptanceError.unexpectedCorpusShape }
-        let passwords = [try await sourceOraclePassword("axis-bank.credit-card.app-pdf"),
-                         try await sourceOraclePassword("axis-bank.credit-card.traditional-pdf")]
+        let passwords = try await sourceOracleCredentials().map(\.1)
         var records: [OracleRecord] = [], inventory: [String: String] = [:]
         for url in files {
             let bytes = try Data(contentsOf: url), digest = sha256Hex(bytes)
@@ -1424,10 +1478,60 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             "total_payment_due": sourceMoney(sourceColumn(payment, 0, 210)),
             "payment_due_date": sourceDate(sourceColumn(payment, 380, 600))]
     }
+    private static func sourceGmailTraditionalControls(_ lines: [Int: [SourceGlyph]]) throws -> [String: String] {
+        // Gmail expands the genuine historical corpus beyond the old page's
+        // fixed y coordinates. Find printed control roles independently; neither
+        // production geometry nor a prepared value supplies an expectation.
+        func text(_ y: Int) -> String { sourceColumn(lines[y] ?? [], 0, 650) }
+        func unique(_ role: String, _ candidates: [Int]) throws -> Int {
+            guard candidates.count == 1, let candidate = candidates.first else { throw AuthenticAcceptanceError.gmailControlRole(role, count: candidates.count) }
+            return candidate
+        }
+        let headerY = try unique("payment-header", lines.keys.filter {
+            text($0).contains("Total Payment Due") && text($0).contains("Statement Period")
+                && text($0).contains("Payment Due Date") && text($0).contains("Statement Generation Date")
+        })
+        let cardY = try unique("card-identity", lines.keys.filter { text($0).hasPrefix("Credit Card Number") })
+        let balanceHeaderY = try unique("balance-header", lines.keys.filter {
+            text($0).contains("Previous Balance") && text($0).contains("Payments") && text($0).contains("Purchase")
+        })
+        let bodyY = try unique("account-summary", lines.keys.filter { text($0) == "Account Summary" })
+        guard headerY > cardY, cardY > balanceHeaderY, balanceHeaderY > bodyY else {
+            throw AuthenticAcceptanceError.oracleMismatch
+        }
+        let controlRows = lines.keys.filter { $0 < headerY && $0 > cardY }
+        let datesY = try unique("dates", controlRows.filter {
+            text($0).range(of: #"\d{2}/\d{2}/\d{4}\s*-\s*\d{2}/\d{2}/\d{4}"#,
+                          options: .regularExpression) != nil
+        })
+        let paymentY = try unique("payment-money", controlRows.filter {
+            sourceColumn(lines[$0] ?? [], 0, 140).range(
+                of: #"^[0-9,.]+\s*(?:Dr|Cr)$"#, options: .regularExpression) != nil
+        })
+        let balancesY = try unique("opening-balance", lines.keys.filter {
+            $0 < balanceHeaderY && $0 > bodyY
+                && text($0).range(of: #"^[0-9]+(?:,[0-9]{3})*\.[0-9]{2}"#, options: .regularExpression) != nil
+        })
+        let dates = lines[datesY] ?? [], payment = lines[paymentY] ?? [], balances = lines[balancesY] ?? []
+        // Printed header order owns these four dates. Older originals move the
+        // period horizontally, so the old corpus's fixed x cut must not clip it.
+        let period = try sourceCapture(#"(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})\s*(\d{2}/\d{2}/\d{4})\s*(\d{2}/\d{2}/\d{4})"#,
+                                       sourceColumn(dates, 0, 650))
+        let opening = try sourceCapture(#"^([0-9]+(?:,[0-9]{3})*\.[0-9]{2}\s*(?:Dr|Cr)?)"#,
+                                        sourceColumn(balances, 0, 650))[0]
+        return try ["statement_period_start": sourceDate(period[0]), "statement_period_end": sourceDate(period[1]),
+            "opening_balance": sourceMoney(opening),
+            "total_payment_due": sourceMoney(sourceColumn(payment, 0, 140)),
+            "payment_due_date": sourceDate(period[2]),
+            "statement_generation_date": sourceDate(period[3])]
+    }
+
     private static func sourceTraditionalControls(_ lines: [Int: [SourceGlyph]]) throws -> [String: String] {
         guard let header = lines[8540], let balanceHeader = lines[7960], let dates = lines[8415], let payment = lines[8405], let balances = lines[7830],
               sourceColumn(header, 0, 140) == "Total Payment Due",
               sourceColumn(header, 255, 375) == "Statement Period",
+              sourceColumn(header, 375, 465) == "Payment Due Date",
+              sourceColumn(header, 465, 600) == "Statement Generation Date",
               sourceColumn(balanceHeader, 60, 130).contains("Previous Balance") else { throw AuthenticAcceptanceError.oracleMismatch }
         let period = try sourceCapture(#"^(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})$"#, sourceColumn(dates, 255, 375))
         return try ["statement_period_start": sourceDate(period[0]), "statement_period_end": sourceDate(period[1]),

@@ -11,6 +11,12 @@ import Testing
 /// No private value is committed, printed, or used as a fixture.
 @MainActor
 struct AmericanExpressPrivateAcceptanceTests {
+    /// Reuses the original-based oracle without the historical filesystem
+    /// corpus/count contract. Call before inspecting production preparation.
+    func gmailComparison(bytes: Data, url: URL, password: String) throws -> (PreparedImport) throws -> Void {
+        let source = try PrivateAmexSource(url: url, bytes: bytes, password: password)
+        return { prepared in try self.compare(prepared: prepared, to: source.oracle) }
+    }
     @Test
     func explicitPrivateContextPresenceTreatsEmptyValuesAsRequested() {
         #expect(PrivateAmexContext.explicitContextRequested(in: [
@@ -155,8 +161,22 @@ struct AmericanExpressPrivateAcceptanceTests {
               evidence.nativeCurrency.code == oracle.nativeCurrency,
               evidence.accountSourceIdentityObservations.count == 1,
               evidence.accountSourceIdentityObservations[0].value == oracle.identity.membershipNumberMasked,
-              evidence.reconciliationRuleIdentifier == CardStatementEvidence.amexQARReconciliationRule else {
+              evidence.reconciliationRuleIdentifier == (oracle.nativeCurrency == "USD"
+                ? CardStatementEvidence.amexUSDZeroReconciliationRule : CardStatementEvidence.amexQARReconciliationRule) else {
             throw PrivateAcceptanceError.productionMismatchAt("statement-metadata")
+        }
+        if oracle.nativeCurrency == "USD" {
+            guard document.transactions.isEmpty, evidence.instrumentSections.isEmpty,
+                  evidence.transactionAnnotations.isEmpty,
+                  let zero = document.zeroActivityEvidence,
+                  zero.nativeCurrency.code == "USD",
+                  zero.cardPaymentDueDate?.canonical == oracle.dueDate,
+                  moneyMatches(zero.openingBalance, oracle.summary.previousBalance),
+                  moneyMatches(zero.closingBalance, oracle.summary.newBalance),
+                  moneyMatches(zero.debitTotal, oracle.summary.newDebits),
+                  moneyMatches(zero.creditTotal, oracle.summary.newCredits) else {
+                throw PrivateAcceptanceError.productionMismatchAt("USD-zero-controls")
+            }
         }
 
         guard let dueDate = evidence.summary(code: "due_date")?.date,
@@ -460,6 +480,15 @@ struct AmericanExpressPrivateAcceptanceTests {
             sources: [source],
             workspaceID: workspaceID
         )
+    }
+
+    func gmailExistingLiabilityAccountChoice(
+        document: FinancialDocument,
+        accountID: String,
+        provider: DatabaseProvider
+    ) throws -> ImportAccountChoice {
+        try explicitSectionChoice(document: document, accountID: accountID,
+                                  provider: provider, workspaceID: "default-workspace")
     }
 
     private func explicitSectionChoice(
@@ -1036,6 +1065,10 @@ private struct PrivateAmexSource {
 
     init(url: URL, password: String) throws {
         let bytes = try Data(contentsOf: url, options: [.mappedIfSafe])
+        try self.init(url: url, bytes: bytes, password: password)
+    }
+
+    init(url: URL, bytes: Data, password: String) throws {
         guard let pdf = PDFDocument(data: bytes) else {
             throw PrivateAcceptanceError.unreadableSource
         }
@@ -1372,13 +1405,14 @@ private enum IndependentAmexOracleBuilder {
         }
 
         let joined = pageTexts.joined(separator: "\n")
-        guard joined.contains("The Platinum Card (QAR)"),
-              joined.contains("Statement of Account"),
+        let isUSDZero = joined.contains("The American Express Card") && joined.contains("(USD)")
+            && !joined.contains("The Platinum Card (QAR)")
+        let currency = isUSDZero ? "USD" : nativeCurrency
+        guard joined.contains("Statement of Account"),
               joined.contains("AMEX (MIDDLE EAST) B.S.C. (C)"),
-              joined.contains("Transaction Date"),
-              joined.contains("Posting Date"),
-              joined.contains("Non QAR Spending"),
-              joined.contains("Amount in QAR") else {
+              isUSDZero || (joined.contains("The Platinum Card (QAR)") &&
+                joined.contains("Transaction Date") && joined.contains("Posting Date") &&
+                joined.contains("Non QAR Spending") && joined.contains("Amount in QAR")) else {
             throw PrivateAcceptanceError.sourceOracleFailure("builder line 86")
         }
 
@@ -1387,10 +1421,20 @@ private enum IndependentAmexOracleBuilder {
             throw PrivateAcceptanceError.sourceOracleFailure("builder line 91")
         }
 
-        let sourceSummary = try readPrintedSummary(pdf, pageTexts: pageTexts)
+        let sourceSummary = try readPrintedSummary(pdf, pageTexts: pageTexts, currency: currency)
         let summaryValues = sourceSummary.values
-        let summary = try makeSummary(summaryValues)
-        let parsed = try parsePages(pageTexts, summary: sourceSummary)
+        let summary = try makeSummary(summaryValues, currency: currency)
+        let parsed: (pages: [OraclePage], sections: [OracleSection], rows: [OracleRow])
+        if isUSDZero {
+            guard summary.newCredits.minorUnits == 0, summary.newDebits.minorUnits == 0,
+                  summary.previousBalance == summary.newBalance else {
+                throw PrivateAcceptanceError.sourceOracleFailure("USD source is not zero activity")
+            }
+            try verifyUSDZeroRegions(pageTexts, summary: sourceSummary)
+            parsed = (pageTexts.map { _ in OraclePage(sectionHeaderOccurrences: []) }, [], [])
+        } else {
+            parsed = try parsePages(pageTexts, summary: sourceSummary)
+        }
 
         let statementDate = try canonicalShortDate(membership[1])
         let periodStart = try canonicalShortDate(membership[2])
@@ -1413,7 +1457,7 @@ private enum IndependentAmexOracleBuilder {
                 end: periodEnd
             ),
             dueDate: dueDate,
-            nativeCurrency: nativeCurrency,
+            nativeCurrency: currency,
             identity: OracleIdentity(
                 membershipNumberMasked: membership[0]
             ),
@@ -1422,6 +1466,33 @@ private enum IndependentAmexOracleBuilder {
             sections: parsed.sections,
             rows: parsed.rows
         )
+    }
+
+    /// The authentic USD source has no transaction table. Independently
+    /// exhaust its body after the repeated page identity and outside the
+    /// geometrically owned summary; financial tokens cannot become prose.
+    private static func verifyUSDZeroRegions(_ pages: [String], summary: PrintedSummary) throws {
+        let pagePattern = try NSRegularExpression(pattern: #"\bPage\s+(\d+)\s+of\s+(\d+)\b"#)
+        let financialPattern = #"\d{1,2}[-/][A-Za-z0-9]{2,9}[-/]\d{2,4}|[0-9][0-9,]*\.[0-9]+|\([A-Z]{3}\)|(?i:Transaction Date|Posting Date|New Transactions|Total of New Transactions|Amount in|Spending)"#
+        for (index, page) in pages.enumerated() {
+            let text = page.components(separatedBy: .newlines).enumerated().map { line, value in
+                index == summary.pageIndex ? summary.remainingTextByLine[line] ?? value : value
+            }.joined(separator: "\n")
+            let ns = text as NSString
+            let labels = pagePattern.matches(in: text, range: NSRange(location: 0, length: ns.length))
+            guard labels.count == 1, let label = labels.first,
+                  Int(ns.substring(with: label.range(at: 1))) == index + 1,
+                  Int(ns.substring(with: label.range(at: 2))) == pages.count else {
+                throw PrivateAcceptanceError.sourceOracleFailure("USD page inventory")
+            }
+            let body = ns.substring(from: NSMaxRange(label.range))
+            let notice = #"Value\s+Added\s+Tax\s+\(VAT\)\s+is\s+charged\s+at\s+[0-9]+(?:\.[0-9]+)?%\s+on\s+fees\s+and\s+charges\s+as\s+per\s+the\s+current\s+VAT\s+Law\s+of\s+the\s+Kingdom\s+of\s+Bahrain"#
+            let bodyOutsideTaxNotice = body.replacingOccurrences(of: notice, with: "", options: .regularExpression)
+            guard body.contains("This Card is issued by AMEX (Middle East)"),
+                  bodyOutsideTaxNotice.range(of: financialPattern, options: .regularExpression) == nil else {
+                throw PrivateAcceptanceError.sourceOracleFailure("unaccounted USD financial body")
+            }
+        }
     }
 
     private static func parsePages(
@@ -1749,16 +1820,16 @@ private enum IndependentAmexOracleBuilder {
     }
 
     private static func makeSummary(
-        _ values: [String]
+        _ values: [String], currency: String = nativeCurrency
     ) throws -> OracleSummary {
         guard values.count == 5 else {
             throw PrivateAcceptanceError.sourceOracleFailure("builder line 467")
         }
 
-        let previous = try money(values[0], currency: nativeCurrency)
-        let credits = try money(values[1], currency: nativeCurrency)
-        let debits = try money(values[2], currency: nativeCurrency)
-        let balance = try money(values[3], currency: nativeCurrency)
+        let previous = try money(values[0], currency: currency)
+        let credits = try money(values[1], currency: currency)
+        let debits = try money(values[2], currency: currency)
+        let balance = try money(values[3], currency: currency)
 
         let expected = previous.minorUnits -
             credits.minorUnits +
@@ -1906,7 +1977,7 @@ private enum IndependentAmexOracleBuilder {
     /// for the printed labels and their cells. No production fragments,
     /// normalizer helpers, or production-derived financial expectations enter it.
     private static func readPrintedSummary(
-        _ pdf: PDFDocument, pageTexts: [String]
+        _ pdf: PDFDocument, pageTexts: [String], currency: String = nativeCurrency
     ) throws -> PrintedSummary {
         struct Word {
             let id: Int
@@ -1980,17 +2051,17 @@ private enum IndependentAmexOracleBuilder {
             }
             let firstColumnWidth = labels[1].maxX - labels[0].maxX
             let prefix = row.filter { $0.rectangle.maxX <= values[0].rectangle.minX }
-            guard firstColumnWidth > 0, prefix.count == 1, prefix[0].text == "(QAR)",
+            guard firstColumnWidth > 0, prefix.count == 1, prefix[0].text == "(\(currency))",
                   prefix[0].rectangle.minX >= labels[0].maxX - firstColumnWidth else {
-                throw PrivateAcceptanceError.sourceOracleFailure("previous balance QAR context")
+                throw PrivateAcceptanceError.sourceOracleFailure("previous balance currency context")
             }
             for (index, symbol) in ["-", "+", "="].enumerated() {
                 let relation = row.filter {
                     $0.rectangle.minX >= values[index].rectangle.maxX &&
                     $0.rectangle.maxX <= values[index + 1].rectangle.minX
                 }.sorted { $0.rectangle.minX < $1.rectangle.minX }
-                guard relation.map(\.text) == [symbol, "(QAR)"] else {
-                    throw PrivateAcceptanceError.sourceOracleFailure("summary QAR relation")
+                guard relation.map(\.text) == [symbol, "(\(currency))"] else {
+                    throw PrivateAcceptanceError.sourceOracleFailure("summary currency relation")
                 }
             }
             let headerWords = words.filter { word in

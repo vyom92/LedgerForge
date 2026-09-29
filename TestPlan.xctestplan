@@ -29,6 +29,8 @@
         "CBQBankAuthenticAcceptanceTests",
         "CBQCreditCardPrivateAcceptanceTests",
         "GlobalAuthenticCorpusAcceptanceTests",
+        "GmailLiveAcquisitionTests",
+        "GmailAuthenticAcceptanceTests",
         "HDFCBankAccountAuthenticAcceptanceTests",
         "ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()",
         "InvestmentRAMOriginalTests",

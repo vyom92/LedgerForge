@@ -8,6 +8,12 @@ import Testing
 /// product package (created 2026-09-15) and checked against cdfb756.
 /// V19/V20 were recorded from published 2f299b1 before Sprint-96 migration edits.
 /// V21 was independently read from published 0cc372ab before the V22 source change.
+/// V22 was independently read from published 5666f28d before the V23 inbox change.
+/// V23 is independently pinned to the owner's accepted Gmail-intake manifest.
+/// V24 is pinned to schema_migrations in the retained qualified
+/// s98-bank-native-01a0b713 ledger, applied 2026-09-19T06:41:48Z before V25.
+/// V25/V26 are now owner-accepted with Sprint 98 r8/r9. The existing literal
+/// identities remain unchanged; Sprint 99 adds only the next migration.
 /// Never regenerate these expectations from candidate migrations. Changes to
 /// accepted history require a separately approved compatibility decision.
 struct MigrationIdentityLockTests {
@@ -39,11 +45,24 @@ struct MigrationIdentityLockTests {
         .init(18, "funding_plan_al_dar_reference_v18", "0fb20df64484d70d0dc880f7cedaf2814574ba25067e5b64aefb6b4a32b413b7"),
         .init(19, "budget_planning_worksheet", "9ff47b44f0347968480748eef0f8a482416cb7c37be57b8747e53f415f675874"),
         .init(20, "budget_planning_bill_dates", "bf0dcc6ed3628262ca4001e71f6d41b056b5c6b18358e02dc2477a0e23410730"),
-        .init(21, "current_investment_holdings", "1a8cb1f7cddfda18ff04adec1f5230c6fbffa722a3053259c32b990991a533e9")
+        .init(21, "current_investment_holdings", "1a8cb1f7cddfda18ff04adec1f5230c6fbffa722a3053259c32b990991a533e9"),
+        .init(22, "authenticated_investment_source", "ffe666d711fcd0d3d7994d458d46bffd9adb1e8fc56248ad33d7504f7e526be3"),
+        .init(23, "gmail_original_inbox_and_receipts", "a344e80fb4081daf6d3e2e96d18e2bda2819476d68e71b59f48de1aeadb3a3f5"),
+        .init(24, "bank_statement_sections_and_occurrence_provenance", "cd138f8befeb361c26aad036bcb41df2560681b705b12b8742ec1345269bd9a1"),
+        .init(25, "background_update_receipts", "4bc61eeb9e7185bf57c52569484726202c923b166ae308e6b2dcf2b2daedf85e")
     ]
+    private let v26 = Identity(26, "bank_section_currency_profiles_and_amex_usd_zero", "a82576c05cd42520ad7e5477df98d37a6d1dc4a5ad34bf122bf4cbba4ec92a03")
 
     @Test func acceptedHistoryRemainsPinned() {
-        #expect(allMigrations.prefix(21).map(Identity.init) == accepted)
+        #expect(allMigrations.prefix(25).map(Identity.init) == accepted)
+        #expect(Identity(migrationV26) == v26)
+        // Independently retained from the qualified Sprint-99 entry V27 ledger.
+        #expect(Identity(migrationV27) == Identity(27, "current_reporting_exclusions", "67840cd8794ac383c834c351602189f3b6c12cb96de9bb75568487da12dc5a2e"))
+        // Retained independently from the first native application to the
+        // isolated Sprint-99 ledger. Applied history must never be rewritten.
+        #expect(Identity(migrationV28) == Identity(28, "financial_intelligence_metadata", "ebcf0722aedee0bc0f7a1af839a0a8974a39277a81ff4f388e8cfdf40bd824ca"))
+        // Owner-approved additive balance-date column; V1–V28 stay pinned above.
+        #expect(Identity(migrationV29) == Identity(29, "Captured planning balance dates", "70dea8d078a2a3d5417eb582c2e92bce502fdabdb1b7facc8d57dea6f0760626"))
     }
 
     @Test func lockDetectsNameSQLPreflightAndExecutionModeDrift() {

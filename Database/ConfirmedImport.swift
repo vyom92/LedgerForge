@@ -111,6 +111,62 @@ public struct CBQStatementSourceEvidenceDTO: nonisolated Equatable, Sendable {
     }
 }
 
+/// One account-owned section of a bank statement.  This deliberately carries
+/// only the bounded source graph needed by the bank import path; it is not a
+/// general product/document framework.  A section may validly contain no rows
+/// when the original establishes a zero-activity account observation.
+public struct BankStatementSectionPlanDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let accountId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let normalizedDocumentId: String
+    public let sectionOrdinal: Int
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let nativeCurrency: String
+    public let sourceEvidence: CBQStatementSourceEvidenceDTO
+    public let identityPatterns: [CBQSourceIdentityPatternDTO]
+    public let sourceRangeStart: Int?
+    public let sourceRangeEnd: Int?
+    public let productLabel: String
+    public let rows: [BankTransactionOccurrencePlanDTO]
+    public let sourceDetails: BankSectionSourceDetailsDTO?
+
+    public init(id: String, accountId: String, documentId: String, importSessionId: String, normalizedDocumentId: String, sectionOrdinal: Int, parserProfileId: String, parserProfileVersion: String, nativeCurrency: String, sourceEvidence: CBQStatementSourceEvidenceDTO, identityPatterns: [CBQSourceIdentityPatternDTO], sourceRangeStart: Int?, sourceRangeEnd: Int?, productLabel: String, rows: [BankTransactionOccurrencePlanDTO], sourceDetails: BankSectionSourceDetailsDTO? = nil) {
+        self.id = id
+        self.accountId = accountId
+        self.documentId = documentId
+        self.importSessionId = importSessionId
+        self.normalizedDocumentId = normalizedDocumentId
+        self.sectionOrdinal = sectionOrdinal
+        self.parserProfileId = parserProfileId
+        self.parserProfileVersion = parserProfileVersion
+        self.nativeCurrency = nativeCurrency
+        self.sourceEvidence = sourceEvidence
+        self.identityPatterns = identityPatterns.sorted { ($0.kind, $0.pattern) < ($1.kind, $1.pattern) }
+        self.sourceRangeStart = sourceRangeStart; self.sourceRangeEnd = sourceRangeEnd; self.productLabel = productLabel
+        self.rows = rows.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+        self.sourceDetails = sourceDetails
+    }
+}
+
+/// Bank-specific source occurrence.  The value-date role is deliberately
+/// separate from CBQ V11's source-transaction-date overlap field.
+public struct BankTransactionOccurrencePlanDTO: nonisolated Equatable, Sendable {
+    public let source: CBQSourceRowDTO
+    public let valueDateISO: String?
+    public let literalNarration: String
+    public let literalReference: String?
+    public let literalBalance: String
+    public var sourceOrdinal: Int { source.sourceOrdinal }
+    public var normalizedRowId: String { source.normalizedRowId }
+    public init(source: CBQSourceRowDTO, valueDateISO: String?, literalNarration: String, literalReference: String?, literalBalance: String) {
+        self.source = source; self.valueDateISO = valueDateISO; self.literalNarration = literalNarration
+        self.literalReference = literalReference; self.literalBalance = literalBalance
+    }
+}
+
 public enum ConfirmedCardInstrumentChoiceDTO: nonisolated Equatable, Sendable {
     case unspecified
     case createProposedInstrument
@@ -941,12 +997,13 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let cbqSourceRows: [CBQSourceRowDTO]
     public let cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO?
     public let cardImportPlan: ConfirmedCardImportPlanDTO?
+    public let bankStatementSectionPlan: BankStatementSectionPlanDTO?
     /// Optional parser-proven controls for a document with no transaction
     /// rows.  The confirmed provider persists this atomically with the
     /// ordinary document/session graph.
     public let zeroActivityControl: StatementZeroActivityControlDTO?
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil, cardImportPlan: ConfirmedCardImportPlanDTO? = nil, zeroActivityControl: StatementZeroActivityControlDTO? = nil) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil, cardImportPlan: ConfirmedCardImportPlanDTO? = nil, bankStatementSectionPlan: BankStatementSectionPlanDTO? = nil, zeroActivityControl: StatementZeroActivityControlDTO? = nil) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
@@ -966,6 +1023,7 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
         self.cbqSourceRows = cbqSourceRows.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
         self.cbqStatementSourceEvidence = cbqStatementSourceEvidence
         self.cardImportPlan = cardImportPlan
+        self.bankStatementSectionPlan = bankStatementSectionPlan
         self.zeroActivityControl = zeroActivityControl
     }
 }

@@ -307,11 +307,15 @@ struct SQLiteOwnershipTests {
         defer { database.close() }
 
         var openError: SQLiteDatabaseError?
+        var namespaceRefusedOpen = false
         do {
             try database.open()
             Issue.record("open unexpectedly succeeded before its parent directory existed")
         } catch let error as SQLiteDatabaseError {
             openError = error
+        } catch LedgerAccessError.unavailable {
+            // Namespace locking fails before SQLite opens a missing parent.
+            namespaceRefusedOpen = true
         } catch {
             Issue.record("open returned an unexpected error: \(error)")
         }
@@ -321,7 +325,7 @@ struct SQLiteOwnershipTests {
                 return
             }
             #expect(execution.operation == .open)
-        } else {
+        } else if !namespaceRefusedOpen {
             Issue.record("failed open did not produce an error")
             return
         }
@@ -506,6 +510,55 @@ struct SQLiteOwnershipTests {
         }
         #expect(callbackCount.withLock { $0 } == 2)
     }
+
+    @MainActor
+    @Test
+    func verifiedPreV24ReadOnlyPrefixUsesLegacyCBQIdentitiesAndEmptySectionSnapshot() throws {
+        let root = try temporaryDirectory(named: "SQLitePreV24HistoricalReadOnly")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("historical.sqlite").path
+        let historicalPrefix = Array(allMigrations.prefix { $0.version < migrationV24.version })
+
+        let seeded = try SQLiteRepositoryProvider(path: path, migrations: historicalPrefix)
+        seeded.database.close()
+
+        let provider = try SQLiteRepositoryProvider(
+            path: path,
+            migrations: historicalPrefix,
+            access: .readOnlySnapshot
+        )
+        defer { provider.database.close() }
+
+        #expect(try provider.importSessionRepo.bankSectionSnapshot(workspaceId: "mechanics").sections.isEmpty)
+        #expect(try provider.accountRepo.cbqSourceIdentityRecords(workspaceId: "mechanics").isEmpty)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == historicalPrefix.count)
+    }
+
+    @MainActor
+    @Test
+    func verifiedV24PrefixDoesNotHideMissingBankSectionTables() throws {
+        let root = try temporaryDirectory(named: "SQLiteV24RequiredSectionTables")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("current.sqlite").path
+        let v24Prefix = Array(allMigrations.prefix(migrationV24.version))
+
+        let seeded = try SQLiteRepositoryProvider(path: path, migrations: v24Prefix)
+        try seeded.database.execute(sql: "DROP TABLE bank_transaction_occurrences;")
+        try seeded.database.execute(sql: "DROP TABLE bank_section_identity_observations;")
+        try seeded.database.execute(sql: "DROP TABLE bank_statement_sections;")
+        seeded.database.close()
+
+        let provider = try SQLiteRepositoryProvider(
+            path: path,
+            migrations: v24Prefix,
+            access: .readOnlySnapshot
+        )
+        defer { provider.database.close() }
+
+        #expect(throws: (any Error).self) {
+            try provider.importSessionRepo.bankSectionSnapshot(workspaceId: "mechanics")
+        }
+    }
 }
 
 private struct RowSnapshot: Equatable, Sendable {
@@ -569,6 +622,8 @@ private func expectDatabaseNotOpen(_ database: SQLiteDatabase) {
             Issue.record("closed database returned an unexpected SQLite error")
             return
         }
+    } catch LedgerAccessError.unavailable {
+        // A nonexistent namespace is refused before a connection can open.
     } catch {
         Issue.record("closed database returned an unexpected error: \(error)")
     }

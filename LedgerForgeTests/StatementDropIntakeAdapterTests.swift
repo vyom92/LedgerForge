@@ -263,7 +263,7 @@ struct StatementDropIntakeAdapterTests {
                     ))
                 },
                 cancelPreparation: { probe.cancel($0) },
-                cancelPasswordChallenge: {},
+                cancelPasswordChallenge: { _ in },
                 failureSummary: { _ in
                     ImportFailureSummary(
                         stage: .documentPreparation,

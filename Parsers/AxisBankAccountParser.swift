@@ -7,7 +7,7 @@
 import CryptoKit
 import Foundation
 
-enum AxisBankCSVColumnRole: String, CaseIterable, Hashable {
+nonisolated enum AxisBankCSVColumnRole: String, CaseIterable, Hashable {
     case date
     case chequeReference
     case description
@@ -17,7 +17,7 @@ enum AxisBankCSVColumnRole: String, CaseIterable, Hashable {
     case sol
 }
 
-enum AxisBankCSVColumnMappingError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankCSVColumnMappingError: Error, Equatable, LocalizedError {
     case missingRole(AxisBankCSVColumnRole)
     case duplicateRole(AxisBankCSVColumnRole)
     case ambiguousHeader(index: Int)
@@ -37,7 +37,7 @@ enum AxisBankCSVColumnMappingError: Error, Equatable, LocalizedError {
     }
 }
 
-struct AxisBankCSVColumnMapping {
+nonisolated struct AxisBankCSVColumnMapping {
     let date: Int
     let chequeReference: Int
     let description: Int
@@ -113,7 +113,7 @@ struct AxisBankCSVColumnMapping {
 /// Available immutable Axis bank-account evidence uses conventional semantics:
 /// a populated physical DR cell is a debit/outflow and a populated physical CR
 /// cell is a credit/inflow. Header resolution remains position-independent.
-enum AxisBankAccountCSVProfileV2 {
+nonisolated enum AxisBankAccountCSVProfileV2 {
     static func resolve(
         sourceDR: Decimal?,
         sourceCR: Decimal?
@@ -136,7 +136,7 @@ enum AxisBankAccountCSVProfileV2 {
 /// those physical source labels, so the two source columns are reversed when
 /// resolving direction.  This profile is CSV-only; the Axis XLS parser keeps
 /// using `AxisBankAccountCSVProfileV2` for its conventionally labelled sheet.
-enum AxisBankAccountCSVProfileV3 {
+nonisolated enum AxisBankAccountCSVProfileV3 {
     static func resolve(
         sourceDR: Decimal?,
         sourceCR: Decimal?
@@ -151,7 +151,7 @@ enum AxisBankAccountCSVProfileV3 {
     }
 }
 
-enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
+nonisolated enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case missingHeader
     case malformedTransactionRow(rowNumber: Int)
     case invalidDate(rowNumber: Int)
@@ -210,7 +210,7 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class AxisBankAccountParser: StatementParser {
+nonisolated final class AxisBankAccountParser: StatementParser {
 
     private enum FinancialDirectionMapping: CaseIterable {
         case conventional
@@ -436,7 +436,8 @@ final class AxisBankAccountParser: StatementParser {
                         normalizedRecordDigest: String.normalizedRecordDigest(values: parsed.row.values),
                         parserProfileID: Self.profileID,
                         parserProfileVersion: Self.profileVersion,
-                        structuredReferenceDigest: parsed.reference.digest
+                        structuredReferenceDigest: parsed.reference.digest,
+                        literalRunningBalance: parsed.row.rawValues?[mapping.balance] ?? parsed.row.values[mapping.balance]
                     )
                 ],
                 verifiedAxisUPIEventEvidence:

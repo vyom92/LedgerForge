@@ -223,7 +223,13 @@ final class AlDarReferenceSessionTests: XCTestCase {
         XCTAssertEqual(AlDarReferenceAge(fetchedAt: sameInstantInQatar, now: nowInTokyo).caption, "Fetched 3 hours ago")
         XCTAssertEqual(AlDarReferenceAge(fetchedAt: fetch, now: fetch).colorPosition, 0)
         XCTAssertEqual(AlDarReferenceAge(fetchedAt: fetch, now: fetch.addingTimeInterval(86_400)).colorPosition, 1)
-        XCTAssertEqual(AlDarReferenceAge(fetchedAt: fetch, now: fetch.addingTimeInterval(4 * 86_400)).colorPosition, 2)
+        XCTAssertEqual(AlDarReferenceAge(fetchedAt: fetch, now: fetch.addingTimeInterval(6 * 86_400)).colorPosition, 2)
+        let friday = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-18T09:00:00Z"))
+        let monday = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-21T09:00:00Z"))
+        let age = AlDarReferenceAge(fetchedAt: friday, now: monday)
+        XCTAssertEqual(age.caption, "Fetched 3 days ago")
+        XCTAssertEqual(age.colorPosition, 1)
+        XCTAssertEqual(age.freshnessSeconds, 86_400)
     }
 }
 

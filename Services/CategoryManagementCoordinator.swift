@@ -67,6 +67,7 @@ enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
     case persistenceUnavailable
     case lifecycleUnavailable
     case repository(CategoryRepositoryError)
+    case automation(CategoryAutomationError)
     case saveFailed
     case savedButRefreshFailed
     case reconciliationRequired
@@ -83,6 +84,8 @@ enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
             return "Categories are unavailable while persistence is unavailable."
         case .lifecycleUnavailable:
             return "Categories are unavailable while the database lifecycle is changing."
+        case .automation(let error):
+            return error.localizedDescription
         case .repository(let error):
             return error.localizedDescription
         case .saveFailed:
@@ -271,6 +274,45 @@ final class CategoryManagementCoordinator: CategoryManaging {
 #endif
     }
 
+    func saveRule(_ rule: CategoryRule, previousVersion: Int?, expectedGeneration: ProviderGenerationToken) throws {
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
+            guard provider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
+            try provider.categoryRepo.saveRule(rule, previousVersion: previousVersion)
+            return true
+        }
+#if DEBUG
+        _ = try mutate(protectedAction: .categoryCreate, operation)
+#else
+        _ = try mutate(operation)
+#endif
+    }
+
+    func deleteRule(_ rule: CategoryRule, expectedGeneration: ProviderGenerationToken) throws {
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
+            guard provider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
+            try provider.categoryRepo.deleteRule(id: rule.id, workspaceId: self.workspaceID, version: rule.version)
+            return true
+        }
+#if DEBUG
+        _ = try mutate(protectedAction: .categoryDelete, operation)
+#else
+        _ = try mutate(operation)
+#endif
+    }
+
+    @discardableResult
+    func applyEvaluation(_ evaluation: CategoryEvaluation, historical: Bool, expectedGeneration: ProviderGenerationToken) throws -> Bool {
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
+            guard provider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
+            return try provider.categoryRepo.applyCategoryEvaluation(evaluation, workspaceId: self.workspaceID, historical: historical) > 0
+        }
+#if DEBUG
+        return try mutate(protectedAction: .transactionCategoryAssignment, operation)
+#else
+        return try mutate(operation)
+#endif
+    }
+
     func retryCanonicalHydration() throws -> CategoryReconciliationRetryResult {
         let lease: DatabaseActivityLease
         do {
@@ -347,6 +389,8 @@ final class CategoryManagementCoordinator: CategoryManaging {
         let changed: Bool
         do {
             changed = try operation(currentProvider, Self.timestamp())
+        } catch let error as CategoryAutomationError {
+            throw CategoryManagementCoordinatorError.automation(error)
         } catch let error as CategoryRepositoryError {
             throw CategoryManagementCoordinatorError.repository(error)
         } catch {

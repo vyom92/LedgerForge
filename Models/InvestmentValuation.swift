@@ -192,6 +192,9 @@ nonisolated enum InvestmentPriceDateBasis: String, Codable, Sendable {
 }
 
 nonisolated enum InvestmentPriceDates {
+    static func fetchInstant(_ date: Date) -> String {
+        AppDateDisplay.timestamp(date, zone: TimeZone(secondsFromGMT: 0)!)
+    }
     static func calendar(_ zone: String = "UTC") -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: zone) ?? TimeZone(secondsFromGMT: 0)!
@@ -226,7 +229,7 @@ nonisolated enum InvestmentPriceDates {
         formatter.locale = Locale(identifier: "en_GB")
         formatter.calendar = calendar()
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "dd MMM yyyy"
+        formatter.dateFormat = "dd MMM yy"
         return formatter.string(from: date)
     }
 
@@ -234,6 +237,45 @@ nonisolated enum InvestmentPriceDates {
         if let instant { return max(0, Int(now.timeIntervalSince(instant) / 86_400)) }
         guard let date = date(day, zone: zone) else { return 4 }
         return max(0, calendar(zone).dateComponents([.day], from: date, to: calendar(zone).startOfDay(for: now)).day ?? 4)
+    }
+
+    static func freshnessAge(day: String, instant: Date?, zone: String, now: Date) -> Int {
+        if let instant { return Int(WeekdayFreshness.seconds(from: instant, to: now, zone: zone) / 86_400) }
+        guard let date = date(day, zone: zone) else { return 4 }
+        return WeekdayFreshness.days(from: date, to: now, zone: zone)
+    }
+}
+
+/// Presentation freshness excludes weekends. Source dates, elapsed-age captions,
+/// quote validation and refresh scheduling keep their original meaning.
+nonisolated enum WeekdayFreshness {
+    static func days(from start: Date, to end: Date, zone: String = "UTC") -> Int {
+        let calendar = InvestmentPriceDates.calendar(zone)
+        let first = calendar.startOfDay(for: start), last = calendar.startOfDay(for: end)
+        let count = max(0, calendar.dateComponents([.day], from: first, to: last).day ?? 0)
+        let weekday = calendar.component(.weekday, from: first)
+        return count / 7 * 5 + (0..<(count % 7)).filter { offset in
+            let next = (weekday + offset) % 7 + 1
+            return next != 1 && next != 7
+        }.count
+    }
+
+    static func seconds(from start: Date, to end: Date, zone: String = "UTC") -> TimeInterval {
+        guard start < end else { return 0 }
+        let calendar = InvestmentPriceDates.calendar(zone)
+        var cursor = start, result: TimeInterval = 0
+        while cursor < end {
+            guard let boundary = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: cursor)), boundary > cursor else { break }
+            let next = min(boundary, end)
+            if ![1, 7].contains(calendar.component(.weekday, from: cursor)) { result += next.timeIntervalSince(cursor) }
+            cursor = next
+        }
+        return result
+    }
+
+    static func colorPosition(days: Double) -> Double {
+        let age = max(0, days)
+        return age <= 1 ? age : min(2, 1 + (age - 1) / 3)
     }
 }
 
@@ -263,6 +305,10 @@ nonisolated struct InvestmentQuote: Equatable, Codable, Sendable {
 
     func age(at now: Date) -> Int {
         InvestmentPriceDates.age(day: valuationDay, instant: valuationInstant, zone: calendarTimeZone, now: now)
+    }
+
+    func freshnessAge(at now: Date) -> Int {
+        InvestmentPriceDates.freshnessAge(day: valuationDay, instant: valuationInstant, zone: calendarTimeZone, now: now)
     }
 
     /// A successful identical FE response proves retrieval, not a new valuation date.

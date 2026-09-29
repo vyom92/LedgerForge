@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct Document: Identifiable {
+nonisolated struct Document: Identifiable, Sendable {
 
     let id = UUID()
 

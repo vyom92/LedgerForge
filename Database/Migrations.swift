@@ -2873,7 +2873,549 @@ CREATE INDEX investment_containers_workspace ON investment_containers(workspace_
 CREATE INDEX investment_holdings_container ON investment_holdings(container_id);
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22]
+// Owner-approved Sprint-98 inbox/backup checkpoint. Originals are unchanged
+// attachment bytes, never decrypted or extracted statement representations.
+nonisolated public let migrationV23 = Migration(version: 23, name: "gmail_original_inbox_and_receipts", sql: """
+CREATE TABLE gmail_originals (
+    sha256 TEXT PRIMARY KEY NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'),
+    byte_count INTEGER NOT NULL CHECK(byte_count>0 AND byte_count<=33554432),
+    original_bytes BLOB NOT NULL CHECK(typeof(original_bytes)='blob' AND length(original_bytes)=byte_count)
+);
+CREATE TABLE gmail_inbox_state (
+    account TEXT PRIMARY KEY NOT NULL CHECK(length(account)>0 AND lower(account)=account),
+    revision INTEGER NOT NULL CHECK(revision>0),
+    state_json TEXT NOT NULL CHECK(json_valid(state_json)),
+    CHECK(json_extract(state_json,'$.formatVersion')=1),
+    CHECK(json_extract(state_json,'$.account')=account),
+    CHECK(json_extract(state_json,'$.revision')=revision)
+);
+""")
+
+// Additive source-section ownership for bank statements.  V11 remains the
+// historical positive-row CBQ-current overlap graph; V24 is intentionally
+// separate so zero-row identity/control observations have no transaction
+// presence dependency and later approved combined-bank sections can reuse it.
+nonisolated public let migrationV24 = Migration(version: 24, name: "bank_statement_sections_and_occurrence_provenance", sql: """
+CREATE TABLE bank_statement_sections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL CHECK(parser_profile_id IN ('cbq.current-account.monthly.pdf','cbq.savings-account.legacy.pdf','cbq.savings-account.monthly.pdf','cbq.e-savings-account.monthly.pdf','axis.relationship-bank.pdf','hdfc.relationship-bank.pdf','axis.bank-account.csv','axis.bank-account.pdf','axis.bank-account.xls','hdfc.bank-account.pdf','hdfc.bank-account.xls')),
+  parser_profile_version TEXT NOT NULL CHECK((parser_profile_id='axis.bank-account.csv' AND parser_profile_version='3') OR (parser_profile_id!='axis.bank-account.csv' AND parser_profile_version='1')),
+  native_currency TEXT NOT NULL CHECK(native_currency IN ('QAR','INR')),
+  source_format_code TEXT NOT NULL,
+  product_label TEXT NOT NULL,
+  section_ordinal INTEGER NOT NULL DEFAULT 1 CHECK(section_ordinal > 0),
+  source_range_start INTEGER,
+  source_range_end INTEGER,
+  statement_boundary_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  opening_balance_minor INTEGER,
+  opening_balance_decimal TEXT,
+  closing_balance_minor INTEGER,
+  closing_balance_decimal TEXT,
+  source_row_count INTEGER NOT NULL CHECK(source_row_count >= 0),
+  source_details_json TEXT,
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, section_ordinal),
+  CHECK((source_range_start IS NULL AND source_range_end IS NULL) OR (source_range_start IS NOT NULL AND source_range_end IS NOT NULL AND source_range_start > 0 AND source_range_start <= source_range_end)),
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK((opening_balance_minor IS NULL) = (opening_balance_decimal IS NULL)),
+  CHECK((closing_balance_minor IS NULL) = (closing_balance_decimal IS NULL)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_bank_statement_sections_account ON bank_statement_sections(workspace_id, account_id, created_at);
+CREATE TABLE bank_section_identity_observations (
+  id TEXT PRIMARY KEY, bank_statement_section_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('cbq_masked_account_number','cbq_masked_iban','axis_masked_account_number','axis_account_number','hdfc_account_number')),
+  pattern TEXT NOT NULL, created_at DATETIME NOT NULL, UNIQUE(bank_statement_section_id, kind),
+  CHECK((kind = 'cbq_masked_account_number' AND length(pattern)=13 AND pattern NOT GLOB '*[^0-9X]*') OR (kind = 'cbq_masked_iban' AND length(pattern)=29 AND pattern NOT GLOB '*[^0-9A-Z]*' AND substr(pattern,1,2)='QA' AND substr(pattern,5,4)='CBQA') OR (kind = 'axis_masked_account_number' AND length(pattern)=15 AND pattern NOT GLOB '*[^0-9X]*') OR (kind='axis_account_number' AND length(pattern)=15 AND pattern NOT GLOB '*[^0-9]*') OR (kind='hdfc_account_number' AND length(pattern)=14 AND pattern NOT GLOB '*[^0-9]*')),
+  FOREIGN KEY(bank_statement_section_id) REFERENCES bank_statement_sections(id) ON DELETE RESTRICT
+);
+CREATE TABLE bank_transaction_occurrences (
+  id TEXT PRIMARY KEY, bank_statement_section_id TEXT NOT NULL, canonical_transaction_id TEXT NOT NULL,
+  normalized_row_id TEXT NOT NULL UNIQUE, source_ordinal INTEGER NOT NULL CHECK(source_ordinal>0), posting_date DATE NOT NULL,
+  source_transaction_date DATE, value_date DATE, native_currency TEXT NOT NULL CHECK(native_currency IN ('QAR','INR')), signed_amount_minor INTEGER NOT NULL CHECK(signed_amount_minor!=0), signed_amount_decimal TEXT NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('debit','credit')), running_balance_minor INTEGER NOT NULL, running_balance_decimal TEXT NOT NULL, literal_narration TEXT NOT NULL, literal_reference TEXT, literal_balance TEXT NOT NULL,
+  structured_reference_digest TEXT CHECK(structured_reference_digest IS NULL OR (length(structured_reference_digest)=64 AND structured_reference_digest NOT GLOB '*[^0-9a-f]*')),
+  created_at DATETIME NOT NULL, UNIQUE(bank_statement_section_id, source_ordinal),
+  FOREIGN KEY(bank_statement_section_id) REFERENCES bank_statement_sections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(canonical_transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT
+);
+CREATE TRIGGER validate_bank_statement_section BEFORE INSERT ON bank_statement_sections BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id=NEW.account_id AND a.workspace_id=NEW.workspace_id AND a.account_type='bank' AND a.native_currency=NEW.native_currency) THEN RAISE(ABORT,'bank section account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM documents d JOIN import_sessions s ON s.id=d.import_session_id JOIN normalized_documents n ON n.document_id=d.id AND n.import_session_id=s.id WHERE d.id=NEW.document_id AND s.id=NEW.import_session_id AND n.id=NEW.normalized_document_id AND d.workspace_id=NEW.workspace_id AND n.profile_id=NEW.parser_profile_id AND n.profile_version=NEW.parser_profile_version) THEN RAISE(ABORT,'bank section source relationship invalid') END;
+END;
+CREATE TRIGGER validate_bank_transaction_occurrence BEFORE INSERT ON bank_transaction_occurrences BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM bank_statement_sections s JOIN transactions t ON t.id=NEW.canonical_transaction_id JOIN normalized_rows r ON r.id=NEW.normalized_row_id JOIN normalized_documents n ON n.id=r.normalized_document_id WHERE s.id=NEW.bank_statement_section_id AND t.account_id=s.account_id AND n.id=s.normalized_document_id AND t.posted_date=NEW.posting_date) THEN RAISE(ABORT,'bank occurrence source relationship invalid') END;
+END;
+-- Extend the existing zero-control trigger only in the additive schema tail.
+-- Accepted V1-V23 identities remain unchanged.
+DROP TRIGGER validate_statement_zero_activity_control;
+CREATE TRIGGER validate_statement_zero_activity_control
+BEFORE INSERT ON statement_zero_activity_controls
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+      AND a.native_currency = NEW.native_currency
+      AND ((NEW.institution_code = 'axis' AND a.institution_id = 'Axis Bank') OR
+           (NEW.institution_code = 'hdfc' AND a.institution_id = 'HDFC Bank') OR
+           (NEW.institution_code = 'cbq' AND a.institution_id = 'Commercial Bank of Qatar') OR
+           (NEW.institution_code = 'amex' AND a.institution_id = 'American Express'))
+      AND ((NEW.statement_family_code LIKE '%.credit-card' AND a.account_type = 'credit_card') OR
+           (NEW.statement_family_code NOT LIKE '%.credit-card' AND a.account_type = 'bank'))
+  ) THEN RAISE(ABORT, 'zero activity account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND d.workspace_id = NEW.workspace_id
+      AND s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+      AND n.id = NEW.normalized_document_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'zero activity source relationship invalid') END;
+  SELECT CASE WHEN 1 != (
+    SELECT COUNT(*) FROM document_fingerprints f
+    WHERE f.document_id = NEW.document_id AND f.import_session_id = NEW.import_session_id
+      AND f.algorithm = NEW.source_fingerprint_algorithm
+      AND f.fingerprint = NEW.source_fingerprint_digest
+      AND f.is_duplicate_authority = 1
+  ) THEN RAISE(ABORT, 'zero activity source fingerprint relationship invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id = 'axis.bank-account.csv' AND NEW.parser_profile_version = '3' AND NEW.source_format_code = 'csv' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.history.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.savings-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.savings-account') OR
+    (NEW.parser_profile_id = 'cbq.e-savings-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.e-savings-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND NEW.statement_family_code = 'amex.credit-card') OR
+    (NEW.parser_profile_id = 'cbq.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xlsx' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/source format binding invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id = 'cbq.current-account.history.pdf' AND NEW.statement_date IS NOT NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND
+      ((NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL) OR
+       (NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL))) OR
+    (NEW.parser_profile_id NOT IN ('cbq.current-account.history.pdf', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity temporal authority invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.financial_region_source_unit IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx'))
+  ) THEN RAISE(ABORT, 'Axis zero activity requires typed financial region bounds') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.evidence_kind = 'exhausted_financial_region' AND
+      NEW.opening_balance_minor IS NULL AND NEW.opening_balance_decimal IS NULL AND
+      NEW.closing_balance_minor IS NULL AND NEW.closing_balance_decimal IS NULL AND
+      NEW.debit_total_minor IS NULL AND NEW.debit_total_decimal IS NULL AND
+      NEW.credit_total_minor IS NULL AND NEW.credit_total_decimal IS NULL AND
+      NEW.card_previous_balance_minor IS NOT NULL AND NEW.card_previous_balance_decimal IS NOT NULL AND
+      NEW.card_total_payment_due_minor IS NOT NULL AND NEW.card_total_payment_due_decimal IS NOT NULL AND
+      NEW.card_previous_balance_minor = NEW.card_total_payment_due_minor AND
+      NEW.card_previous_balance_decimal = NEW.card_total_payment_due_decimal AND
+      NEW.card_payment_due_date IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.card_previous_balance_minor IS NULL AND NEW.card_previous_balance_decimal IS NULL AND
+      NEW.card_total_payment_due_minor IS NULL AND NEW.card_total_payment_due_decimal IS NULL AND
+      NEW.card_payment_due_date IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity card controls invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.institution_code IN ('axis', 'hdfc') AND NEW.native_currency = 'INR') OR
+    (NEW.institution_code IN ('cbq', 'amex') AND NEW.native_currency = 'QAR')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/native currency binding invalid') END;
+  SELECT CASE WHEN NEW.authority_role = 'supporting' AND 1 != (
+    SELECT COUNT(*) FROM statement_zero_activity_controls a
+    WHERE a.workspace_id = NEW.workspace_id AND a.account_id = NEW.account_id
+      AND a.institution_code = NEW.institution_code AND a.statement_family_code = NEW.statement_family_code
+      AND a.semantic_cycle_key = NEW.semantic_cycle_key AND a.native_currency = NEW.native_currency
+      AND a.semantic_digest = NEW.semantic_digest AND a.authority_role = 'authoritative'
+  ) THEN RAISE(ABORT, 'zero activity supporting source has no authority') END;
+END;
+""")
+
+nonisolated public let migrationV25 = Migration(version: 25, name: "background_update_receipts", sql: """
+CREATE TABLE background_update_receipts (
+  job_kind TEXT PRIMARY KEY NOT NULL CHECK(job_kind IN ('public_references','gmail_collection','zurich_isp')),
+  claim_id TEXT NOT NULL,
+  activation_epoch TEXT NOT NULL,
+  claimed_at TEXT NOT NULL,
+  completed_at TEXT,
+  outcome TEXT,
+  origin TEXT NOT NULL CHECK(origin IN ('foreground','helper')),
+  CHECK((completed_at IS NULL AND outcome IS NULL) OR (completed_at IS NOT NULL AND outcome IS NOT NULL))
+);
+CREATE TABLE background_schedule_configuration (
+  singleton INTEGER PRIMARY KEY NOT NULL CHECK(singleton = 1),
+  configuration_json BLOB
+);
+INSERT INTO background_schedule_configuration(singleton, configuration_json)
+VALUES(1, NULL);
+CREATE TABLE background_public_progress (leg_id TEXT PRIMARY KEY NOT NULL, record_json BLOB NOT NULL);
+CREATE TABLE background_al_dar_reference_cache (
+  currency TEXT PRIMARY KEY NOT NULL CHECK(currency IN ('INR', 'USD')),
+  raw_token TEXT NOT NULL,
+  fetched_at TEXT NOT NULL
+);
+CREATE TABLE background_investment_quote_cache (
+  identity TEXT PRIMARY KEY NOT NULL,
+  quote_json BLOB NOT NULL
+);
+""")
+
+
+nonisolated public let migrationV26 = Migration(version: 26, name: "bank_section_currency_profiles_and_amex_usd_zero", sql: """
+-- Rebuild only V24 bank provenance tables: SQLite cannot widen their CHECK
+-- constraints in place. Foreign keys remain enabled for the entire migration.
+DROP TRIGGER validate_bank_transaction_occurrence;
+DROP TRIGGER validate_bank_statement_section;
+DROP INDEX idx_bank_statement_sections_account;
+
+ALTER TABLE bank_section_identity_observations RENAME TO bank_section_identity_observations_v26;
+ALTER TABLE bank_transaction_occurrences RENAME TO bank_transaction_occurrences_v26;
+ALTER TABLE bank_statement_sections RENAME TO bank_statement_sections_v26;
+
+CREATE TABLE bank_statement_sections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL CHECK(parser_profile_id IN ('cbq.current-account.monthly.pdf','cbq.current-account.legacy.pdf','cbq.current-account.usd-monthly.pdf','cbq.savings-account.legacy.pdf','cbq.savings-account.monthly.pdf','cbq.e-savings-account.monthly.pdf','axis.relationship-bank.pdf','hdfc.relationship-bank.pdf','axis.bank-account.csv','axis.bank-account.pdf','axis.bank-account.xls','hdfc.bank-account.pdf','hdfc.bank-account.xls')),
+  parser_profile_version TEXT NOT NULL CHECK((parser_profile_id='axis.bank-account.csv' AND parser_profile_version='3') OR (parser_profile_id!='axis.bank-account.csv' AND parser_profile_version='1')),
+  native_currency TEXT NOT NULL CHECK(native_currency IN ('QAR','INR','USD')),
+  source_format_code TEXT NOT NULL,
+  product_label TEXT NOT NULL,
+  section_ordinal INTEGER NOT NULL DEFAULT 1 CHECK(section_ordinal > 0),
+  source_range_start INTEGER,
+  source_range_end INTEGER,
+  statement_boundary_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  opening_balance_minor INTEGER,
+  opening_balance_decimal TEXT,
+  closing_balance_minor INTEGER,
+  closing_balance_decimal TEXT,
+  source_row_count INTEGER NOT NULL CHECK(source_row_count >= 0),
+  source_details_json TEXT,
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, section_ordinal),
+  CHECK((source_range_start IS NULL AND source_range_end IS NULL) OR (source_range_start IS NOT NULL AND source_range_end IS NOT NULL AND source_range_start > 0 AND source_range_start <= source_range_end)),
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK((opening_balance_minor IS NULL) = (opening_balance_decimal IS NULL)),
+  CHECK((closing_balance_minor IS NULL) = (closing_balance_decimal IS NULL)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE TABLE bank_section_identity_observations (
+  id TEXT PRIMARY KEY, bank_statement_section_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('cbq_masked_account_number','cbq_masked_iban','axis_masked_account_number','axis_account_number','hdfc_account_number')),
+  pattern TEXT NOT NULL, created_at DATETIME NOT NULL, UNIQUE(bank_statement_section_id, kind),
+  CHECK((kind = 'cbq_masked_account_number' AND length(pattern)=13 AND pattern NOT GLOB '*[^0-9X]*') OR (kind = 'cbq_masked_iban' AND length(pattern)=29 AND pattern NOT GLOB '*[^0-9A-Z]*' AND substr(pattern,1,2)='QA' AND substr(pattern,5,4)='CBQA') OR (kind = 'axis_masked_account_number' AND length(pattern)=15 AND pattern NOT GLOB '*[^0-9X]*') OR (kind='axis_account_number' AND length(pattern)=15 AND pattern NOT GLOB '*[^0-9]*') OR (kind='hdfc_account_number' AND length(pattern)=14 AND pattern NOT GLOB '*[^0-9]*')),
+  FOREIGN KEY(bank_statement_section_id) REFERENCES bank_statement_sections(id) ON DELETE RESTRICT
+);
+CREATE TABLE bank_transaction_occurrences (
+  id TEXT PRIMARY KEY, bank_statement_section_id TEXT NOT NULL, canonical_transaction_id TEXT NOT NULL,
+  normalized_row_id TEXT NOT NULL UNIQUE, source_ordinal INTEGER NOT NULL CHECK(source_ordinal>0), posting_date DATE NOT NULL,
+  source_transaction_date DATE, value_date DATE, native_currency TEXT NOT NULL CHECK(native_currency IN ('QAR','INR','USD')), signed_amount_minor INTEGER NOT NULL CHECK(signed_amount_minor!=0), signed_amount_decimal TEXT NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('debit','credit')), running_balance_minor INTEGER NOT NULL, running_balance_decimal TEXT NOT NULL, literal_narration TEXT NOT NULL, literal_reference TEXT, literal_balance TEXT NOT NULL,
+  structured_reference_digest TEXT CHECK(structured_reference_digest IS NULL OR (length(structured_reference_digest)=64 AND structured_reference_digest NOT GLOB '*[^0-9a-f]*')),
+  created_at DATETIME NOT NULL, UNIQUE(bank_statement_section_id, source_ordinal),
+  FOREIGN KEY(bank_statement_section_id) REFERENCES bank_statement_sections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(canonical_transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT
+);
+
+INSERT INTO bank_statement_sections (id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, native_currency, source_format_code, product_label, section_ordinal, source_range_start, source_range_end, statement_boundary_date, statement_start_date, statement_end_date, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, source_row_count, source_details_json, created_at)
+SELECT id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, native_currency, source_format_code, product_label, section_ordinal, source_range_start, source_range_end, statement_boundary_date, statement_start_date, statement_end_date, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, source_row_count, source_details_json, created_at FROM bank_statement_sections_v26;
+INSERT INTO bank_section_identity_observations (id, bank_statement_section_id, kind, pattern, created_at)
+SELECT id, bank_statement_section_id, kind, pattern, created_at FROM bank_section_identity_observations_v26;
+INSERT INTO bank_transaction_occurrences (id, bank_statement_section_id, canonical_transaction_id, normalized_row_id, source_ordinal, posting_date, source_transaction_date, value_date, native_currency, signed_amount_minor, signed_amount_decimal, direction, running_balance_minor, running_balance_decimal, literal_narration, literal_reference, literal_balance, structured_reference_digest, created_at)
+SELECT id, bank_statement_section_id, canonical_transaction_id, normalized_row_id, source_ordinal, posting_date, source_transaction_date, value_date, native_currency, signed_amount_minor, signed_amount_decimal, direction, running_balance_minor, running_balance_decimal, literal_narration, literal_reference, literal_balance, structured_reference_digest, created_at FROM bank_transaction_occurrences_v26;
+
+DROP TABLE bank_transaction_occurrences_v26;
+DROP TABLE bank_section_identity_observations_v26;
+DROP TABLE bank_statement_sections_v26;
+
+CREATE INDEX idx_bank_statement_sections_account ON bank_statement_sections(workspace_id, account_id, created_at);
+CREATE TRIGGER validate_bank_statement_section BEFORE INSERT ON bank_statement_sections BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id=NEW.account_id AND a.workspace_id=NEW.workspace_id AND a.account_type='bank' AND a.native_currency=NEW.native_currency AND (
+      (NEW.parser_profile_id IN ('axis.relationship-bank.pdf', 'axis.bank-account.pdf') AND NEW.source_format_code='pdf' AND NEW.native_currency='INR' AND a.institution_id='Axis Bank') OR
+      (NEW.parser_profile_id='axis.bank-account.csv' AND NEW.source_format_code='csv' AND NEW.native_currency='INR' AND a.institution_id='Axis Bank') OR
+      (NEW.parser_profile_id='axis.bank-account.xls' AND NEW.source_format_code='xls' AND NEW.native_currency='INR' AND a.institution_id='Axis Bank') OR
+      (NEW.parser_profile_id IN ('hdfc.relationship-bank.pdf', 'hdfc.bank-account.pdf') AND NEW.source_format_code='pdf' AND NEW.native_currency='INR' AND a.institution_id='HDFC Bank') OR
+      (NEW.parser_profile_id='hdfc.bank-account.xls' AND NEW.source_format_code='xls' AND NEW.native_currency='INR' AND a.institution_id='HDFC Bank') OR
+      (NEW.parser_profile_id IN ('cbq.current-account.legacy.pdf', 'cbq.savings-account.legacy.pdf') AND NEW.source_format_code='legacy-pdf' AND NEW.native_currency='QAR' AND a.institution_id='Commercial Bank of Qatar') OR
+      (NEW.parser_profile_id IN ('cbq.current-account.monthly.pdf', 'cbq.savings-account.monthly.pdf', 'cbq.e-savings-account.monthly.pdf') AND NEW.source_format_code='monthly-pdf' AND NEW.native_currency='QAR' AND a.institution_id='Commercial Bank of Qatar') OR
+      (NEW.parser_profile_id='cbq.current-account.usd-monthly.pdf' AND NEW.source_format_code='monthly-pdf' AND NEW.native_currency='USD' AND a.institution_id='Commercial Bank of Qatar')
+    )
+  ) THEN RAISE(ABORT,'bank section account/profile relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM documents d JOIN import_sessions s ON s.id=d.import_session_id JOIN normalized_documents n ON n.document_id=d.id AND n.import_session_id=s.id WHERE d.id=NEW.document_id AND s.id=NEW.import_session_id AND n.id=NEW.normalized_document_id AND d.workspace_id=NEW.workspace_id AND n.profile_id=NEW.parser_profile_id AND n.profile_version=NEW.parser_profile_version) THEN RAISE(ABORT,'bank section source relationship invalid') END;
+END;
+CREATE TRIGGER validate_bank_transaction_occurrence BEFORE INSERT ON bank_transaction_occurrences BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM bank_statement_sections s JOIN transactions t ON t.id=NEW.canonical_transaction_id JOIN normalized_rows r ON r.id=NEW.normalized_row_id JOIN normalized_documents n ON n.id=r.normalized_document_id WHERE s.id=NEW.bank_statement_section_id AND t.account_id=s.account_id AND n.id=s.normalized_document_id AND t.posted_date=NEW.posting_date) THEN RAISE(ABORT,'bank occurrence source relationship invalid') END;
+END;
+
+DROP TRIGGER validate_statement_zero_activity_control;
+CREATE TRIGGER validate_statement_zero_activity_control
+BEFORE INSERT ON statement_zero_activity_controls
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+      AND a.native_currency = NEW.native_currency
+      AND ((NEW.institution_code = 'axis' AND a.institution_id = 'Axis Bank') OR
+           (NEW.institution_code = 'hdfc' AND a.institution_id = 'HDFC Bank') OR
+           (NEW.institution_code = 'cbq' AND a.institution_id = 'Commercial Bank of Qatar') OR
+           (NEW.institution_code = 'amex' AND a.institution_id = 'American Express'))
+      AND ((NEW.statement_family_code LIKE '%.credit-card' AND a.account_type = 'credit_card') OR
+           (NEW.statement_family_code NOT LIKE '%.credit-card' AND a.account_type = 'bank'))
+  ) THEN RAISE(ABORT, 'zero activity account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND d.workspace_id = NEW.workspace_id
+      AND s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+      AND n.id = NEW.normalized_document_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'zero activity source relationship invalid') END;
+  SELECT CASE WHEN 1 != (
+    SELECT COUNT(*) FROM document_fingerprints f
+    WHERE f.document_id = NEW.document_id AND f.import_session_id = NEW.import_session_id
+      AND f.algorithm = NEW.source_fingerprint_algorithm
+      AND f.fingerprint = NEW.source_fingerprint_digest
+      AND f.is_duplicate_authority = 1
+  ) THEN RAISE(ABORT, 'zero activity source fingerprint relationship invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id = 'axis.bank-account.csv' AND NEW.parser_profile_version = '3' AND NEW.source_format_code = 'csv' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.history.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.legacy.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.usd-monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.savings-account.legacy.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.savings-account') OR
+    (NEW.parser_profile_id = 'cbq.savings-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.savings-account') OR
+    (NEW.parser_profile_id = 'cbq.e-savings-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.e-savings-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND NEW.statement_family_code = 'amex.credit-card') OR
+    (NEW.parser_profile_id = 'cbq.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xlsx' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/source format binding invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('cbq.current-account.history.pdf', 'cbq.current-account.legacy.pdf', 'cbq.savings-account.legacy.pdf') AND NEW.statement_date IS NOT NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND
+      ((NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL) OR
+       (NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL))) OR
+    (NEW.parser_profile_id NOT IN ('cbq.current-account.history.pdf', 'cbq.current-account.legacy.pdf', 'cbq.savings-account.legacy.pdf', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity temporal authority invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.financial_region_source_unit IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx'))
+  ) THEN RAISE(ABORT, 'Axis zero activity requires typed financial region bounds') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.evidence_kind = 'exhausted_financial_region' AND
+      NEW.opening_balance_minor IS NULL AND NEW.opening_balance_decimal IS NULL AND
+      NEW.closing_balance_minor IS NULL AND NEW.closing_balance_decimal IS NULL AND
+      NEW.debit_total_minor IS NULL AND NEW.debit_total_decimal IS NULL AND
+      NEW.credit_total_minor IS NULL AND NEW.credit_total_decimal IS NULL AND
+      NEW.card_previous_balance_minor IS NOT NULL AND NEW.card_previous_balance_decimal IS NOT NULL AND
+      NEW.card_total_payment_due_minor IS NOT NULL AND NEW.card_total_payment_due_decimal IS NOT NULL AND
+      NEW.card_previous_balance_minor = NEW.card_total_payment_due_minor AND
+      NEW.card_previous_balance_decimal = NEW.card_total_payment_due_decimal AND
+      NEW.card_payment_due_date IS NOT NULL) OR
+    (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND
+      NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND
+      NEW.statement_family_code = 'amex.credit-card' AND NEW.native_currency = 'USD' AND
+      NEW.evidence_kind = 'printed_controls' AND
+      NEW.opening_balance_minor IS NOT NULL AND NEW.opening_balance_decimal IS NOT NULL AND
+      NEW.closing_balance_minor = NEW.opening_balance_minor AND
+      NEW.closing_balance_decimal = NEW.opening_balance_decimal AND
+      NEW.debit_total_minor = 0 AND NEW.debit_total_decimal = '0.00' AND
+      NEW.credit_total_minor = 0 AND NEW.credit_total_decimal = '0.00' AND
+      NEW.card_previous_balance_minor IS NULL AND NEW.card_previous_balance_decimal IS NULL AND
+      NEW.card_total_payment_due_minor IS NULL AND NEW.card_total_payment_due_decimal IS NULL AND
+      NEW.card_payment_due_date IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND NOT
+      (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND
+       NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND
+       NEW.statement_family_code = 'amex.credit-card' AND NEW.native_currency = 'USD') AND
+      NEW.card_previous_balance_minor IS NULL AND NEW.card_previous_balance_decimal IS NULL AND
+      NEW.card_total_payment_due_minor IS NULL AND NEW.card_total_payment_due_decimal IS NULL AND
+      NEW.card_payment_due_date IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity card controls invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.institution_code IN ('axis', 'hdfc') AND NEW.native_currency = 'INR') OR
+    (NEW.native_currency = 'QAR') OR
+    (NEW.parser_profile_id = 'cbq.current-account.usd-monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account' AND NEW.native_currency = 'USD') OR
+    (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND NEW.statement_family_code = 'amex.credit-card' AND NEW.native_currency = 'USD')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/native currency binding invalid') END;
+  SELECT CASE WHEN NEW.authority_role = 'supporting' AND 1 != (
+    SELECT COUNT(*) FROM statement_zero_activity_controls a
+    WHERE a.workspace_id = NEW.workspace_id AND a.account_id = NEW.account_id
+      AND a.institution_code = NEW.institution_code AND a.statement_family_code = NEW.statement_family_code
+      AND a.semantic_cycle_key = NEW.semantic_cycle_key AND a.native_currency = NEW.native_currency
+      AND a.semantic_digest = NEW.semantic_digest AND a.authority_role = 'authoritative'
+  ) THEN RAISE(ABORT, 'zero activity supporting source has no authority') END;
+END;
+""")
+
+// Sparse owner metadata: source/holding replacement cannot discard an exclusion.
+// The existing backup package retains these rows with their canonical parents.
+nonisolated public let migrationV27 = Migration(version: 27, name: "current_reporting_exclusions", sql: """
+CREATE TABLE net_worth_exclusions (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+  container_id TEXT REFERENCES investment_containers(id) ON DELETE RESTRICT,
+  CHECK ((account_id IS NOT NULL AND container_id IS NULL) OR
+         (account_id IS NULL AND container_id IS NOT NULL)),
+  UNIQUE (workspace_id, account_id),
+  UNIQUE (workspace_id, container_id)
+);
+CREATE TRIGGER net_worth_exclusion_insert_guard BEFORE INSERT ON net_worth_exclusions
+BEGIN
+  SELECT CASE WHEN NEW.account_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM accounts WHERE id = NEW.account_id AND workspace_id = NEW.workspace_id
+      AND account_type IN ('bank', 'credit_card')
+  ) THEN RAISE(ABORT, 'invalid reporting account') END;
+  SELECT CASE WHEN NEW.container_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM investment_containers WHERE id = NEW.container_id AND workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'invalid reporting container') END;
+END;
+CREATE TRIGGER net_worth_exclusion_update_guard BEFORE UPDATE ON net_worth_exclusions
+BEGIN
+  SELECT RAISE(ABORT, 'replace reporting choice through delete and insert');
+END;
+""")
+
+// S99 owner metadata. Financial rows remain immutable; only genuinely inserted
+// trusted transaction IDs acquire classification work, in the importing transaction.
+// There is deliberately no migration backfill of assignments or historical work.
+nonisolated public let migrationV28 = Migration(version: 28, name: "financial_intelligence_metadata", sql: """
+CREATE TABLE category_rules (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+  account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+  version INTEGER NOT NULL CHECK(version > 0),
+  rule_json TEXT NOT NULL
+);
+CREATE INDEX category_rules_workspace ON category_rules(workspace_id);
+CREATE TABLE transaction_category_intent (
+  transaction_id TEXT PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK(kind IN ('automatic','manual','deliberatelyCleared')),
+  category_id TEXT REFERENCES categories(id) ON DELETE RESTRICT,
+  matches_json TEXT NOT NULL,
+  CHECK((kind = 'deliberatelyCleared' AND category_id IS NULL) OR
+        (kind <> 'deliberatelyCleared' AND category_id IS NOT NULL))
+);
+CREATE TABLE category_import_work (
+  transaction_id TEXT PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  import_session_id TEXT NOT NULL REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  outcome TEXT NOT NULL CHECK(outcome IN ('pending','assigned','noMatch','conflict','protected','retryable')),
+  explanation TEXT NOT NULL,
+  origin TEXT NOT NULL DEFAULT 'newImport' CHECK(origin IN ('newImport','historical'))
+);
+CREATE INDEX category_work_workspace_outcome ON category_import_work(workspace_id,outcome);
+CREATE TRIGGER category_work_for_new_transaction AFTER INSERT ON transactions
+WHEN NEW.is_trusted = 1 AND NEW.import_session_id IS NOT NULL
+BEGIN
+  INSERT INTO category_import_work(transaction_id,workspace_id,import_session_id,outcome,explanation)
+  VALUES(NEW.id,NEW.workspace_id,NEW.import_session_id,'pending','Waiting for classification after import.');
+END;
+CREATE TRIGGER category_intent_insert_guard BEFORE INSERT ON transaction_category_intent
+BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM transactions WHERE id = NEW.transaction_id
+    AND workspace_id = NEW.workspace_id AND is_trusted = 1)
+    THEN RAISE(ABORT,'invalid category intent transaction') END;
+  SELECT CASE WHEN NEW.category_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM categories
+    WHERE id = NEW.category_id AND workspace_id = NEW.workspace_id)
+    THEN RAISE(ABORT,'invalid category intent category') END;
+END;
+CREATE TRIGGER category_intent_update_guard BEFORE UPDATE ON transaction_category_intent
+BEGIN
+  SELECT RAISE(ABORT,'replace category intent through delete and insert');
+END;
+CREATE TABLE movement_events (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  decision TEXT NOT NULL CHECK(decision IN ('confirmed','rejected')),
+  event_json TEXT NOT NULL
+);
+CREATE TABLE movement_legs (
+  transaction_id TEXT PRIMARY KEY REFERENCES transactions(id) ON DELETE RESTRICT,
+  event_id TEXT NOT NULL REFERENCES movement_events(id) ON DELETE CASCADE
+);
+CREATE INDEX movement_events_workspace ON movement_events(workspace_id);
+CREATE TABLE recurring_definitions (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+  definition_json TEXT NOT NULL
+);
+CREATE TABLE recurring_occurrences (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  definition_id TEXT NOT NULL REFERENCES recurring_definitions(id) ON DELETE RESTRICT,
+  occurrence_json TEXT NOT NULL
+);
+CREATE TABLE reserve_designations (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  account_id TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+  designation_json TEXT NOT NULL
+);
+CREATE TABLE plan_assistance (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  plan_month TEXT NOT NULL,
+  assistance_json TEXT NOT NULL,
+  PRIMARY KEY(workspace_id,plan_month)
+);
+CREATE TABLE salary_assistance (
+  transaction_id TEXT PRIMARY KEY REFERENCES transactions(id) ON DELETE RESTRICT,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  assistance_json TEXT NOT NULL
+);
+CREATE TABLE intelligence_preferences (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE RESTRICT,
+  preferences_json TEXT NOT NULL
+);
+""")
+
+nonisolated public let migrationV29 = Migration(version: 29, name: "Captured planning balance dates", sql: """
+ALTER TABLE funding_plan_balances ADD COLUMN financial_balance_date DATE;
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

@@ -8,7 +8,7 @@ One numeric register of accepted architecture. Current [product state](PROJECT_S
 2. Apply later accepted ADRs and explicit owner decisions where they supersede earlier limits.
 3. Check current state for implementation/support and the approved prompt for execution authority.
 
-Order inherits [Guide rule G](Project_Guide.md#documentation-order): ADR number ascending; dated alignments newest first, undated alignments after dated ones; original record interiors remain unchanged. No new ADR number is allocated here. Schema/fixture/protocol capacity is not production support. Historical artifact permissions do not override the current owner source-processing rule.
+Order inherits [Guide rule G](Project_Guide.md#documentation-order): ADR number ascending; dated alignments newest first, undated alignments after dated ones; original record interiors remain unchanged. Schema/fixture/protocol capacity is not production support. Historical artifact permissions do not override the current owner source-processing rule.
 
 ## Current scope applicability — 2026-09-11
 
@@ -65,6 +65,7 @@ Order inherits [Guide rule G](Project_Guide.md#documentation-order): ADR number 
 | [ADR-045](#adr-045) | Qatar Airways Salary Actuals and Current-Month Funding Planner |
 | [ADR-046](#adr-046) | Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation |
 | [ADR-047](#adr-047) | Verified User Backup and Receipt-Owned Restore |
+| [ADR-048](#adr-048) | Enrolled Background Worker and Shared Ledger Activation Authority |
 
 <a id="adr-001"></a>
 
@@ -2308,11 +2309,11 @@ Users gain durable, privacy-safe explanation of supported import outcomes withou
 <a id="adr-033"></a>
 
 # ADR-033 — Deterministic Money and Native-Currency Integrity
-## Current Alignment — 2026-08-17
+## Current Alignment — 2026-09-19
 
 - **Decision standing:** Accepted and implemented in Sprint 44.
-- **Implementation:** Money, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation remain operational. Sprint 76A advances the offline authority to `ledgerforge.currency-catalog.v2`: 155 active ordinary ISO 4217 List One currencies with numeric minor units, compiled from the SIX 2026-01-01 publication after excluding current List Two fund codes and List One `N.A.`-scale entries.
-- **Current qualification:** Sprint 44 introduced no migration. Production non-INR import, FX storage, conversion and reporting-currency totals remain unsupported.
+- **Implementation:** Money, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation remain operational. Sprint 76A established `ledgerforge.currency-catalog.v2`: 155 active ordinary ISO 4217 List One currencies with numeric minor units, compiled from the SIX 2026-01-01 publication after excluding current List Two fund codes and List One `N.A.`-scale entries. The owner-expanded Sprint 98 bank/card work on 2026-09-19 adds the source-required historical BGN and HRK definitions, each with two minor-unit digits, as the local unaccepted `ledgerforge.currency-catalog.v3`. Its 157 entries preserve all 155 prior definitions; the two additions cite SIX amendments 180 and 174. They preserve literal merchant currency and authorize no conversion or broader historical-currency admission.
+- **Qualification boundary:** Sprint 44 introduced no migration and originally qualified INR only. Subsequent accepted source profiles retain their own ADR-046 boundaries. The Sprint 98 historical-currency addition passed the 70-original CBQ card gate and all 12 Money tests; the expanded integrated campaign and Sprint 98 acceptance remain open. Catalog membership alone establishes neither parser support nor FX support.
 
 
 
@@ -5172,6 +5173,10 @@ This ADR does not authorize:
 
 # ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
 
+## Current alignment — Sprint 98 owner-approved bank sections, 2026-09-19
+
+The [combined-bank contract](SCOPE_DECISIONS.md#combined-bank-parent-section-overlap-contract-20260918) adds a narrow account-section occurrence path for qualified Axis/HDFC relationship statements and their authentic standalone counterparts. When the same resolved account has retained relationship-section evidence, a later qualified standalone representation uses that occurrence path; it cannot fall back to creating ordinary transactions after a linkage hold. This supersedes whole-statement period/projection requirements only for that selected relationship boundary. The existing standalone-only exact-equivalence path and immutable first-accepted source remain intact. Implementation and qualification status belong to [current state](PROJECT_STATE.md#sprint-98-selected-source-checkpoint), not this approval record.
+
 ## Original accepted decision
 
 **Status:** Accepted and implemented in Sprint 73
@@ -5291,6 +5296,14 @@ storage or generic mutation infrastructure.
 <a id="adr-043"></a>
 
 # ADR-043 — Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts
+
+## Current alignment — Sprint 98 owner-approved bank sections, 2026-09-19
+
+The [owner-approved contract](SCOPE_DECISIONS.md#combined-bank-parent-section-overlap-contract-20260918) retains one original/document/fingerprint/import session and ordered, separately account-owned bank sections. Each section retains its native currency, actual date roles, period, source range, controls, literal narration/reference/balance and ordered occurrences. Every required section resolves before one provider transaction accepts the parent. All-new parents create transactions; fully represented parents add supporting observations; mixed parents create only proven-new occurrences and retain links for every represented occurrence. A required identity, linkage, multiplicity or financial contradiction holds the whole parent with no accepted partial graph.
+
+Existing CBQ/QAR observations are unique per whole document and cannot carry this boundary unchanged. The authorized additive tail after immutable V23 uses narrow bank-section, identity-observation and occurrence-link tables, reusing documents, normalized rows, Money, accounts, provider transactions, hydration and the normal SQLite backup package. The selected CBQ Savings/E-Savings extension preserves real value-date versus transaction-date roles. This does not extend the legacy Current Account scope or establish absent authentic cases.
+
+Automatic linkage remains bounded to qualified Axis/HDFC profiles and versions, the same resolved account, exact native signed amount and actual date roles, plus source-proven reference/balance and ordered one-to-one occurrence evidence. Neither narration similarity nor date/amount alone nor general leading-zero removal establishes identity. Axis masks never reconstruct hidden digits. HDFC reference representation rules are documented in the [source relationship qualification note](Work%20notes/Source_relationships.md#sprint-98-bank-occurrence-rules); every source's literal fields remain unchanged. The exact June Axis adjudication does not authorize a conflicting-source link. Cross-account and statement-summary totals do not relate independent accounts or authorize invented movements. This is architecture approval; full Sprint-98 product acceptance remains pending.
 
 ## Original accepted decision
 
@@ -5856,6 +5869,11 @@ not generic card equivalence.
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 
+## Accepted Sprint-99 alignment — 2026-09-29
+
+[Accepted Sprint 99](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) applies the owner’s salary-cycle generation/due windows and payslip-first reviewable proposal to existing plan/provider ownership. Expected pay remains separate from confirmed receipt; exact dated included-balance acknowledgment and bank evidence prevent double counting, including deductions already in net pay. Monthly worksheets and their Dashboard summary exclude saved reserve targets; explicit Keep in CBQ remains. V28 optional assistance and V29 captured financial dates follow ADR-047. Shared reporting FX reuses the accepted Al Dar authority. These later selected boundaries supersede the corresponding original exclusions only; no automated payment or bank receipt is fabricated. UI/UX adoption remains outstanding.
+
+
 ## Accepted Sprint-97 alignment — 2026-09-17
 
 [Owner-accepted Sprint 97](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-97) retains the shared Al Dar authority and month-local manual planning override while moving manual provider refresh to Settings > Live FX. The app-owned coordinator now refreshes on real launch and at 00:00/06:00/12:00/18:00 UTC, with one missed-slot wake catch-up, shared in-flight work and one 60-second failed-work retry. Provider/valuation date and actual successful fetch time remain distinct. Exact current-FX investment presentation is accepted; whole-app reporting/net worth and future background scheduling remain separate. The [owning contract](Work%20notes/Holdings_and_valuation.md#sprint-97-refresh-contract) supersedes only the earlier cadence/control placement, not stored plan evidence, financial calculation or explicit Save ownership.
@@ -6135,6 +6153,15 @@ ADR-045 does not authorize generic payroll/employer support, OCR/image payroll, 
 <a id="adr-046"></a>
 
 # ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation
+
+## Accepted implementation alignment — 2026-09-29
+
+Full Sprint 98 was accepted under `SPRINT_98_ACCEPTED`, confirmed 21 September; the final [Sprint-99 acceptance](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) retains exact Gmail-original authority, approved local originals and IBKR/Zurich exceptions. The latest Axis date correction qualifies 32 local and 38 retained Gmail originals with seven overlaps, not 70 independent sources. Final batch password/identity/source/support holds remain explicit. No accepted subset generalizes to an institution or unsupported layout. Closure reuses matching-byte evidence and performs no new source campaign; in-memory financial-processing rules remain unchanged.
+
+## Current Alignment — 2026-09-18 — Accepted Gmail source authority
+
+The owner accepted the local V23 Gmail intake foundation under `SPRINT_98_GMAIL_INTAKE_ACCEPTED`, activating the [recorded source transition](SCOPE_DECISIONS.md#sprint-98-gmail-intake-acceptance-20260918). Exact retained Gmail originals are the default source authority for email-delivered families; the manually assembled Originals collection is historical/supplementary. IBKR and Zurich ISP retain their established exact original/direct paths. Original bytes, ordinary databases and approved backups may persist locally; independent financial comparison and extraction remain in RAM/pipes/owner Chat, with no derivative statement or financial evidence files. This supersedes the root-only input wording below, without changing source authenticity, independent-oracle or affected-family qualification requirements. Full Sprint 98 acceptance and publication remain separate.
+
 ## Current Alignment — 2026-09-11 — Original inputs and in-memory evidence
 
 The owner’s explicit [source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older permissions for exact/decrypted/extracted files and persisted oracle/evidence artifacts. Only authentic originals in the approved root are statement inputs; processing and independent financial-oracle comparison remain in memory, with no derived financial evidence files on disk. The normal app database remains permitted. Financial correctness, complete affected corpus, independent truth, exact provenance and failure/persistence/hydration proof remain required. This documentation alignment changes no migration, parser, accepted original decision body or executable validation tooling; future runs must establish compliance rather than assume old artifact recipes remain allowed. <!-- user-specified -->
@@ -6317,6 +6344,39 @@ ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-
 
 # ADR-047 — Verified User Backup and Receipt-Owned Restore
 
+## Accepted Sprint-99 implementation alignment — 2026-09-29
+
+[Accepted Sprint 99](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) closes the approved V27–V29 contracts below after accepted Sprint-98 V26. The actual chain is V1–V29; identities are immutable and no closeout migration is allocated. Exact two-member format-1 backup semantics remain. The retained populated native V29 restore/reopen reconciles 80 tables and all 416 original BLOB hashes, with only the already-specified public-quote JSON equivalence and activation-scoped operational resets. Later settlement-focused backup/reopen covers the pending-allocation observation semantics without a storage change. Original checkpoint approval/qualification statements below remain historical, not present acceptance blockers.
+
+
+## Owner-approved captured planning balance dates — 2026-09-21
+
+The owner approved additive V29, `Captured planning balance dates`, with one nullable `funding_plan_balances.financial_balance_date` civil-date column. Explicit balance capture records the financial date supplied with that amount. Capture time stays separate. Editing the amount manually or refreshing to a changed amount without an explicit capture clears the financial date; carrying the same captured value retains its date. No date is inferred from the capture timestamp or backfilled into older plans.
+
+Format 1 remains exactly `ledger.sqlite` plus `manifest.json`. Exact supported V17–V28 packages validate their original history/schema and upgrade only the isolated destination; prior amounts and provenance remain, with an unknown financial date. V29 packages recover the exact captured date alongside the plan. V1–V28 migration identities remain immutable. This records the approved contract; current Sprint-99 verification and owner acceptance remain separate.
+
+<a id="sprint-99-intelligence-backup"></a>
+## Owner-approved Sprint-99 intelligence alignment — 2026-09-21
+
+The owner approved additive V28, `financial_intelligence_metadata`, after V27. It keeps category rules, manual/automatic/deliberately-cleared intent, exact-new-transaction retry work, reviewed movement relationships, recurring definitions/occurrences, reserve designations, salary/ISP assistance, preferences and month-local plan assistance inside the existing ledger. Canonical source facts are unchanged. Category work is recorded with exact inserted IDs in the financial transaction; later metadata failure cannot replay that import. Confirmed movement legs have one owner. Metadata validation checks workspace, canonical parent, expected prior value and current generation before publication. Saved plan assistance and consumed salary proposals commit atomically with the ordinary plan.
+
+V1–V27 migration identities remain immutable. Format 1 is still exactly `ledger.sqlite` plus `manifest.json`; no separate intelligence backup or merged restore is introduced. Exact supported older packages validate their own schema/history, then upgrade only the isolated destination. New metadata starts empty, while pre-existing category assignments and saved plans remain intact. V28 packages recover exact saved metadata with their canonical parents. Metadata read/validation failure is unavailable, never an empty successful load that silently resets owner choices. Currency visibility remains device-local. Existing shared ledger activity/activation gates and coherent canonical hydration continue to own mutation and restore.
+
+This records the approved contract and local implementation, not completed Sprint-99 qualification or owner acceptance. [Product decisions](SCOPE_DECISIONS.md#sprint-99-intelligence-decisions), [category/movement evidence](Work%20notes/Rules_and_recurring.md#sprint-99-intelligence), and [planning evidence](Work%20notes/Salary_and_current_AlDar.md#sprint-99-planning) own the narrower behavior and current proof.
+
+<a id="sprint-99-reporting-backup"></a>
+## Owner-approved Sprint-99 reporting alignment — 2026-09-21
+
+D09 and the Sprint-99 implementation instruction authorize one sparse workspace-scoped `net_worth_exclusions` table after the accepted V26 tail. The implemented additive V27, `current_reporting_exclusions`, identifies exactly one canonical bank/card account or whole investment container. Parent FKs restrict deletion; uniqueness and same-workspace/type checks preserve identity. Source replacement retains containers and cannot remove reporting intent. V1–V26 migration identities remain unchanged.
+
+Format 1 remains exactly `ledger.sqlite` plus `manifest.json`. Exact already-supported V17–V26 packages validate their own immutable history/schema before upgrading only the isolated restore candidate; their exclusion set starts empty. V27 packages restore exact exclusions with their canonical parents. No choices merge from a replaced ledger. Display currencies remain device-local; converted totals and prepared imports are not persisted. Membership stages with canonical parents before publication, and mutations use the existing provider transaction/shared activity gate followed by canonical hydration.
+
+The shared app/helper schema check follows the new exact tail. An older helper cannot open the newer schema to write; the helper still neither creates nor migrates a ledger nor writes exclusions. This records the approved architecture and local implementation; Sprint-99 owner acceptance and publication remain separate. [Current reporting evidence](Work%20notes/Current_FX_and_net_worth.md#sprint-99-implementation).
+
+## Approved Sprint-98 background alignment — 2026-09-19
+
+[ADR-048](#adr-048) adds a stable namespace commit/restore gate and activation epoch outside the replaceable SQLite file. Replacement and recovery invalidate old worker authority and publish a fresh activation; the lock/enrollment/live activation state is not restored from a backup. This is operational activation identity, not permanent ledger lineage. The minimal shared public-cache/job/schedule tail after V24 participates in the existing backup package and is reconciled on restore. Earlier exclusions of rebuildable public caches are superseded only for that explicitly approved shared tail. Format 1, immutable migration identities, original package/receipt identity and receipt-owned replacement remain unchanged. This is architecture approval, with implementation and qualification pending.
+
 ## Accepted Sprint-97 alignment — 2026-09-17
 
 [Owner-accepted Sprint 97](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-97) adds V22 for distinct authenticated ZIO provenance in the current investment tables, retaining every V1–V21 migration identity and format 1. Exact V17–V21 packages verify their original history/schema/manifest before an isolated candidate applies only its missing registered tail; V22 verifies directly. Populated V22 backup/restore and reopen preserve the complete account receipt, current holdings and source distinction. Original package and receipt identity, atomic replacement and canonical hydration rules remain unchanged. Root qualification used isolated namespaces; the owner independently opened V22 Current before acceptance, and publication performs no Current mutation. [The owning note](Work%20notes/Holdings_and_valuation.md#sprint-97-implementation-evidence) records the retained evidence and limits.
@@ -6370,6 +6430,40 @@ The receipt and backup UUID/checksum identify this restoration, not permanent le
 Routine product verification is separate from the independent acceptance verifier. The authorized genuine drill compares complete typed logical SQLite state in RAM before backup, after an approved existing-account display-name differentiation/restore, and after clean relaunch. Targeted package, ownership, rollback and interruption checks are authorized; broad regression, parser and source-oracle campaigns remain suspended. Genuine backup/staging/rollback files are recovery artifacts; financial comparison dumps remain prohibited.
 
 No sync, scheduling, workspace switching, archive dependency, retention UI, encryption, appearance export or structured financial export is added. Source meaning, Money and migrations are unchanged. The [accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) owns completed verification and limitations; the [backup work note](Work%20notes/Backup_and_export.md) retains the separate optional-export boundary.
+
+---
+
+<a id="adr-048"></a>
+# ADR-048 — Enrolled Background Worker and Shared Ledger Activation Authority
+
+## Accepted implementation alignment — 2026-09-29
+
+Full [Sprint 98](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-98) is owner-accepted, confirmed 21 September, including the qualified V26 background/intake boundary and retained incident/non-run evidence. [Sprint 99](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) reuses that ownership for source-specific refresh and the approved separate daily salary-linked ISP check with foreground fallback. Review-ledger helper state remains off; acceptance/publication does not enable a permanent service or change schedules. Preserve the owner-removed locked-Keychain test and accepted clamshell substitution for restart/login. The 19 September incomplete status below is an earlier checkpoint, not the final acceptance state.
+
+
+## Status — 2026-09-19
+
+**ARCHITECTURE APPROVED; local implementation present, actual-Mac qualification incomplete.** The owner approved the prepared Sprint-98 contract and the fifth-day foreground ISP fallback. [Scope decision](SCOPE_DECISIONS.md#sprint-98-background-contract-20260919). Signed Debug/Release packaging and focused operational checks pass. The coordinated actual-Mac window exercised app-closed authenticated collection/updates, public retry/rearm, foreground convergence, dirty-draft preservation and disable/re-enable/fallback. The [current implementation checkpoint](PROJECT_STATE.md#sprint-98-selected-source-checkpoint) records the first credential prompt, later owner-confirmed unattended runs, bounded resource measurements, subsequent XPC callback repair and isolation incident. Native proof on the repaired bytes, real restore overlap and the owner-deferred disruptive conditions remain open. This decision authorizes phase 4 only; temporary registration/disruptive testing remains coordinated, and permanent enablement, final population and full Sprint acceptance remain separate gates.
+
+## Decision
+
+Use one app-bundled per-user short-lived helper, `com.vyom.LedgerForge.BackgroundWorker`, with stable existing Apple Development signing (team `T45VZQAFDY`). Both the main app and helper are sandboxed; the helper retains Hardened Runtime and an embedded Info plist with its distinct identity. The owner approved this correction on 2026-09-19 because [Apple disallows a sandboxed app with an unsandboxed agent on current macOS](https://developer.apple.com/forums/thread/802443); the earlier unsandboxed-helper clause is superseded. The helper receives only scoped existing LedgerForge data-directory read/write, outbound client networking and its exact Mach-service registration. Directory exceptions use the [documented home-relative path form](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/AppSandboxTemporaryExceptionEntitlements.html). No data migration or folder-picker workflow is introduced. The helper exits between OS execution opportunities. Dynamic nonrepeating XPC activity targets absolute UTC opportunities; preserve registered criteria at check-in, reject early callbacks and qualify recurring rearm. No forced wake, resident process or frequent polling is introduced.
+
+The approved local service `com.vyom.LedgerForge.BackgroundWorker.control` transfers public-update requests from foreground to the registered helper. Main-app lookup and helper registration are limited to that exact service, with mutual bundle/team code requirements. Messages contain only enrollment revision, requested public scopes, manual/due intent and nonfinancial acknowledgement. They carry no source contents, credentials, paths or executable commands. Accepted work survives client disconnect; requests share the existing OS job lease and durable public progress. Reply completion is bounded, uncertain delivery must not force duplicate work, and unavailable service leaves foreground fallback usable. An explicitly requested manual scope retains only its pending retry across process exit, without enabling future automatic slots. No new user steps, negligible measured overhead, responsive foreground and prompt helper exit are owner conditions, still requiring actual-Mac proof.
+
+The helper uses only existing credential identities. A normal one-time foreground helper authorization may be needed; scheduled work forbids interactive Keychain/browser authorization and reports an actionable failure. Existing scoped credential renewal remains within the existing grant; no copying, credential store migration or access widening is introduced. Gmail collection retains exact originals and truthful coverage receipts through the accepted repository. Financial Gmail preparation and import remain the existing explicit foreground batch action; no durable prepared import or unattended financial batch is added. Existing public-price/FX adapters and the accepted native ISP synchronization provide their respective work.
+
+Explicit foreground enrollment binds the helper to one existing namespace and ledger. A stable namespace OS lock, shared by every financial writer, migration, backup capture and restore/provider replacement, protects short database operations. One process-local coordinator preserves consistent lock ordering and deliberate nesting. Network work runs outside that gate. An activation epoch outside the replaceable SQLite file, actual target file identity, complete schema history and app/helper compatibility are checked before opening and again before committing. The helper cannot create, migrate or recover a ledger. A stale connection or result fails closed after replacement. Activation is operational authority, not a permanent ledger UUID.
+
+Restore writes an invalidating transition before moving canonical files, retains the existing operation receipt as recovery authority, and publishes a fresh activation after either successful replacement or recovery. The stable lock is never replaced with the ledger. Enrollment and live activation are not resurrected from a backup. The existing provider transaction remains the financial atomicity boundary. Per-job coalescing and durable completion association distinguish committed work from interrupted or uncommitted work; receipt publication must be atomic with its coupled effect. The namespace gate does not introduce nested SQLite transactions or span network awaits.
+
+Add only required typed shared public caches, job receipts and UTC schedules after the bank V24 migration. Preserve all prior migration identities and existing backup format. Restore retains valid last-good public values, reconciles job/coverage state with the restored ledger, invalidates in-flight claims and does not reuse stale outside activation authority. Foreground reconciliation publishes coherent canonical state while preserving dirty Budget Planning drafts; ordinary helper completion does not invoke profile reset or replace drafts.
+
+The owner's subsequent Settings decision makes every schedule editable. Public prices/FX, including Al Dar, default to 00:00/06:00/12:00/18:00 UTC every day. The three clock groups (public references, Gmail and ISP) support selected weekdays or monthly dates and one or more UTC times; the four fetch/update scopes have independent switches. Monthly days 29–31 clamp to the final day in shorter months, and duplicate occurrences are coalesced. Settings owns an editable draft separate from incoming status/cache updates; explicit Save changes enrollment and re-registers the helper. Only failed public legs get one 60-second retry; successful legs and last-good values remain. Catch-up fetches current data once and defers when the next slot is at most 60 minutes away; an exact slot executes once. Gmail defaults to daily 00:00 UTC, configurable, and covers the complete missed delivery interval with truthful pagination/part accounting. ISP defaults to day 1 monthly at 00:00 UTC, configurable, and performs one current catch-up without replaying missed months. An active qualified helper lets foreground opening read shared cache/receipts and fetch only when due. Disabled/unregistered helper restores the accepted foreground ISP fifth-of-month schedule; its configured helper schedule remains dormant. Failed launch or authorization cannot indefinitely suppress foreground work. No new recurring authentication retry cadence is authorized.
+
+## Verification boundary
+
+The external prototype proves only its recorded mechanisms and identities. Product qualification must cover signing/bundle placement, repeated idle-exit/relaunch/rearm, existing-target restrictions, every writer/restore race, stale-result rejection, crash-after-commit truth, backup/reopen/recovery, shared-cache convergence and draft preservation. Schedule tests use source-independent clocks; financial checks use authentic sources under ADR-046. Actual sleep/wake, locked/revoked credentials, timezone changes, disabled fallback, logout/login and full shutdown/restart remain explicitly observed or unobserved. Permanent enablement waits for final owner acceptance.
 
 ---
 

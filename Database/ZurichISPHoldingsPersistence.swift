@@ -8,6 +8,7 @@ nonisolated public struct ZurichISPHoldingsPlan: Sendable {
     let workspace: WorkspaceDTO
     let baseline: InvestmentSnapshot
     let source: ZurichISPAccountSnapshot
+    var backgroundJob: BackgroundJobRecord? = nil
 
     func applying(to current: InvestmentSnapshot, now: Date) throws -> InvestmentSnapshot {
         guard current.hasSameSource(as: baseline) else { throw InvestmentError.staleReview }

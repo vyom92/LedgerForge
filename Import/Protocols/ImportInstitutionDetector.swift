@@ -9,7 +9,7 @@ public extension ImportFramework {
     }
 }
 
-public struct ImportInstitutionCandidate: Equatable, Sendable {
+nonisolated public struct ImportInstitutionCandidate: Equatable, Sendable {
     public let institutionCode: String?
     public let confidence: Double
     public let reasons: [String]

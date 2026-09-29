@@ -151,7 +151,7 @@ struct InvestmentPriceQualificationTests {
         await coordinator.createBackup(to: destination)
         guard let package = coordinator.lastBackupURL else { throw QualificationError.missingLedger }
         let manifest = try BackupFiles.verifyPackage(package)
-        #expect(manifest.schemaVersion == 22)
+        #expect(manifest.schemaVersion == 23)
         await coordinator.verifyRestore(from: package)
         await coordinator.replaceLedger()
         let restored = try DatabaseProvider.shared.investmentRepo.snapshot(workspaceID: "default-workspace") == mapped

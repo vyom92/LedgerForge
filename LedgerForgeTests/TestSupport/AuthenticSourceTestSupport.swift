@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 @testable import LedgerForge
 
@@ -6,6 +7,42 @@ import Testing
 /// Financial source support is established by the separate complete-corpus
 /// oracle campaigns, never by these single-carrier transport checks.
 enum AuthenticSourceTestSupport {
+    /// Independent private nominations are streamed from RAM, never loaded from
+    /// a derived financial evidence file. FileHandle supports the FIFO carrier.
+    static func ramNomination(_ environmentKey: String) throws -> Data {
+        let path = try #require(ProcessInfo.processInfo.environment[environmentKey])
+        var metadata = stat()
+        try #require(lstat(path, &metadata) == 0 && metadata.st_mode & S_IFMT == S_IFIFO)
+        let input = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+        defer { try? input.close() }
+        let data = try #require(try input.readToEnd())
+        try #require(data.count < 1_000_000)
+        return data
+    }
+
+    /// An explicitly nominated, already populated isolated qualification ledger
+    /// can supply presentation regressions without opening ordinary Current.
+    /// It is read-only below and must not resolve to the Current database.
+    @MainActor
+    static func presentationDatabaseURL() throws -> URL {
+        let environment = ProcessInfo.processInfo.environment
+        let identity = try DevelopmentDatabaseIdentity.applicationOwned(environment: environment)
+        if let path = environment["LEDGERFORGE_PRESENTATION_DATABASE"] {
+            let selected = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+            let current = try DevelopmentDatabaseIdentity.applicationOwned(environment: [:]).canonicalDevelopmentURL
+                .resolvingSymlinksInPath().standardizedFileURL
+            guard selected != current, FileManager.default.fileExists(atPath: selected.path) else {
+                throw RepositoryError.persistenceUnavailable
+            }
+            return selected
+        }
+        let current = identity.canonicalDevelopmentURL
+        guard !identity.isIsolatedCanonicalNamespace,
+              identity.authorizesCurrentDatabaseIdentity(at: current),
+              FileManager.default.fileExists(atPath: current.path) else { throw RepositoryError.persistenceUnavailable }
+        return current
+    }
+
     /// Presentation checks read the accepted Current schema without attempting
     /// a candidate migration. Its complete registered prefix is verified first;
     /// both connections enforce read-only access before any repository exists.

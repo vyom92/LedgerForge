@@ -135,7 +135,11 @@ nonisolated enum AlDarCurrency: String, CaseIterable, Codable, Sendable { case i
 /// and calendar-day boundaries do not participate in rates or financial math.
 nonisolated struct AlDarReferenceAge: Equatable, Sendable {
     let seconds: TimeInterval
-    init(fetchedAt: Date, now: Date) { seconds = max(0, now.timeIntervalSince(fetchedAt)) }
+    let freshnessSeconds: TimeInterval
+    init(fetchedAt: Date, now: Date) {
+        seconds = max(0, now.timeIntervalSince(fetchedAt))
+        freshnessSeconds = WeekdayFreshness.seconds(from: fetchedAt, to: now)
+    }
 
     var caption: String {
         if seconds < 60 { return "Fetched just now" }
@@ -153,8 +157,7 @@ nonisolated struct AlDarReferenceAge: Equatable, Sendable {
 
     /// Continuous scale: green=0, yellow=1 (24h), red=2 (four days).
     var colorPosition: Double {
-        if seconds <= 86_400 { return seconds / 86_400 }
-        return min(2, 1 + (seconds - 86_400) / (3 * 86_400))
+        WeekdayFreshness.colorPosition(days: freshnessSeconds / 86_400)
     }
 }
 

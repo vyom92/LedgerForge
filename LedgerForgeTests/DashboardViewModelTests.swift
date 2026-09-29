@@ -17,7 +17,6 @@ struct DashboardViewModelTests {
             accountStore: context.accountStore,
             transactionStore: context.transactionStore,
             cardStore: context.cardStore,
-            categoryStore: context.categoryStore,
             fundingPlanStore: context.fundingPlanStore,
             availability: availability,
             workspaceID: context.workspaceID,
@@ -25,7 +24,7 @@ struct DashboardViewModelTests {
         )
         viewModel.refreshPresentation()
 
-        let expectedPositions = dashboardPositionOracle(snapshot: context.snapshot)
+        let expectedPositions = dashboardPositionOracle(context: context)
         assertPositions(viewModel.positions, equalTo: expectedPositions)
         check(
             viewModel.positionState == DashboardContentState.resolve(
@@ -34,16 +33,10 @@ struct DashboardViewModelTests {
             ),
             "Dashboard position state follows canonical availability"
         )
-        assertCanonicalBalancesMatchSelectedEvidence(snapshot: context.snapshot)
+        assertCanonicalBalancesMatchSelectedEvidence(context: context)
 
-        let expectedRecentActivity = recentActivityOracle(snapshot: context.snapshot)
-        assertRecentActivity(viewModel.recentActivity, equalTo: expectedRecentActivity)
-        check(viewModel.recentActivityState == DashboardContentState.resolve(
-            availability: availability.state,
-            isEmpty: context.snapshot.transactions.isEmpty
-        ), "Dashboard activity state follows canonical availability")
         check(viewModel.accounts.count == context.snapshot.accounts.count, "Dashboard account mirror is observation-only")
-        check(viewModel.transactionCount == context.snapshot.transactions.count, "Dashboard transaction count reflects hydrated store")
+        #expect(viewModel.storedTransactionCount == context.snapshot.transactions.count)
 
         check(
             Set(viewModel.positions.map(\.currency)).count == viewModel.positions.count,
@@ -66,6 +59,51 @@ struct DashboardViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func historyOnlyCardLeavesDashboardPositionsButKeepsCanonicalHistory() throws {
+        let source = try dashboardCurrentDatabaseContext()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-dashboard-history-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("qualification.sqlite").path
+        try source.provider.database.createBackup(at: path)
+        let sqlite = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing, migrateExisting: true)
+        defer { sqlite.database.close() }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
+        let accounts = AccountStore(), transactions = TransactionStore(), cards = CardStore()
+        let categories = CategoryStore(), funding = FundingPlanStore()
+        let hydrator = RepositoryStoreHydrator(accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo, cardRepo: provider.cardRepo,
+            salaryRepo: provider.salaryRepo, fundingPlanRepo: provider.fundingPlanRepo, investmentRepo: provider.investmentRepo,
+            accountStore: accounts, transactionStore: transactions, categoryStore: categories, cardStore: cards,
+            salaryStore: SalaryStore(), fundingPlanStore: funding, investmentStore: InvestmentStore(),
+            importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(), workspaceId: source.workspaceID,
+            persistenceState: .verifiedSQLite, providerGeneration: provider.generationToken, participatesInLifecycleGate: false)
+        let before = try hydrator.stageHydration()
+        hydrator.publish(before)
+        let accountID = try #require(before.accounts.first { account in
+            account.type == .creditCard && !account.isHistoryOnly && before.transactions.contains {
+                $0.repositoryAccountId == account.repositoryAccountId
+            }
+        }?.repositoryAccountId)
+        let durableRows = try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID)
+        let durableCards = try provider.cardRepo.snapshot(workspaceId: source.workspaceID)
+        let metadata = AccountMetadataCoordinator(provider: { provider }, developerConsole: nil,
+            forcedHydration: { _, _ in try hydrator.hydrateIfNeeded(forceRefresh: true) },
+            acknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
+        #expect(try metadata.markCreditCardHistoryOnly(accountId: accountID, workspaceId: source.workspaceID))
+        let availability = ApplicationAvailability()
+        availability.didHydrate(before.hydrationResult, generation: provider.generationToken)
+        let model = DashboardViewModel(accountStore: accounts, transactionStore: transactions, cardStore: cards,
+            fundingPlanStore: funding, availability: availability, workspaceID: source.workspaceID)
+        model.refreshPresentation()
+        #expect(model.positions.flatMap(\.cards).allSatisfy { $0.id != accountID })
+        #expect(transactions.transactions.map(\.repositoryTransactionId) == before.transactions.map(\.repositoryTransactionId))
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows)
+        #expect(try provider.cardRepo.snapshot(workspaceId: source.workspaceID) == durableCards)
+        #expect(accounts.accounts.first { $0.repositoryAccountId == accountID }?.isHistoryOnly == true)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func currentMonthSalaryFundingMapsSavedPlanExactlyOrReportsNotObserved() throws {
         let context = try dashboardCurrentDatabaseContext()
         let availability = ApplicationAvailability()
@@ -75,7 +113,6 @@ struct DashboardViewModelTests {
             accountStore: context.accountStore,
             transactionStore: context.transactionStore,
             cardStore: context.cardStore,
-            categoryStore: context.categoryStore,
             fundingPlanStore: context.fundingPlanStore,
             availability: availability,
             workspaceID: context.workspaceID,
@@ -141,7 +178,6 @@ struct DashboardViewModelTests {
             accountStore: AccountStore(),
             transactionStore: TransactionStore(),
             cardStore: CardStore(),
-            categoryStore: CategoryStore(),
             fundingPlanStore: FundingPlanStore(),
             availability: availability,
             now: { Date(timeIntervalSince1970: 0) }
@@ -149,7 +185,6 @@ struct DashboardViewModelTests {
         viewModel.markHydrationStarted()
         check(viewModel.presentationState == .loading("Loading persisted dashboard..."), "Hydration start is loading")
         check(viewModel.positionState == .loading, "Hydration start resets positions to loading")
-        check(viewModel.recentActivityState == .loading, "Hydration start resets activity to loading")
         check(viewModel.fundingState == .loading, "Hydration start resets funding to loading")
 
         viewModel.markHydrationCompleted(.init(didHydrate: true, accountCount: 1, transactionCount: 2))
@@ -157,9 +192,8 @@ struct DashboardViewModelTests {
         viewModel.markHydrationFailed(DashboardTestError.fixed)
         check(viewModel.presentationState == .failed("Dashboard load failed"), "Hydration failure reports unavailable")
         check(viewModel.positionState == .unavailable, "Hydration failure clears position state")
-        check(viewModel.recentActivityState == .unavailable, "Hydration failure clears activity state")
         check(viewModel.fundingState == .unavailable, "Hydration failure clears funding state")
-        check(viewModel.positions.isEmpty && viewModel.recentActivity.isEmpty && viewModel.fundingCalculation == nil, "Hydration failure clears projected values")
+        check(viewModel.positions.isEmpty && viewModel.fundingCalculation == nil, "Hydration failure clears projected values")
 
         availability.didHydrate(.init(didHydrate: true, accountCount: 0, transactionCount: 0), generation: ProviderGenerationToken())
         viewModel.refreshPresentation()
@@ -169,7 +203,11 @@ struct DashboardViewModelTests {
     @Test
     func asOfLabelUsesOnlyOptionalStatementDateAndRoutesKeepApprovedDestinations() throws {
         let date = try StatementDate(year: 2026, month: 9, day: 11)
-        check(DashboardAccountPosition.asOfLabel(for: date) == "As of \(date.presentation)", "As-of label preserves source day")
+        let today = try StatementDate(year: 2026, month: 9, day: 21)
+        check(DashboardAccountPosition.asOfLabel(for: date, today: today) == "10 days ago", "Age counts calendar days from the source balance date")
+        check(DashboardAccountPosition.asOfLabel(for: today, today: today) == "Today", "Same-day balance")
+        check(DashboardAccountPosition.asOfLabel(for: try StatementDate(canonical: "2026-09-20"), today: today) == "1 day ago", "Singular age")
+        check(DashboardAccountPosition.asOfLabel(for: today, today: date) == "In 10 days", "Future date is not presented as fresh current data")
         check(DashboardAccountPosition.asOfLabel(for: nil) == "Date unavailable", "Missing as-of date remains unavailable")
 
         check(DashboardRoute.allCases.count == 3, "Dashboard exposes exactly three approved routes")
@@ -258,7 +296,6 @@ struct DashboardViewModelTests {
             accountStore: AccountStore(),
             transactionStore: TransactionStore(),
             cardStore: CardStore(),
-            categoryStore: CategoryStore(),
             fundingPlanStore: FundingPlanStore(),
             availability: availability,
             workspaceID: "day-change-regression",
@@ -296,7 +333,7 @@ struct DashboardViewModelTests {
         let probe = DashboardDayChangeProbe(currentDate: Date())
         let model = DashboardViewModel(
             accountStore: context.accountStore, transactionStore: context.transactionStore,
-            cardStore: context.cardStore, categoryStore: context.categoryStore,
+            cardStore: context.cardStore,
             fundingPlanStore: context.fundingPlanStore, availability: availability,
             workspaceID: context.workspaceID, now: { probe.now() }
         )
@@ -309,8 +346,8 @@ struct DashboardViewModelTests {
         context.accountStore.notifyAccountsOfInstalledValue()
         availability.begin()
         check(model.positionState == .loading, "Loading invalidates synchronously")
-        check(model.positions.isEmpty && model.recentActivity.isEmpty, "Old positions and activity are withdrawn immediately")
-        check(model.activityComparison == nil && model.fundingCalculation == nil, "Old aggregates are withdrawn immediately")
+        check(model.positions.isEmpty, "Old positions are withdrawn immediately")
+        check(model.fundingCalculation == nil, "Old aggregates are withdrawn immediately")
         try await Task.sleep(for: .milliseconds(30))
         check(probe.refreshCount == 2, "Withdrawal cancels the previously queued refresh")
         withExtendedLifetime(model) {}
@@ -384,6 +421,8 @@ private struct DashboardReadOnlyContext {
     let databaseURL: URL
     let workspaceID: String
     let snapshot: RepositoryRuntimeSnapshot
+    let bankSections: [BankStatementSectionPlanDTO]
+    let zeroControls: [StatementZeroActivityControlDTO]
     let accountStore: AccountStore
     let transactionStore: TransactionStore
     let cardStore: CardStore
@@ -402,14 +441,7 @@ private enum AcceptedDashboardSnapshot {
 private func dashboardCurrentDatabaseContext() throws -> DashboardReadOnlyContext {
     if let cached = AcceptedDashboardSnapshot.cached { return cached }
 
-    let identity = try DevelopmentDatabaseIdentity.applicationOwned(environment: ProcessInfo.processInfo.environment)
-    let databaseURL = identity.canonicalDevelopmentURL
-    guard !identity.isIsolatedCanonicalNamespace,
-          identity.authorizesCurrentDatabaseIdentity(at: databaseURL),
-          FileManager.default.fileExists(atPath: databaseURL.path) else {
-        throw RepositoryError.persistenceUnavailable
-    }
-
+    let databaseURL = try AuthenticSourceTestSupport.presentationDatabaseURL()
     let provider = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: databaseURL)
     try provider.database.execute(sql: "PRAGMA query_only = ON;")
     // The owner may import in the separate app process during this read-only
@@ -458,6 +490,8 @@ private func dashboardCurrentDatabaseContext() throws -> DashboardReadOnlyContex
         databaseURL: databaseURL,
         workspaceID: workspaceID,
         snapshot: snapshot,
+        bankSections: try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID).sections,
+        zeroControls: try provider.importSessionRepo.statementZeroActivityControls(workspaceId: workspaceID),
         accountStore: accountStore,
         transactionStore: transactionStore,
         cardStore: cardStore,
@@ -500,6 +534,7 @@ private struct OraclePosition {
     let amount: Money?
     let asOf: StatementDate?
     let sourceContext: String?
+    let sourcePeriodEnd: StatementDate?
 }
 
 private struct OracleCurrencyPosition {
@@ -511,23 +546,41 @@ private struct OracleCurrencyPosition {
 }
 
 @MainActor
-private func dashboardPositionOracle(snapshot: RepositoryRuntimeSnapshot) -> [OracleCurrencyPosition] {
+private func oracleDisplayName(_ account: Account, context: DashboardReadOnlyContext) -> String {
+    if let nickname = account.nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nickname }
+    let identifierOnly = !account.name.isEmpty && account.name.allSatisfy { "0123456789Xx* -".contains($0) }
+    guard identifierOnly else { return account.name }
+    let labels = context.bankSections.filter { $0.accountId == account.repositoryAccountId }.map(\.productLabel)
+    let roles = Set(labels.flatMap { label in
+        ["NRE", "NRO"].filter { label.uppercased().range(of: "\\b" + $0 + "\\b", options: .regularExpression) != nil }
+    })
+    if account.type == .bank, ["Axis Bank", "HDFC Bank"].contains(account.institution),
+       roles.count == 1, let role = roles.first {
+        return String(account.institution.split(separator: " ")[0]) + " " + role
+    }
+    return account.institution + " account"
+}
+
+@MainActor
+private func dashboardPositionOracle(context: DashboardReadOnlyContext) -> [OracleCurrencyPosition] {
+    let snapshot = context.snapshot
     let eligible = snapshot.accounts
-        .filter { $0.type == .bank || $0.type == .creditCard }
+        .filter { ($0.type == .bank || $0.type == .creditCard) && !$0.isHistoryOnly }
         .sorted(by: oracleAccountPrecedes)
     let banks = eligible.compactMap { account -> (CurrencyCode, OraclePosition)? in
         guard account.type == .bank else { return nil }
-        let selected = oracleBankBalance(for: account, transactions: snapshot.transactions)
+        let selected = oracleBankBalance(for: account, context: context)
         let amount = selected?.money.currency == account.nativeCurrency ? selected?.money : nil
         return (
             account.nativeCurrency,
             OraclePosition(
                 id: oraclePositionID(account),
-                displayName: account.nickname ?? account.name,
+                displayName: oracleDisplayName(account, context: context),
                 institution: account.institution,
                 amount: amount,
                 asOf: amount == nil ? nil : selected?.date,
-                sourceContext: nil
+                sourceContext: nil,
+                sourcePeriodEnd: nil
             )
         )
     }
@@ -547,13 +600,14 @@ private func dashboardPositionOracle(snapshot: RepositoryRuntimeSnapshot) -> [Or
             account.nativeCurrency,
             OraclePosition(
                 id: oraclePositionID(account),
-                displayName: account.nickname ?? account.name,
+                displayName: oracleDisplayName(account, context: context),
                 institution: account.institution,
                 amount: amount,
                 asOf: amount == nil ? nil : selected?.statementDate,
                 sourceContext: amount == nil || selected?.statementDate != nil
                     ? nil
-                    : oracleCardSourceContext(selected)
+                    : oracleCardSourceContext(selected),
+                sourcePeriodEnd: amount == nil ? nil : selected?.period?.end
             )
         )
     }
@@ -592,8 +646,40 @@ private func oracleAggregate(_ positions: [OraclePosition], currency: CurrencyCo
     return try? Money.aggregate(positions.compactMap(\.amount))
 }
 
+/// Independently include source-owned zero-activity closings, which can be
+/// later than the last transaction. Read persisted evidence, not the hydrated
+/// account's selected date or the production balance selector.
 @MainActor
-private func oracleBankBalance(
+private func oracleBankBalance(for account: Account, context: DashboardReadOnlyContext) -> (money: Money, date: StatementDate)? {
+    let transaction = oracleTransactionBalance(for: account, transactions: context.snapshot.transactions)
+    let controls = context.zeroControls.filter { $0.accountId == account.repositoryAccountId }
+    var observations: [(Money, StatementDate)] = []
+    for control in controls where control.authorityRole == "authoritative" {
+        if let decimal = control.closingBalanceDecimal,
+           let day = control.statementDateISO ?? control.statementEndDateISO,
+           let money = try? Money(canonicalDecimal: decimal, currency: control.nativeCurrency),
+           let date = try? StatementDate(canonical: day) { observations.append((money, date)) }
+    }
+    for section in context.bankSections where section.accountId == account.repositoryAccountId && section.rows.isEmpty {
+        guard !controls.contains(where: { $0.documentId == section.documentId && $0.authorityRole == "supporting" }) else { continue }
+        let evidence = section.sourceEvidence
+        if let decimal = evidence.closingBalanceDecimal,
+           let day = evidence.statementBoundaryDateISO ?? evidence.statementEndDateISO,
+           let money = try? Money(canonicalDecimal: decimal, currency: section.nativeCurrency),
+           let date = try? StatementDate(canonical: day) { observations.append((money, date)) }
+    }
+    guard let newest = observations.map({ $0.1 }).max() else { return transaction }
+    if let transaction, transaction.date > newest { return transaction }
+    let latest = observations.filter { $0.1 == newest }
+    guard let money = latest.first?.0, money.currency == account.nativeCurrency,
+          latest.allSatisfy({ $0.0 == money }) else { return nil }
+    if context.snapshot.transactions.contains(where: { $0.repositoryAccountId == account.repositoryAccountId && $0.runningBalanceMoney != nil && $0.statementDate == newest }),
+       transaction?.money != money { return nil }
+    return (money, newest)
+}
+
+@MainActor
+private func oracleTransactionBalance(
     for account: Account,
     transactions: [Transaction]
 ) -> (money: Money, date: StatementDate)? {
@@ -688,19 +774,25 @@ private func assertAccountPositions(_ actual: [DashboardAccountPosition], equalT
     check(actual.count == expected.count, "Dashboard account membership matches independent domain oracle")
     for (actualPosition, expectedPosition) in zip(actual, expected) {
         check(actualPosition.id == expectedPosition.id, "Dashboard account identity is durable")
-        check(actualPosition.displayName == expectedPosition.displayName, "Dashboard account display name is canonical")
-        check(actualPosition.institution == expectedPosition.institution, "Dashboard account institution is canonical")
+        let displayName = expectedPosition.displayName.replacingOccurrences(of: "Commercial Bank of Qatar", with: "CBQ", options: .caseInsensitive)
+        let institution = expectedPosition.institution.replacingOccurrences(of: "Commercial Bank of Qatar", with: "CBQ", options: .caseInsensitive)
+        check(actualPosition.displayName == displayName, "Dashboard account name follows the approved CBQ abbreviation")
+        check(actualPosition.institution == institution, "Dashboard institution follows the approved CBQ abbreviation")
         check(sameMoney(actualPosition.amount, expectedPosition.amount), "Dashboard account amount matches selected source money")
         check(actualPosition.asOf == expectedPosition.asOf, "Dashboard account as-of date is source-backed")
         check(actualPosition.sourceContext == expectedPosition.sourceContext, "Dashboard account source context remains optional")
+        check(actualPosition.sourcePeriodEnd == expectedPosition.sourcePeriodEnd,
+              "Printed period end remains separate from the optional balance date")
     }
 }
 
 @MainActor
-private func assertCanonicalBalancesMatchSelectedEvidence(snapshot: RepositoryRuntimeSnapshot) {
+private func assertCanonicalBalancesMatchSelectedEvidence(context: DashboardReadOnlyContext) {
+    let snapshot = context.snapshot
     for account in snapshot.accounts where account.type == .bank {
-        guard let selected = oracleBankBalance(for: account, transactions: snapshot.transactions) else { continue }
+        guard let selected = oracleBankBalance(for: account, context: context) else { continue }
         check(sameMoney(account.currentBalanceMoney, selected.money), "Hydrated bank balance matches selected running balance")
+        check(account.currentBalanceAsOfISO == selected.date.canonical, "Hydrated bank balance date matches independently selected source date")
     }
     for account in snapshot.accounts where account.type == .creditCard {
         guard let selected = oracleCardStatement(for: account, snapshot: snapshot.cardSnapshot),
@@ -710,121 +802,6 @@ private func assertCanonicalBalancesMatchSelectedEvidence(snapshot: RepositoryRu
             continue
         }
         check(sameMoney(account.currentBalanceMoney, negated), "Hydrated card balance is the negation of selected statement balance")
-    }
-}
-
-private struct OracleRecentActivityRow {
-    let transaction: Transaction
-    let stableID: String
-    let accountID: String?
-    let accountDisplayName: String
-    let accountIdentityDisplay: String
-    let institutionDisplayName: String
-    let currentCategory: TransactionPresentationCategoryChoice
-    let currentCategoryDisplayName: String
-    let domain: TransactionPresentationDomain
-    let effect: TransactionPresentationEffect
-    let sourceCivilDate: StatementDate?
-}
-
-@MainActor
-private func recentActivityOracle(snapshot: RepositoryRuntimeSnapshot) -> [OracleRecentActivityRow] {
-    let accounts = Dictionary(uniqueKeysWithValues: snapshot.accounts.compactMap { account in
-        account.repositoryAccountId.map { ($0, account) }
-    })
-    let categories = Dictionary(uniqueKeysWithValues: snapshot.categorySnapshot.categories.map { ($0.id, $0) })
-    return Array(snapshot.transactions.map { transaction in
-        let account = transaction.repositoryAccountId.flatMap { accounts[$0] }
-        let categoryID = transaction.repositoryTransactionId.flatMap { snapshot.categorySnapshot.assignments[$0] }
-        let category = categoryID.flatMap { categories[$0] }
-        let domain: TransactionPresentationDomain
-        if transaction.cardLiabilityEffect != nil || account?.type == .creditCard {
-            domain = .card
-        } else if account?.type == .bank {
-            domain = .bank
-        } else {
-            domain = .unknown
-        }
-        let effect: TransactionPresentationEffect
-        switch domain {
-        case .card:
-            switch transaction.cardLiabilityEffect {
-            case .increasesAmountOwed: effect = .increasesAmountOwed
-            case .decreasesAmountOwed: effect = .decreasesAmountOwed
-            case nil: effect = .unknown
-            }
-        case .bank:
-            if transaction.creditMoney != nil, transaction.debitMoney == nil { effect = .credit }
-            else if transaction.debitMoney != nil, transaction.creditMoney == nil { effect = .debit }
-            else { effect = .unknown }
-        case .unknown:
-            effect = .unknown
-        }
-        return OracleRecentActivityRow(
-            transaction: transaction,
-            stableID: oracleStableID(transaction),
-            accountID: transaction.repositoryAccountId,
-            accountDisplayName: account?.name ?? "Unavailable",
-            accountIdentityDisplay: account?.identitySummaries.map(\.redactedValue).sorted().joined(separator: ", ") ?? "",
-            institutionDisplayName: account?.institution ?? "Unavailable",
-            currentCategory: categoryID.map(TransactionPresentationCategoryChoice.categoryID) ?? .uncategorized,
-            currentCategoryDisplayName: categoryID == nil ? "Uncategorized" : (category?.name ?? "Unavailable"),
-            domain: domain,
-            effect: effect,
-            sourceCivilDate: transaction.statementDate
-        )
-    }.sorted(by: oracleRecentActivityPrecedes).prefix(3))
-}
-
-@MainActor
-private func oracleStableID(_ transaction: Transaction) -> String {
-    if let durable = transaction.repositoryTransactionId, !durable.isEmpty {
-        return "durable:" + durable
-    }
-    return "runtime:" + transaction.id.uuidString.lowercased()
-}
-
-@MainActor
-private func oracleRecentActivityPrecedes(_ lhs: OracleRecentActivityRow, _ rhs: OracleRecentActivityRow) -> Bool {
-    switch (lhs.sourceCivilDate, rhs.sourceCivilDate) {
-    case let (left?, right?) where left != right:
-        return left > right
-    case (.some, nil):
-        return true
-    case (nil, .some):
-        return false
-    default:
-        break
-    }
-    let leftSource = lhs.transaction.documentScopedSourceOrder
-    let rightSource = rhs.transaction.documentScopedSourceOrder
-    if let leftSource, let rightSource,
-       leftSource.documentID == rightSource.documentID,
-       leftSource.ordinal != rightSource.ordinal {
-        return leftSource.ordinal < rightSource.ordinal
-    }
-    let leftDocument = lhs.transaction.repositoryDocumentId ?? leftSource?.documentID ?? ""
-    let rightDocument = rhs.transaction.repositoryDocumentId ?? rightSource?.documentID ?? ""
-    if leftDocument != rightDocument { return leftDocument < rightDocument }
-    return lhs.stableID < rhs.stableID
-}
-
-@MainActor
-private func assertRecentActivity(_ actual: [TransactionPresentationRow], equalTo expected: [OracleRecentActivityRow]) {
-    check(actual.count == expected.count, "Dashboard recent activity count matches independent oracle")
-    for (actualRow, expectedRow) in zip(actual, expected) {
-        check(actualRow.stableID == expectedRow.stableID, "Dashboard recent activity stable identity is durable or runtime scoped")
-        check(actualRow.transaction.id == expectedRow.transaction.id, "Dashboard recent activity retains transaction identity")
-        check(sameMoney(actualRow.transaction.money, expectedRow.transaction.money), "Dashboard recent activity retains native Money")
-        check(actualRow.accountID == expectedRow.accountID, "Dashboard recent activity account identity is canonical")
-        check(actualRow.accountDisplayName == expectedRow.accountDisplayName, "Dashboard recent activity account display is canonical")
-        check(actualRow.accountIdentityDisplay == expectedRow.accountIdentityDisplay, "Dashboard recent activity identity display is canonical")
-        check(actualRow.institutionDisplayName == expectedRow.institutionDisplayName, "Dashboard recent activity institution is canonical")
-        check(actualRow.currentCategory == expectedRow.currentCategory, "Dashboard recent activity category choice is canonical")
-        check(actualRow.currentCategoryDisplayName == expectedRow.currentCategoryDisplayName, "Dashboard recent activity category display is canonical")
-        check(actualRow.domain == expectedRow.domain, "Dashboard recent activity domain is canonical")
-        check(actualRow.effect == expectedRow.effect, "Dashboard recent activity effect is canonical")
-        check(actualRow.sourceCivilDate == expectedRow.sourceCivilDate, "Dashboard recent activity date is source-backed")
     }
 }
 

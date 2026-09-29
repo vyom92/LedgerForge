@@ -6,7 +6,7 @@
 
 import Foundation
 
-struct InstitutionDetectionResult: Equatable, Sendable {
+nonisolated struct InstitutionDetectionResult: Equatable, Sendable {
     let metadata: DocumentMetadata
     let reasons: [String]
 
@@ -19,17 +19,24 @@ struct InstitutionDetectionResult: Equatable, Sendable {
     }
 }
 
-struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
+nonisolated struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
     private let rules: [InstitutionDetectionRule]
 
     init(
         rules: [InstitutionDetectionRule] = [
+            .hdfcRelationshipBankPDF,
+            .axisRelationshipBankPDF,
             .americanExpressPlatinumQARPDF,
+            .americanExpressUSDStatementPDF,
             .hdfcBankAccountPDF,
             .hdfcBankAccountXLS,
             .cbqCreditCardPDF,
             .cbqCurrentAccountMonthlyPDF,
             .cbqCurrentAccountHistoryPDF,
+            .cbqCurrentAccountLegacyPDF,
+            .cbqSavingsAccountLegacyPDF,
+            .cbqSavingsAccountMonthlyPDF,
+            .cbqESavingsAccountMonthlyPDF,
             .cbqCurrentAccountXLS,
             // Axis card signatures must precede the deliberately broad Axis
             // bank-account rule. Exact card identity and transaction-table
@@ -43,6 +50,14 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
 
     func detect(from text: String) -> InstitutionDetectionResult {
         let normalizedText = Self.normalized(text)
+
+        for (family, rule) in [(BankRelationshipFamily.hdfc, InstitutionDetectionRule.hdfcRelationshipBankPDF),
+                               (.axis, .axisRelationshipBankPDF)] where rules.contains(rule) {
+            if BankRelationshipPDFNormalizer.recognizes(text, family: family) {
+                return .init(metadata: .init(institution: family.institution, documentType: .bankAccount,
+                    fileFormat: .unknown, confidence: 0.995), reasons: ["Matched coherent relationship and bank-account section headings."])
+            }
+        }
 
         for rule in rules {
             if let result = rule.detect(in: normalizedText) {
@@ -74,6 +89,8 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
             case "xls", "xlsx":
                 applicableRules = rules.filter {
                     $0 != .hdfcBankAccountPDF
+                        && $0 != .hdfcRelationshipBankPDF
+                        && $0 != .axisRelationshipBankPDF
                         && $0 != .cbqCurrentAccountMonthlyPDF
                         && $0 != .cbqCurrentAccountHistoryPDF
                         && $0 != .cbqCreditCardPDF
@@ -116,7 +133,7 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
     }
 }
 
-struct InstitutionDetectionRule: Equatable, Sendable {
+nonisolated struct InstitutionDetectionRule: Equatable, Sendable {
     let institution: Institution
     let documentType: DocumentType
     let confidence: Double
@@ -142,6 +159,23 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             reasons: matchedReasons
         )
     }
+
+    static let axisRelationshipBankPDF = InstitutionDetectionRule(
+        institution: .axis, documentType: .bankAccount, confidence: 0.995, requiredMatchCount: 3,
+        signatures: [
+            .init(token: "RELATIONSHIP STATEMENT FOR THE PERIOD FROM:", reason: "Matched Axis relationship title."),
+            .init(token: "RELATIONSHIP SUMMARY", reason: "Matched relationship summary."),
+            .init(token: "STATEMENT FOR ACCOUNT NO.", reason: "Matched separate bank-account sections.")
+        ])
+
+    static let hdfcRelationshipBankPDF = InstitutionDetectionRule(
+        institution: .hdfc, documentType: .bankAccount, confidence: 0.995, requiredMatchCount: 4,
+        signatures: [
+            .init(token: "ACCOUNT RELATIONSHIP SUMMARY", reason: "Matched HDFC relationship summary."),
+            .init(token: "ACCOUNT NUMBER:", reason: "Matched section account identity."),
+            .init(token: "ACCOUNT TYPE:", reason: "Matched section product label."),
+            .init(token: "STATEMENT FROM:", reason: "Matched section period label.")
+        ])
 
     static let axisBankAccount = InstitutionDetectionRule(
         institution: .axis,
@@ -182,6 +216,24 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             InstitutionSignature(token: "AMEX (MIDDLE EAST) B.S.C. (C)", reason: "Matched the exact Amex Middle East issuer."),
             InstitutionSignature(token: "TRANSACTION DATE POSTING DATE DETAILS NON QAR SPENDING AMOUNT IN QAR", reason: "Matched the exact Amex financial header."),
             InstitutionSignature(token: "CARD ACCOUNT NUMBER:", reason: "Matched the Amex instrument-section identity label.")
+        ]
+    )
+
+    // Routing identifies the exact retained USD masthead. The normalizer must
+    // still prove its complete printed controls and exhausted zero-row body.
+    static let americanExpressUSDStatementPDF = InstitutionDetectionRule(
+        institution: .amex,
+        documentType: .creditCard,
+        confidence: 0.99,
+        requiredMatchCount: 7,
+        signatures: [
+            InstitutionSignature(token: "THE AMERICAN EXPRESS CARD", reason: "Matched the Amex USD card product."),
+            InstitutionSignature(token: "STATEMENT OF ACCOUNT", reason: "Matched the Amex statement title."),
+            InstitutionSignature(token: "AMEX (MIDDLE EAST) B.S.C. (C)", reason: "Matched the exact Amex Middle East issuer."),
+            InstitutionSignature(token: "MEMBERSHIP NUMBER", reason: "Matched the Amex liability identity label."),
+            InstitutionSignature(token: "STATEMENT PERIOD", reason: "Matched the Amex statement coverage label."),
+            InstitutionSignature(token: "(USD)", reason: "Matched the printed native USD summary currency."),
+            InstitutionSignature(token: "NEW CREDITS", reason: "Matched the Amex liability summary label.")
         ]
     )
 
@@ -252,7 +304,7 @@ struct InstitutionDetectionRule: Equatable, Sendable {
         institution: .cbq,
         documentType: .creditCard,
         confidence: 0.99,
-        requiredMatchCount: 5,
+        requiredMatchCount: 4,
         signatures: [
             InstitutionSignature(
                 token: "CARD ACCOUNT REFERENCE",
@@ -266,8 +318,7 @@ struct InstitutionDetectionRule: Equatable, Sendable {
                 token: "POST DATE PURCHASE DATE DESCRIPTION & REFERANCE FOREIGN CURRENCY AMOUNT IN QAR",
                 reason: "Matched the exact CBQ card transaction header."
             ),
-            InstitutionSignature(token: "DINERS CLUB", reason: "Matched the Diners companion section."),
-            InstitutionSignature(token: "MASTERCARD PLATINUM", reason: "Matched the Mastercard companion section.")
+            InstitutionSignature(token: "DINERS CLUB", reason: "Matched the Diners companion section.")
         ]
     )
 
@@ -299,9 +350,57 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             InstitutionSignature(token: "POSTING DATE TRANSACTION DESCRIPTION TRANSACTION DATE DEBIT CREDIT BALANCE", reason: "Matched the exact CBQ monthly transaction header.")
         ]
     )
+
+    static let cbqCurrentAccountLegacyPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "YOUR BANK STATEMENT", reason: "Matched the exact CBQ legacy bank-statement title."),
+            InstitutionSignature(token: "CURRENT ACCOUNT-RETAIL", reason: "Matched the exact CBQ legacy Current product evidence."),
+            InstitutionSignature(token: "POST DATE NARRATIVE VALUE DATE DEBIT CREDIT BOOK BALANCE", reason: "Matched the exact CBQ legacy Current transaction header.")
+        ]
+    )
+
+    static let cbqSavingsAccountLegacyPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "YOUR BANK STATEMENT", reason: "Matched the exact CBQ legacy bank-statement title."),
+            InstitutionSignature(token: "SAVINGS ACCOUNT", reason: "Matched the exact CBQ Savings product evidence."),
+            InstitutionSignature(token: "POST DATE NARRATIVE VALUE DATE DEBIT CREDIT BOOK BALANCE", reason: "Matched the exact CBQ legacy Savings transaction header.")
+        ]
+    )
+
+    static let cbqSavingsAccountMonthlyPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "ACCOUNT STATEMENT", reason: "Matched the exact CBQ monthly statement title."),
+            InstitutionSignature(token: "ACCOUNT TYPE: SAVINGS ACCOUNT", reason: "Matched the exact CBQ Savings product evidence."),
+            InstitutionSignature(token: "POSTING DATE TRANSACTION DESCRIPTION TRANSACTION DATE DEBIT CREDIT BALANCE", reason: "Matched the exact CBQ monthly transaction header.")
+        ]
+    )
+
+    static let cbqESavingsAccountMonthlyPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "ACCOUNT STATEMENT", reason: "Matched the exact CBQ monthly statement title."),
+            InstitutionSignature(token: "ACCOUNT TYPE: E SAVINGS ACCOUNT", reason: "Matched the exact CBQ E-Savings product evidence."),
+            InstitutionSignature(token: "POSTING DATE TRANSACTION DESCRIPTION TRANSACTION DATE DEBIT CREDIT BALANCE", reason: "Matched the exact CBQ monthly transaction header.")
+        ]
+    )
 }
 
-struct InstitutionSignature: Equatable, Sendable {
+nonisolated struct InstitutionSignature: Equatable, Sendable {
     let token: String
     let reason: String
 
@@ -314,7 +413,7 @@ struct InstitutionSignature: Equatable, Sendable {
 /// presentation. The generic reader owns extraction; this detector consumes only
 /// source identity plus the reader's tagged logical-table evidence.
 /// Financial row interpretation remains in the Axis normalizer/parser.
-enum AxisCreditCardAppStructuralSignature {
+nonisolated enum AxisCreditCardAppStructuralSignature {
     private static let expectedHeader = [
         "DATE", "TRANSACTIONDETAILS", "AMOUNT(INR)", "DEBIT/CREDIT"
     ]

@@ -1,6 +1,6 @@
 import Foundation
 
-struct IBKRCurrentHoldingsParser {
+nonisolated struct IBKRCurrentHoldingsParser {
     private struct Instrument {
         let identity: String
         let name: String
@@ -139,5 +139,5 @@ struct IBKRCurrentHoldingsParser {
 }
 
 private extension Array {
-    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+    nonisolated subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }

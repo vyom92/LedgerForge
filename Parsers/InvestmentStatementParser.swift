@@ -2,7 +2,7 @@ import Foundation
 
 /// Families interpret current holdings from the existing immutable reader output.
 /// This path never creates bank transactions from investment history.
-struct InvestmentStatementParser {
+nonisolated struct InvestmentStatementParser {
     static let name = "Current holdings"
 
     func canRecognize(_ source: RawDocument) -> Bool {
@@ -18,6 +18,13 @@ struct InvestmentStatementParser {
                 && text.contains("ISIN") && text.localizedCaseInsensitiveContains("Folio"))
             || text.localizedCaseInsensitiveContains("Client Investment Statement") && text.contains("CIF")
             || text.localizedCaseInsensitiveContains("Investment Portfolio Holding Statement") && text.contains("Unit Holder")
+    }
+
+    /// Preserve the existing main-actor route for the two non-email exceptions.
+    /// Recognition and grammar remain the same as the ordinary parser below.
+    func isEmailDeliveredFamily(_ source: RawDocument) -> Bool {
+        source.fileExtension == "pdf" && canRecognize(source)
+            && !source.searchableText.split(whereSeparator: \.isWhitespace).joined(separator: " ").contains("Interactive Brokers")
     }
 
     func parse(_ source: RawDocument) throws -> FinancialDocument {
@@ -53,7 +60,7 @@ struct InvestmentStatementParser {
 }
 
 /// CSV quoting is structural syntax. Financial column meaning remains family-owned.
-enum InvestmentSourceText {
+nonisolated enum InvestmentSourceText {
     static func csv(_ text: String) throws -> [[String]] {
         let text = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
         let chars = Array(text)
@@ -134,7 +141,7 @@ enum InvestmentSourceText {
     }
 }
 
-struct ZurichClosingHoldingsParser {
+nonisolated struct ZurichClosingHoldingsParser {
     func parse(_ source: RawDocument) throws -> InvestmentStatementEvidence {
         let rows = try InvestmentSourceText.csv(source.searchableText)
         guard let header = rows.first, Set(header).count == header.count,

@@ -14,7 +14,7 @@
 
 import Foundation
 
-struct CSVNormalizationResult {
+nonisolated struct CSVNormalizationResult {
 
     let rows: [NormalizedRow]
 
@@ -24,7 +24,7 @@ struct CSVNormalizationResult {
 
 }
 
-final class CSVNormalizer {
+nonisolated final class CSVNormalizer {
 
     func normalize(
         text: String,

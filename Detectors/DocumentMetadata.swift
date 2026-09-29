@@ -6,7 +6,7 @@
 
 import Foundation
 
-enum Institution: String, CaseIterable, Equatable, Sendable {
+nonisolated enum Institution: String, CaseIterable, Equatable, Sendable {
 
     case axis = "Axis Bank"
     case hdfc = "HDFC Bank"
@@ -17,7 +17,7 @@ enum Institution: String, CaseIterable, Equatable, Sendable {
 
 }
 
-enum DocumentType: String, CaseIterable, Equatable, Sendable {
+nonisolated enum DocumentType: String, CaseIterable, Equatable, Sendable {
 
     case bankAccount = "Bank Account"
     case creditCard = "Credit Card"
@@ -28,7 +28,7 @@ enum DocumentType: String, CaseIterable, Equatable, Sendable {
 
 }
 
-enum FileFormat: String, CaseIterable, Equatable, Sendable {
+nonisolated enum FileFormat: String, CaseIterable, Equatable, Sendable {
 
     case csv = "CSV"
     case pdf = "PDF"
@@ -39,7 +39,7 @@ enum FileFormat: String, CaseIterable, Equatable, Sendable {
 
 }
 
-struct DocumentMetadata: Equatable, Sendable {
+nonisolated struct DocumentMetadata: Equatable, Sendable {
 
     let institution: Institution
 

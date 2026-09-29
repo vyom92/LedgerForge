@@ -2,26 +2,30 @@ import Foundation
 import PDFKit
 import CoreGraphics
 
-final class PDFDocumentReader: ImportFramework.DocumentReader {
+nonisolated final class PDFDocumentReader: ImportFramework.DocumentReader {
     let supportedFileExtensions: Set<String> = ["pdf"]
 
     /// The positioned extractor is deliberately injectable for reader tests:
     /// resource extraction must remain available even when an individual
     /// geometry/range lookup fails. Production intake uses the strict
     /// PDFKitPositionedTextExtractor implementation below.
-    private let positionedEvidenceExtractor: (PDFDocument) -> [RawPDFPageEvidence]?
+    private let positionedEvidenceExtractor: @Sendable (PDFDocument) -> [RawPDFPageEvidence]?
 
     init(
-        positionedEvidenceExtractor: @escaping (PDFDocument) -> [RawPDFPageEvidence]? = PDFKitPositionedTextExtractor.extractPages
+        positionedEvidenceExtractor: @escaping @Sendable (PDFDocument) -> [RawPDFPageEvidence]? = PDFKitPositionedTextExtractor.extractPages
     ) {
         self.positionedEvidenceExtractor = positionedEvidenceExtractor
     }
 
-    func read(
+    // Each call creates and destroys its own PDFKit/CoreGraphics graph during
+    // one synchronous extraction. No PDF document, page, scanner or selection
+    // crosses an actor or task boundary; only RawDocument value evidence does.
+    @concurrent func read(
         request: ImportRequest,
         snapshot: SourceContentSnapshot,
         password: String?
     ) async throws -> RawDocument {
+        try Task.checkCancellation()
         guard supportedFileExtensions.contains(request.fileExtension) else {
             throw ImportError.unsupportedFile(extension: request.fileExtension)
         }
@@ -53,6 +57,7 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             var pages: [String] = []
             pages.reserveCapacity(document.pageCount)
             for pageIndex in 0..<document.pageCount {
+                try Task.checkCancellation()
                 guard let page = document.page(at: pageIndex) else {
                     throw ImportError.invalidDocument(message: "PDF document contains an unreadable physical page.")
                 }
@@ -88,6 +93,7 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             return (text, pages, pageEvidence, pageResourceEvidence, taggedTables)
         }
 
+        try Task.checkCancellation()
         return RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
@@ -98,6 +104,152 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             pdfPageResourceEvidence: extracted.pageResourceEvidence,
             pdfTaggedTables: extracted.taggedTables
         )
+    }
+}
+
+/// Extracts painted page rules without interpreting any text or financial
+/// value. Each invocation owns its scanner and graphics state.
+nonisolated private enum PDFPageDrawingExtractor {
+    private final class State {
+        var transform = CGAffineTransform.identity
+        var transforms: [CGAffineTransform] = []
+        var point: CGPoint?
+        var subpathStart: CGPoint?
+        var path: [RawPDFLineSegment] = []
+        var pathRectangles: [CGRect] = []
+        var segments: [RawPDFLineSegment] = []
+        var rectangles: [CGRect] = []
+        var invalid = false
+
+        func numbers(_ scanner: CGPDFScannerRef, count: Int) -> [CGFloat]? {
+            var values: [CGFloat] = []
+            for _ in 0..<count {
+                var value: CGPDFReal = 0
+                guard CGPDFScannerPopNumber(scanner, &value), value.isFinite else {
+                    invalid = true; return nil
+                }
+                values.append(CGFloat(value))
+            }
+            return Array(values.reversed())
+        }
+
+        func line(to end: CGPoint) {
+            if let point { path.append(.init(start: point, end: end)) }
+            point = end
+            if path.count > 50_000 { invalid = true; discardPath() }
+        }
+
+        func closePath() {
+            if let subpathStart { line(to: subpathStart) }
+        }
+
+        func discardPath() {
+            point = nil; subpathStart = nil
+            path.removeAll(keepingCapacity: true)
+            pathRectangles.removeAll(keepingCapacity: true)
+        }
+
+        func paint() {
+            guard !invalid, segments.count + path.count <= 50_000,
+                  rectangles.count + pathRectangles.count <= 10_000 else {
+                invalid = true; discardPath(); return
+            }
+            segments += path
+            rectangles += pathRectangles
+            discardPath()
+        }
+    }
+
+    static func extract(_ page: PDFPage) -> RawPDFDrawingEvidence? {
+        guard let source = page.pageRef, let table = CGPDFOperatorTableCreate() else { return nil }
+        let state = State()
+        let info = Unmanaged.passUnretained(state).toOpaque()
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard state.transforms.count < 128 else { state.invalid = true; return }
+            state.transforms.append(state.transform)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let transform = state.transforms.popLast() else { state.invalid = true; return }
+            state.transform = transform
+        }
+        CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let v = state.numbers(scanner, count: 6) else { return }
+            let t = state.transform
+            // PDF concatenates the new user transform inside the current CTM.
+            state.transform = CGAffineTransform(a: t.a * v[0] + t.c * v[1], b: t.b * v[0] + t.d * v[1],
+                c: t.a * v[2] + t.c * v[3], d: t.b * v[2] + t.d * v[3],
+                tx: t.a * v[4] + t.c * v[5] + t.tx, ty: t.b * v[4] + t.d * v[5] + t.ty)
+        }
+        CGPDFOperatorTableSetCallback(table, "m") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let v = state.numbers(scanner, count: 2) else { return }
+            let point = CGPoint(x: v[0], y: v[1]).applying(state.transform)
+            state.point = point; state.subpathStart = point
+        }
+        CGPDFOperatorTableSetCallback(table, "l") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let v = state.numbers(scanner, count: 2) else { return }
+            state.line(to: CGPoint(x: v[0], y: v[1]).applying(state.transform))
+        }
+        CGPDFOperatorTableSetCallback(table, "re") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let v = state.numbers(scanner, count: 4) else { return }
+            let rect = CGRect(x: v[0], y: v[1], width: v[2], height: v[3])
+            let points = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+                          CGPoint(x: rect.maxX, y: rect.maxY), CGPoint(x: rect.minX, y: rect.maxY)]
+                .map { $0.applying(state.transform) }
+            state.point = points[0]; state.subpathStart = points[0]
+            for point in points.dropFirst() { state.line(to: point) }
+            state.closePath()
+            state.pathRectangles.append(rect.applying(state.transform))
+        }
+        CGPDFOperatorTableSetCallback(table, "h") { _, info in
+            guard let info else { return }
+            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().closePath()
+        }
+        CGPDFOperatorTableSetCallback(table, "S") { _, info in
+            guard let info else { return }
+            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().paint()
+        }
+        for operation in ["s", "f", "F", "f*", "B", "B*", "b", "b*"] {
+            CGPDFOperatorTableSetCallback(table, operation) { _, info in
+                guard let info else { return }
+                let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+                state.closePath(); state.paint()
+            }
+        }
+        CGPDFOperatorTableSetCallback(table, "n") { _, info in
+            guard let info else { return }
+            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().discardPath()
+        }
+        // Curves are not straight rules; retain their endpoint only so a
+        // following explicit line starts at its actual source position.
+        CGPDFOperatorTableSetCallback(table, "c") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            guard let v = state.numbers(scanner, count: 6) else { return }
+            state.point = CGPoint(x: v[4], y: v[5]).applying(state.transform)
+        }
+        for operation in ["v", "y"] {
+            CGPDFOperatorTableSetCallback(table, operation) { scanner, info in
+                guard let info else { return }
+                let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+                guard let v = state.numbers(scanner, count: 4) else { return }
+                state.point = CGPoint(x: v[2], y: v[3]).applying(state.transform)
+            }
+        }
+        let scanner = CGPDFScannerCreate(CGPDFContentStreamCreateWithPage(source), table, info)
+        guard CGPDFScannerScan(scanner), !state.invalid else { return nil }
+        return .init(segments: state.segments, rectangles: state.rectangles)
     }
 }
 
@@ -147,20 +299,45 @@ private enum PDFKitPositionedTextExtractor {
                     extractionFailed = true
                     break
                 }
-                fragments.append(RawPDFTextFragment(text: text, geometry: geometry, bounds: bounds))
+                let positionOrderedText = positionedNumericText(text, range: match.range, page: page)
+                fragments.append(RawPDFTextFragment(text: text, geometry: geometry, bounds: bounds,
+                                                    positionOrderedText: positionOrderedText))
             }
             result.append(RawPDFPageEvidence(
                 fragments: extractionFailed ? [] : fragments,
-                bounds: page.bounds(for: .mediaBox)
+                bounds: page.bounds(for: .mediaBox),
+                drawings: PDFPageDrawingExtractor.extract(page)
             ))
         }
         return result
+    }
+
+    /// PDFKit may expose numeric punctuation in bidirectional stream order.
+    /// Keep a separate source-geometric projection without parsing a number or
+    /// changing the native text consumed by existing profiles.
+    nonisolated private static func positionedNumericText(_ text: String, range: NSRange, page: PDFPage) -> String? {
+        guard text.count > 1, text.contains(where: \.isNumber),
+              text.unicodeScalars.allSatisfy({ $0.isASCII && !CharacterSet.letters.contains($0) }) else { return nil }
+        var characters: [(index: Int, text: String, bounds: CGRect)] = []
+        for offset in 0..<range.length {
+            guard let selection = page.selection(for: NSRange(location: range.location + offset, length: 1)),
+                  let value = selection.string, value.utf16.count == 1 else { return nil }
+            let bounds = selection.bounds(for: page)
+            guard bounds.minX.isFinite, bounds.minY.isFinite, bounds.width.isFinite, bounds.width > 0 else { return nil }
+            characters.append((offset, value, bounds))
+        }
+        guard let first = characters.first,
+              characters.allSatisfy({ abs($0.bounds.minY - first.bounds.minY) <= 1 }) else { return nil }
+        let ordered = characters.sorted {
+            $0.bounds.minX == $1.bounds.minX ? $0.index < $1.index : $0.bounds.minX < $1.bounds.minX
+        }.map(\.text).joined()
+        return ordered == text ? nil : ordered
     }
 }
 
 /// Minimal, page-count-validated resource evidence that does not depend on
 /// positioned text extraction. It intentionally retains no image bytes.
-private enum PDFKitPageResourceExtractor {
+nonisolated private enum PDFKitPageResourceExtractor {
     static func extractPages(document: PDFDocument) -> [RawPDFPageResourceEvidence]? {
         guard document.pageCount > 0 else { return nil }
         return (0..<document.pageCount).map { index in
@@ -222,7 +399,7 @@ private enum PDFKitPageResourceExtractor {
 /// Bounded extraction of source-tagged table structure. This evidence is
 /// independent of PDFKit's visual range geometry and is used only when a
 /// profile explicitly requires a tagged logical table.
-private enum TaggedPDFTableExtractor {
+nonisolated private enum TaggedPDFTableExtractor {
     private struct MarkedSegment {
         var textBlocks: [String] = []
         var rectangleCount = 0
@@ -739,7 +916,7 @@ private enum TaggedPDFTableExtractor {
 /// Minimal Type-3 font decoding used only while scanning an explicitly tagged
 /// PDF table. It is not a competing full-page text representation and cannot
 /// replace PDFKit page text or geometry.
-private enum TaggedPDFFontMapExtractor {
+nonisolated private enum TaggedPDFFontMapExtractor {
     private static let maximumFontsPerPage = 128
     private static let maximumMappingsPerFont = 4096
     private static let maximumCMapBytes = 32 * 1024

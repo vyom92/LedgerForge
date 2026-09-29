@@ -505,7 +505,7 @@ struct DeveloperConsoleView: View {
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS 'UTC'"
+        formatter.dateFormat = "dd MMM yy HH:mm:ss.SSS 'UTC'"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
@@ -513,7 +513,7 @@ struct DeveloperConsoleView: View {
 
     private static let rowTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS 'UTC'"
+        formatter.dateFormat = "dd MMM yy HH:mm:ss.SSS 'UTC'"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter

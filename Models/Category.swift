@@ -22,6 +22,8 @@ struct CategorySnapshot: Equatable, Sendable {
 
     let categories: [Category]
     let assignments: [String: String]
+    var automation: CategoryAutomationSnapshot? = nil
+    var providerGeneration: ProviderGenerationToken? = nil
 
     var activeCategories: [Category] { categories.filter { !$0.isArchived } }
     var archivedCategories: [Category] { categories.filter(\.isArchived) }

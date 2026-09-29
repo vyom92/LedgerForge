@@ -6,7 +6,7 @@
 
 import Foundation
 
-struct StatementClassificationDetector: ImportFramework.StatementClassifier {
+nonisolated struct StatementClassificationDetector: ImportFramework.StatementClassifier {
     private let rules: [StatementClassificationRule]
 
     init(rules: [StatementClassificationRule] = [.creditCardStatement, .bankStatement]) {
@@ -36,6 +36,14 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
             )
         }
         let normalizedText = Self.normalized(document.searchableText)
+        if document.fileExtension == "pdf" {
+            for family in [BankRelationshipFamily.hdfc, .axis] where institution?.institutionCode == family.institution.rawValue {
+                if BankRelationshipPDFNormalizer.recognizes(document.searchableText, family: family) {
+                    return .init(documentType: .bankStatement, confidence: 0.995,
+                                 reasons: ["Matched account-owned bank sections in one relationship original."])
+                }
+            }
+        }
 
         // CBQ PDFs must enter exactly one retained statement family before the
         // generic classifier rules are considered. Institution context is a
@@ -47,7 +55,11 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
             let exactFamilies = [
                 InstitutionDetectionRule.cbqCreditCardPDF,
                 .cbqCurrentAccountHistoryPDF,
-                .cbqCurrentAccountMonthlyPDF
+                .cbqCurrentAccountMonthlyPDF,
+                .cbqCurrentAccountLegacyPDF,
+                .cbqSavingsAccountLegacyPDF,
+                .cbqSavingsAccountMonthlyPDF,
+                .cbqESavingsAccountMonthlyPDF
             ].compactMap { $0.detect(in: normalizedText) }
 
             guard exactFamilies.count == 1, let family = exactFamilies.first else {
@@ -108,7 +120,7 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
     }
 }
 
-struct StatementClassificationRule: Equatable, Sendable {
+nonisolated struct StatementClassificationRule: Equatable, Sendable {
     let documentType: StatementDocumentType
     let confidence: Double
     let requiredMatchCount: Int
@@ -162,6 +174,7 @@ struct StatementClassificationRule: Equatable, Sendable {
         requiredMatchCount: 2,
         signatures: [
             StatementClassificationSignature(token: "THE PLATINUM CARD (QAR)", reason: "Matched the exact Amex card product."),
+            StatementClassificationSignature(token: "THE AMERICAN EXPRESS CARD", reason: "Matched the retained Amex USD card product."),
             StatementClassificationSignature(token: "CARD ACCOUNT NUMBER:", reason: "Matched a card-instrument section."),
             StatementClassificationSignature(token: "NEW CREDITS", reason: "Matched card liability summary evidence."),
             StatementClassificationSignature(token: "CREDIT CARD", reason: "Matched credit card statement phrase."),
@@ -178,7 +191,7 @@ struct StatementClassificationRule: Equatable, Sendable {
     )
 }
 
-struct StatementClassificationSignature: Equatable, Sendable {
+nonisolated struct StatementClassificationSignature: Equatable, Sendable {
     let token: String
     let reason: String
 
@@ -188,7 +201,7 @@ struct StatementClassificationSignature: Equatable, Sendable {
 }
 
 extension StatementDocumentType {
-    var legacyDocumentType: DocumentType {
+    nonisolated var legacyDocumentType: DocumentType {
         switch self {
         case .bankStatement:
             return .bankAccount

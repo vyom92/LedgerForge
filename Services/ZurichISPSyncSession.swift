@@ -34,6 +34,7 @@ final class ZurichISPSyncSession: ObservableObject {
     @Published private(set) var lastSuccessfulFetch: Date?
     @Published private(set) var sourceValuationDates: [String] = []
     @Published private(set) var requiresReconnect = false
+    @Published private(set) var completedConnectionID: UUID?
     private let enabled: Bool
     private let keychain: ZurichISPCredentialStore
     private let client: ZurichISPClient
@@ -50,6 +51,22 @@ final class ZurichISPSyncSession: ObservableObject {
     private var timerEpoch = UUID()
     private var started = false
     private var pendingDueCheck = false
+    private var backgroundScheduleActive = false
+    var sharedHoldingsRefresh: ((Bool) -> Void)?
+
+    func setBackgroundScheduleActive(_ active: Bool) {
+        guard active != backgroundScheduleActive else { return }
+        backgroundScheduleActive = active
+        if active { monthlyTimer?.cancel(); monthlyTimer = nil; pendingDueCheck = false }
+        else if started { checkMonthlyDue(); scheduleNextMonth() }
+        objectWillChange.send()
+    }
+
+    func sharedRefreshState(busy: Bool, message: String?) {
+        guard operation == nil else { return }
+        isBusy = busy
+        self.message = message
+    }
 
     init(enabled: Bool = true, keychain: ZurichISPCredentialStore = .init(), client: ZurichISPClient = .init(),
          now: @escaping @Sendable () -> Date = { Date() },
@@ -58,10 +75,13 @@ final class ZurichISPSyncSession: ObservableObject {
     }
 
     var connectionSummary: String {
+        if !enabled { return "ISP connections are disabled in this app session" }
         if isBusy { return "Checking ISP account…" }
         if requiresReconnect { return "Reconnect to resume automatic updates" }
-        return username == nil ? "Not connected · statement import available" : "Connected · monthly on the 5th, UTC"
+        return username == nil ? "Not connected · statement import available" : (backgroundScheduleActive ? "Connected · schedule in Background Updates" : "Connected · monthly on the 5th, UTC")
     }
+
+    var isConnectionAvailable: Bool { enabled }
 
     func start(store: InvestmentStore = .shared) {
         guard enabled, !started else { return }
@@ -74,7 +94,7 @@ final class ZurichISPSyncSession: ObservableObject {
                 Task { @MainActor [weak self] in self?.checkMonthlyDue(); self?.scheduleNextMonth() }
             }
         pendingDueCheck = true
-        let keychain = keychain
+        let keychain = keychain.forbiddingInteraction()
         Task { [weak self] in
             do {
                 let credentials = try await Task.detached { try keychain.load() }.value
@@ -99,17 +119,22 @@ final class ZurichISPSyncSession: ObservableObject {
     }
 
     func checkMonthlyDue() {
-        guard enabled, started else { return }
+        guard enabled, started, !backgroundScheduleActive else { return }
         guard ApplicationAvailability.shared.state.permitsMutation, generation != nil,
               !DatabaseActivityGate.shared.hasExclusiveOperation else { pendingDueCheck = true; return }
         guard operation == nil else { pendingDueCheck = true; return }
         pendingDueCheck = false
         guard username != nil, !requiresReconnect,
               ZurichISPMonthlySchedule.isDue(at: now(), lastSuccess: lastSuccessfulFetch) else { return }
-        fetchHoldings()
+        if let sharedHoldingsRefresh { sharedHoldingsRefresh(false) }
+        else { fetchHoldings() }
     }
 
-    func fetchHoldings() { perform(mode: .holdings) }
+    func fetchHoldings() {
+        guard permitsCommand() else { return }
+        if let sharedHoldingsRefresh { sharedHoldingsRefresh(true) }
+        else { perform(mode: .holdings) }
+    }
     func checkConnection() { perform(mode: .check) }
     func connect(_ credentials: ZurichISPCredentials) { perform(mode: .connect(credentials)) }
     func replaceCredentials(_ credentials: ZurichISPCredentials) { perform(mode: .replace(credentials)) }
@@ -117,8 +142,20 @@ final class ZurichISPSyncSession: ObservableObject {
 
     private enum Mode { case holdings, check, connect(ZurichISPCredentials), replace(ZurichISPCredentials), pilot }
 
+    private func permitsCommand() -> Bool {
+        guard enabled else {
+            message = "Online services are disabled for this app session. Reopen LedgerForge with online services enabled to connect."
+            return false
+        }
+        guard !isBusy else {
+            message = ZurichISPClientError.inFlight.localizedDescription
+            return false
+        }
+        return true
+    }
+
     private func perform(mode: Mode) {
-        guard enabled, operation == nil else { return }
+        guard permitsCommand() else { return }
         guard ApplicationAvailability.shared.state.permitsMutation, let generation,
               generation == DatabaseProvider.shared.generationToken else {
             message = ZurichISPSnapshotError.unavailable.localizedDescription; return
@@ -134,6 +171,12 @@ final class ZurichISPSyncSession: ObservableObject {
                 }
             }
             do {
+                let jobLease: BackgroundJobLease?
+                if let sqlite = DatabaseProvider.shared.sqliteProvider {
+                    guard let acquired = try BackgroundJobLease.acquire(path: sqlite.databasePath, kind: .zurichISP) else { throw ZurichISPClientError.inFlight }
+                    jobLease = acquired
+                } else { jobLease = nil }
+                defer { withExtendedLifetime(jobLease) {} }
                 let credentials: ZurichISPCredentials
                 var pilotMoveToken: ZurichISPCredentialStore.PilotMoveToken?
                 switch mode {
@@ -186,8 +229,12 @@ final class ZurichISPSyncSession: ObservableObject {
                     try await Task.detached { try keychain.finishPilotMove(verified: reloaded, token: moveToken) }.value
                     try Task.checkCancellation()
                 }
+                let label = try await Task.detached { try keychain.label() }.value
+                try Task.checkCancellation()
+                guard self.epoch == token, self.generation == generation,
+                      DatabaseProvider.shared.generationToken == generation else { return }
                 self.username = credentials.username; self.requiresReconnect = false
-                self.credentialLabel = try await Task.detached { try keychain.label() }.value
+                self.credentialLabel = label
                 if case .check = mode {
                     self.message = "Connection verified · \(accepted.policies.count) policies · \(accepted.positionCount) positions. Holdings were not changed."
                 } else {
@@ -211,10 +258,14 @@ final class ZurichISPSyncSession: ObservableObject {
                     self.lastSuccessfulFetch = accepted.fetchedAt
                     self.sourceValuationDates = Array(Set(accepted.policies.map(\.valuationDay))).sorted()
                 }
+                switch mode {
+                case .connect, .replace, .pilot: self.completedConnectionID = token
+                case .holdings, .check: break
+                }
             } catch {
                 guard let self, self.epoch == token else { return }
                 if let error = error as? ZurichISPClientError,
-                   [.rejectedSignIn, .rejectedPIN, .unsupportedSignIn, .sessionExpired].contains(error) { self.requiresReconnect = true }
+                   [.rejectedSignIn, .rejectedPIN, .unsupportedSignIn, .unexpectedSignInPage, .sessionExpired].contains(error) { self.requiresReconnect = true }
                 self.message = (error as? LocalizedError)?.errorDescription ?? "The ISP update failed. Previous holdings are retained."
             }
         }
@@ -223,7 +274,7 @@ final class ZurichISPSyncSession: ObservableObject {
     func cancel(silent: Bool = false) {
         epoch = UUID(); operation?.cancel(); operation = nil; isBusy = false; pendingDueCheck = false
         Task { await client.cancel() }
-        if !silent { message = "Cancelled. Previous ISP holdings are retained." }
+        message = silent ? nil : "Cancelled. Previous ISP holdings are retained."
     }
 
     func disconnect() {
@@ -252,6 +303,7 @@ final class ZurichISPSyncSession: ObservableObject {
     }
 
     private func scheduleNextMonth() {
+        guard !backgroundScheduleActive else { return }
         monthlyTimer?.cancel(); timerEpoch = UUID()
         let token = timerEpoch, due = ZurichISPMonthlySchedule.nextDate(after: now()), sleep = sleep
         let delay = max(0, due.timeIntervalSince(now()))

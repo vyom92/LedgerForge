@@ -8,9 +8,12 @@
 import Foundation
 
 /// Performs validation on imported transactions before they are trusted by the application.
-final class ImportValidator {
+nonisolated final class ImportValidator {
 
     static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
+        if let bank = financialDocument.bankStatementEvidence, bank.isAccountRelationshipStatement {
+            return validateBankSections(financialDocument, evidence: bank)
+        }
         if let investment = financialDocument.investmentStatementEvidence {
             var issues: [ValidationIssue] = []
             do {
@@ -55,6 +58,58 @@ final class ImportValidator {
             zeroActivityEvidence: financialDocument.zeroActivityEvidence,
             financialDocument: financialDocument
         )
+    }
+
+    private static func validateBankSections(_ document: FinancialDocument, evidence: BankStatementEvidence) -> ImportValidationResult {
+        var issues: [ValidationIssue] = []
+        let sections = evidence.sections
+        let transactions = document.transactions
+        let expectedProfile: String?
+        switch document.metadata.institution {
+        case .axis: expectedProfile = BankRelationshipFamily.axis.profileID
+        case .hdfc: expectedProfile = BankRelationshipFamily.hdfc.profileID
+        default: expectedProfile = nil
+        }
+        let complete = !sections.isEmpty && document.metadata.documentType == .bankAccount &&
+            document.metadata.fileFormat == .pdf && expectedProfile != nil && document.parserProfileID == expectedProfile &&
+            document.parserProfileVersion == "1" && document.bookedCurrency?.code == "INR" &&
+            document.financialIdentifiers.isEmpty && sections.map(\.ordinal) == Array(1...sections.count) &&
+            Set(sections.map(\.id)).count == sections.count &&
+            Set(sections.map { $0.sourceIdentity.literal }).count == sections.count &&
+            sections.flatMap(\.transactionIDs) == transactions.map(\.id) &&
+            Set(transactions.map(\.id)).count == transactions.count
+        if !complete {
+            issues.append(.init(severity: .error, rowNumber: nil, message: "Bank section ownership is incomplete or contradictory."))
+        }
+        let byID = Dictionary(transactions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for section in sections {
+            let rows = section.transactionIDs.compactMap { byID[$0] }
+            let ordinals = rows.compactMap { $0.sourceProvenance.first?.sourceOrdinal }
+            let valid = section.nativeCurrency == document.bookedCurrency && !section.productLabel.isEmpty &&
+                section.exhaustedRegion.matches(normalizedFinancialRowCount: rows.count) &&
+                rows.count == section.transactionIDs.count && ordinals.count == rows.count &&
+                ordinals == ordinals.sorted() && Set(ordinals).count == ordinals.count &&
+                rows.allSatisfy { row in
+                    row.statementDate != nil && row.financialDateRole == .transactionDate &&
+                    row.money.currency == section.nativeCurrency && row.money.amount != .zero &&
+                    row.runningBalanceMoney?.currency == section.nativeCurrency && row.sourceProvenance.count == 1 &&
+                    row.sourceProvenance.first?.parserProfileID == document.parserProfileID &&
+                    row.sourceProvenance.first?.literalRunningBalance != nil &&
+                    (document.metadata.institution == .hdfc ? row.valueDate != nil : row.valueDate == nil) &&
+                    (row.money.amount < .zero ? row.debitMoney?.amount == -row.money.amount && row.creditMoney == nil
+                                             : row.creditMoney?.amount == row.money.amount && row.debitMoney == nil)
+                }
+            if !valid {
+                issues.append(.init(severity: .error, rowNumber: section.firstSourceOrdinal,
+                                    message: "A bank account section has incomplete transaction evidence."))
+            }
+        }
+        // The owner selected complete transactions mapped to separate accounts.
+        // Printed account/cross-account controls remain observations; neither
+        // recurrence nor aggregate totals rewrite or veto these extracted rows.
+        return .init(rowsRead: transactions.count, transactionsParsed: transactions.count,
+            statementCurrency: document.bookedCurrency, debitTotalMoney: nil, creditTotalMoney: nil,
+            openingBalanceMoney: nil, closingBalanceMoney: nil, passed: issues.isEmpty, issues: issues)
     }
 
     private static func validateSalaryStatement(
@@ -167,6 +222,8 @@ final class ImportValidator {
             !((contract == .axis && [.pdf, .xlsx].contains(financialDocument.metadata.fileFormat)) ||
               (contract != .axis && financialDocument.metadata.fileFormat == .pdf)) ||
             financialDocument.bookedCurrency != currency ||
+            currency.code != contract.nativeCurrency ||
+            (contract == .amexUSDZero && (!transactions.isEmpty || !evidence.instrumentSections.isEmpty)) ||
             financialDocument.declaredStatementPeriod != evidence.declaredStatementPeriod ||
             !temporalEvidenceValid {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement metadata conflicts with parser evidence."))
@@ -197,8 +254,15 @@ final class ImportValidator {
                 issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card row is missing posting-date or annotation evidence."))
                 continue
             }
+            let isCBQV1PrecedingBoundaryRepayment =
+                contract == .cbqV1 &&
+                annotation.financialScope == .accountLevel &&
+                annotation.summaryMembership == .cbqV1PaymentReceived &&
+                annotation.liabilityEffect == .decreasesAmountOwed &&
+                annotation.sourceTransactionDate == postingDate &&
+                Self.immediatelyPrecedes(postingDate, periodStart: evidence.declaredStatementPeriod?.start)
             if contract != .axis, let period = evidence.declaredStatementPeriod,
-               (postingDate > period.end || postingDate < period.start) {
+               (postingDate > period.end || (postingDate < period.start && !isCBQV1PrecedingBoundaryRepayment)) {
                 issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card financial date is outside the source-proven statement period."))
             }
             if transaction.financialDateRole != (contract == .axis ? .transactionDate : .postingDate) ||
@@ -291,7 +355,7 @@ final class ImportValidator {
         } else if let accountKind = contract.accountObservationKindCode,
                   let instrumentKind = contract.instrumentObservationKindCode,
                   let sectionRule = contract.sectionRule {
-            let permitsAccountOnlyZero = contract == .amex &&
+            let permitsAccountOnlyZero = contract.isAmex &&
                 transactions.isEmpty && zeroValidation?.passed == true
             structuralIdentityIsInvalid = evidence.accountSourceIdentityObservations.count != 1 ||
                 evidence.accountSourceIdentityObservations.first?.kind.rawValue != accountKind ||
@@ -348,7 +412,7 @@ final class ImportValidator {
                 }
             }
             let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
-            let expectedSectionCoverage = contract == .amex ? instrumentTotal : allRowsTotal
+            let expectedSectionCoverage = contract.isAmex ? instrumentTotal : allRowsTotal
             if sectionsTotal != expectedSectionCoverage {
                 issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
             }
@@ -388,7 +452,7 @@ final class ImportValidator {
         }
         let mismatch: Bool
         switch contract {
-        case .amex:
+        case .amex, .amexUSDZero:
             let credits = component("new_credits")
             let debits = component("new_debits")
             let printedInstrument = component("instrument_net_total")
@@ -438,6 +502,16 @@ final class ImportValidator {
         if mismatch {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement summary does not reconcile under its exact profile contract."))
         }
+    }
+
+    private static func immediatelyPrecedes(_ date: StatementDate, periodStart: StatementDate?) -> Bool {
+        guard let periodStart else { return false }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let start = calendar.date(from: DateComponents(year: periodStart.year, month: periodStart.month, day: periodStart.day)),
+              let preceding = calendar.date(byAdding: .day, value: -1, to: start) else { return false }
+        let parts = calendar.dateComponents([.year, .month, .day], from: preceding)
+        return parts.year == date.year && parts.month == date.month && parts.day == date.day
     }
 
     static func validate(transactions: [Transaction]) -> ImportValidationResult {

@@ -269,7 +269,7 @@ struct ImportCentreAuthenticBatchTests {
         case .choiceRequired:
             return .createNewAccount(displayName: "Imported review account")
         case .unavailable, .liabilityAccountChoiceRequired, .ambiguous, .conflict,
-                .cardChoiceRequired:
+                .cardChoiceRequired, .bankSections:
             throw TestError.unexpectedIdentityReview
         }
     }

@@ -893,6 +893,21 @@ struct AxisBankAuthenticAcceptanceTests {
         return (digest, data.count, "axis|\(carrier.logicalStatementId)", carrier.rowCount)
     }
 
+    func standaloneComparisonsForRelationshipCampaign(root: URL) throws -> [AuthenticStandaloneBankComparison] {
+        let oracle = try Self.loadOracle(root: root)
+        let sources = try sourceURLsByDigest(root: root)
+        return try oracle.carriers.map { carrier in
+            let pdf = try #require(oracle.carriers.first { $0.format == "pdf" && $0.logicalStatementId == carrier.logicalStatementId })
+            return AuthenticStandaloneBankComparison(url: try #require(sources[carrier.sourceSha256]),
+                sha256: carrier.sourceSha256, equivalentPDFSHA: pdf.sourceSha256, rowCount: carrier.rowCount,
+                compare: { prepared in
+                    let bytesMatch = try prepared.sourceSnapshot.withBytes(sha256) == carrier.sourceSha256
+                    #expect(bytesMatch)
+                    try verify(prepared: prepared, against: carrier)
+                })
+        }
+    }
+
     private static func loadOracle(root: URL) throws -> Oracle {
         let files = try directAxisFiles(root: root)
         let csvStatements = try files

@@ -30,11 +30,6 @@ struct InvestmentListView: View {
                 Text("\(store.snapshot.holdings.count) current holdings")
                     .font(theme.typography.formBody).foregroundStyle(theme.palette.secondaryText)
                 Spacer()
-                Button("Details", systemImage: "info.circle") { showsDetails.toggle() }
-                    .disabled(selected == nil || !showsHoldingsTable).buttonStyle(LFActionButtonStyle(kind: .secondary))
-                Button("Import Statement", systemImage: "square.and.arrow.down", action: importStatement)
-                    .buttonStyle(LFActionButtonStyle(kind: .primary))
-                    .disabled(!availabilityState.permitsMutation)
             }
             if availabilityState == .loading {
                 ProgressView("Loading holdings…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -142,7 +137,7 @@ struct InvestmentListView: View {
                                        let fund = policy.funds.first(where: { $0.code == holding.zioFundCode }) {
                                         detailLine("Source", "Zurich ZIO account")
                                         detailLine("Portal valuation date", policy.valuationDateText)
-                                        detailLine("Holdings fetched", policy.fetchedAt.formatted(.iso8601))
+                                        detailLine("Holdings fetched", AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
                                         detailLine("Source fund code", fund.code)
                                         detailLine("Portal unit price (exact)", fund.price.sourceText + " " + fund.currency)
                                         detailLine("Portal value (exact)", fund.value.sourceText + " " + fund.currency)
@@ -162,7 +157,7 @@ struct InvestmentListView: View {
                                         detailLine("Price kind", quote.mapping.priceKind ?? "Unavailable")
                                         detailLine("Date basis", quote.dateBasis.label)
                                         if let text = quote.valuationText { detailLine("Provider date / time", text) }
-                                        detailLine("Fetched successfully", quote.fetchedAt.formatted(.iso8601))
+                                        detailLine("Fetched successfully", AppDateDisplay.timestamp(quote.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
                                         detailLine("Source qualification", quote.qualification)
                                     }
                                 }
@@ -406,14 +401,15 @@ struct InvestmentListView: View {
     @ViewBuilder private func valuationDate(_ quote: InvestmentQuote?, at now: Date) -> some View {
         if let quote {
             let days = quote.age(at: now)
-            let color = ageColor(days)
+            let freshness = quote.freshnessAge(at: now)
+            let color = ageColor(freshness)
             Text(InvestmentPriceDates.display(quote.valuationDay))
                 .monospacedDigit().fixedSize().foregroundStyle(color)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(LinearGradient(colors: [color.opacity(0.16), color.opacity(0.05)],
                     startPoint: .leading, endPoint: .trailing), in: Capsule())
                 .frame(maxWidth: .infinity)
-                .help("\(quote.dateBasis.label) · \(days == 0 ? "Today" : "\(days) days old")\(days >= 4 ? " · Stale" : "")")
+                .help("\(quote.dateBasis.label) · \(days == 0 ? "Today" : "\(days) days old")\(freshness >= 4 ? " · Stale" : "")")
         } else {
             Text("Unavailable").foregroundStyle(theme.palette.secondaryText).frame(maxWidth: .infinity)
         }
@@ -431,12 +427,6 @@ struct InvestmentListView: View {
     /// Al Dar's visual scale, applied to printed calendar dates: green today,
     /// yellow at one day, gradually red by four days. No rate behavior changes.
     private func ageColor(_ days: Int) -> Color {
-        let position = days == 0 ? 0 : min(2, 1 + Double(days - 1) / 3)
-        let first = (position <= 1 ? NSColor.systemGreen : NSColor.systemYellow).usingColorSpace(.deviceRGB)!
-        let second = (position <= 1 ? NSColor.systemYellow : NSColor.systemRed).usingColorSpace(.deviceRGB)!
-        let progress = CGFloat(position <= 1 ? position : position - 1)
-        return Color(red: Double(first.redComponent + (second.redComponent - first.redComponent) * progress),
-                     green: Double(first.greenComponent + (second.greenComponent - first.greenComponent) * progress),
-                     blue: Double(first.blueComponent + (second.blueComponent - first.blueComponent) * progress))
+        FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(days)))
     }
 }

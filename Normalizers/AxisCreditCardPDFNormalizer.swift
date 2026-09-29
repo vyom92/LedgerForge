@@ -1,6 +1,6 @@
 import Foundation
 
-enum AxisCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
+nonisolated enum AxisCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
     case unsupportedFamily
     case changedHeader
@@ -24,7 +24,7 @@ enum AxisCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     }
 }
 
-struct AxisCreditCardPDFNormalizationResult {
+nonisolated struct AxisCreditCardPDFNormalizationResult {
     let document: Document
     let rows: [NormalizedRow]
     let header: NormalizedRow
@@ -35,7 +35,7 @@ struct AxisCreditCardPDFNormalizationResult {
     let presentation: AxisCreditCardPDFPresentation
 }
 
-enum AxisCreditCardPDFPresentation: Sendable, Equatable {
+nonisolated enum AxisCreditCardPDFPresentation: Sendable, Equatable {
     case appPDF
     case traditionalPDF
 }
@@ -44,7 +44,7 @@ enum AxisCreditCardPDFPresentation: Sendable, Equatable {
 /// source-faithful row contract. It deliberately does not decrypt or write a
 /// PDF; the reader supplies the native page text extracted from the immutable
 /// source snapshot.
-final class AxisCreditCardPDFNormalizer {
+nonisolated final class AxisCreditCardPDFNormalizer {
     static let logicalHeader = [
         "Transaction Date", "Transaction Details", "Amount (INR)",
         "Liability Effect", "Scope", "Section ID", "Reference",
@@ -91,7 +91,7 @@ final class AxisCreditCardPDFNormalizer {
             throw AxisCreditCardPDFNormalizationError.changedHeader
         }
         let isAppLayout = hasAppHeader
-        let positionedPages: [String]?
+        let positionedPages: [TraditionalPositionedPage]?
         if !isAppLayout {
             guard let pageEvidence, pageEvidence.count == pageTexts.count else {
                 throw AxisCreditCardPDFNormalizationError.malformedSummary
@@ -108,16 +108,11 @@ final class AxisCreditCardPDFNormalizer {
             rows = tagged.rows
             financialRegion = tagged.financialRegion
         } else {
-            let transactionPages = positionedPages ?? pageTexts
+            let transactionPages = positionedPages?.map(\.transactionLines) ?? pageTexts.map {
+                $0.components(separatedBy: .newlines).map(Self.clean)
+            }
             var traditionalRows: [NormalizedRow] = []
-            var unresolvedFinancialCandidateCount = 0
-            for page in transactionPages {
-                let lines: [String]
-                if positionedPages != nil {
-                    lines = page.components(separatedBy: .newlines).map(Self.sourceVisibleText)
-                } else {
-                    lines = page.components(separatedBy: .newlines).map(Self.clean)
-                }
+            for lines in transactionPages {
                 var index = 0
                 while index < lines.count {
                     let line = lines[index]
@@ -137,20 +132,12 @@ final class AxisCreditCardPDFNormalizer {
                             lookahead += 1
                         }
                     }
+                    // Geometry has already established transaction ownership.
+                    // An incomplete owned row must never disappear silently.
                     guard let fields else {
-                        if Self.looksLikeFinancialLine(line) {
-                            unresolvedFinancialCandidateCount += 1
-                            if line.range(
-                                of: #"(?:INR|₹|Debit|Credit|\bDr\b|\bCr\b)"#,
-                                options: [.regularExpression, .caseInsensitive]
-                            ) != nil {
-                                throw AxisCreditCardPDFNormalizationError.malformedTransaction(
-                                    sourceOrdinal: traditionalRows.count + 1
-                                )
-                            }
-                        }
-                        index += 1
-                        continue
+                        throw AxisCreditCardPDFNormalizationError.malformedTransaction(
+                            sourceOrdinal: traditionalRows.count + 1
+                        )
                     }
                     let ordinal = traditionalRows.count + 1
                     guard !fields.details.isEmpty else {
@@ -166,21 +153,14 @@ final class AxisCreditCardPDFNormalizer {
                     index += 1
                 }
             }
-            // A zero-row statement is admissible only when the complete
-            // source region contains no unresolved date-leading financial
-            // candidate. Absence of a currency/direction token is not proof
-            // that such a candidate is nonfinancial.
-            guard !traditionalRows.isEmpty || unresolvedFinancialCandidateCount == 0 else {
-                throw AxisCreditCardPDFNormalizationError.unconsumedFinancialEvidence
-            }
             rows = traditionalRows
             financialRegion = try .init(
-                descriptor: "Axis traditional PDF transaction pages after exact header recognition",
+                descriptor: "Axis traditional PDF header-bounded transaction pages",
                 sourceUnit: .page,
                 startOrdinal: 1,
                 endOrdinal: pageTexts.count,
                 recognizedFinancialRowCount: traditionalRows.count,
-                sourceRecords: pageTexts
+                sourceRecords: positionedPages?.map(\.financialRegionPageRecord) ?? pageTexts
             )
         }
 
@@ -194,7 +174,9 @@ final class AxisCreditCardPDFNormalizer {
 
         var sourceEvidenceText = joined
         if let positionedPages {
-            sourceEvidenceText += "\n" + positionedPages.joined(separator: "\n")
+            // Preserve the established generic-fragment projection. It is
+            // separate from complete source pages and from table-owned rows.
+            sourceEvidenceText += "\n" + positionedPages.map(\.fragmentPageText).joined(separator: "\n")
         }
         var fragments = Self.sourceFragments(from: sourceEvidenceText)
         if isAppLayout {
@@ -214,7 +196,7 @@ final class AxisCreditCardPDFNormalizer {
         if !isAppLayout, let pageEvidence, pageEvidence.count == pageTexts.count {
             let geometryOwnedKeys: Set<String> = [
                 "OPENING_BALANCE", "TOTAL_PAYMENT_DUE", "PERIOD",
-                "PAYMENT_DUE_DATE"
+                "PAYMENT_DUE_DATE", "STATEMENT_DATE"
             ]
             fragments.removeAll { fragment in
                 guard let key = fragment.text.split(separator: "\t", maxSplits: 1).first else { return false }
@@ -510,29 +492,61 @@ final class AxisCreditCardPDFNormalizer {
         }.filter { !$0.isEmpty }
     }
 
-    nonisolated private static func traditionalPositionedPages(from pageEvidence: [RawPDFPageEvidence]) throws -> [String] {
+    private struct TraditionalPositionedPage {
+        /// The established generic metadata projection. It intentionally
+        /// excludes the post-statement Active Loans section.
+        let fragmentPageText: String
+        /// Only rows positively owned by the printed Date/Description/Amount
+        /// table are permitted to reach the text row parser.
+        let transactionLines: [String]
+        /// Header-bounded source records defining the exhausted transaction
+        /// region. Header rows keep an empty statement's region non-empty.
+        let financialRegionRecords: [String]
+
+        /// The Axis parser's established evidence binding is page-granular;
+        /// each page record contains only its positively owned table content.
+        var financialRegionPageRecord: String {
+            financialRegionRecords.joined(separator: "\n")
+        }
+    }
+
+    nonisolated private static func traditionalPositionedPages(
+        from pageEvidence: [RawPDFPageEvidence]
+    ) throws -> [TraditionalPositionedPage] {
         let rowPages = pageEvidence.map(positionedFragmentRows)
         guard let globalBounds = rowPages.compactMap({ traditionalDescriptionBounds(in: $0) }).first else {
             throw AxisCreditCardPDFNormalizationError.changedHeader
         }
         var activeLoansBoundaryReached = false
         var transactionOrdinal = 0
-        var result: [String] = []
+        var result: [TraditionalPositionedPage] = []
         for rows in rowPages {
             let bounds = traditionalDescriptionBounds(in: rows) ?? globalBounds
-            var pageLines: [String] = []
+            var fragmentPageLines: [String] = []
+            var transactionLines: [String] = []
+            var financialRegionRecords: [String] = []
             for row in rows {
                 let ordered = row.sorted { lhs, rhs in
                     if abs(lhs.x - rhs.x) > 0.1 { return lhs.x < rhs.x }
                     return lhs.y > rhs.y
                 }
                 let rowText = sourceVisibleText(ordered.map(\.text).joined(separator: " "))
+                if traditionalDescriptionBounds(in: [row]) != nil, !rowText.isEmpty {
+                    financialRegionRecords.append(rowText)
+                }
+                // Table ownership comes from the exact printed header geometry.
+                // A date-looking fragment elsewhere on a page is not a financial
+                // row merely because adjacent prose happens to contain a word
+                // such as “credit”.
+                // The first printed table column owns the source-relative
+                // outer half-plane up to Description. A short/centered Date
+                // header is not the horizontal extent of a transaction date.
                 let dates = ordered.filter {
-                    $0.x < bounds.start && traditionalDateFragment($0.text)
+                    $0.x < bounds.detailsStartX && traditionalDateFragment($0.text)
                 }
                 let directedAmounts = traditionalDirectedAmountCandidates(
                     in: ordered,
-                    minimumX: bounds.end
+                    minimumX: bounds.detailsEndX
                 )
                 let isActiveLoansBoundary =
                     rowText.localizedCaseInsensitiveContains("Active Loans") &&
@@ -543,27 +557,35 @@ final class AxisCreditCardPDFNormalizer {
                 }
                 if activeLoansBoundaryReached { continue }
                 let detailsFragments = ordered.filter {
-                    $0.x >= bounds.start && $0.x < bounds.end &&
+                    $0.x >= bounds.detailsStartX && $0.x < bounds.detailsEndX &&
                         !traditionalDateFragment($0.text)
                 }
                 let amountEvidence = ordered.filter {
-                    $0.x >= bounds.end &&
+                    $0.x >= bounds.detailsEndX &&
                         (traditionalAmountFragment($0.text) ||
                          traditionalDirectionFragment($0.text) ||
                          traditionalDirectedAmountFragment($0.text))
                 }
-                let hasFinancialMarker = rowText.range(
-                    of: #"(?:INR|₹|Debit|Credit|\bDr\b|\bCr\b)"#,
-                    options: [.regularExpression, .caseInsensitive]
-                ) != nil
-                let looksLikeTransaction = !dates.isEmpty && !amountEvidence.isEmpty
+                let beginsInDescriptionColumn = detailsFragments.contains {
+                    $0.x <= bounds.detailsStartX + 16
+                }
+                let hasDateInTableColumn = !dates.isEmpty
+                let hasFinancialColumnEvidence = !amountEvidence.isEmpty
+                // The table owns a dated row only when the exact header's
+                // description-origin or financial columns also participate.
+                // This makes a date-looking legal/web notice outside those
+                // columns nontransactional while retaining a fail-closed
+                // result for incomplete date-leading financial candidates.
+                let ownsTableCandidate = hasDateInTableColumn &&
+                    (beginsInDescriptionColumn || hasFinancialColumnEvidence)
+                let looksLikeTransaction = ownsTableCandidate && hasFinancialColumnEvidence
                 guard looksLikeTransaction else {
-                    if !dates.isEmpty, !detailsFragments.isEmpty, hasFinancialMarker {
+                    if ownsTableCandidate {
                         throw AxisCreditCardPDFNormalizationError.malformedTransaction(
                             sourceOrdinal: transactionOrdinal + 1
                         )
                     }
-                    if !rowText.isEmpty { pageLines.append(rowText) }
+                    if !rowText.isEmpty { fragmentPageLines.append(rowText) }
                     continue
                 }
                 guard dates.count == 1,
@@ -581,7 +603,7 @@ final class AxisCreditCardPDFNormalizer {
                 // its values; using that heading as a clipping boundary cut
                 // off long category text from otherwise valid source rows.
                 let completeDetails = ordered.prefix(amount.startIndex).filter {
-                    $0.x >= bounds.start
+                    $0.x >= bounds.detailsStartX
                 }
                 let details = sourceVisibleText(completeDetails.map(\.text).joined(separator: " "))
                 guard !details.isEmpty else {
@@ -590,9 +612,16 @@ final class AxisCreditCardPDFNormalizer {
                     )
                 }
                 transactionOrdinal += 1
-                pageLines.append(sourceVisibleText("\(date.text) \(details) \(amount.text)"))
+                let transactionLine = sourceVisibleText("\(date.text) \(details) \(amount.text)")
+                transactionLines.append(transactionLine)
+                financialRegionRecords.append(transactionLine)
+                fragmentPageLines.append(transactionLine)
             }
-            result.append(pageLines.joined(separator: "\n"))
+            result.append(.init(
+                fragmentPageText: fragmentPageLines.joined(separator: "\n"),
+                transactionLines: transactionLines,
+                financialRegionRecords: financialRegionRecords
+            ))
         }
         return result
     }
@@ -643,10 +672,17 @@ final class AxisCreditCardPDFNormalizer {
         return matches
     }
 
+    private struct TraditionalTableBounds {
+        let dateMinX: Double
+        let dateMaxX: Double
+        let detailsStartX: Double
+        let detailsEndX: Double
+    }
+
     nonisolated private static func traditionalDescriptionBounds(
         in rows: [[RawPDFTextFragment]]
-    ) -> (start: Double, end: Double)? {
-        var candidates = [(start: Double, end: Double)]()
+    ) -> TraditionalTableBounds? {
+        var candidates = [TraditionalTableBounds]()
         for row in rows {
             let dates = traditionalHeaderPhrases("Date", in: row)
             let transactionDetails = traditionalHeaderPhrases("Transaction Details", in: row)
@@ -654,7 +690,7 @@ final class AxisCreditCardPDFNormalizer {
                 ? traditionalHeaderPhrases("Description", in: row)
                 : transactionDetails
             let merchantCategories = traditionalHeaderPhrases("Merchant Category", in: row)
-            var rowCandidates = [(start: Double, end: Double)]()
+            var rowCandidates = [TraditionalTableBounds]()
             for date in dates {
                 for description in descriptions where date.endIndex < description.startIndex {
                     for merchant in merchantCategories
@@ -664,9 +700,15 @@ final class AxisCreditCardPDFNormalizer {
                         guard date.maxX <= description.minX,
                               description.maxX <= merchant.minX,
                               date.maxX < merchant.minX else { continue }
-                        rowCandidates.append((
-                            start: date.maxX,
-                            end: merchant.minX
+                        rowCandidates.append(.init(
+                            dateMinX: date.minX,
+                            dateMaxX: date.maxX,
+                            // The heading is centered over the narration
+                            // column. Its left glyph is not the left edge of
+                            // source narration (including short fee rows).
+                            // Retain the established boundary after Date.
+                            detailsStartX: date.maxX,
+                            detailsEndX: merchant.minX
                         ))
                     }
                 }
@@ -677,10 +719,14 @@ final class AxisCreditCardPDFNormalizer {
         }
         guard let reference = candidates.first,
               candidates.allSatisfy({
-                  abs($0.start - reference.start) <= 2 &&
-                    abs($0.end - reference.end) <= 2
+                  abs($0.dateMinX - reference.dateMinX) <= 2 &&
+                    abs($0.dateMaxX - reference.dateMaxX) <= 2 &&
+                    abs($0.detailsStartX - reference.detailsStartX) <= 2 &&
+                    abs($0.detailsEndX - reference.detailsEndX) <= 2
               }) else { return nil }
-        return reference.start < reference.end ? reference : nil
+        return reference.dateMinX < reference.dateMaxX &&
+            reference.dateMaxX <= reference.detailsStartX &&
+            reference.detailsStartX < reference.detailsEndX ? reference : nil
     }
 
     nonisolated private static func traditionalDateFragment(_ value: String) -> Bool {
@@ -1258,8 +1304,8 @@ final class AxisCreditCardPDFNormalizer {
               let totalRaw = dueValues["Total Payment Due"],
               let periodRaw = dueValues["Statement Period"],
               let dueDateRaw = dueValues["Payment Due Date"],
-              dueValues["Minimum Payment Due"] != nil,
-              dueValues["Statement Generation Date"] != nil else {
+              let generationRaw = dueValues["Statement Generation Date"],
+              dueValues["Minimum Payment Due"] != nil else {
             throw AxisCreditCardPDFNormalizationError.malformedSummary
         }
         let totalCandidates = summaryMoneyCandidates(totalRaw)
@@ -1268,9 +1314,11 @@ final class AxisCreditCardPDFNormalizer {
         }
         let periodDates = summaryDates(periodRaw)
         let dueDates = summaryDates(dueDateRaw)
+        let generationDates = summaryDates(generationRaw)
         add("TOTAL_PAYMENT_DUE", total.magnitude)
         add("PERIOD", "\(periodDates[0])\t\(periodDates[1])")
         add("PAYMENT_DUE_DATE", dueDates[0])
+        add("STATEMENT_DATE", generationDates[0])
         return result
     }
 

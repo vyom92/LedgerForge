@@ -12,6 +12,79 @@ import Testing
 /// or row is committed or printed.
 @MainActor
 struct CBQCreditCardPrivateAcceptanceTests {
+    private enum GmailPreparedComparisonError: Error { case envelope, row, sectionMembership }
+    /// High-level source interpretation remains independent. This shares only
+    /// the existing low-level PDFKit text/position reader, disclosed by the
+    /// campaign, and runs before any production normalizer/parser output.
+    func gmailComparison(bytes: Data, url: URL, password: String) async throws -> (PreparedImport) throws -> Void {
+        let snapshot = SourceContentSnapshot(bytes: bytes)
+        defer { snapshot.invalidate() }
+        let raw = try await PDFDocumentReader().read(request: ImportRequest(fileURL: url), snapshot: snapshot, password: password)
+        guard let pages = raw.pdfPageTexts, let positioned = raw.pdfPageEvidence else {
+            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+        }
+        let oracle = try independentOracle(pages: pages, positioned: positioned)
+        let normalized = try CBQCreditCardPDFNormalizer().normalize(text: raw.searchableText, pageTexts: pages, fileURL: url)
+        let digest = GmailInboxSource.digest(bytes)
+        return { prepared in
+            let document = prepared.financialDocument
+            guard let evidence = document.cardStatementEvidence else { throw GmailPreparedComparisonError.envelope }
+            let envelopeChecks = [
+                "byte-identity": prepared.sourceSnapshot.sourceByteFingerprint.digest == digest,
+                "validation": prepared.validation.passed,
+                "statement-date": evidence.statementDate == oracle.statementDate,
+                "period": evidence.declaredStatementPeriod == oracle.period,
+                "due-date": evidence.summary(code: "due_date")?.date == oracle.dueDate,
+                "row-count": document.transactions.count == oracle.rows.count,
+                "normalizer-source-projection": self.financialMismatchCount(oracleRows: oracle.rows, normalizedRows: normalized.rows,
+                                              document: document, evidence: evidence) == 0,
+                "sections": self.independentSectionMismatchCount(oracle: oracle, evidence: evidence) == 0,
+                "summaries": self.independentSummaryMismatchCount(oracle: oracle, evidence: evidence) == 0
+            ]
+            guard envelopeChecks.values.allSatisfy({ $0 }) else {
+                Issue.record("CBQ Gmail prepared envelope \(digest.prefix(12)) differs in: \(envelopeChecks.filter { !$0.value }.keys.sorted().joined(separator: ", ")).")
+                let categories = [
+                    "Card financial date is outside the source-proven statement period.": "date-outside-period",
+                    "Card row semantics or provenance are incomplete.": "row-provenance",
+                    "Original merchant Money is invalid for the card liability effect.": "original-money",
+                    "CBQ account-level activity has invalid summary membership.": "account-summary-membership",
+                    "CBQ instrument activity has invalid summary membership.": "instrument-summary-membership",
+                    "Card summary components are incomplete or contradictory.": "summary-components",
+                    "Card source identity or section evidence is incompatible with its exact profile.": "source-identity",
+                    "Card statement summary does not reconcile under its exact profile contract.": "summary-equation"
+                ]
+                for issue in prepared.validation.issues where issue.severity == .error {
+                    print("CBQ_GMAIL_VALIDATION \(digest.prefix(12)) \(categories[issue.message] ?? "other-static-validation") ordinal=\(issue.rowNumber ?? 0)")
+                }
+                throw GmailPreparedComparisonError.envelope
+            }
+            for (transaction, expected) in zip(document.transactions, oracle.rows) {
+                guard let annotation = evidence.transactionAnnotations.first(where: { $0.parserTransactionID == transaction.id }) else {
+                    throw GmailPreparedComparisonError.row
+                }
+                let sourceRow = normalized.rows.first { $0.rowNumber == expected.sourceOrdinal }
+                let rowChecks = [
+                    "source-ordinal": transaction.sourceProvenance.first?.sourceOrdinal == expected.sourceOrdinal,
+                    "posting-date": transaction.statementDate == expected.postingDate,
+                    "purchase-date": annotation.sourceTransactionDate == expected.purchaseDate,
+                    "narration": transaction.description == expected.description,
+                    "reference": transaction.reference == expected.reference,
+                    "posted-money": transaction.money == expected.postedMoney,
+                    "liability-effect": annotation.liabilityEffect == expected.effect,
+                    "original-money": annotation.originalMerchantMoney == expected.originalMoney,
+                    "physical-page": sourceRow?.values.count == 12 && Int(sourceRow?.values[10] ?? "") == expected.sourcePage,
+                    "financial-scope": (annotation.financialScope == .accountLevel) == expected.accountLevel
+                ]
+                guard rowChecks.values.allSatisfy({ $0 }) else {
+                    Issue.record("CBQ Gmail prepared row \(digest.prefix(12)) ordinal \(expected.sourceOrdinal) differs in: \(rowChecks.filter { !$0.value }.keys.sorted().joined(separator: ", ")).")
+                    throw GmailPreparedComparisonError.row
+                }
+                guard evidence.instrumentSections.first(where: { $0.documentScopedSectionID == annotation.documentScopedSectionID })?.sourceOrdinal == expected.sectionOrdinal else {
+                    throw GmailPreparedComparisonError.sectionMembership
+                }
+            }
+        }
+    }
     // Keep the historical root key so existing private-context wiring remains compatible.
     // The value is now treated as the CBQ private root, not as a text-fixture directory.
     private static let rootEnvironmentKey = "LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY"
@@ -444,11 +517,20 @@ struct CBQCreditCardPrivateAcceptanceTests {
         }
     }
 
+    /// Explicit cohort choice after the caller resolves the source-proven
+    /// liability account. A genuinely new companion may need a new instrument.
+    func gmailExistingLiabilityAccountChoice(document: FinancialDocument, accountID: String,
+        provider: DatabaseProvider) throws -> ImportAccountChoice {
+        try reuseChoice(document: document, accountID: accountID, provider: provider,
+            workspaceID: "default-workspace", permitsNewInstrument: true)
+    }
+
     private func reuseChoice(
         document: FinancialDocument,
         accountID: String,
         provider: DatabaseProvider,
-        workspaceID: String
+        workspaceID: String,
+        permitsNewInstrument: Bool = false
     ) throws -> ImportAccountChoice {
         let evidence = try #require(document.cardStatementEvidence)
         let snapshot = try provider.cardRepo.snapshot(workspaceId: workspaceID)
@@ -464,11 +546,12 @@ struct CBQCreditCardPrivateAcceptanceTests {
                       }) else { return nil }
                 return durableSection.instrumentId
             })
-            guard matches.count == 1, let instrumentID = matches.first else {
-                throw PrivateCBQAcceptanceError.persistenceGraphMismatch
+            guard matches.count <= 1 else { throw PrivateCBQAcceptanceError.persistenceGraphMismatch }
+            if let instrumentID = matches.first {
+                return (section.documentScopedSectionID, ImportCardInstrumentChoice.reuseExistingInstrument(instrumentId: instrumentID))
             }
-            let choice: ImportCardInstrumentChoice = .reuseExistingInstrument(instrumentId: instrumentID)
-            return (section.documentScopedSectionID, choice)
+            guard permitsNewInstrument else { throw PrivateCBQAcceptanceError.persistenceGraphMismatch }
+            return (section.documentScopedSectionID, ImportCardInstrumentChoice.createNewInstrument())
         })
         return .useExistingCardLiabilityAccountSections(accountId: accountID, sectionChoices: choices)
     }
@@ -575,6 +658,9 @@ struct CBQCreditCardPrivateAcceptanceTests {
         var sectionDescriptors = [Int: PrivateCBQOracleSectionDescriptor]()
         var sectionOrdinal: Int?
         var sawTermination = false
+        var planRegion = false
+        var planTotal = false
+        var planRows = 0
         let rowPattern = #"^(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2})\s+(.+)$"#
 
         for (pageOffset, page) in pages.enumerated() {
@@ -591,35 +677,67 @@ struct CBQCreditCardPrivateAcceptanceTests {
                     // that tail is financial evidence and must never be
                     // silently discarded as boilerplate.
                     guard !isPostTerminationFinancialEvidence(line) else {
-                        throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                        print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                     }
                     index += 1
                     continue
                 }
                 if isEndOfStatement(line) {
-                    guard sectionOrdinal == nil else {
-                        throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                    guard sectionOrdinal == nil, !planRegion || planTotal else {
+                        print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                     }
                     sawTermination = true
                     index += 1
                     continue
                 }
-                if line.range(of: "Diners Club", options: .caseInsensitive) != nil ||
-                    line.range(of: "Mastercard Platinum", options: .caseInsensitive) != nil {
-                    guard let descriptor = oracleSectionDescriptor(line) else {
+                if line == "Installment Purchase Plan Details" {
+                    guard sectionOrdinal == nil, !planTotal, index + 2 < lines.count,
+                          lines[index + 1] == "Description Date Purchase Tenure Monthly Installments Paid Remaining Balance",
+                          lines[index + 2] == "Amount Plan Installment Months Amount Months Amount" else {
                         throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                     }
-                    if let existing = sectionDescriptors.first(where: { $0.value.label == descriptor.label }) {
-                        guard existing.value.card == descriptor.card,
-                              existing.value.holderLabel == descriptor.holderLabel else {
+                    planRegion = true
+                    index += 3
+                    continue
+                }
+                if planRegion {
+                    guard captures(rowPattern, in: line) == nil,
+                          oracleSectionDescriptor(line) == nil,
+                          try oracleSectionTotal(line) == nil else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
+                    let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
+                    if fields.count == 10, fields[0].hasSuffix(","),
+                       fields[0].dropLast().allSatisfy({ $0.isNumber || $0 == "X" || $0 == "*" }),
+                       fields[0].contains("X"), fields[1].count == 6, fields[1].allSatisfy(\.isNumber),
+                       captures(#"^\d{2}/\d{2}/\d{2}$"#, in: fields[2]) != nil {
+                        guard !planTotal, Int(fields[4]) != nil, Int(fields[6]) != nil, Int(fields[8]) != nil else {
                             throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                        }
+                        _ = try shortDate(fields[2])
+                        for position in [3, 5, 7, 9] { _ = try sourceMoney(fields[position], currency: "QAR", negative: false) }
+                        planRows += 1
+                        index += 1
+                        continue
+                    }
+                    if line.hasPrefix("Total Amount in QAR ") {
+                        guard !planTotal, planRows > 0, fields.count == 8 else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
+                        for token in fields.suffix(4) { _ = try sourceMoney(token, currency: "QAR", negative: false) }
+                        planTotal = true
+                        index += 1
+                        continue
+                    }
+                    if captures(#"\d{2}/\d{2}/\d{2}|[0-9]+\.[0-9]{2}"#, in: line) != nil {
+                        throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                    }
+                }
+                if let descriptor = oracleSectionDescriptor(line) {
+                    if let existing = sectionDescriptors.first(where: { $0.value.card == descriptor.card }) {
+                        guard existing.value.label == descriptor.label,
+                              existing.value.holderLabel == descriptor.holderLabel else {
+                            print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                         }
                         sectionOrdinal = existing.key
                     } else {
                         let ordinal = sectionDescriptors.count + 1
-                        guard ordinal <= 2 else {
-                            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
-                        }
                         sectionDescriptors[ordinal] = descriptor
                         sectionOrdinal = ordinal
                     }
@@ -629,7 +747,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
                 if let total = try oracleSectionTotal(line) {
                     guard let currentOrdinal = sectionOrdinal,
                           sectionTotals[currentOrdinal] == nil else {
-                        throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                        print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                     }
                     sectionTotals[currentOrdinal] = total
                     sectionOrdinal = nil
@@ -666,6 +784,18 @@ struct CBQCreditCardPrivateAcceptanceTests {
                             candidate.hasPrefix("Date Description & Referance")
                         if isStructuralBoundary { break }
 
+                        // These authentic installment rows have a wrapped QAR
+                        // amount preceding the remaining inline reference text.
+                        // Interpret the two physical lines before flattening.
+                        if values[2].hasPrefix("Standing Order for Instalment # "),
+                           let parts = captures(#"^([0-9]+(?:,[0-9]{3})*\.[0-9]{2})\s+([0-9]{6}(?:\s+,[0-9]+)?)$"#, in: candidate), parts.count == 2,
+                           assembledTail == values[2] {
+                            resolvedTail = PrivateCBQOracleTail(description: values[2] + " " + parts[1],
+                                effect: .increasesAmountOwed,
+                                postedMoney: try sourceMoney(parts[0], currency: "QAR", negative: false), originalMoney: nil)
+                            tailEndIndex = probe
+                            break
+                        }
                         assembledTail += " " + candidate
                         if let tail = try oracleMoneyTail(assembledTail) {
                             resolvedTail = tail
@@ -677,7 +807,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
                 }
 
                 guard let tail = resolvedTail else {
-                    throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                    print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                 }
                 var description = tail.description
                 var reference: String?
@@ -698,12 +828,12 @@ struct CBQCreditCardPrivateAcceptanceTests {
                     }
                     if candidate.hasPrefix("Reference:") {
                         guard reference == nil else {
-                            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                            print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                         }
                         let value = String(candidate.dropFirst("Reference:".count))
                             .trimmingCharacters(in: .whitespaces)
                         guard !value.isEmpty else {
-                            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                            print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
                         }
                         reference = value
                     } else {
@@ -721,7 +851,9 @@ struct CBQCreditCardPrivateAcceptanceTests {
                     effect: tail.effect,
                     postedMoney: tail.postedMoney,
                     originalMoney: tail.originalMoney,
-                    accountLevel: tail.description.hasPrefix("Paid using bankDirect"),
+                    // Both authentic labels describe repayment of the card
+                    // account. Physical section membership is retained separately.
+                    accountLevel: tail.description.hasPrefix("Paid using bankDirect") || tail.description.hasPrefix("PAID BY ACCOUNT"),
                     sectionOrdinal: activeSection
                 ))
                 index = next
@@ -729,16 +861,20 @@ struct CBQCreditCardPrivateAcceptanceTests {
         }
         guard sawTermination,
               sectionOrdinal == nil,
-              sectionDescriptors.count == 2,
+              !sectionDescriptors.isEmpty,
               sectionTotals.count == sectionDescriptors.count,
-              Set(sectionDescriptors.values.map(\.label)) == Set(["Diners Club", "Mastercard Platinum"]),
+              pages.joined(separator: "\n").components(separatedBy: .newlines).filter({
+                  $0.trimmingCharacters(in: .whitespaces) == "Card Number Card Holder Name Product Card Limit"
+              }).count == pages.joined(separator: "\n").components(separatedBy: .newlines).filter({
+                  oracleSectionDescriptor($0.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+              }).count,
               !rows.isEmpty else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         let sections = try sectionDescriptors.keys.sorted().map { ordinal -> PrivateCBQOracleSection in
             guard let descriptor = sectionDescriptors[ordinal],
                   let total = sectionTotals[ordinal] else {
-                throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                print("CBQ_SOURCE_ORACLE_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
             }
             return PrivateCBQOracleSection(
                 sourceOrdinal: ordinal,
@@ -853,7 +989,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
         pages: [String],
         positioned: [RawPDFPageEvidence]
     ) throws -> [String: Money] {
-        let preamble = pages.joined(separator: "\n").components(separatedBy: "Diners Club").first ?? ""
+        let preamble = pages.joined(separator: "\n").components(separatedBy: "Card Number Card Holder Name Product Card Limit").first ?? ""
         let bounded = preamble.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         if bounded.contains("Previous Outstanding Balance") && bounded.contains("Amount Billed") {
             let minimum = try oracleMinimumAmountDue(in: preamble)
@@ -862,7 +998,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             let payment = try positive(oracleLabeledMoney("Payment Received", in: bounded))
             let current = try oracleLabeledMoney("Current Outstanding Balance", in: bounded)
             guard previous.amount + billed.amount - payment.amount == current.amount else {
-                throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
             }
             return [
                 "minimum_amount_due": minimum,
@@ -884,11 +1020,11 @@ struct CBQCreditCardPrivateAcceptanceTests {
         let current = values[6]
         let labeledCurrent = try oracleLineBoundMoney("Total Statement Balance QAR", in: preamble)
         guard labeledCurrent == current else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         guard previous.amount - payment.amount - credit.amount + purchases.amount +
                 installment.amount + fees.amount == current.amount else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return [
             "minimum_amount_due": minimum,
@@ -920,7 +1056,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             }
         }
         guard candidates.count == 1 else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try candidates[0].map { try oracleSummaryMoney($0.text) }
     }
@@ -952,10 +1088,12 @@ struct CBQCreditCardPrivateAcceptanceTests {
     private func oracleLabeledMoney(_ label: String, in text: String) throws -> Money {
         let escaped = NSRegularExpression.escapedPattern(for: label)
         let token = #"(?:CR\s+)?\)?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\(?"#
-        let matches = capturesAll(escaped + #"\s+("# + token + #")"#, in: text)
+        let installmentQualifier = ["Previous Outstanding Balance", "Current Outstanding Balance"].contains(label)
+            ? #"(?:\s+\(excluding installment balance\))?"# : ""
+        let matches = capturesAll(escaped + installmentQualifier + #"\s+("# + token + #")"#, in: text)
         guard matches.count == 1,
               let raw = matches[0].first(where: { !$0.isEmpty }) else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try oracleSummaryMoney(raw)
     }
@@ -969,7 +1107,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             return raw
         }
         guard candidates.count == 1 else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try oracleSummaryMoney(candidates[0])
     }
@@ -983,7 +1121,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             }
         }
         guard candidates.count == 1 else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try oracleSummaryMoney(candidates[0])
     }
@@ -997,7 +1135,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ",", with: "")
         guard let amount = Decimal(string: token, locale: Locale(identifier: "en_US_POSIX")) else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+            print("CBQ_SOURCE_SUMMARY_BOUNDARY line=\(#line)"); throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try Money(amount: negative ? -amount : amount, currency: "QAR")
     }
@@ -1008,7 +1146,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
 
     private func oracleSectionTotal(_ line: String) throws -> Money? {
         guard let values = captures(
-            #"^(?:[A-Z0-9]+-Total|Total\s+(?:Diners Club|Mastercard Platinum))\s+(CR\s+)?([0-9]+(?:,[0-9]{3})*\.[0-9]{2})$"#,
+            #"^(?:[A-Z0-9]+-Total|Total\s+(?:Diners Club(?: Titanium)?|Mastercard (?:Platinum|Titanium)|Visa Platinum))\s+(CR\s+)?([0-9]+(?:,[0-9]{3})*\.[0-9]{2})$"#,
             in: line
         ), values.count == 2 else { return nil }
         return try sourceMoney(values[1], currency: "QAR", negative: !values[0].isEmpty)
@@ -1085,14 +1223,9 @@ struct CBQCreditCardPrivateAcceptanceTests {
     }
 
     private func oracleSectionDescriptor(_ line: String) -> PrivateCBQOracleSectionDescriptor? {
-        let label: String
-        if line.range(of: "Diners Club", options: .caseInsensitive) != nil {
-            label = "Diners Club"
-        } else if line.range(of: "Mastercard Platinum", options: .caseInsensitive) != nil {
-            label = "Mastercard Platinum"
-        } else {
-            return nil
-        }
+        guard captures(#"^[0-9X*]{8,}\s+.+?\s+(?:DINERS CLUB(?: TITANIUM)?|MASTERCARD (?:PLATINUM|TITANIUM)|VISA PLATINUM)\s+[0-9]+(?:,[0-9]{3})*\.[0-9]{2}$"#, in: line) != nil else { return nil }
+        let labels = ["Diners Club Titanium", "Mastercard Titanium", "Mastercard Platinum", "Visa Platinum", "Diners Club"]
+        guard let label = labels.first(where: { line.range(of: $0, options: .caseInsensitive) != nil }) else { return nil }
         guard let labelRange = line.range(of: label, options: .caseInsensitive) else {
             return nil
         }

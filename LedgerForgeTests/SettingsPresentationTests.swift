@@ -57,11 +57,13 @@ struct SettingsPresentationTests {
         #expect(relaunchEquivalent == .available(1))
     }
 
-    @Test func completedImportsCountsUniqueFullAndPartialSessionsWithSeparatePartialSubset() {
+    @Test func completedImportsCountsUniqueFullPartialAndCBQSourceSessions() {
         let attempts = [
             attempt(id: "full", outcome: .successfulImport),
             attempt(id: "partial", outcome: .partialImportCommitted),
             attempt(id: "partial-repeat", outcome: .partialImportCommitted, sessionID: "session-partial"),
+            attempt(id: "cbq", outcome: .cbqSourceOverlapCommitted),
+            attempt(id: "cbq-repeat", outcome: .cbqSourceOverlapCommitted, sessionID: "session-cbq"),
             attempt(id: "duplicate", outcome: .exactStatementDuplicate),
             attempt(id: "failed", outcome: .persistenceFailure)
         ]
@@ -70,7 +72,7 @@ struct SettingsPresentationTests {
             SettingsPresentation.completedImports(
                 from: attempts,
                 persistenceState: .verifiedSQLite
-            ) == .available(2, partialCount: 1)
+            ) == .available(3, partialCount: 1)
         )
         #expect(
             SettingsPresentation.completedImports(

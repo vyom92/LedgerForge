@@ -1,6 +1,6 @@
 import Foundation
 
-enum HDFCBankAccountPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum HDFCBankAccountPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocumentFormat
     case invalidSourceSemantics
 
@@ -14,7 +14,7 @@ enum HDFCBankAccountPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class HDFCBankAccountPDFParser: StatementParser {
+nonisolated final class HDFCBankAccountPDFParser: StatementParser {
     static let profileID = "hdfc.bank-account.pdf"
     static let profileVersion = "1"
 
@@ -30,6 +30,9 @@ final class HDFCBankAccountPDFParser: StatementParser {
     func parse(document: NormalizedDocument) throws -> FinancialDocument {
         guard canParse(document: document.document, metadata: document.metadata) else {
             throw HDFCBankAccountPDFParserError.unsupportedDocumentFormat
+        }
+        if !document.sourceContext.bankAccountSections.isEmpty {
+            return try BankRelationshipPDFParser.parse(document)
         }
         do {
             return try HDFCBankAccountXLSParser().parse(

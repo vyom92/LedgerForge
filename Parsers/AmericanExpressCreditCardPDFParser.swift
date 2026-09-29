@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum AmericanExpressCreditCardPDFParserError: Error, Equatable, LocalizedError {
+nonisolated enum AmericanExpressCreditCardPDFParserError: Error, Equatable, LocalizedError {
     case unsupportedDocument
     case changedHeader
     case malformedSourceEvidence
@@ -21,7 +21,7 @@ enum AmericanExpressCreditCardPDFParserError: Error, Equatable, LocalizedError {
     }
 }
 
-final class AmericanExpressCreditCardPDFParser: StatementParser {
+nonisolated final class AmericanExpressCreditCardPDFParser: StatementParser {
     static let profileID = "amex.credit-card.pdf"
     static let profileVersion = "1"
     var name: String { "American Express Credit Card PDF" }
@@ -59,11 +59,14 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
               let creditsText = fragments["NEW_CREDITS"],
               let debitsText = fragments["NEW_DEBITS"],
               let newBalanceText = fragments["NEW_BALANCE"],
-              let dueDateText = fragments["DUE_DATE"] else {
+              let dueDateText = fragments["DUE_DATE"],
+              let nativeCurrency = fragments["NATIVE_CURRENCY"],
+              ["QAR", "USD"].contains(nativeCurrency),
+              nativeCurrency != "USD" || (document.rows.isEmpty && sectionFragments.isEmpty) else {
             throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
         }
         do {
-            let currency = try CurrencyCode("QAR")
+            let currency = try CurrencyCode(nativeCurrency)
             let statementDate = try Self.shortDate(statementDateText)
             let periodParts = periodText.components(separatedBy: " to ")
             guard periodParts.count == 2 else { throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence }
@@ -197,7 +200,9 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                         ? try Money(amount: .zero, currency: currency)
                         : try Money.aggregate(instrumentSections.map(\.signedNetTotal)))
                 ],
-                reconciliationRuleIdentifier: CardStatementEvidence.amexQARReconciliationRule
+                reconciliationRuleIdentifier: nativeCurrency == "USD"
+                    ? CardStatementEvidence.amexUSDZeroReconciliationRule
+                    : CardStatementEvidence.amexQARReconciliationRule
             )
             // Only explicit, coherent printed controls can establish an empty
             // Amex statement. Empty parser output alone is never sufficient.
@@ -210,7 +215,8 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                     openingBalance: Self.money(previousText, currency: currency),
                     closingBalance: Self.money(newBalanceText, currency: currency),
                     debitTotal: Self.money(debitsText, currency: currency),
-                    creditTotal: Self.money(creditsText, currency: currency)
+                    creditTotal: Self.money(creditsText, currency: currency),
+                    cardPaymentDueDate: nativeCurrency == "USD" ? Self.shortDate(dueDateText) : nil
                 ) : nil
             return FinancialDocument(
                 sourceDocument: document.document,

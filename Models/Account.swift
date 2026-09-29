@@ -7,6 +7,22 @@
 
 import Foundation
 
+/// Presentation only; source and repository institution identities stay exact.
+nonisolated enum AccountDisplayText {
+    static func shortened(_ value: String) -> String {
+        value.replacingOccurrences(of: "Commercial Bank of Qatar", with: "CBQ", options: .caseInsensitive)
+    }
+
+    /// Display only. An unknown trailing digit stays unknown; this never
+    /// establishes account identity or removes masking to fill missing digits.
+    static func maskedNumber(_ value: String) -> String? {
+        let compact = value.filter { !$0.isWhitespace && $0 != "-" }
+        let suffix = compact.suffix(4)
+        guard suffix.count == 4, suffix.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        return "xxx" + suffix
+    }
+}
+
 enum AccountType: String, Codable {
     case bank
     case creditCard
@@ -46,6 +62,11 @@ struct Account: Identifiable, Codable {
     /// Current balance in the account's native currency.
     var currentBalanceMoney: Money
 
+    /// For bank accounts, a nonnil canonical date means hydration selected a
+    /// source-backed balance. Nil preserves unavailable/ambiguous authority;
+    /// the legacy zero display fallback is not itself a balance observation.
+    var currentBalanceAsOfISO: String?
+
     /// Transitional display accessors. Money remains the source of truth.
     var currencyCode: String { nativeCurrency.code }
     var currentBalance: Decimal { currentBalanceMoney.amount }
@@ -60,9 +81,33 @@ struct Account: Identifiable, Codable {
     var exchangeRateToBaseCurrency: Decimal?
 
     var status: AccountStatus
+    /// Owner-confirmed closed and settled; financial records remain historical.
+    var isHistoryOnly: Bool { type == .creditCard && status == .closed }
 
     var lastImport: Date?
     var identitySummaries: [AccountIdentitySummary]
+    /// A presentation label derived from coherent, source-owned product labels.
+    /// It never changes the canonical account identity or a saved owner name.
+    var sourceProductName: String?
+    var sourceAccountLabel: String?
+    /// Last-four display derived from retained account-scoped source evidence.
+    var sourceAccountNumberLabel: String?
+
+    nonisolated var institutionDisplayName: String { AccountDisplayText.shortened(institution) }
+
+    nonisolated var preferredDisplayName: String {
+        if let nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return AccountDisplayText.shortened(nickname) }
+        let identifierCharacters = CharacterSet(charactersIn: "0123456789Xx* -")
+        if !name.isEmpty, name.unicodeScalars.allSatisfy(identifierCharacters.contains) {
+            return AccountDisplayText.shortened(sourceProductName ?? institution + " account")
+        }
+        return AccountDisplayText.shortened(name)
+    }
+
+    nonisolated var selectionTitle: String {
+        let identity = sourceAccountLabel ?? identitySummaries.first?.redactedValue
+        return ([preferredDisplayName, identity, nativeCurrency.code].compactMap { $0 }).joined(separator: " · ")
+    }
 
     init(
         id: UUID = UUID(),
@@ -75,12 +120,16 @@ struct Account: Identifiable, Codable {
         currencyCode: String,
         timeZoneIdentifier: String = TimeZone.current.identifier,
         currentBalance: Decimal = .zero,
+        currentBalanceAsOfISO: String? = nil,
         includeInNetWorth: Bool = true,
         baseCurrencyBalance: Decimal? = nil,
         exchangeRateToBaseCurrency: Decimal? = nil,
         status: AccountStatus = .active,
         lastImport: Date? = nil,
-        identitySummaries: [AccountIdentitySummary] = []
+        identitySummaries: [AccountIdentitySummary] = [],
+        sourceProductName: String? = nil,
+        sourceAccountLabel: String? = nil,
+        sourceAccountNumberLabel: String? = nil
     ) {
         self.id = id
         self.repositoryAccountId = repositoryAccountId
@@ -92,12 +141,16 @@ struct Account: Identifiable, Codable {
         self.nativeCurrency = try! CurrencyCode(currencyCode)
         self.timeZoneIdentifier = timeZoneIdentifier
         self.currentBalanceMoney = try! Money(amount: currentBalance, currency: self.nativeCurrency)
+        self.currentBalanceAsOfISO = currentBalanceAsOfISO
         self.includeInNetWorth = includeInNetWorth
         self.baseCurrencyBalance = baseCurrencyBalance
         self.exchangeRateToBaseCurrency = exchangeRateToBaseCurrency
         self.status = status
         self.lastImport = lastImport
         self.identitySummaries = identitySummaries
+        self.sourceProductName = sourceProductName
+        self.sourceAccountLabel = sourceAccountLabel
+        self.sourceAccountNumberLabel = sourceAccountNumberLabel
     }
 }
 

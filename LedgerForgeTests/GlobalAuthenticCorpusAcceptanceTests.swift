@@ -3411,7 +3411,7 @@ struct GlobalAuthenticCorpusAcceptanceTests {
             .preparation("\(token) Axis-card envelope")
         )
         try require(
-            try axisControls(evidence) == oracle.controls.filter { $0.key != "statement_generation_date" },
+            try axisControls(evidence) == oracle.controls,
             .preparation("\(token) Axis-card printed controls")
         )
         let annotations = Dictionary(uniqueKeysWithValues: evidence.transactionAnnotations.map {
@@ -3657,6 +3657,7 @@ struct GlobalAuthenticCorpusAcceptanceTests {
 
     private func axisControls(_ evidence: CardStatementEvidence) throws -> [String: String] {
         var result: [String: String] = [:]
+        result["statement_generation_date"] = evidence.statementDate?.canonical
         result["statement_period_start"] = evidence.declaredStatementPeriod?.start.canonical
         result["statement_period_end"] = evidence.declaredStatementPeriod?.end.canonical
         result["selected_statement_month"] = evidence.selectedStatementMonth?.canonical
