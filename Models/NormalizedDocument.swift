@@ -87,6 +87,7 @@ nonisolated struct NormalizedDocument: Sendable {
         let openingSourceOrdinal: Int
         let totalsSourceOrdinal: Int
         let closingSourceOrdinal: Int
+        let literalControls: [SourceStatementControl]
 
         init(
             profileID: String,
@@ -98,7 +99,8 @@ nonisolated struct NormalizedDocument: Sendable {
             closingBalance: Money,
             openingSourceOrdinal: Int,
             totalsSourceOrdinal: Int,
-            closingSourceOrdinal: Int
+            closingSourceOrdinal: Int,
+            literalControls: [SourceStatementControl] = []
         ) throws {
             let values = [openingBalance, debitTotal, creditTotal, closingBalance]
             guard !profileID.isEmpty, !profileVersion.isEmpty, !sourceFormatCode.isEmpty,
@@ -118,6 +120,7 @@ nonisolated struct NormalizedDocument: Sendable {
             self.openingSourceOrdinal = openingSourceOrdinal
             self.totalsSourceOrdinal = totalsSourceOrdinal
             self.closingSourceOrdinal = closingSourceOrdinal
+            self.literalControls = literalControls
         }
     }
 

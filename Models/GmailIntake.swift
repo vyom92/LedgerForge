@@ -207,7 +207,7 @@ nonisolated struct GmailPartBody: Decodable, Sendable {
 
 nonisolated enum GmailIntakeError: Error, LocalizedError, Equatable, Sendable {
     case invalidInterval, invalidResponse, invalidLocator, resourceLimit, integrity
-    case unauthorized, accountMismatch, scopeMismatch, unavailable, rateLimited, timedOut, network
+    case unauthorized, authorizationFailed, accountMismatch, scopeMismatch, unavailable, rateLimited, timedOut, network
     case keychainUnavailable, configurationRequired, repeatedPage, busy, staleProvider, storageUnavailable
     case invalidSender, duplicateSender, excludedSender
 
@@ -219,6 +219,7 @@ nonisolated enum GmailIntakeError: Error, LocalizedError, Equatable, Sendable {
         case .resourceLimit: "This response exceeds the bounded intake size. The source remains held."
         case .integrity: "The original's byte identity or size could not be verified. The source remains held."
         case .unauthorized: "The Gmail grant has expired or was revoked. Reconnect to continue."
+        case .authorizationFailed: "Gmail authorization was not completed. Reconnect in the browser to try again."
         case .accountMismatch: "The Gmail account does not match the selected connection."
         case .scopeMismatch: "This connection must grant only read-only Gmail access."
         case .unavailable: "The message or attachment is no longer available in Gmail."

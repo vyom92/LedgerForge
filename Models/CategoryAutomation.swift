@@ -143,3 +143,28 @@ nonisolated public struct CategoryEvaluation: Equatable, Sendable {
         })
     }
 }
+
+/// Frozen owner metadata for an explicit history review. A no-match result can
+/// remove an automatic category, so its effect differs from an unchanged row.
+nonisolated struct CategoryHistoricalPreview: Equatable, Sendable {
+    let evaluation: CategoryEvaluation
+    let assignments: [String: String]
+    let intents: [String: CategoryIntent]
+
+    var decisions: [CategoryEvaluation.Decision] { evaluation.decisions }
+    var removalCount: Int { decisions.filter(removesCategory).count }
+    var unchangedCount: Int { decisions.filter(isUnchanged).count }
+
+    func removesCategory(_ decision: CategoryEvaluation.Decision) -> Bool {
+        assignments[decision.transactionID] != nil && intents[decision.transactionID]?.kind == .automatic &&
+            (decision.outcome == .noMatch || decision.outcome == .conflict)
+    }
+
+    func isUnchanged(_ decision: CategoryEvaluation.Decision) -> Bool {
+        decision.outcome == .protected || (decision.outcome == .noMatch && !removesCategory(decision))
+    }
+
+    func matches(assignments: [String: String], intents: [String: CategoryIntent]) -> Bool {
+        self.assignments == assignments && self.intents == intents
+    }
+}

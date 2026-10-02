@@ -81,7 +81,7 @@ nonisolated enum AlDarReferenceError: Error, Equatable {
     case invalidResponse, unavailable, invalidBinding, amountOutOfRange
 }
 
-nonisolated struct AlDarReferenceQuote: Equatable, Sendable {
+nonisolated struct AlDarReferenceQuote: Equatable, Sendable, Codable {
     let submittedQAR: Money
     let returnedINR: AlDarReturnedINRDecimal
     let fetchedAtISO: String
@@ -115,7 +115,7 @@ nonisolated struct AlDarReferenceQuote: Equatable, Sendable {
     var fetchedAt: Date { ISO8601DateFormatter().date(from: fetchedAtISO)! }
 }
 
-nonisolated struct AlDarReferenceEvidence: Equatable, Sendable {
+nonisolated struct AlDarReferenceEvidence: Equatable, Sendable, Codable {
     let quote: AlDarReferenceQuote
     let boundShortfallINR: Money
 
@@ -222,5 +222,32 @@ nonisolated enum AlDarPair: String, CaseIterable, Sendable {
         guard error == .noError || error == .lossOfPrecision, !ratio.isNaN else { return nil }
         NSDecimalRound(&rounded, &ratio, 2, .plain)
         return rounded.formatted(.number.locale(Locale(identifier: "en_US_POSIX")).grouping(.never).precision(.fractionLength(2)))
+    }
+}
+
+
+extension AlDarReturnedINRDecimal: Codable {
+    nonisolated init(from decoder: Decoder) throws {
+        try self.init(rawToken: decoder.singleValueContainer().decode(String.self))
+    }
+    nonisolated func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer(); try value.encode(rawToken)
+    }
+}
+extension AlDarReferenceQuote {
+    nonisolated private enum CodingKeys: String, CodingKey { case submittedQAR, returnedINR, fetchedAtISO }
+    nonisolated init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(submittedQAR: values.decode(Money.self, forKey: .submittedQAR),
+                      returnedINR: values.decode(AlDarReturnedINRDecimal.self, forKey: .returnedINR),
+                      fetchedAtISO: values.decode(String.self, forKey: .fetchedAtISO))
+    }
+}
+extension AlDarReferenceEvidence {
+    nonisolated private enum CodingKeys: String, CodingKey { case quote, boundShortfallINR }
+    nonisolated init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(quote: values.decode(AlDarReferenceQuote.self, forKey: .quote),
+                      boundShortfallINR: values.decode(Money.self, forKey: .boundShortfallINR))
     }
 }

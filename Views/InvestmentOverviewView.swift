@@ -7,56 +7,367 @@ private func investmentTextWidth(_ values: [String], role: LFFontRole, theme: LF
     return ceil(values.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0)
 }
 
+/// Display-only shares of the current snapshot. Stored money and quantities
+/// remain exact; only the bar width crosses into floating-point geometry.
+private struct InvestmentAllocationShare {
+    let fraction: Double
+    let label: String
+
+    init?(numerator: InvestmentArithmetic.Exact, denominator: InvestmentArithmetic.Exact) {
+        guard numerator.sign >= 0, denominator.sign > 0,
+              let percentage = try? InvestmentRatioFormatter.rounded(numerator: numerator, denominator: denominator, places: 1, decimalShift: 2),
+              let token = try? InvestmentRatioFormatter.rounded(numerator: numerator, denominator: denominator, places: 6),
+              let fraction = Double(token), fraction.isFinite, (0...1).contains(fraction) else { return nil }
+        self.fraction = fraction
+        self.label = "≈" + percentage + "%"
+    }
+
+    static func value(_ part: InvestmentOverviewScope, of total: InvestmentOverviewScope) -> Self? {
+        guard let amount = part.usd?.value?.covering(part.holdingCount),
+              let whole = total.usd?.value?.covering(total.holdingCount),
+              let numerator = try? InvestmentArithmetic.product(amount.numerator, whole.denominator),
+              let denominator = try? InvestmentArithmetic.product(amount.denominator, whole.numerator) else { return nil }
+        return Self(numerator: numerator, denominator: denominator)
+    }
+
+    static func units(_ part: Decimal, of total: Decimal) -> Self? {
+        guard let numerator = try? InvestmentArithmetic.Exact(part),
+              let denominator = try? InvestmentArithmetic.Exact(total) else { return nil }
+        return Self(numerator: numerator, denominator: denominator)
+    }
+}
+
+private func investmentAllocationColor(_ index: Int, theme: LFTheme) -> Color {
+    switch index % 4 {
+    case 0: theme.palette.focusRing
+    case 1: Color(hex: 0x70C7DC)
+    case 2: Color(hex: 0xE8B86A)
+    default: Color(hex: 0x64BFAF)
+    }
+}
+
+private struct InvestmentAllocationBar: View {
+    @Environment(\.lfTheme) private var theme
+    let share: InvestmentAllocationShare?
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: theme.spacing.controlGap) {
+            GeometryReader { geometry in
+                Capsule().fill(theme.palette.tableBorder)
+                    .overlay(alignment: .leading) {
+                        if let share {
+                            Capsule().fill(color).frame(width: geometry.size.width * share.fraction)
+                        }
+                    }
+            }.frame(height: 6).accessibilityHidden(true)
+            Text(share?.label ?? "Unavailable")
+                .font(theme.typography.secondary.weight(.semibold)).monospacedDigit()
+                .foregroundStyle(share == nil ? theme.palette.secondaryText : color)
+                .fixedSize()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Current value allocation")
+        .accessibilityValue(share?.label ?? "Unavailable")
+    }
+}
+
 struct InvestmentOverviewView: View {
     @Environment(\.lfTheme) private var theme
     @State private var expandedDetailsID: String?
     let overview: InvestmentOverview
+    let availableWidth: CGFloat
     let viewPortfolioHoldings: (InvestmentPortfolioSummary) -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                LFPanel(title: "Investment overview") {
-                    if let comparison = capitalComparison {
-                        ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .center, spacing: theme.spacing.majorModuleGap) {
-                                overviewFigures(now: context.date).frame(minWidth: 560)
-                                capitalChart(comparison).frame(width: 340)
-                            }
-                            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                                overviewFigures(now: context.date)
-                                capitalChart(comparison)
+                LFPanel { overallSummary }
+                HStack(alignment: .top) {
+                    status(overview.total, now: context.date)
+                    Spacer(minLength: theme.spacing.small)
+                    Button("Calculation details") { expandedDetailsID = "overview" }
+                        .buttonStyle(.link)
+                        .popover(isPresented: detailsBinding("overview")) {
+                            detailsPopover("Calculation details") {
+                                valuationDetails
+                                if let comparison = capitalComparison { capitalChart(comparison) }
                             }
                         }
-                    } else {
-                        overviewFigures(now: context.date)
-                    }
                 }
-
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 460), spacing: theme.spacing.sectionGap)],
-                          alignment: .leading, spacing: theme.spacing.sectionGap) {
-                    ForEach(overview.portfolios) { portfolio in
-                        portfolioCard(portfolio, now: context.date)
+                if availableWidth >= allocationAndComparisonMinimumWidth {
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        allocationPanel.frame(width: allocationPanelWidth)
+                        comparisonPanel(now: context.date, width: availableWidth - allocationPanelWidth - theme.spacing.sectionGap)
+                    }
+                } else {
+                    allocationPanel
+                    comparisonPanel(now: context.date, width: availableWidth)
+                }
+                if overview.portfolios.contains(where: { $0.group == .isp && $0.scope.holdingCount > 0 }) {
+                    Text("ISP growth uses allocated contributions; fund cost and fund-level gain / loss remain unavailable.")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                }
+                if let isp = overview.portfolios.first(where: { $0.group == .isp }), isp.scope.holdingCount > 0 {
+                    if let pending = overview.ispReported?.pendingAllocation, !pending.isEmpty {
+                        LFPanel(contentSpacing: theme.spacing.small) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack {
+                                inlineAmounts("ISP pending allocation", pending)
+                                Spacer(minLength: theme.spacing.controlGap)
+                                policyDetailsButton(isp)
+                            }
+                            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                inlineAmounts("ISP pending allocation", pending)
+                                policyDetailsButton(isp)
+                            }
+                        }
+                        }
+                    } else {
+                        HStack { Spacer(); policyDetailsButton(isp) }
                     }
                 }
             }
             .foregroundStyle(theme.palette.primaryText)
-            .padding(.trailing, theme.spacing.micro)
         }
     }
 
-    private func overviewFigures(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            overallSummary
-            inlineAmounts("Invested / contributed",
-                          orderedLines(overview.performance, currency: "USD").compactMap { $0.cost?.covering(overview.performance.costCount) })
-            partialPerformance(overview.performance)
-            status(overview.total, now: now)
-            DisclosureGroup("Calculation details", isExpanded: detailsBinding("overview")) {
-                valuationDetails.padding(.top, theme.spacing.small)
-            }
-            .font(theme.typography.secondary)
+    private var allocationPanelWidth: CGFloat {
+        max(340, min(availableWidth * 0.34, availableWidth - comparisonMinimumWidth - theme.spacing.sectionGap))
+    }
+    private var allocationAndComparisonMinimumWidth: CGFloat {
+        max(1180, 340 + comparisonMinimumWidth + theme.spacing.sectionGap)
+    }
+
+    private var allocationPanel: some View {
+        LFPanel(title: "Where your value sits", contentSpacing: theme.spacing.controlGap) {
+            Text("Portfolio allocation · US dollars")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            VStack(alignment: .leading, spacing: theme.spacing.sectionGap * 2) {
+                ForEach(Array(overview.portfolios.enumerated()), id: \.element.id) { index, portfolio in
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                        HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
+                                Circle().fill(investmentAllocationColor(index, theme: theme)).frame(width: 7, height: 7).accessibilityHidden(true)
+                                Text(portfolio.group.rawValue).font(theme.typography.rowTitle)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: theme.spacing.small)
+                            VStack(alignment: .trailing, spacing: theme.spacing.micro) {
+                                portfolioValue(portfolio.scope, currency: "USD", field: \.value)
+                                if portfolio.scope.priceCount < portfolio.scope.holdingCount {
+                                    Text("\(portfolio.scope.priceCount)/\(portfolio.scope.holdingCount) prices available")
+                                        .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                                }
+                            }
+                        }
+                        InvestmentAllocationBar(share: .value(portfolio.scope, of: overview.total),
+                                                color: investmentAllocationColor(index, theme: theme))
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("investments.allocation." + portfolio.id)
+                }
+            }.padding(.vertical, theme.spacing.sectionGap)
+            Text("Bars show current allocation, not return.")
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
         }
+    }
+
+    private var comparisonColumnWidths: [CGFloat] {
+        let portfolios = overview.portfolios
+        return [
+            max(125, investmentTextWidth(portfolios.map { $0.group.rawValue }, role: .rowTitle, theme: theme)),
+            max(150, investmentTextWidth(portfolios.map { portfolio in
+                portfolio.group == .isp
+                    ? overview.ispReported?.allocatedContributions.first(where: { $0.currency == "USD" })?.display ?? "Unavailable"
+                    : portfolio.scope.lines.first(where: { $0.currency == nativeCurrency(for: portfolio) })?.cost?.covering(portfolio.scope.costCount)?.display ?? "Unavailable"
+            }, role: .rowTitle, theme: theme)),
+            max(140, investmentTextWidth(portfolios.map { portfolio in
+                performance(for: portfolio).lines.first(where: { $0.currency == nativeCurrency(for: portfolio) })?.gain?.covering(performance(for: portfolio).gainCount)?.display ?? "Unavailable"
+            }, role: .rowTitle, theme: theme)),
+            max(85, investmentTextWidth(portfolios.map { performance(for: $0).returnPercent ?? "Unavailable" }, role: .rowTitle, theme: theme)),
+            max(135, investmentTextWidth(["View holdings"], role: .body, theme: theme) + 32)
+        ]
+    }
+
+    private var comparisonMinimumWidth: CGFloat {
+        comparisonColumnWidths.reduce(0, +) + 4 * theme.spacing.controlGap + 2 * theme.spacing.panelPadding
+    }
+
+    private func comparisonPanel(now: Date, width: CGFloat) -> some View {
+        LFPanel(title: "Cost, contributions & growth", contentSpacing: theme.spacing.controlGap) {
+            Text("Each portfolio keeps its reported basis.")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            if width >= comparisonMinimumWidth {
+                portfolioGrid(now: now, width: width)
+            } else {
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    ForEach(overview.portfolios) { portfolio in
+                        compactPortfolioRow(portfolio, now: now, width: width)
+                        if portfolio.id != overview.portfolios.last?.id { Divider() }
+                    }
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func portfolioGrid(now: Date, width: CGFloat) -> some View {
+        let extra = max(0, width - comparisonMinimumWidth) / 5
+        let columns = comparisonColumnWidths.map { $0 + extra }
+        return VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            HStack(spacing: theme.spacing.controlGap) {
+                Text("Portfolio").frame(width: columns[0], alignment: .leading)
+                Text("Invested / allocated").frame(width: columns[1], alignment: .trailing)
+                Text("Gain / growth").frame(width: columns[2], alignment: .trailing)
+                Text("Growth").frame(width: columns[3], alignment: .trailing)
+                Color.clear.frame(width: columns[4], height: 1).accessibilityHidden(true)
+            }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            ForEach(overview.portfolios) { portfolio in
+                Divider()
+                HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                    portfolioIdentity(portfolio).frame(width: columns[0], alignment: .leading)
+                    portfolioCapital(portfolio).frame(width: columns[1], alignment: .trailing)
+                    portfolioGrowth(portfolio).frame(width: columns[2], alignment: .trailing)
+                    Text(performance(for: portfolio).returnPercent ?? "Unavailable")
+                        .font(theme.typography.rowTitle).monospacedDigit().fixedSize()
+                        .foregroundStyle(growthSign(performance(for: portfolio)).map(profitColor) ?? theme.palette.secondaryText)
+                        .frame(width: columns[3], alignment: .trailing)
+                    portfolioActions(portfolio, now: now).frame(width: columns[4], alignment: .trailing)
+                }.padding(.vertical, theme.spacing.sectionGap)
+            }
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func compactPortfolioRow(_ portfolio: InvestmentPortfolioSummary, now: Date, width: CGFloat) -> some View {
+        let metricWidth = width - 2 * theme.spacing.panelPadding
+        let metricCount = min(2, max(1, Int((metricWidth + theme.spacing.controlGap) / (200 + theme.spacing.controlGap))))
+        return VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            HStack(alignment: .top) {
+                portfolioIdentity(portfolio)
+                Spacer(minLength: theme.spacing.small)
+                portfolioActions(portfolio, now: now)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: theme.spacing.controlGap, alignment: .topLeading), count: metricCount), alignment: .leading, spacing: theme.spacing.controlGap) {
+                compactPortfolioMetrics(portfolio)
+            }
+        }.padding(.vertical, theme.spacing.small)
+    }
+
+    @ViewBuilder private func compactPortfolioMetrics(_ portfolio: InvestmentPortfolioSummary) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text("Invested / allocated").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            portfolioCapital(portfolio, alignment: .leading)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(portfolio.group == .isp ? "Growth" : "Gain / loss").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            portfolioGrowth(portfolio, alignment: .leading)
+            Text(performance(for: portfolio).returnPercent ?? "Percentage unavailable").font(theme.typography.secondary).monospacedDigit()
+                .foregroundStyle(growthSign(performance(for: portfolio)).map(profitColor) ?? theme.palette.secondaryText)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func performance(for portfolio: InvestmentPortfolioSummary) -> InvestmentOverviewScope {
+        portfolio.group == .isp ? overview.ispPerformance ?? portfolio.scope : portfolio.scope
+    }
+
+    private func portfolioGrowth(_ portfolio: InvestmentPortfolioSummary, alignment: HorizontalAlignment = .trailing) -> some View {
+        let scope = performance(for: portfolio)
+        let amount = scope.lines.first(where: { $0.currency == nativeCurrency(for: portfolio) })?.gain?.covering(scope.gainCount)
+        return VStack(alignment: alignment, spacing: theme.spacing.micro) {
+            Text(amount?.display ?? "Unavailable").font(theme.typography.rowTitle).monospacedDigit().fixedSize()
+                .foregroundStyle(amount.map { profitColor($0.numerator.sign) } ?? theme.palette.secondaryText)
+            Text(portfolio.group == .isp ? "Contribution growth" : "Gain / loss")
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            if !scope.hasCompleteGain {
+                Text("\(scope.gainCount)/\(scope.holdingCount) holdings").font(theme.typography.caption)
+                    .foregroundStyle(theme.palette.secondaryText)
+            }
+        }
+    }
+
+    private func portfolioIdentity(_ portfolio: InvestmentPortfolioSummary) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(portfolio.group.rawValue).font(theme.typography.rowTitle.weight(.semibold))
+            Text("\(portfolio.scope.holdingCount) holdings").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            if portfolio.scope.priceCount < portfolio.scope.holdingCount {
+                Text("\(portfolio.scope.priceCount)/\(portfolio.scope.holdingCount) prices available").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }.frame(minWidth: 135, maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func portfolioValue(_ scope: InvestmentOverviewScope, currency: String,
+                                field: KeyPath<InvestmentOverviewLine, InvestmentConvertedAmount?>, profit: Bool = false,
+                                alignment: HorizontalAlignment = .trailing) -> some View {
+        let lines = orderedLines(scope, currency: currency)
+        let count = field == \.value ? scope.priceCount : field == \.cost ? scope.costCount : scope.gainCount
+        return VStack(alignment: alignment, spacing: theme.spacing.micro) {
+            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                let amount = line[keyPath: field]?.covering(count)
+                Text(amount?.display ?? "Unavailable")
+                    .font(index == 0 ? theme.typography.rowTitle : theme.typography.secondary).monospacedDigit()
+                    .foregroundStyle(profit && index == 0 ? amount.map { profitColor($0.numerator.sign) } ?? theme.palette.secondaryText
+                                     : index == 0 ? theme.palette.primaryText : theme.palette.secondaryText)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityLabel(line.currency + " " + (amount?.display ?? "Unavailable"))
+            }
+            if field == \.gain, !scope.hasCompleteGain {
+                Text("\(scope.gainCount)/\(scope.holdingCount) holdings").font(theme.typography.caption)
+                    .foregroundStyle(theme.palette.secondaryText)
+            }
+        }.frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .top))
+    }
+
+    private func portfolioCapital(_ portfolio: InvestmentPortfolioSummary, alignment: HorizontalAlignment = .trailing) -> some View {
+        VStack(alignment: alignment, spacing: theme.spacing.micro) {
+            if portfolio.group == .isp {
+                Text(overview.ispReported?.allocatedContributions.first(where: { $0.currency == "USD" })?.display ?? "Unavailable")
+                    .font(theme.typography.rowTitle).monospacedDigit().fixedSize()
+            } else {
+                let line = portfolio.scope.lines.first { $0.currency == nativeCurrency(for: portfolio) }
+                Text(line?.cost?.covering(portfolio.scope.costCount)?.display ?? "Unavailable")
+                    .font(theme.typography.rowTitle).monospacedDigit().fixedSize()
+            }
+            Text(portfolio.group == .isp ? "Allocated contributions" : "Invested cost")
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            if portfolio.group != .isp, !portfolio.scope.hasCompleteCost {
+                Text("\(portfolio.scope.costCount)/\(portfolio.scope.holdingCount) holdings")
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }
+    }
+
+    private func portfolioActions(_ portfolio: InvestmentPortfolioSummary, now: Date) -> some View {
+        VStack(alignment: .trailing, spacing: theme.spacing.micro) {
+            Button("View holdings") { viewPortfolioHoldings(portfolio) }.lfSecondaryAction()
+                .accessibilityLabel("View " + portfolio.group.rawValue + " holdings")
+            Button("Details") { expandedDetailsID = portfolio.id }.buttonStyle(.link)
+                .accessibilityLabel(portfolio.group.rawValue + " details")
+                .popover(isPresented: detailsBinding(portfolio.id)) {
+                    detailsPopover(portfolio.group.rawValue) {
+                        portfolioDetails(portfolio, performance: performance(for: portfolio))
+                        status(portfolio.scope, now: now)
+                    }
+                }
+        }
+    }
+
+    private func policyDetailsButton(_ isp: InvestmentPortfolioSummary) -> some View {
+        Button("Policy contributions & portal details") { expandedDetailsID = "policies" }.buttonStyle(.link)
+            .popover(isPresented: detailsBinding("policies")) {
+                detailsPopover("Policy contributions") { ispReportedDetails }
+            }
+    }
+
+    private func detailsPopover<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            HStack {
+                Text(title).font(theme.typography.rowTitle)
+                Spacer()
+                Button("Close details", systemImage: "xmark") { expandedDetailsID = nil }
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+            }
+            ScrollView { content().frame(maxWidth: .infinity, alignment: .leading) }
+        }.padding(theme.spacing.panelPadding).frame(width: 580, height: 440)
     }
 
     // These are two current comparison endpoints, not a historical series.
@@ -126,63 +437,29 @@ struct InvestmentOverviewView: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
                 valueMeasure(overview.total, currency: "USD")
-                moneyMeasure("Gain / loss", scope: overview.performance, currency: "USD", field: \.gain, prominent: true)
-                percentageMeasure("Growth %", overview.performance.returnPercent, prominent: true, sign: growthSign(overview.performance))
-            }
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                valueMeasure(overview.total, currency: "USD")
-                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                    moneyMeasure("Gain / loss", scope: overview.performance, currency: "USD", field: \.gain, prominent: true)
-                    percentageMeasure("Growth %", overview.performance.returnPercent, prominent: true, sign: growthSign(overview.performance))
-                }
-            }
+                Divider()
+                moneyMeasure("Invested / allocated", scope: overview.performance, currency: "USD", field: \.cost, prominent: true)
+                Divider()
+                overviewGrowth
+            }.fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) { overviewMetrics }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func portfolioCard(_ portfolio: InvestmentPortfolioSummary, now: Date) -> some View {
-        let currency = nativeCurrency(for: portfolio)
-        let performance = portfolio.group == .isp ? overview.ispPerformance ?? portfolio.scope : portfolio.scope
-        return LFPanel(title: portfolio.group.rawValue, trailing: holdingsAction(for: portfolio)) {
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        valueMeasure(portfolio.scope, currency: currency)
-                        moneyMeasure(portfolio.group == .isp ? "Growth" : "Gain / loss", scope: performance, currency: currency, field: \.gain, prominent: true)
-                        percentageMeasure("Growth %", performance.returnPercent, prominent: true, sign: growthSign(performance))
-                    }
-                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                        valueMeasure(portfolio.scope, currency: currency)
-                        HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                            moneyMeasure(portfolio.group == .isp ? "Growth" : "Gain / loss", scope: performance, currency: currency, field: \.gain, prominent: true)
-                            percentageMeasure("Growth %", performance.returnPercent, prominent: true, sign: growthSign(performance))
-                        }
-                    }
-                }
+    @ViewBuilder private var overviewMetrics: some View {
+        valueMeasure(overview.total, currency: "USD")
+        moneyMeasure("Invested / allocated", scope: overview.performance, currency: "USD", field: \.cost, prominent: true)
+        overviewGrowth
+    }
 
-                Divider().overlay(theme.palette.divider)
-                if portfolio.group == .isp {
-                    inlineAmounts("Allocated contributions", overview.ispReported?.allocatedContributions ?? [])
-                } else {
-                    inlineAmounts("Invested cost",
-                                  orderedLines(performance, currency: currency).compactMap { $0.cost?.covering(performance.costCount) })
-                }
-                if portfolio.group == .isp, let source = overview.ispReported, !source.pendingAllocation.isEmpty {
-                    inlineAmounts("Pending allocation", source.pendingAllocation)
-                        .help("Recorded by Zurich; awaiting fund units. Excluded from current value and growth.")
-                }
-                partialPerformance(performance)
-                status(portfolio.scope, now: now)
-
-                DisclosureGroup("Details", isExpanded: detailsBinding(portfolio.id)) {
-                    portfolioDetails(portfolio, performance: performance)
-                        .padding(.top, theme.spacing.small)
-                }
-                .font(theme.typography.secondary)
-                .accessibilityIdentifier("investment.details.\(portfolio.id)")
+    private var overviewGrowth: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                moneyMeasure("Gain / growth", scope: overview.performance, currency: "USD", field: \.gain, prominent: true)
+                percentageMeasure("Growth", overview.performance.returnPercent, prominent: true, sign: growthSign(overview.performance))
             }
+            partialPerformance(overview.performance)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func detailsBinding(_ id: String) -> Binding<Bool> {
@@ -260,12 +537,12 @@ struct InvestmentOverviewView: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: theme.spacing.small) {
                 Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                Text(amounts.isEmpty ? "—" : amounts.map(\.display).joined(separator: "  ·  "))
+                Text(amounts.isEmpty ? "Unavailable" : amounts.map(\.display).joined(separator: "  ·  "))
                     .font(theme.typography.tableMoney).monospacedDigit().fixedSize()
             }
             VStack(alignment: .leading, spacing: theme.spacing.micro) {
                 Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                Text(amounts.isEmpty ? "—" : amounts.map(\.display).joined(separator: "  ·  "))
+                Text(amounts.isEmpty ? "Unavailable" : amounts.map(\.display).joined(separator: "  ·  "))
                     .font(theme.typography.tableMoney).monospacedDigit()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -274,7 +551,7 @@ struct InvestmentOverviewView: View {
 
     @ViewBuilder private func partialPerformance(_ scope: InvestmentOverviewScope) -> some View {
         if scope.holdingCount > 0, !scope.hasCompleteGain {
-            Text(scope.gainCount == 0 ? "Growth basis unavailable" : "Growth covers \(scope.gainCount) of \(scope.holdingCount) holdings")
+            Text(scope.gainCount == 0 ? "Growth unavailable" : "Growth covers \(scope.gainCount) of \(scope.holdingCount) holdings")
                 .font(theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
         }
@@ -358,13 +635,12 @@ struct InvestmentOverviewView: View {
     }
 
     private func status(_ scope: InvestmentOverviewScope, now: Date) -> some View {
-        let priced = scope.priceCount == scope.holdingCount
-            ? "\(scope.holdingCount) holdings priced"
-            : "\(scope.priceCount) of \(scope.holdingCount) holdings priced"
+        let priced = "\(scope.priceCount)/\(scope.holdingCount) prices available"
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: theme.spacing.controlGap) {
-                    Text(priced)
+                    Text(priced).padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.micro)
+                        .background(theme.palette.raisedSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
                     freshness(scope, now: now)
                 }
                 VStack(alignment: .leading, spacing: theme.spacing.micro) {
@@ -382,8 +658,10 @@ struct InvestmentOverviewView: View {
         let age = scope.oldestAge(at: now)
         let freshness = scope.oldestFreshnessAge(at: now)
         if !scope.quotes.isEmpty {
-            Label(age == 0 ? "Data updated today" : "Oldest data \(age) \(age == 1 ? "day" : "days") ago\(freshness >= 4 ? " · Stale" : "")", systemImage: "clock")
+            Label(age == 0 ? "Data updated today" : "Oldest data · \(age) \(age == 1 ? "day" : "days")\(freshness >= 4 ? " · Stale" : "")", systemImage: "clock")
                 .foregroundStyle(FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(freshness))))
+                .padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.micro)
+                .background(theme.palette.raisedSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
         }
     }
 
@@ -395,199 +673,478 @@ struct InvestmentOverviewView: View {
 struct InvestmentPortfolioDetailView: View {
     @Environment(\.lfTheme) private var theme
     let portfolio: InvestmentPortfolioSummary
+    let overview: InvestmentOverview
     let holdings: [InvestmentHolding]
     let containers: [InvestmentContainer]
     let portfolioNames: [String: String]
+    let valuations: [String: InvestmentValuation]
+    @Binding var selection: String?
+    @FocusState private var focusedFund: String?
+
+    private var selectedFund: InvestmentFundSummary? {
+        portfolio.funds.first { $0.id == selection } ?? portfolio.funds.first
+    }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            ScrollView {
-                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                    if portfolio.group == .isp && !portfolio.scope.hasCompleteCost {
-                        Text("The ISP sources do not report fund acquisition cost, so fund cost, P/L and return are unavailable.")
-                            .font(theme.typography.caption)
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text("Capital and P/L shares below are within \(portfolio.group.rawValue).")
-                            .font(theme.typography.caption)
-                            .foregroundStyle(theme.palette.secondaryText)
-                    }
-
-                    if portfolio.group == .isp, containers.contains(where: { $0.zioSource != nil }) {
-                        DisclosureGroup("Policy contributions and portal details") {
-                            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                                ForEach(containers.filter { $0.zioSource != nil }) { container in
-                                    if let policy = container.zioSource {
-                                        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                                            Text(container.displayName + " · " + container.identity).font(theme.typography.rowTitle)
-                                            Text("Contributions \(InvestmentArithmetic.displayedMoney(policy.contributions.amount.value, currency: policy.currency)) · Portal value \(InvestmentArithmetic.displayedMoney(policy.value.amount.value, currency: policy.currency)) · Reported growth \(InvestmentArithmetic.displayedMoney(policy.growth.amount.value, currency: policy.currency))")
-                                            if let pending = policy.pendingAllocation, pending > 0, let allocated = policy.allocatedContributions {
-                                                Text("Allocated contributions \(InvestmentArithmetic.displayedMoney(allocated.amount.value, currency: policy.currency)) · Pending allocation \(InvestmentArithmetic.displayedMoney(pending, currency: policy.currency))")
-                                            }
-                                            if let vested = policy.vestedValue {
-                                                Text("Vested value \(InvestmentArithmetic.displayedMoney(vested.amount.value, currency: policy.currency))")
-                                            }
-                                            Text("Portal valuation \(InvestmentPriceDates.display(policy.valuationDay)) · fetched \(AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
-                                                .foregroundStyle(theme.palette.secondaryText)
-                                        }
+        GeometryReader { viewport in
+            let wide = viewport.size.width >= max(1110, (220 + fundUnitsWidth + fundValueWidth + 2 * theme.spacing.panelPadding) / 0.55)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                            LFPanel { portfolioSummary }
+                            if wide {
+                                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                                    fundAllocationPanel(availableWidth: (viewport.size.width - theme.spacing.sectionGap) * 0.55, proxy: proxy)
+                                        .frame(width: (viewport.size.width - theme.spacing.sectionGap) * 0.55)
+                                    if let selectedFund {
+                                        LFPanel(contentSpacing: theme.spacing.controlGap) { selectedDetail(selectedFund, now: context.date) }
                                     }
                                 }
-                                Text("These are policy-level source totals. They do not establish fund acquisition costs. The portal does not supply a separate units-as-of date.")
-                                    .foregroundStyle(theme.palette.secondaryText)
-                            }.font(theme.typography.caption).padding(.top, theme.spacing.small)
-                        }.font(theme.typography.secondary)
-                    }
-
-                    ForEach(portfolio.funds) { fund in
-                        fundRow(fund, now: context.date)
-                        if fund.id != portfolio.funds.last?.id { Divider().overlay(theme.palette.divider) }
+                            } else {
+                                fundAllocationPanel(availableWidth: viewport.size.width, proxy: proxy)
+                                if let selectedFund {
+                                    LFPanel(contentSpacing: theme.spacing.controlGap) { selectedDetail(selectedFund, now: context.date) }
+                                }
+                            }
+                            if portfolio.group == .isp, portfolio.scope.costCount == 0 {
+                                Text("Fund acquisition cost and fund-level gain / loss: Unavailable")
+                                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            }
+                            if portfolio.group == .isp, containers.contains(where: { $0.zioSource != nil }) {
+                                policyDetails
+                            }
+                        }.padding(.trailing, theme.spacing.micro)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, theme.spacing.micro)
             }
         }
     }
 
-    private func fundRow(_ fund: InvestmentFundSummary, now: Date) -> some View {
-        let positions = holdings.filter { fund.holdingIDs.contains($0.id) }
-        let dates = Array(Set(positions.map(\.holdingsDate))).sorted()
-        let dateLabels = Set(positions.map(\.sourceDateLabel))
-        let sharedDate = dates.count == 1 && dateLabels.count == 1 ? dates.first.map(InvestmentPriceDates.display) : nil
+    private var portfolioSummary: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: theme.spacing.sectionGap) { summaryMetrics }
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) { summaryMetrics }
+        }
+    }
 
+    @ViewBuilder private var summaryMetrics: some View {
+        amountGroup("\(portfolio.group.rawValue) \(portfolio.scope.priceCount < portfolio.scope.holdingCount ? "priced value" : "current value")", scope: portfolio.scope, field: \.value)
+        if portfolio.group == .isp {
+            summarySourceAmount("Allocated contributions", amounts: overview.ispReported?.allocatedContributions ?? [])
+            if let pending = overview.ispReported?.pendingAllocation, !pending.isEmpty {
+                summarySourceAmount("Pending allocation", amounts: pending)
+            }
+        } else {
+            amountGroup("Invested cost", scope: portfolio.scope, field: \.cost)
+            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                amountGroup("Gain / loss", scope: portfolio.scope, field: \.gain, profit: true)
+                Text(portfolio.scope.returnPercent ?? "Return unavailable")
+                    .font(theme.typography.secondary).monospacedDigit()
+            }
+        }
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            Text("\(portfolio.scope.priceCount)/\(portfolio.scope.holdingCount) prices available")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                .padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.micro)
+                .background(theme.palette.raisedSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+            Text("\(portfolio.funds.count) fund groups · \(portfolio.group == .indianMF ? "INR" : "USD")")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func summarySourceAmount(_ title: String, amounts: [InvestmentConvertedAmount]) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text(amounts.first(where: { $0.currency == "USD" })?.display ?? "Unavailable")
+                .font(theme.typography.headlineMoney).monospacedDigit().fixedSize()
+            if let amount = amounts.first(where: { $0.currency == "INR" }) {
+                Text(amount.display).font(theme.typography.secondary).monospacedDigit().foregroundStyle(theme.palette.secondaryText).fixedSize()
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func fundAllocationPanel(availableWidth: CGFloat, proxy: ScrollViewProxy) -> some View {
+        LFPanel(title: "Fund allocation", contentSpacing: theme.spacing.controlGap) {
+            Text("Share of \(portfolio.group.rawValue) current value · US dollars")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            fundList(availableWidth: availableWidth, proxy: proxy)
+            Text("Allocation bars compare fund values; they do not show performance.")
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                .padding(.top, theme.spacing.controlGap)
+        }
+    }
+
+    private func fundList(availableWidth: CGFloat, proxy: ScrollViewProxy) -> some View {
+        let nameWidth = max(140, availableWidth - 2 * theme.spacing.panelPadding - 2 * theme.spacing.small
+                            - 2 * theme.spacing.controlGap - fundUnitsWidth - fundValueWidth)
+        let compact = availableWidth < 140 + fundUnitsWidth + fundValueWidth + 2 * theme.spacing.panelPadding
+            + 2 * theme.spacing.small + 2 * theme.spacing.controlGap
         return VStack(alignment: .leading, spacing: theme.spacing.small) {
-            fundHeading(fund)
-            fundWideContent(fund, positions: positions, sharedDate: sharedDate, now: now)
-            if portfolio.group == .isp && fund.scope.costCount > 0 { performanceColumn(fund) }
-            fundStatus(fund.scope, now: now)
+            if !compact {
+            HStack(spacing: theme.spacing.controlGap) {
+                Text("Fund / identifier").frame(width: nameWidth, alignment: .leading)
+                Text("Units").frame(width: fundUnitsWidth, alignment: .trailing)
+                Text("Current value").frame(width: fundValueWidth, alignment: .trailing)
+            }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                .padding(.horizontal, theme.spacing.small)
+            Divider()
+            }
+            ForEach(portfolio.funds) { fund in
+                fundButton(fund, nameWidth: nameWidth, compact: compact).id(fund.id)
+                    .onKeyPress(.downArrow) { moveFund(from: fund.id, by: 1, proxy: proxy); return .handled }
+                    .onKeyPress(.upArrow) { moveFund(from: fund.id, by: -1, proxy: proxy); return .handled }
+                if fund.id != portfolio.funds.last?.id { Divider() }
+            }
+        }
+    }
 
+    private var fundUnitsWidth: CGFloat {
+        max(85, investmentTextWidth(portfolio.funds.map(\.unitsText), role: .body, theme: theme))
+    }
+    private var fundValueWidth: CGFloat {
+        let currency = portfolio.group == .indianMF ? "INR" : "USD"
+        return max(145, portfolio.funds.flatMap { fund in
+            fund.scope.lines.map { line in
+                investmentTextWidth([line.value?.covering(fund.scope.priceCount)?.display ?? "Unavailable"],
+                    role: line.currency == currency ? .rowTitle : .secondary, theme: theme)
+            }
+        }.max() ?? 0)
+    }
+
+    private func fundButton(_ fund: InvestmentFundSummary, nameWidth: CGFloat, compact: Bool) -> some View {
+        Button {
+            selection = fund.id; focusedFund = fund.id
+        } label: {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                if compact {
+                    fundIdentity(fund)
+                    HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                            Text("Units").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            Text(fund.unitsText).font(theme.typography.body).monospacedDigit().fixedSize()
+                        }
+                        Spacer(minLength: theme.spacing.small)
+                        fundRowValues(fund)
+                    }
+                } else {
+                HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                fundIdentity(fund).frame(width: nameWidth, alignment: .leading)
+                Text(fund.unitsText).font(theme.typography.body).monospacedDigit().fixedSize()
+                    .frame(width: fundUnitsWidth, alignment: .trailing)
+                fundRowValues(fund).frame(width: fundValueWidth, alignment: .trailing)
+                }
+                }
+                InvestmentAllocationBar(share: .value(fund.scope, of: portfolio.scope),
+                    color: investmentAllocationColor(portfolio.funds.firstIndex(where: { $0.id == fund.id }) ?? 0, theme: theme))
+            }
+            .padding(.horizontal, theme.spacing.small).padding(.vertical, theme.spacing.sectionGap)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selectedFund?.id == fund.id ? theme.palette.dataSelection : Color.clear,
+                        in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay(alignment: .leading) {
+                if selectedFund?.id == fund.id {
+                    RoundedRectangle(cornerRadius: 2).fill(theme.interaction.focusRing).frame(width: 3).padding(.vertical, 8)
+                }
+            }.contentShape(Rectangle())
+        }.buttonStyle(LFPlainActionStyle()).focusable().focused($focusedFund, equals: fund.id)
+            .accessibilityLabel(investmentDisplayTitle(fund.name) + ", " + fund.displayIdentifier + ", " + fund.unitsText
+                + " units, " + fund.scope.lines.map { $0.currency + " " + ($0.value?.covering(fund.scope.priceCount)?.display ?? "Unavailable") }.joined(separator: ", ")
+                + ", Current value allocation " + (InvestmentAllocationShare.value(fund.scope, of: portfolio.scope)?.label ?? "unavailable"))
+            .accessibilityValue(selectedFund?.id == fund.id ? "Selected" : "Not selected")
+            .accessibilityIdentifier("investments.fund." + fund.id)
+    }
+
+    private func fundIdentity(_ fund: InvestmentFundSummary) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(investmentDisplayTitle(fund.name)).font(theme.typography.body.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(fund.displayIdentifier).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+        }
+    }
+
+    private func fundRowValues(_ fund: InvestmentFundSummary) -> some View {
+        let primary = portfolio.group == .indianMF ? "INR" : "USD"
+        let ordered = fund.scope.lines.sorted { left, right in
+            if left.currency == right.currency { return false }
+            if left.currency == primary { return true }
+            if right.currency == primary { return false }
+            return left.currency < right.currency
+        }
+        return VStack(alignment: .trailing, spacing: theme.spacing.micro) {
+            ForEach(ordered) { line in
+                Text(line.value?.covering(fund.scope.priceCount)?.display ?? "Unavailable")
+                    .font(line.currency == primary ? theme.typography.rowTitle : theme.typography.secondary)
+                    .monospacedDigit().fixedSize()
+                    .foregroundStyle(line.currency == primary ? theme.palette.primaryText : theme.palette.secondaryText)
+            }
+            if fund.scope.priceCount < fund.scope.holdingCount {
+                Text("\(fund.scope.priceCount)/\(fund.scope.holdingCount) prices available")
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }
+    }
+
+    private func selectedDetail(_ fund: InvestmentFundSummary, now: Date) -> some View {
+        let positions = holdings.filter { fund.holdingIDs.contains($0.id) }
+        return VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            Text("Selected fund").font(theme.typography.caption).foregroundStyle(theme.interaction.focusRing)
+            Text(investmentDisplayTitle(fund.name)).font(theme.typography.sectionTitle).fixedSize(horizontal: false, vertical: true)
+            Text(fund.displayIdentifier + " · " + (fund.quote?.mapping.currency ?? positions.first?.currency ?? "Currency unavailable")
+                 + " · \(positions.count) \(positions.count == 1 ? "position" : "positions")")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Divider()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: theme.spacing.sectionGap) { selectedPrice(fund, now: now) }
+                VStack(alignment: .leading, spacing: theme.spacing.small) { selectedPrice(fund, now: now) }
+            }
+            fundStatus(fund.scope, now: now)
+            Divider()
+            if portfolio.group == .isp {
+                policyUnitAllocation(positions, fund: fund)
+                Text("Regular split is this fund’s contribution allocation within each policy—not its share of today’s holding.")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                if fund.scope.costCount > 0 { performanceColumn(fund) }
+            } else {
+                Text("Position details").font(theme.typography.rowTitle)
+                ForEach(positions) { holding in
+                    positionDetail(holding, fund: fund)
+                    if holding.id != positions.last?.id { Divider() }
+                }
+                Divider()
+                performanceColumn(fund)
+            }
             if let quote = fund.quote {
-                DisclosureGroup("Source details") {
-                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                DisclosureGroup("Price source details") {
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
                         Text("\(quote.dateBasis.label) · last successful fetch \(InvestmentPriceDates.fetchInstant(quote.fetchedAt))")
                         Text(quote.qualification)
-                    }
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
-                    .padding(.top, theme.spacing.micro)
-                }
-                .font(theme.typography.caption)
+                    }.font(theme.typography.secondary).padding(.top, theme.spacing.small)
+                }.font(theme.typography.secondary)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, theme.spacing.micro)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func fundHeading(_ fund: InvestmentFundSummary) -> some View {
+    @ViewBuilder private func selectedPrice(_ fund: InvestmentFundSummary, now: Date) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text(fund.name).font(theme.typography.rowTitle)
-            Text("Identifier · \(fund.displayIdentifier)")
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
+            Text("NAV / price").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text(fund.quote.map { MoneyFormatting.unitPrice($0.price.sourceText, currency: $0.mapping.currency) } ?? "Unavailable")
+                .font(theme.typography.headlineMoney).monospacedDigit().fixedSize()
+        }.frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text("NAV / price date").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text(fund.quote.map { InvestmentPriceDates.display($0.valuationDay) } ?? "Unavailable")
+                .font(theme.typography.rowTitle).monospacedDigit().fixedSize()
+                .foregroundStyle(fund.quote.map { freshnessColor($0.freshnessAge(at: now)) } ?? theme.palette.secondaryText)
         }
     }
 
-    @ViewBuilder
-    private func fundWideContent(
-        _ fund: InvestmentFundSummary,
-        positions: [InvestmentHolding],
-        sharedDate: String?,
-        now: Date
-    ) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
-                valueAndPriceColumn(fund, now: now)
-                    .frame(minWidth: max(220, moneyColumnWidth(fund.scope, field: \.value, emphasized: true)), maxWidth: .infinity, alignment: .leading)
-                policyPositionsColumn(fund, positions: positions, sharedDate: sharedDate)
-                    .frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
-                if portfolio.group == .isp {
-                    contributionStrategyColumn(fund, positions: positions)
-                        .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
-                } else {
-                    performanceColumn(fund)
-                        .frame(minWidth: max(240, max(moneyColumnWidth(fund.scope, field: \.cost), moneyColumnWidth(fund.scope, field: \.gain))), maxWidth: .infinity, alignment: .leading)
-                }
+    private func policyColor(_ holding: InvestmentHolding) -> Color {
+        let policies = containers.filter { $0.zioSource != nil }.sorted { $0.identity < $1.identity }
+        let index = policies.firstIndex(where: { $0.id == holding.containerID }) ?? 0
+        return investmentAllocationColor(index == 0 ? 1 : index == 1 ? 0 : index, theme: theme)
+    }
+
+    private func policyUnitShares(_ positions: [InvestmentHolding], fund: InvestmentFundSummary) -> [String: InvestmentAllocationShare] {
+        guard let total = fund.units, total > 0,
+              !positions.isEmpty, Set(positions.map(\.id)) == Set(fund.holdingIDs),
+              positions.allSatisfy({ $0.units.value >= 0 }),
+              let sum = try? positions.reduce(Decimal.zero, { try InvestmentArithmetic.add($0, $1.units.value) }),
+              sum == total else { return [:] }
+        let shares = positions.compactMap { holding -> (String, InvestmentAllocationShare)? in
+            InvestmentAllocationShare.units(holding.units.value, of: total).map { (holding.id, $0) }
+        }
+        guard shares.count == positions.count else { return [:] }
+        return Dictionary(uniqueKeysWithValues: shares)
+    }
+
+    private func policyUnitAllocation(_ positions: [InvestmentHolding], fund: InvestmentFundSummary) -> some View {
+        let shares = policyUnitShares(positions, fund: fund)
+        let unitsWidth = max(80, investmentTextWidth(positions.map { $0.units.sourceText }, role: .body, theme: theme))
+        let shareWidth = max(85, investmentTextWidth(shares.values.map(\.label), role: .body, theme: theme))
+        let regularWidth = max(95, investmentTextWidth(positions.map { regularSplit($0, fund: fund) }, role: .body, theme: theme))
+        return VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                Text("Policy unit allocation").font(theme.typography.rowTitle)
+                Text("Share of this fund’s \(fund.unitsText) units")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                valueAndPriceColumn(fund, now: now)
-                policyPositionsColumn(fund, positions: positions, sharedDate: sharedDate)
-                if portfolio.group == .isp {
-                    contributionStrategyColumn(fund, positions: positions)
-                } else {
-                    performanceColumn(fund)
-                }
-            }
-        }
-    }
-
-    private func valueAndPriceColumn(_ fund: InvestmentFundSummary, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.small) {
-            currentValue(fund)
-            Text("\(fund.unitsText) units")
-                .font(theme.typography.secondary)
-                .monospacedDigit()
-            navPrice(fund, now: now)
-        }
-    }
-
-    private func policyPositionsColumn(
-        _ fund: InvestmentFundSummary,
-        positions: [InvestmentHolding],
-        sharedDate: String?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.small) {
-            Text(sharedDate.map { "\(positions.first?.sourceDateLabel ?? "Source date") \($0)" }
-                 ?? (portfolio.group == .isp ? "Policy positions and source dates" : "Positions and source dates"))
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
-            ForEach(positions) { holding in
-                compositionRow(holding, showsDate: sharedDate == nil)
-            }
-        }
-    }
-
-    private func contributionStrategyColumn(
-        _ fund: InvestmentFundSummary,
-        positions: [InvestmentHolding]
-    ) -> some View {
-        let strategies = observedStrategies(for: fund, positions: positions)
-        return VStack(alignment: .leading, spacing: theme.spacing.small) {
-            Text("Regular contribution split")
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
-            if !strategies.isEmpty {
-                ForEach(strategies, id: \.self) { strategy in
-                    Text(strategy)
-                        .font(theme.typography.secondary)
-                        .foregroundStyle(theme.palette.primaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else if let strategy = fund.contributionStrategy {
-                Text(strategy)
-                    .font(theme.typography.secondary)
-                    .foregroundStyle(theme.palette.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+            if shares.count == positions.count, !positions.isEmpty {
+                GeometryReader { geometry in
+                    HStack(spacing: 2) {
+                        ForEach(positions) { holding in
+                            if let share = shares[holding.id] {
+                                Rectangle().fill(policyColor(holding))
+                                    .frame(width: max(0, geometry.size.width - CGFloat(positions.count - 1) * 2) * share.fraction)
+                            }
+                        }
+                    }
+                }.frame(height: 16).clipShape(RoundedRectangle(cornerRadius: 4)).accessibilityHidden(true)
             } else {
-                Text("No regular contribution split reported.")
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
+                Text("Unit allocation unavailable")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
+            ViewThatFits(in: .horizontal) {
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    HStack(spacing: theme.spacing.controlGap) {
+                        Text("Policy").frame(width: 170, alignment: .leading)
+                        Text("Units").frame(width: unitsWidth, alignment: .trailing)
+                        Text("Unit share").frame(width: shareWidth, alignment: .trailing)
+                        Text("Regular split").frame(width: regularWidth, alignment: .trailing)
+                    }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    ForEach(positions) { holding in
+                        VStack(alignment: .leading, spacing: theme.spacing.small) {
+                            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                                policyIdentity(holding).frame(width: 170, alignment: .leading)
+                                Text(holding.units.sourceText).font(theme.typography.body).monospacedDigit().fixedSize()
+                                    .frame(width: unitsWidth, alignment: .trailing)
+                                Text(shares[holding.id]?.label ?? "Unavailable").font(theme.typography.body.weight(.semibold))
+                                    .monospacedDigit().foregroundStyle(policyColor(holding)).fixedSize()
+                                    .frame(width: shareWidth, alignment: .trailing)
+                                Text(regularSplit(holding, fund: fund)).font(theme.typography.body).monospacedDigit().fixedSize()
+                                    .frame(width: regularWidth, alignment: .trailing)
+                            }
+                            policySourceDetails(holding)
+                        }.padding(.vertical, theme.spacing.small)
+                        Divider()
+                    }
+                }.fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    ForEach(positions) { holding in
+                        policyIdentity(holding)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                                policyMetrics(holding, fund: fund, share: shares[holding.id])
+                            }
+                            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                policyMetrics(holding, fund: fund, share: shares[holding.id])
+                            }
+                        }
+                        policySourceDetails(holding)
+                        Divider()
+                    }
+                }
+            }
+            policyDates(positions, fund: fund)
         }
     }
 
-    private func observedStrategies(
-        for fund: InvestmentFundSummary,
-        positions: [InvestmentHolding]
-    ) -> [String] {
-        let values = positions.compactMap { holding -> String? in
-            guard let policy = containers.first(where: { $0.id == holding.containerID })?.zioSource,
-                  let strategy = policy.regularStrategy.first(where: { $0.code == fund.code }) else { return nil }
-            return "\(policy.displayName) · \(strategy.percentage.sourceText)% · effective \(InvestmentPriceDates.display(strategy.effectiveDay))"
+    private func policyIdentity(_ holding: InvestmentHolding) -> some View {
+        let container = containers.first { $0.id == holding.containerID }
+        return VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
+                Circle().fill(policyColor(holding)).frame(width: 7, height: 7).accessibilityHidden(true)
+                Text(container?.zioSource?.displayName ?? container?.displayName ?? "Policy unavailable")
+                    .font(theme.typography.body.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Policy " + (container?.identity ?? "Unavailable"))
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
         }
-        return Array(Set(values)).sorted()
+    }
+
+    private func regularSplit(_ holding: InvestmentHolding, fund: InvestmentFundSummary) -> String {
+        containers.first(where: { $0.id == holding.containerID })?.zioSource?.regularStrategy
+            .first(where: { $0.code == fund.code }).map { $0.percentage.sourceText + "%" } ?? "Not reported"
+    }
+
+    @ViewBuilder private func policyMetrics(_ holding: InvestmentHolding, fund: InvestmentFundSummary, share: InvestmentAllocationShare?) -> some View {
+        metric("Units", holding.units.sourceText)
+        metric("Unit share", share?.label)
+        metric("Regular split", regularSplit(holding, fund: fund))
+    }
+
+    private func policySourceDetails(_ holding: InvestmentHolding) -> some View {
+        DisclosureGroup("Source details") {
+            InvestmentHoldingInlineDetails(holding: holding, valuation: valuations[holding.id],
+                container: containers.first { $0.id == holding.containerID },
+                portfolioName: portfolioNames[holding.containerID] ?? "Unavailable")
+                .padding(.top, theme.spacing.small)
+        }.font(theme.typography.secondary)
+            .accessibilityLabel("Source details for " + (portfolioNames[holding.containerID] ?? "policy"))
+    }
+
+    private func policyDates(_ positions: [InvestmentHolding], fund: InvestmentFundSummary) -> some View {
+        let policies = positions.compactMap { holding in containers.first { $0.id == holding.containerID }?.zioSource }
+        let valuationDays = Set(policies.map(\.valuationDay)).sorted()
+        let splitDays = Set(policies.compactMap { $0.regularStrategy.first { $0.code == fund.code }?.effectiveDay }).sorted()
+        return VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            if !valuationDays.isEmpty {
+                Text("Portal valuation: " + valuationDays.map(InvestmentPriceDates.display).joined(separator: ", "))
+            }
+            if !splitDays.isEmpty {
+                Text("Split effective: " + splitDays.map(InvestmentPriceDates.display).joined(separator: ", "))
+            }
+        }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+    }
+
+    private func positionDetail(_ holding: InvestmentHolding, fund: InvestmentFundSummary) -> some View {
+        let container = containers.first { $0.id == holding.containerID }
+        let policy = container?.zioSource
+        let strategy = policy?.regularStrategy.first { $0.code == fund.code }
+        return VStack(alignment: .leading, spacing: theme.spacing.small) {
+            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                    Text(policy?.displayName ?? container?.displayName ?? "Portfolio unavailable").font(theme.typography.body)
+                    Text((portfolio.group == .isp ? "Policy " : "Portfolio / Folio ") + (container?.identity ?? "Unavailable"))
+                        .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .trailing, spacing: theme.spacing.micro) {
+                    Text("Units").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    Text(holding.units.sourceText).font(theme.typography.body).monospacedDigit().fixedSize()
+                }
+                if portfolio.group == .isp {
+                    VStack(alignment: .trailing, spacing: theme.spacing.micro) {
+                        Text("Regular split").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                        Text(strategy.map { $0.percentage.sourceText + "%" } ?? "Not reported")
+                            .font(theme.typography.body).monospacedDigit().fixedSize()
+                    }
+                }
+            }
+            Text(holding.sourceDateLabel + " " + InvestmentPriceDates.display(holding.holdingsDate))
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            if let strategy {
+                Text("Contribution split effective " + InvestmentPriceDates.display(strategy.effectiveDay))
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            } else if portfolio.group == .isp, policy == nil, let strategy = fund.contributionStrategy {
+                Text(strategy).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+            DisclosureGroup("Source details") {
+                InvestmentHoldingInlineDetails(holding: holding, valuation: valuations[holding.id], container: container,
+                    portfolioName: portfolioNames[holding.containerID] ?? "Unavailable")
+                    .padding(.top, theme.spacing.small)
+            }.font(theme.typography.secondary)
+        }.padding(.vertical, theme.spacing.small)
+    }
+
+    private func moveFund(from id: String, by step: Int, proxy: ScrollViewProxy) {
+        guard let index = portfolio.funds.firstIndex(where: { $0.id == id }), portfolio.funds.indices.contains(index + step) else { return }
+        let next = portfolio.funds[index + step].id
+        selection = next; focusedFund = next; proxy.scrollTo(next, anchor: .center)
+    }
+
+    private var policyDetails: some View {
+        DisclosureGroup("Policy contributions and portal details") {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                ForEach(containers.filter { $0.zioSource != nil }) { container in
+                    if let policy = container.zioSource {
+                        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                            Text(container.displayName + " · " + container.identity).font(theme.typography.rowTitle)
+                            Text("Contributions \(InvestmentArithmetic.displayedMoney(policy.contributions.amount.value, currency: policy.currency)) · Portal value \(InvestmentArithmetic.displayedMoney(policy.value.amount.value, currency: policy.currency)) · Reported growth \(InvestmentArithmetic.displayedMoney(policy.growth.amount.value, currency: policy.currency))")
+                            if let pending = policy.pendingAllocation, pending > 0, let allocated = policy.allocatedContributions {
+                                Text("Allocated contributions \(InvestmentArithmetic.displayedMoney(allocated.amount.value, currency: policy.currency)) · Pending allocation \(InvestmentArithmetic.displayedMoney(pending, currency: policy.currency))")
+                            }
+                            if let vested = policy.vestedValue {
+                                Text("Vested value \(InvestmentArithmetic.displayedMoney(vested.amount.value, currency: policy.currency))")
+                            }
+                            Text("Portal valuation \(InvestmentPriceDates.display(policy.valuationDay)) · fetched \(AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
+                                .foregroundStyle(theme.palette.secondaryText)
+                        }
+                    }
+                }
+                Text("These are policy-level source totals. They do not establish fund acquisition costs. The portal does not supply a separate units-as-of date.")
+                    .foregroundStyle(theme.palette.secondaryText)
+            }.font(theme.typography.caption).padding(.top, theme.spacing.small)
+        }.font(theme.typography.secondary)
     }
 
     private func performanceColumn(_ fund: InvestmentFundSummary) -> some View {
@@ -611,12 +1168,12 @@ struct InvestmentPortfolioDetailView: View {
 
     private func fundStatus(_ scope: InvestmentOverviewScope, now: Date) -> some View {
         let priced = scope.priceCount == scope.holdingCount
-            ? "\(scope.holdingCount) \(scope.holdingCount == 1 ? "position" : "positions") priced"
-            : "Partial: \(scope.priceCount)/\(scope.holdingCount) positions priced"
+            ? "\(scope.priceCount)/\(scope.holdingCount) prices available"
+            : "Partial: \(scope.priceCount)/\(scope.holdingCount) prices available"
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(priced).foregroundStyle(theme.palette.secondaryText)
             if scope.fxMissing {
-                Text("FX incomplete · native values remain available in the holdings table")
+                Text("Currency conversion incomplete · original values remain available in the holdings table")
                     .foregroundStyle(theme.palette.secondaryText)
             }
             if let oldestFX = scope.fxDates.min() {
@@ -657,9 +1214,9 @@ struct InvestmentPortfolioDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-            currencyValues(scope, field: field, profit: profit)
+            currencyValues(scope, field: field, profit: profit, emphasized: true)
         }
-        .frame(minWidth: moneyColumnWidth(scope, field: field), maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: moneyColumnWidth(scope, field: field, emphasized: true), maxWidth: .infinity, alignment: .leading)
     }
 
     private func returnAndShares(_ fund: InvestmentFundSummary) -> some View {
@@ -703,7 +1260,7 @@ struct InvestmentPortfolioDetailView: View {
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             ForEach(ordered) { line in
                 let amount = line[keyPath: field]?.covering(expectedCount)
-                Text(amount?.display ?? "—")
+                Text(amount?.display ?? "Unavailable")
                         .font(emphasized && line.currency == primary ? theme.typography.headlineMoney : theme.typography.tableMoney)
                         .monospacedDigit()
                         .foregroundStyle(profit ? amount.map { profitColor($0.numerator.sign) } ?? theme.palette.secondaryText : (line.currency == primary ? theme.palette.primaryText : theme.palette.secondaryText))

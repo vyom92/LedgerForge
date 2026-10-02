@@ -29,7 +29,7 @@ struct CategoryRulesView: View {
     @State private var baseline = Self.blankRule()
     @State private var previousVersion: Int?
     @State private var generation: ProviderGenerationToken?
-    @State private var preview: CategoryEvaluation?
+    @State private var preview: CategoryHistoricalPreview?
     @State private var showUnchangedPreview = false
     @State private var isPreviewing = false
     @State private var message: String?
@@ -73,7 +73,7 @@ struct CategoryRulesView: View {
                 if isPreviewing { ProgressView().controlSize(.small) }
                 Spacer()
                 if let preview {
-                    Text("\(preview.decisions.filter { $0.outcome == .assigned }.count) assignments · \(preview.decisions.filter { $0.outcome == .conflict }.count) conflicts")
+                    Text("\(preview.decisions.filter { $0.outcome == .assigned }.count) assignments · \(preview.removalCount) removals · \(preview.decisions.filter { $0.outcome == .conflict }.count) conflicts")
                         .font(theme.typography.formCaption)
                     Button("Apply reviewed results") { request(.transactionCategoryAssignment, action: applyPreview) }
                         .buttonStyle(.borderedProminent)
@@ -81,7 +81,7 @@ struct CategoryRulesView: View {
                 }
             }
             if let preview {
-                Toggle("Show \(preview.decisions.filter { $0.outcome == .noMatch || $0.outcome == .protected }.count) unchanged results", isOn: $showUnchangedPreview)
+                Toggle("Show \(preview.unchangedCount) unchanged results", isOn: $showUnchangedPreview)
                     .font(theme.typography.formCaption)
                 previewList(preview).frame(minHeight: 140, maxHeight: 230)
             }
@@ -114,6 +114,8 @@ struct CategoryRulesView: View {
         }
         .onChange(of: draft) { _, _ in draftOwner.isDirty = draft != baseline }
         .onChange(of: categories.snapshot.rulesForDisplay) { _, _ in preview = nil }
+        .onChange(of: categories.snapshot.assignments) { _, _ in preview = nil }
+        .onChange(of: categories.snapshot.automation?.intents) { _, _ in preview = nil }
         .onChange(of: categories.snapshot.providerGeneration) { _, value in
             if value != generation { preview = nil; message = "The ledger changed. Close this editor and reopen it before saving." }
         }
@@ -197,15 +199,11 @@ struct CategoryRulesView: View {
                     Button("Create") { request(.categoryCreate) { perform { _ = try CategoryManagementCoordinator().create(name: newCategoryName); newCategoryName = "" } } }
                 }
             }
-            Picker("Account", selection: $draft.accountID) {
-                Text("Any account").tag(String?.none)
-                ForEach(accounts.accounts.filter { $0.repositoryAccountId != nil }) { account in
-                    Text([account.preferredDisplayName,
-                          account.sourceAccountLabel ?? account.identitySummaries.first?.redactedValue,
-                          account.nativeCurrency.code].compactMap { $0 }.joined(separator: " · "))
-                        .tag(account.repositoryAccountId)
-                }
-            }
+            LFAccountPicker(label: "Account", placeholder: "Any account",
+                selection: Binding(get: { draft.accountID ?? "" }, set: { draft.accountID = $0.isEmpty ? nil : $0 }),
+                options: accounts.accounts.filter { $0.repositoryAccountId != nil }.map {
+                    .init(id: $0.repositoryAccountId!, title: $0.preferredDisplayName, detail: $0.selectionContext)
+                })
             HStack(spacing: 16) {
                 Picker("Currency", selection: $draft.currency) {
                     Text("Any").tag(String?.none)
@@ -243,11 +241,11 @@ struct CategoryRulesView: View {
         }
     }
 
-    private func previewList(_ value: CategoryEvaluation) -> some View {
+    private func previewList(_ value: CategoryHistoricalPreview) -> some View {
         let byID = Dictionary(uniqueKeysWithValues: transactions.compactMap { transaction in transaction.repositoryTransactionId.map { ($0, transaction) } })
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(value.decisions.filter { showUnchangedPreview || ($0.outcome != .noMatch && $0.outcome != .protected) }.sorted {
+                ForEach(value.decisions.filter { showUnchangedPreview || !value.isUnchanged($0) }.sorted {
                     let left = byID[$0.transactionID]?.statementDate?.canonical ?? ""
                     let right = byID[$1.transactionID]?.statementDate?.canonical ?? ""
                     return left == right ? $0.transactionID < $1.transactionID : left > right
@@ -256,13 +254,17 @@ struct CategoryRulesView: View {
                         DisclosureGroup {
                             Text(transaction.description).textSelection(.enabled)
                             Text(decision.explanation).foregroundStyle(theme.palette.secondaryText)
-                            Text("Current: " + (categories.category(forTransactionID: decision.transactionID)?.name ?? "Uncategorized"))
+                            Text("Current: " + (value.assignments[decision.transactionID].flatMap { id in categories.categories.first { $0.id == id }?.name } ?? "Uncategorized"))
+                            if value.removesCategory(decision) {
+                                Text("Applying these results will remove the automatic category.")
+                            }
                         } label: {
                             HStack {
                                 Text(transaction.statementDate?.presentation ?? "Date unavailable").frame(width: 84, alignment: .leading)
-                                Text(transaction.account).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(accounts.accounts.first { $0.repositoryAccountId == transaction.repositoryAccountId }?.preferredDisplayName ?? transaction.account)
+                                    .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                                 Text(transaction.signedAmountDisplay).monospacedDigit().frame(width: 140, alignment: .trailing)
-                                Text(decision.categoryID.flatMap { id in categories.categories.first { $0.id == id }?.name } ?? decision.outcome.displayTitle).frame(width: 155, alignment: .leading)
+                                Text(value.removesCategory(decision) ? "Remove category" : (decision.categoryID.flatMap { id in categories.categories.first { $0.id == id }?.name } ?? decision.outcome.displayTitle)).frame(width: 155, alignment: .leading)
                             }
                         }.padding(.vertical, 6).font(theme.typography.formCaption)
                         Divider()
@@ -294,16 +296,18 @@ struct CategoryRulesView: View {
                 CategoryEvaluation.evaluate(inputs: inputs, snapshot: metadata, assignments: snapshot.assignments, activeCategoryIDs: active)
             }.value
             isPreviewing = false
-            guard categories.snapshot.providerGeneration == generation, snapshot.rulesForDisplay == categories.snapshot.rulesForDisplay else {
+            guard categories.snapshot.providerGeneration == generation, snapshot.rulesForDisplay == categories.snapshot.rulesForDisplay,
+                  snapshot.assignments == categories.snapshot.assignments, metadata.intents == categories.snapshot.automation?.intents else {
                 message = "The ledger or rules changed. Create a fresh preview."; return
             }
-            preview = result
+            preview = CategoryHistoricalPreview(evaluation: result, assignments: snapshot.assignments, intents: metadata.intents)
         }
     }
     private func applyPreview() {
         perform {
-            guard let preview, let generation else { throw CategoryAutomationError.stalePreview }
-            _ = try CategoryManagementCoordinator().applyEvaluation(preview, historical: true, expectedGeneration: generation)
+            guard let preview, let generation, let metadata = categories.snapshot.automation,
+                  preview.matches(assignments: categories.snapshot.assignments, intents: metadata.intents) else { throw CategoryAutomationError.stalePreview }
+            _ = try CategoryManagementCoordinator().applyEvaluation(preview.evaluation, historical: true, expectedGeneration: generation)
             self.preview = nil; message = "Reviewed category results saved. Manual choices were preserved."
         }
     }

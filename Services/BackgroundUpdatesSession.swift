@@ -16,10 +16,11 @@ final class BackgroundUpdatesSession: ObservableObject {
     @Published private(set) var nextUpdate: Date?
     @Published private(set) var jobRecords: [BackgroundJobKind: BackgroundJobRecord] = [:]
     private let service = BackgroundWorkerService()
-    private let enrollmentStore = BackgroundEnrollmentStore()
+    private let enrollmentStore: BackgroundEnrollmentStore
     private let workerControl = BackgroundWorkerControlClient()
     private var provider: SQLiteRepositoryProvider?
     private var executor: BackgroundUpdateExecutor?
+    private var executorActivation: LedgerActivationStamp?
     private var executorEnrollmentRevision: UUID?
     private var unavailableHelperRevision: UUID?
     private var publicRequests = BackgroundPublicControlQueue()
@@ -28,18 +29,23 @@ final class BackgroundUpdatesSession: ObservableObject {
     private weak var rates: AlDarReferenceSession?
     private weak var prices: InvestmentPriceSession?
     private weak var isp: ZurichISPSyncSession?
+    private weak var ibkr: IBKRFlexSyncSession?
     private weak var online: OnlineRefreshCoordinator?
     private var observations: [AnyCancellable] = []
     private var automaticTask: Task<Void, Never>?
     private var publicTask: Task<Void, Never>?
     private var ispTask: Task<Void, Never>?
+    private var ispRequest: ZurichISPRefreshRequest?
+    private var ibkrTask: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     private var reloadTask: Task<Void, Never>?
     private var reloadInProgress = false
     private var started = false
     private let networkEnabled: Bool
 
-    init(networkEnabled: Bool = ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1") {
+    init(networkEnabled: Bool = ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1",
+         enrollmentStore: BackgroundEnrollmentStore = .init()) {
+        self.enrollmentStore = enrollmentStore
 #if DEBUG
         self.networkEnabled = networkEnabled && ProcessInfo.processInfo.environment["LEDGERFORGE_BACKGROUND_NETWORK_DISABLED"] != "1"
 #else
@@ -47,10 +53,14 @@ final class BackgroundUpdatesSession: ObservableObject {
 #endif
     }
 
+#if DEBUG
+    var executorForTesting: BackgroundUpdateExecutor? { executor }
+#endif
+
     func start(rates: AlDarReferenceSession, prices: InvestmentPriceSession,
-               isp: ZurichISPSyncSession, online: OnlineRefreshCoordinator) {
+               isp: ZurichISPSyncSession, online: OnlineRefreshCoordinator, ibkr: IBKRFlexSyncSession? = nil) {
         guard !started else { return }
-        started = true; self.rates = rates; self.prices = prices; self.isp = isp; self.online = online
+        started = true; self.rates = rates; self.prices = prices; self.isp = isp; self.online = online; self.ibkr = ibkr
         observations = [
             DistributedNotificationCenter.default().publisher(for: BackgroundUpdateExecutor.didPublishNotification)
                 .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.queueReload() },
@@ -62,7 +72,7 @@ final class BackgroundUpdatesSession: ObservableObject {
         ]
         observations.append(FinancialIntelligenceStore.shared.$snapshot.dropFirst().removeDuplicates().sink { [weak self] _ in self?.queueReload() })
         reload()
-        isp.start()
+        isp.start(); ibkr?.start()
     }
 
     private func queueReload() {
@@ -97,11 +107,13 @@ final class BackgroundUpdatesSession: ObservableObject {
             let managed = available && configuration.enabled && matching && service.status() == .enabled
                 && enrolled?.revision != unavailableHelperRevision
             let revision = managed ? enrolled?.revision : nil
-            if changed || activeSchedule != managed || executor == nil || executorEnrollmentRevision != revision {
+            // Relaunch confirmation can adopt a new activation on the same provider.
+            if changed || activeSchedule != managed || executor == nil || executorEnrollmentRevision != revision || executorActivation != activation {
                 cancelExecution()
                 executor = BackgroundUpdateExecutor(provider: current, activation: activation, workspaceID: "default-workspace",
                     enrollment: managed ? enrolled : nil)
                 executorEnrollmentRevision = revision
+                executorActivation = activation
             }
             installSharedHandlers(true)
             activeSchedule = managed
@@ -152,25 +164,28 @@ final class BackgroundUpdatesSession: ObservableObject {
             rates?.sharedRefresh = { [weak self] manual in self?.requestPublic(rates: true, prices: false, manual: manual) }
             rates?.sharedRefreshAll = { [weak self] manual in self?.requestPublic(rates: true, prices: true, manual: manual) }
             prices?.sharedRefresh = { [weak self] in self?.requestPublic(rates: false, prices: true, manual: true) }
-            isp?.sharedHoldingsRefresh = { [weak self] manual in self?.requestISP(manual: manual) }
+            if let isp {
+                installSharedISPHandlers(on: isp) { [weak self] manual in self?.requestISP(manual: manual) }
+            }
         } else {
             rates?.sharedRefresh = nil; rates?.sharedRefreshAll = nil
-            prices?.sharedRefresh = nil; isp?.sharedHoldingsRefresh = nil
+            prices?.sharedRefresh = nil; isp?.sharedHoldingsRefresh = nil; isp?.sharedHoldingsCancel = nil
         }
     }
 
     private func cancelExecution() {
         executionID = UUID()
-        automaticTask?.cancel(); publicTask?.cancel(); ispTask?.cancel(); timer?.cancel()
-        automaticTask = nil; publicTask = nil; ispTask = nil; timer = nil; nextUpdate = nil
+        automaticTask?.cancel(); publicTask?.cancel(); ibkrTask?.cancel(); timer?.cancel()
+        invalidateISPRequest()
+        automaticTask = nil; publicTask = nil; ibkrTask = nil; timer = nil; nextUpdate = nil
         publicRequests = BackgroundPublicControlQueue()
         busyPublicScopes = []
-        isp?.sharedRefreshState(busy: false, message: nil)
+        ibkr?.sharedRefreshState(busy: false, message: nil)
     }
 
     private func clearExecutor() {
         cancelExecution()
-        executor = nil; provider = nil; executorEnrollmentRevision = nil
+        executor = nil; provider = nil; executorEnrollmentRevision = nil; executorActivation = nil
     }
 
     private func installSharedState(_ current: SQLiteRepositoryProvider) {
@@ -316,20 +331,84 @@ final class BackgroundUpdatesSession: ObservableObject {
         }
     }
 
+    /// The production handler and source-independent ownership tests use the
+    /// same command wiring, without starting a provider or reading credentials.
+    func installSharedISPHandlers(on session: ZurichISPSyncSession,
+                                  refresh: @escaping @MainActor (Bool) -> Void) {
+        isp = session
+        session.sharedHoldingsRefresh = refresh
+        session.sharedHoldingsCancel = { [weak self] silent in self?.cancelISPRequest(silent: silent) ?? false }
+    }
+
     private func requestISP(manual: Bool, salaryCheck: Bool = false) {
         guard networkEnabled, ispTask == nil, let executor, ApplicationAvailability.shared.permitsMutation else { return }
         var value = configuration
         if !activeSchedule { value.zurichISPRule = .monthly(daysUTC: [5], timesUTC: [0]) }
-        let executionID = executionID
+        let requestConfiguration = value
+        startISPRequest { request in
+            await executor.refreshISP(configuration: requestConfiguration, manual: manual, salaryCheck: salaryCheck, request: request)
+        } completion: { [weak self] outcome in
+            // A user-cancelled request must not immediately restart itself via
+            // reload's automatic due path. Independent opportunities stay intact.
+            if outcome != .cancelled { self?.reload() }
+        }
+    }
+
+    func startISPRequest(_ operation: @escaping @Sendable (ZurichISPRefreshRequest) async -> BackgroundUpdateExecutor.Outcome,
+                         completion: (@MainActor @Sendable (BackgroundUpdateExecutor.Outcome) -> Void)? = nil) {
+        guard ispTask == nil else { return }
+        let request = ZurichISPRefreshRequest()
+        ispRequest = request
         isp?.sharedRefreshState(busy: true, message: "Updating ISP holdings…")
-        ispTask = Task { [weak self] in
-            let outcome = await executor.refreshISP(configuration: value, manual: manual, salaryCheck: salaryCheck)
-            if case .ispFailed(let explanation) = outcome {
-                DeveloperConsole.shared.error(.runtime, explanation)
-            }
+        ispTask = Task { @concurrent [weak self] in
+            let outcome = await operation(request)
+            await self?.finishISPRequest(request, outcome: outcome, completion: completion)
+        }
+    }
+
+    private func finishISPRequest(_ request: ZurichISPRefreshRequest, outcome: BackgroundUpdateExecutor.Outcome,
+                                  completion: (@MainActor @Sendable (BackgroundUpdateExecutor.Outcome) -> Void)?) {
+        guard ispRequest === request else { return }
+        let resolved = request.resolved(outcome)
+        ispRequest = nil; ispTask = nil
+        if case .ispFailed(let explanation) = resolved { DeveloperConsole.shared.error(.runtime, explanation) }
+        isp?.sharedRefreshState(busy: false, message: Self.summary(resolved))
+        completion?(resolved)
+    }
+
+    private func cancelISPRequest(silent: Bool) -> Bool {
+        guard let request = ispRequest else { return false }
+        if request.cancel() {
+            // This task owns the structured client fetch and URLSession read.
+            // Never reset an executor-wide client or cancel another job.
+            ispTask?.cancel()
+            isp?.sharedRefreshState(busy: true, message: silent ? nil : "Cancelling ISP update…")
+        } else {
+            isp?.sharedRefreshState(busy: true, message: silent ? nil : "ISP holdings were already updated. Finishing the refresh…")
+        }
+        // Keep admission busy until the request has released its job lease.
+        return true
+    }
+
+    @discardableResult
+    func invalidateISPRequest() -> Task<Void, Never>? {
+        let previous = ispTask
+        ispRequest?.cancel(); previous?.cancel()
+        ispRequest = nil; ispTask = nil
+        isp?.sharedRefreshState(busy: false, message: nil)
+        return previous
+    }
+
+    private func requestIBKR() {
+        guard networkEnabled, ibkrTask == nil, let executor, configuration.ibkrFlexHoldingsEnabled,
+              ApplicationAvailability.shared.permitsMutation else { return }
+        let value = configuration, executionID = executionID
+        ibkr?.sharedRefreshState(busy: true, message: "Updating IBKR holdings…")
+        ibkrTask = Task { [weak self] in
+            let outcome = await executor.refreshIBKR(configuration: value, manual: false)
             guard let self, self.executionID == executionID else { return }
-            self.ispTask = nil
-            self.isp?.sharedRefreshState(busy: false, message: Self.summary(outcome))
+            self.ibkrTask = nil
+            self.ibkr?.sharedRefreshState(busy: false, message: Self.summary(outcome, kind: .ibkrFlex))
             self.reload()
         }
     }
@@ -337,17 +416,17 @@ final class BackgroundUpdatesSession: ObservableObject {
     private func armTimer() {
         timer?.cancel()
         nextUpdate = nil
-        guard networkEnabled, let executor, let provider else { return }
+        guard networkEnabled, let executor, provider != nil else { return }
         let value = configuration, active = activeSchedule, executionID = executionID
         timer = Task { [weak self] in
             do {
                 let target: Date?
                 if active { target = try await executor.nextAutomaticTarget(configuration: value) }
                 else {
-                    let publicTarget = try BackgroundPublicProgressStore(database: provider.database).load().values
-                        .filter { !$0.succeeded && $0.attempts < 2 }.compactMap(\.retryAt).min()
+                    let publicTarget = try await executor.nextPublicRetry()
                     let salaryTarget = try await executor.nextSalaryISPCheck()
-                    target = [publicTarget, salaryTarget].compactMap { $0 }.min()
+                    let ibkrTarget = try await executor.nextIBKRTarget(configuration: value)
+                    target = [publicTarget, salaryTarget, ibkrTarget].compactMap { $0 }.min()
                 }
                 guard let target, !Task.isCancelled, let self, self.executionID == executionID else { return }
                 self.nextUpdate = target
@@ -357,19 +436,59 @@ final class BackgroundUpdatesSession: ObservableObject {
                 else {
                     self.requestPublic(rates: true, prices: true, manual: false, retryOnly: true)
                     self.requestISP(manual: false, salaryCheck: true)
+                    self.requestIBKR()
                 }
             } catch { }
         }
     }
 
+    /// An IBKR schedule edit must not enroll an inactive ledger or turn on
+    /// unrelated background scopes. An already-active helper uses its existing
+    /// settings-change lifecycle so it reloads the new cadence.
+    func saveIBKRSchedule(enabled: Bool, rule: BackgroundScheduleRule,
+                          replacing baseline: BackgroundScheduleConfiguration,
+                          completion: ((Bool) -> Void)? = nil) {
+        guard !isSaving, available, let provider else { completion?(false); return }
+        var value = baseline
+        value.ibkrFlexHoldingsEnabled = enabled
+        value.ibkrFlexRule = rule
+        if activeSchedule {
+            save(value, replacing: baseline, completion: completion)
+            return
+        }
+        isSaving = true; message = nil
+        var saved = false
+        defer { isSaving = false; reload(); completion?(saved) }
+        do {
+            _ = try value.validated()
+            guard DatabaseProvider.shared.generationToken == provider.generationToken else {
+                throw LedgerAccessError.staleActivation
+            }
+            try provider.database.withExclusiveAccess {
+                guard try provider.backgroundScheduleRepo.configuration() == baseline else {
+                    throw LedgerAccessError.staleActivation
+                }
+                try provider.backgroundScheduleRepo.saveConfiguration(value)
+            }
+            configuration = value
+            saved = true
+            message = enabled ? "IBKR weekly schedule saved." : "IBKR weekly refresh turned off."
+        } catch {
+            message = "IBKR schedule could not be saved: \(error.localizedDescription)"
+        }
+    }
+
     func save(_ value: BackgroundScheduleConfiguration, replacing baseline: BackgroundScheduleConfiguration,
-              authorizeConnections: Bool = false) {
-        guard !isSaving, available, let provider else { return }
+              authorizeConnections: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        guard !isSaving, available, let provider else { completion?(false); return }
         isSaving = true; message = nil
         Task { [weak self] in
             guard let self else { return }
-            defer { self.isSaving = false; self.reload() }
             var settingsSaved = false
+            defer {
+                self.isSaving = false; self.reload()
+                completion?(settingsSaved && DatabaseProvider.shared.generationToken == provider.generationToken)
+            }
             do {
                 _ = try value.validated()
                 let activation = try provider.database.validatedActivationStamp()
@@ -408,13 +527,14 @@ final class BackgroundUpdatesSession: ObservableObject {
         }
     }
 
-    static func summary(_ outcome: BackgroundUpdateExecutor.Outcome) -> String {
+    static func summary(_ outcome: BackgroundUpdateExecutor.Outcome, kind: BackgroundJobKind = .zurichISP) -> String {
         switch outcome {
         case .alreadyRunning: "This update is already running. The view will refresh when it finishes."
         case .notDue: "Already up to date for this schedule."
         case .authorityRefused: "The ledger changed or is unavailable. Previous data is retained."
-        case .ispFailed(let message): message
-        case .completed(.committedCurrentHoldings): "ISP holdings updated."
+        case .cancelled: "Cancelled. Previous ISP holdings are retained."
+        case .ispFailed(let message), .ibkrFailed(let message): message
+        case .completed(.committedCurrentHoldings): kind == .ibkrFlex ? "IBKR holdings updated." : "ISP holdings updated."
         case .completed(.refusedCredentialInteraction): "Saved connection needs authorization. Open its Settings page or authorize the helper."
         case .completed(.refusedNoCoverage): "Collect a complete interval in Email Statements before automatic collection."
         case .completed(.failedFinal): "Update failed. Previous successful data is retained."

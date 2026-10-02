@@ -24,6 +24,7 @@ final class GmailIntakeSession: ObservableObject {
     @Published private(set) var inbox: GmailInboxState?
     @Published private(set) var importedSourceIDs: Set<String> = []
     @Published private(set) var coverage: GmailIntakeCoverage?
+    @Published private(set) var reconciliationError: String?
     @Published private(set) var progress = GmailCollectionProgress()
     @Published var fromDate = Date()
     @Published var throughDate = Date()
@@ -38,6 +39,8 @@ final class GmailIntakeSession: ObservableObject {
     private var client: GmailClient?
     private var task: Task<Void, Never>?
     private var observation: AnyCancellable?
+    private var inboxReloadID: UUID?
+    private var inboxGeneration: ProviderGenerationToken?
 
     init(tokens: GmailTokenBroker = GmailTokenBroker(), preferences: UserDefaults = .standard) {
         self.tokens = tokens; self.preferences = preferences
@@ -51,8 +54,16 @@ final class GmailIntakeSession: ObservableObject {
         return account == nil ? "Connect Gmail and collect statement originals" : "Saved inbox · Check connection to collect"
     }
     var sources: [GmailInboxSource] { inbox?.orderedSources ?? [] }
+    var isReconciled: Bool {
+        guard let coverage else { return false }
+        return coverage.generation == DatabaseProvider.shared.generationToken
+            && inboxGeneration == coverage.generation
+            && coverage.inbox?.account == inbox?.account && coverage.inbox?.revision == inbox?.revision
+    }
     var batchSources: [GmailInboxSource] {
-        sources.filter { !$0.dismissed && !importedSourceIDs.contains($0.id) && $0.acquisition == .available
+        guard isReconciled else { return [] }
+        return sources.filter { !$0.dismissed && $0.retainedNewerHoldings != true
+            && !importedSourceIDs.contains($0.id) && $0.acquisition == .available
             && [.pending, .review, .skipped].contains($0.attention) }
     }
     var selectedSource: GmailInboxSource? { selectedSourceID.flatMap { inbox?.sources[$0] } }
@@ -69,30 +80,41 @@ final class GmailIntakeSession: ObservableObject {
     }
 
     func connect(configuration: Data? = nil, reauthorize: Bool = false) {
-        guard !isChecking, !isCollecting else { return }
+        connect {
+            if let configuration { try await self.tokens.configureExistingClient(configuration) }
+            if reauthorize { try await self.tokens.reauthorizeExistingConnection() }
+            let selectedAccount = try await self.tokens.savedAccount()
+            let connection = GmailClient(expectedAccount: selectedAccount, tokens: self.tokens)
+            try await connection.verifyAccount()
+            try Task.checkCancellation()
+            self.client = connection; self.account = selectedAccount; self.isConnected = true; self.needsClientConfiguration = false
+            self.needsAuthorization = false
+            self.preferences.set(selectedAccount, forKey: Self.savedAccountKey)
+            self.message = "Connected with read-only access. Collection does not import financial data."
+            await self.reloadInbox()
+        }
+    }
+
+    /// Owns the connection's busy/error lifecycle independently of the browser
+    /// and provider operation, so terminal outcomes always restore its controls.
+    @discardableResult
+    func connect(operation: @escaping @MainActor () async throws -> Void) -> Task<Void, Never>? {
+        guard !isChecking, !isCollecting else { return nil }
         isChecking = true; message = nil
         task = Task { [weak self] in
             guard let self else { return }
             defer { isChecking = false; task = nil }
             do {
-                if let configuration { try await tokens.configureExistingClient(configuration) }
-                if reauthorize { try await tokens.reauthorizeExistingConnection() }
-                let selectedAccount = try await tokens.savedAccount()
-                let connection = GmailClient(expectedAccount: selectedAccount, tokens: tokens)
-                try await connection.verifyAccount()
-                try Task.checkCancellation()
-                client = connection; account = selectedAccount; isConnected = true; needsClientConfiguration = false
-                needsAuthorization = false
-                preferences.set(selectedAccount, forKey: Self.savedAccountKey)
-                message = "Connected with read-only access. Collection does not import financial data."
-                await reloadInbox()
+                try await operation()
             } catch {
                 isConnected = false
-                needsClientConfiguration = (error as? GmailIntakeError) == .configurationRequired
-                needsAuthorization = (error as? GmailIntakeError) == .unauthorized
+                let intakeError = error as? GmailIntakeError
+                needsClientConfiguration = intakeError == .configurationRequired
+                needsAuthorization = intakeError == .unauthorized || intakeError == .authorizationFailed
                 message = Self.message(for: error)
             }
         }
+        return task
     }
 
     func collectSelectedRange(replaceIncomplete: Bool = false) {
@@ -193,6 +215,7 @@ final class GmailIntakeSession: ObservableObject {
         try update(&rules)
         state.senderRules = rules
         inbox = try repository.save(state, originals: [:], expectedRevision: state.revision)
+        inboxGeneration = DatabaseProvider.shared.generationToken
         republishLocalCoverage()
     }
 
@@ -206,7 +229,10 @@ final class GmailIntakeSession: ObservableObject {
     /// Called only after ordinary recovery/initial hydration. It reads metadata
     /// off the main actor and never launches a mailbox history scan at startup.
     func reloadInbox() async {
+        let reloadID = UUID()
+        inboxReloadID = reloadID
         coverage = nil
+        reconciliationError = nil
         guard DatabaseProvider.shared.persistenceState.isUsable else { return }
         let provider = DatabaseProvider.shared
         let repository = provider.gmailInboxRepo
@@ -222,7 +248,12 @@ final class GmailIntakeSession: ObservableObject {
                 else { throw GmailIntakeError.accountMismatch }
                 return try selected.map { try repository.load(account: $0) }
             }.value
-            guard DatabaseProvider.shared.generationToken == generation else { return }
+            guard DatabaseProvider.shared.generationToken == generation, inboxReloadID == reloadID else { return }
+            if inboxGeneration == generation, let state, let current = inbox, state.account == current.account,
+               state.revision < current.revision {
+                try await reconcileImportedSources(generation: generation)
+                return
+            }
             if let state {
                 account = state.account
                 preferences.set(state.account, forKey: Self.savedAccountKey)
@@ -231,19 +262,24 @@ final class GmailIntakeSession: ObservableObject {
                 }
             }
             inbox = state
+            inboxGeneration = generation
             try await reconcileImportedSources(generation: generation)
-        } catch { message = Self.message(for: error) }
+        } catch {
+            guard DatabaseProvider.shared.generationToken == generation, inboxReloadID == reloadID else { return }
+            reconciliationError = Self.message(for: error)
+            message = reconciliationError
+        }
     }
 
     func startConfirmedEmailBatch() -> Bool {
-        guard !isCollecting, ProductionImportCentre.shared.permitsSourceSelection else { return false }
+        guard isReconciled, !isCollecting, ProductionImportCentre.shared.permitsSourceSelection else { return false }
         let urls = batchSources.compactMap(\.importURL)
         guard !urls.isEmpty, urls.count == batchSources.count else { return false }
         return ProductionImportCentre.shared.startConfirmedBatch(urls, preparationLimit: 2)
     }
 
     func startSelectedEmailImport() -> Bool {
-        guard !isCollecting, ProductionImportCentre.shared.permitsSourceSelection,
+        guard isReconciled, !isCollecting, ProductionImportCentre.shared.permitsSourceSelection,
               let source = selectedSource, !source.dismissed, source.acquisition == .available,
               let url = source.importURL else { return false }
         return ProductionImportCentre.shared.startConfirmedBatch([url], preparationLimit: 2)
@@ -260,13 +296,20 @@ final class GmailIntakeSession: ObservableObject {
             var state = try repository.load(account: account)
             guard state.sources[id] != nil else { return }
             state.sources[id]?.dismissed = dismissed
-            if !dismissed { state.sources[id]?.attention = .pending }
+            if !dismissed {
+                state.sources[id]?.attention = .pending
+                state.sources[id]?.retainedNewerHoldings = nil
+            }
             inbox = try repository.save(state, originals: [:], expectedRevision: state.revision)
+            inboxGeneration = DatabaseProvider.shared.generationToken
             republishLocalCoverage()
         } catch { message = Self.message(for: error) }
     }
 
     func status(for source: GmailInboxSource) -> String {
+        guard isReconciled else {
+            return reconciliationError == nil ? "Checking imported originals…" : "Import check unavailable"
+        }
         if importedSourceIDs.contains(source.id) { return "Imported in this ledger" }
         if source.dismissed { return "Dismissed" }
         switch source.acquisition {
@@ -275,6 +318,7 @@ final class GmailIntakeSession: ObservableObject {
         case .sizeLimit: return "Held · Original exceeds intake size"
         case .available: break
         }
+        if source.retainedNewerHoldings == true { return "Current holdings kept · No update needed" }
         switch source.attention {
         case .pending: return "Ready to prepare"
         case .review: return "Needs review"
@@ -321,13 +365,16 @@ final class GmailIntakeSession: ObservableObject {
                     state.sources[source.id]?.attention = attention
                     changed = true
                 }
+                if attention != nil, (source.retainedNewerHoldings == true) != item.retainedNewerHoldings {
+                    state.sources[source.id]?.retainedNewerHoldings = item.retainedNewerHoldings ? true : nil
+                    changed = true
+                }
             }
             guard changed else { return }
             state = try repository.save(state, originals: [:], expectedRevision: state.revision)
-            coverage = nil
             inbox = state
-            let generation = DatabaseProvider.shared.generationToken
-            Task { [weak self] in try? await self?.reconcileImportedSources(generation: generation) }
+            inboxGeneration = DatabaseProvider.shared.generationToken
+            requestReconciliation()
         } catch { message = Self.message(for: error) }
     }
 
@@ -363,10 +410,27 @@ final class GmailIntakeSession: ObservableObject {
     /// Reuse reconciliation only when it already belongs to this ledger.
     private func republishLocalCoverage() {
         guard let previous = coverage, previous.generation == DatabaseProvider.shared.generationToken else {
-            coverage = nil
+            requestReconciliation()
             return
         }
         coverage = .init(generation: previous.generation, inbox: inbox, importedSourceIDs: previous.importedSourceIDs)
+    }
+
+    private func requestReconciliation() {
+        coverage = nil
+        reconciliationError = nil
+        guard DatabaseProvider.shared.persistenceState.isUsable else { return }
+        let generation = DatabaseProvider.shared.generationToken
+        let revision = inbox?.revision
+        Task { [weak self] in
+            do { try await self?.reconcileImportedSources(generation: generation) }
+            catch {
+                guard let self, DatabaseProvider.shared.generationToken == generation,
+                      inbox?.revision == revision else { return }
+                reconciliationError = Self.message(for: error)
+                message = reconciliationError
+            }
+        }
     }
 
     private static func message(for error: Error) -> String {

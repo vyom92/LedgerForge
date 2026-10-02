@@ -73,7 +73,7 @@ struct ImportBatchQueueItemPresentation: Identifiable, Equatable {
                 tone = .danger
             }
         case .skipped:
-            status = "Skipped"
+            status = item.retainedNewerHoldings ? "Current holdings kept · No update needed" : "Skipped"
             iconName = "forward.fill"
             tone = .warning
         case .cancelled:
@@ -98,6 +98,7 @@ struct ImportBatchSummaryPresentation: Equatable {
     let skippedCount: Int
     let cancelledOrNotProcessedCount: Int
     let reconciliationRequiredCount: Int
+    let noUpdateNeededCount: Int
 
     @MainActor
     init<Preparation: ImportCentrePreparation>(
@@ -112,6 +113,7 @@ struct ImportBatchSummaryPresentation: Equatable {
         skippedCount = summary.skippedCount
         cancelledOrNotProcessedCount = summary.cancelledOrNotProcessedCount
         reconciliationRequiredCount = summary.reconciliationRequiredCount
+        noUpdateNeededCount = summary.noUpdateNeededCount
     }
 }
 
@@ -209,6 +211,9 @@ struct ImportBatchSummaryView: View {
             summaryRow("Selected", value: summary.totalSelected)
             summaryRow("Imported", value: summary.committedCount)
             summaryRow("Previously imported", value: summary.exactDuplicateCount)
+            if summary.noUpdateNeededCount > 0 {
+                summaryRow("Current holdings kept · No update needed", value: summary.noUpdateNeededCount)
+            }
             summaryRow("Statement blocked", value: summary.transactionEventBlockedCount)
             summaryRow("Rejected", value: summary.rejectedCount)
             summaryRow("Preparation failed", value: summary.failedPreparationCount)

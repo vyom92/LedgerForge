@@ -37,39 +37,33 @@ struct DeveloperConsoleView: View {
     @State private var showsResetConfirmation = false
 
     var body: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
-                LFInlineBadge(title: DatabaseProvider.shared.persistenceState.displayName, color: LFTheme.info)
+        GeometryReader { geometry in
+            let width = max(0, geometry.size.width - theme.spacing.pagePadding * 2)
+            let pairedMinimum = max(1200, theme.typography.size(.body) * 70)
+            let paired = width >= pairedMinimum
+            let diagnosticsWidth = paired ? max(0, width - theme.spacing.sectionGap) * 0.70 : width
+            let logHeight = max(380, geometry.size.height - 340)
 
-                Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                    LFSettingsPageHeader("Developer Console", subtitle: "Advanced diagnostics and inspection")
+                    environmentRow
 
-                LFInlineBadge(title: Self.timeFormatter.string(from: Date()), color: theme.palette.secondaryText)
-            }
-
-            HStack(alignment: .top, spacing: 14) {
-                LFPanel {
-                    VStack(alignment: .leading, spacing: 14) {
-                        logHeader
-                        consoleLogTable
-                        logActions
+                    LFSettingsColumns(availableWidth: width, leadingFraction: 0.70, minimumWidth: pairedMinimum) {
+                        diagnosticsPanel(availableWidth: diagnosticsWidth, logHeight: logHeight)
+                    } trailing: {
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+#if DEBUG
+                            databaseProfilePanel
+#endif
+                            runtimePanel
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity)
-
-                VStack(spacing: 14) {
-                    runtimeInspectorPanel
-                    repositorySummaryPanel
-#if DEBUG
-                    databaseProfilePanel
-#endif
-                    toolsPanel
-                }
-                .frame(width: 330)
+                .frame(width: width, alignment: .topLeading)
+                .padding(theme.spacing.pagePadding)
             }
-
         }
-        .padding(theme.spacing.pagePadding)
 #if DEBUG
         .confirmationDialog(
             profileViewModel.resetActionLabel.map { "\($0)?" } ?? "Reset Development Profile?",
@@ -109,17 +103,80 @@ struct DeveloperConsoleView: View {
         return DeveloperConsole.newestFirst(filtered)
     }
 
-    private var logHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                Text("Developer Diagnostics")
-                    .font(theme.typography.formHeading)
-                Spacer()
-                LFInlineBadge(title: "\(displayedEntries.count) shown", color: theme.palette.secondaryText)
-            }
+    private var persistenceColor: Color {
+        switch DatabaseProvider.shared.persistenceState {
+        case .verifiedSQLite: LFTheme.info
+        case .unavailable: LFTheme.danger
+        case .intentionalNonDurable: LFTheme.warning
+        }
+    }
 
-            HStack(spacing: 10) {
-                // Level filter
+    private var environmentBadges: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: theme.spacing.controlGap) {
+                LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
+                LFInlineBadge(title: DatabaseProvider.shared.persistenceState.displayName, color: persistenceColor)
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
+                LFInlineBadge(title: DatabaseProvider.shared.persistenceState.displayName, color: persistenceColor)
+            }
+        }
+    }
+
+    private var environmentRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: theme.spacing.sectionGap) {
+                environmentBadges
+                Spacer(minLength: theme.spacing.sectionGap)
+                consoleTimestamp
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                environmentBadges
+                consoleTimestamp
+            }
+        }
+    }
+
+    private var consoleTimestamp: some View {
+        Text(Self.timeFormatter.string(from: Date()))
+            .font(theme.typography.diagnosticText)
+            .foregroundStyle(theme.palette.secondaryText)
+            .padding(.horizontal, theme.spacing.controlGap)
+            .padding(.vertical, theme.spacing.small)
+            .background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .fixedSize(horizontal: true, vertical: false)
+            .help("UTC time at the latest view update.")
+    }
+
+    private func diagnosticsPanel(availableWidth: CGFloat, logHeight: CGFloat) -> some View {
+        let innerWidth = max(0, availableWidth - theme.spacing.panelPadding * 2)
+        let tabular = innerWidth >= max(720, theme.typography.size(.secondary) * 52)
+        let headerLayout = innerWidth >= max(700, theme.typography.size(.body) * 38)
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: theme.spacing.controlGap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.controlGap))
+        return LFPanel {
+            headerLayout {
+                HStack(spacing: theme.spacing.controlGap) {
+                    Text("Diagnostics").font(theme.typography.sectionTitle)
+                    LFInlineBadge(title: "\(displayedEntries.count) shown", color: theme.palette.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                logActions(availableWidth: innerWidth)
+            }
+            logFilters(availableWidth: innerWidth)
+            consoleLogTable(tabular: tabular, height: logHeight)
+        }
+    }
+
+    private func logFilters(availableWidth: CGFloat) -> some View {
+        let paired = availableWidth >= max(670, theme.typography.size(.body) * 36)
+        let layout = paired
+            ? AnyLayout(HStackLayout(alignment: .bottom, spacing: theme.spacing.controlGap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.controlGap))
+        return layout {
+            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                filterLabel("Level")
                 Picker("Level", selection: $selectedLevel) {
                     Text("All Levels").tag(LevelPicker.all)
                     Text("Debug").tag(LevelPicker.debug)
@@ -128,9 +185,14 @@ struct DeveloperConsoleView: View {
                     Text("Error").tag(LevelPicker.error)
                 }
                 .pickerStyle(.menu)
-                .frame(width: 160)
+                .labelsHidden()
+                .tint(theme.palette.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(width: paired ? max(150, theme.typography.size(.secondary) * 12) : nil)
 
-                // Category filter
+            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                filterLabel("Category")
                 Picker("Category", selection: $selectedCategory) {
                     Text("All Categories").tag(CategoryPicker.all)
                     Text("Application").tag(CategoryPicker.application)
@@ -141,100 +203,183 @@ struct DeveloperConsoleView: View {
                     Text("Runtime").tag(CategoryPicker.runtime)
                 }
                 .pickerStyle(.menu)
-                .frame(width: 180)
+                .labelsHidden()
+                .tint(theme.palette.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(width: paired ? max(180, theme.typography.size(.secondary) * 14) : nil)
 
-                // Search
-                TextField("Search diagnostics (message, metadata)", text: $filters.searchText)
+            HStack(spacing: theme.spacing.controlGap) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .accessibilityHidden(true)
+                TextField("Search diagnostics…", text: $filters.searchText)
                     .textFieldStyle(.plain)
-                    .font(theme.typography.formCaption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(theme.palette.controlSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7)
-                            .stroke(theme.palette.border, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .accessibilityLabel("Search diagnostics")
+                    .help("Search diagnostic messages and their visible metadata.")
+            }
+            .font(theme.typography.body)
+            .padding(.horizontal, theme.spacing.controlGap)
+            .padding(.vertical, theme.spacing.small)
+            .frame(maxWidth: .infinity, minHeight: theme.typography.compactControlMinimum)
+            .background(theme.palette.contentSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay {
+                RoundedRectangle(cornerRadius: theme.radius.control)
+                    .strokeBorder(theme.palette.border, lineWidth: 1)
             }
         }
     }
 
-    private var consoleLogTable: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if console.entries.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "terminal")
-                            .font(theme.typography.emptyStateIcon)
-                            .foregroundStyle(theme.palette.accentHover)
-                        Text("No console messages")
-                            .font(theme.typography.formHeading)
-                        Text("Runtime diagnostics appear here when import, validation or hydration emits messages.")
-                            .font(theme.typography.formCaption)
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 260)
-                } else if displayedEntries.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(theme.typography.emptyStateIcon)
-                            .foregroundStyle(theme.palette.accentHover)
-                        Text("No matching console messages")
-                            .font(theme.typography.formHeading)
-                        Text("Search filters the visible messages only.")
-                            .font(theme.typography.formCaption)
-                            .foregroundStyle(theme.palette.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 260)
-                } else {
-                    ForEach(displayedEntries) { entry in
-                        logRow(entry)
-                        Divider().overlay(theme.palette.divider)
+    private func filterLabel(_ title: String) -> some View {
+        Text(title)
+            .font(theme.typography.secondary.weight(.semibold))
+            .foregroundStyle(theme.palette.secondaryText)
+    }
+
+    private var sequenceWidth: CGFloat { max(30, theme.typography.size(.secondary) * 3) }
+    private var timestampWidth: CGFloat { max(132, theme.typography.size(.secondary) * 11) }
+    private var levelWidth: CGFloat { max(66, theme.typography.size(.secondary) * 5.5) }
+    private var categoryWidth: CGFloat { max(104, theme.typography.size(.secondary) * 8) }
+
+    private var logColumnHeadings: some View {
+        HStack(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap) {
+            Text("#").frame(width: sequenceWidth, alignment: .leading)
+            Text("Time (UTC)").frame(width: timestampWidth, alignment: .leading)
+            Text("Level").frame(width: levelWidth, alignment: .leading)
+            Text("Category").frame(width: categoryWidth, alignment: .leading)
+            Text("Message").frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(theme.typography.secondary.weight(.semibold))
+        .foregroundStyle(theme.palette.secondaryText)
+        .padding(.horizontal, theme.spacing.controlGap)
+    }
+
+    private func consoleLogTable(tabular: Bool, height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            if tabular {
+                logColumnHeadings
+                Divider().overlay(theme.palette.divider)
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: theme.spacing.small) {
+                    if console.entries.isEmpty {
+                        consoleEmptyState(
+                            title: "No console messages",
+                            message: "Runtime diagnostics appear here when import, validation or hydration emits messages.",
+                            systemImage: "terminal"
+                        )
+                    } else if displayedEntries.isEmpty {
+                        consoleEmptyState(
+                            title: "No matching console messages",
+                            message: "Search filters the visible messages only.",
+                            systemImage: "magnifyingglass"
+                        )
+                    } else {
+                        ForEach(displayedEntries) { entry in
+                            logRow(entry, tabular: tabular)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(height: height)
         }
-        .frame(minHeight: 430)
     }
 
-    @ViewBuilder
-    private func logRow(_ entry: DeveloperLogEntry) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("#\(entry.sequence)")
-                .font(theme.typography.diagnosticText)
+    private func consoleEmptyState(title: String, message: String, systemImage: String) -> some View {
+        VStack(spacing: theme.spacing.controlGap) {
+            Image(systemName: systemImage)
+                .font(theme.typography.emptyStateIcon)
                 .foregroundStyle(theme.palette.secondaryText)
-                .frame(width: 86, alignment: .leading)
+            Text(title).font(theme.typography.formHeading)
+            Text(message)
+                .font(theme.typography.body)
+                .foregroundStyle(theme.palette.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 260)
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(Self.rowTimeFormatter.string(from: entry.timestamp))
+    private func logRow(_ entry: DeveloperLogEntry, tabular: Bool) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            if tabular {
+                HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                    Text("\(entry.sequence)")
                         .font(theme.typography.diagnosticText)
                         .foregroundStyle(theme.palette.secondaryText)
-
+                        .frame(width: sequenceWidth, alignment: .leading)
+                    logTimestamp(entry.timestamp)
+                        .frame(width: timestampWidth, alignment: .leading)
                     levelBadge(entry.level)
-                    categoryBadge(entry.category)
+                        .frame(width: levelWidth, alignment: .leading)
+                    Text(entry.category.rawValue)
+                        .font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText)
+                        .frame(width: categoryWidth, alignment: .leading)
+                    logMessage(entry)
                 }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.spacing.controlGap) {
+                        Text("#\(entry.sequence)")
+                        Text(Self.timeFormatter.string(from: entry.timestamp))
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        Text("#\(entry.sequence)")
+                        Text(Self.timeFormatter.string(from: entry.timestamp))
+                    }
+                }
+                .font(theme.typography.diagnosticText)
+                .foregroundStyle(theme.palette.secondaryText)
+                HStack(spacing: theme.spacing.controlGap) {
+                    levelBadge(entry.level)
+                    Text(entry.category.rawValue)
+                        .font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText)
+                }
+                logMessage(entry)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(theme.spacing.controlGap)
+        .background(theme.palette.controlSurface.opacity(0.35), in: RoundedRectangle(cornerRadius: theme.radius.control))
+        .textSelection(.enabled)
+        .accessibilityElement(children: .contain)
+    }
 
-                Text(DiagnosticPrivacy.text(entry.message))
-                    .font(theme.typography.diagnosticText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    private func logTimestamp(_ timestamp: Date) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(Self.rowDateFormatter.string(from: timestamp))
+                .foregroundStyle(theme.palette.primaryText)
+            Text(Self.rowTimeFormatter.string(from: timestamp))
+                .foregroundStyle(theme.palette.secondaryText)
+        }
+        .font(theme.typography.diagnosticText)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.timeFormatter.string(from: timestamp))
+    }
 
-                if let metadataText = DeveloperConsole.metadataText(for: entry) {
-                    DisclosureGroup("Details") { Text(metadataText)
+    private func logMessage(_ entry: DeveloperLogEntry) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            Text(DiagnosticPrivacy.text(entry.message))
+                .font(theme.typography.body.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let metadataText = DeveloperConsole.metadataText(for: entry) {
+                DisclosureGroup("Details") {
+                    Text(metadataText)
                         .font(theme.typography.diagnosticDetail)
                         .foregroundStyle(theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
-                    }
                 }
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
             }
         }
-        .padding(.vertical, 10)
-        .textSelection(.enabled)
-        .accessibilityElement(children: .contain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func levelBadge(_ level: DeveloperLogLevel) -> some View {
@@ -247,28 +392,18 @@ struct DeveloperConsoleView: View {
             }
         }()
         return Text(level.rawValue)
-            .font(theme.typography.finePrint.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.15))
+            .font(theme.typography.secondary.weight(.semibold))
+            .padding(.horizontal, theme.spacing.controlGap)
+            .padding(.vertical, theme.spacing.small)
+            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: theme.radius.control))
             .foregroundStyle(color)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
-    private func categoryBadge(_ category: DeveloperLogCategory) -> some View {
-        Text(category.rawValue)
-            .font(theme.typography.finePrint.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(theme.palette.controlSurface)
-            .foregroundStyle(theme.palette.secondaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    private var logActions: some View {
-        HStack(spacing: 10) {
-            Spacer()
-
+    private func logActions(availableWidth: CGFloat) -> some View {
+        let layout = availableWidth >= max(400, theme.typography.size(.body) * 22)
+            ? AnyLayout(HStackLayout(spacing: theme.spacing.controlGap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.controlGap))
+        return layout {
             LFConsoleButton(
                 title: "Copy All",
                 systemImage: "doc.on.doc",
@@ -277,55 +412,66 @@ struct DeveloperConsoleView: View {
             ) {
                 copyAllLogs()
             }
+            .help("Copy the complete diagnostic history, including entries hidden by filters.")
 
             LFConsoleButton(
-                title: "Clear",
+                title: "Clear diagnostics",
                 systemImage: "trash",
-                minWidth: 88,
                 fill: theme.palette.controlSurface,
                 foreground: LFTheme.danger
             ) {
                 console.clear()
-                // Reset presentation state
                 filters = DeveloperConsole.Filters()
                 selectedLevel = .all
                 selectedCategory = .all
             }
         }
-        .padding(12)
-        .background(theme.palette.contentSurface)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.palette.border, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private var runtimeInspectorPanel: some View {
-        LFPanel(title: "Runtime Inspector") {
-            VStack(spacing: 0) {
-                LFInfoRow(title: "Persistence", value: runtimeSnapshot.persistenceState.displayName, verticalPadding: 5)
-                LFInfoRow(title: "Status", value: runtimeSnapshot.persistenceState.statusMessage, verticalPadding: 5)
-                if let guidance = runtimeSnapshot.persistenceState.recoveryGuidance {
-                    LFInfoRow(title: "Recovery", value: guidance, verticalPadding: 5)
+    private var runtimePanel: some View {
+        let snapshot = runtimeSnapshot
+        return LFPanel(title: "Runtime & repository") {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                Grid(alignment: .leading, horizontalSpacing: theme.spacing.controlGap, verticalSpacing: theme.spacing.controlGap) {
+                    GridRow {
+                        filterLabel("Source")
+                        filterLabel("Accounts").frame(maxWidth: .infinity, alignment: .trailing)
+                        filterLabel("Transactions").frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    Divider().gridCellColumns(3)
+                    GridRow {
+                        Text("Runtime").font(theme.typography.body.weight(.semibold))
+                        Text(snapshot.accountCount.formatted()).frame(maxWidth: .infinity, alignment: .trailing)
+                        Text(snapshot.transactionCount.formatted()).frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .font(theme.typography.body.monospacedDigit())
                 }
-                LFInfoRow(title: "Hydration", value: runtimeSnapshot.hydrationStatus, verticalPadding: 5)
-                LFInfoRow(title: "Latest Refresh", value: runtimeSnapshot.latestRefreshResult, verticalPadding: 5)
-                LFInfoRow(title: "Accounts", value: "\(runtimeSnapshot.accountCount)", verticalPadding: 5)
-                LFInfoRow(title: "Transactions", value: "\(runtimeSnapshot.transactionCount)", verticalPadding: 5)
-            }
-        }
-    }
+                Text("Counts reflect the loaded data.")
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
 
-    private var repositorySummaryPanel: some View {
-        LFPanel(title: "Repository Summary") {
-            VStack(spacing: 0) {
-                LFInfoRow(title: "Accounts", value: "\(runtimeSnapshot.accountCount)", verticalPadding: 5)
-                LFInfoRow(title: "Transactions", value: "\(runtimeSnapshot.transactionCount)", verticalPadding: 5)
-            }
-        }
-    }
+                Divider().overlay(theme.palette.divider)
+                filterLabel("Persistence status")
+                Text(snapshot.persistenceState.statusMessage)
+                    .font(theme.typography.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let guidance = snapshot.persistenceState.recoveryGuidance {
+                    Text(guidance)
+                        .font(theme.typography.body)
+                        .foregroundStyle(LFTheme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-    private var toolsPanel: some View {
-        LFPanel(title: "Tools") {
-            VStack(spacing: 10) {
+                Divider().overlay(theme.palette.divider)
+                Text("Console refresh").font(theme.typography.body.weight(.semibold))
+                Text(snapshot.hydrationStatus)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                Text(snapshot.latestRefreshResult)
+                    .font(theme.typography.body)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 LFConsoleButton(
                     title: "Reload Data",
                     systemImage: "arrow.clockwise",
@@ -335,10 +481,11 @@ struct DeveloperConsoleView: View {
                 ) {
                     reloadData()
                 }
+                .padding(.top, theme.spacing.small)
 
                 if let actionError {
                     Text(actionError)
-                        .font(theme.typography.formCaption)
+                        .font(theme.typography.secondary)
                         .foregroundStyle(LFTheme.danger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -348,44 +495,57 @@ struct DeveloperConsoleView: View {
 
 #if DEBUG
     private var databaseProfilePanel: some View {
-        LFPanel(title: "Database Profile") {
-            VStack(alignment: .leading, spacing: 10) {
-                LFInfoRow(title: "Active", value: profileViewModel.activeProfileLabel, verticalPadding: 4)
+        LFPanel(title: "Database context") {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                LFInfoRow(title: "Active database", value: profileViewModel.activeProfileLabel, verticalPadding: 4)
                 if let sourceSchema = profileViewModel.activeSourceSchemaLabel {
-                    LFInfoRow(title: "Source Schema", value: sourceSchema, verticalPadding: 4)
+                    LFInfoRow(title: "Source schema", value: sourceSchema, verticalPadding: 4)
                 }
-                LFInfoRow(title: "Current Schema", value: profileViewModel.currentSchemaLabel, verticalPadding: 4)
+                LFInfoRow(title: "Schema", value: profileViewModel.currentSchemaLabel, verticalPadding: 4)
 
-                Picker(
-                    "Profile",
-                    selection: Binding(
-                        get: { profileViewModel.selectedProfileKind },
-                        set: { profileViewModel.selectProfile($0) }
-                    )
-                ) {
-                    ForEach(DevelopmentDatabaseProfileKind.allCases, id: \.rawValue) { kind in
-                        Text(kind.displayName).tag(kind)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                if profileViewModel.showsMigrationSourceSelection {
+                Divider().overlay(theme.palette.divider)
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    filterLabel("Switch to")
                     Picker(
-                        "Source Version",
+                        "Switch to database profile",
                         selection: Binding(
-                            get: { profileViewModel.selectedMigrationSourceVersion },
-                            set: { profileViewModel.selectMigrationSourceVersion($0) }
+                            get: { profileViewModel.selectedProfileKind },
+                            set: { profileViewModel.selectProfile($0) }
                         )
                     ) {
-                        ForEach(profileViewModel.availableMigrationSourceVersions, id: \.self) { version in
-                            Text("V\(version)").tag(version)
+                        ForEach(DevelopmentDatabaseProfileKind.allCases, id: \.rawValue) { kind in
+                            Text(kind.displayName).tag(kind)
                         }
                     }
                     .pickerStyle(.menu)
+                    .labelsHidden()
+                    .tint(theme.palette.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if profileViewModel.showsMigrationSourceSelection {
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        filterLabel("Source version")
+                        Picker(
+                            "Source Version",
+                            selection: Binding(
+                                get: { profileViewModel.selectedMigrationSourceVersion },
+                                set: { profileViewModel.selectMigrationSourceVersion($0) }
+                            )
+                        ) {
+                            ForEach(profileViewModel.availableMigrationSourceVersions, id: \.self) { version in
+                                Text("V\(version)").tag(version)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .tint(theme.palette.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 LFConsoleButton(
-                    title: "Activate",
+                    title: "Activate selected profile",
                     systemImage: "arrow.triangle.2.circlepath",
                     fill: theme.palette.accent,
                     foreground: theme.palette.primaryText,
@@ -395,6 +555,7 @@ struct DeveloperConsoleView: View {
                 ) {
                     profileViewModel.activateSelectedProfile()
                 }
+                .padding(.top, theme.spacing.small)
 
                 if let resetActionLabel = profileViewModel.resetActionLabel {
                     LFConsoleButton(
@@ -412,7 +573,7 @@ struct DeveloperConsoleView: View {
 
                 if let message = profileViewModel.operationState.message {
                     Text(message)
-                        .font(theme.typography.formCaption)
+                        .font(theme.typography.secondary)
                         .foregroundStyle(LFTheme.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -511,9 +672,17 @@ struct DeveloperConsoleView: View {
         return formatter
     }()
 
+    private static let rowDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd MMM yy"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
+
     private static let rowTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "dd MMM yy HH:mm:ss.SSS 'UTC'"
+        formatter.dateFormat = "HH:mm:ss.SSS"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter

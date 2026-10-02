@@ -8,14 +8,40 @@ nonisolated public struct BankSectionSourceDetailsDTO: Codable, Equatable, Senda
         public let label: String
         public let literal: String
         public let sourceOrdinal: Int
-        public let sourcePage: Int
+        public let sourcePage: Int?
+        public let sourceUnit: String?
+
+        public init(kind: String, label: String, literal: String, sourceOrdinal: Int,
+                    sourcePage: Int?, sourceUnit: String? = nil) {
+            self.kind = kind; self.label = label; self.literal = literal
+            self.sourceOrdinal = sourceOrdinal; self.sourcePage = sourcePage; self.sourceUnit = sourceUnit
+        }
     }
-    public let firstPage: Int
-    public let lastPage: Int
-    public let regionDescriptor: String
-    public let regionSignature: String
-    public let recognizedRowCount: Int
+    // Relationship PDFs retain their complete page/region geometry. A
+    // standalone source may retain controls without inventing page evidence.
+    public let firstPage: Int?
+    public let lastPage: Int?
+    public let regionDescriptor: String?
+    public let regionSignature: String?
+    public let recognizedRowCount: Int?
     public let controls: [Control]
+
+    func isValidStandalone(sourceFormatCode: String) -> Bool {
+        let expectedUnit: String
+        switch sourceFormatCode {
+        case "xls": expectedUnit = "row"
+        case "pdf": expectedUnit = "line"
+        default: return false
+        }
+        let allowed = Set(["openingBalance", "closingBalance", "debitTotal", "creditTotal", "debitCount", "creditCount"])
+        return firstPage == nil && lastPage == nil && regionDescriptor == nil && regionSignature == nil &&
+            recognizedRowCount == nil && !controls.isEmpty &&
+            Set(controls.map(\.kind)).count == controls.count && controls.allSatisfy {
+                allowed.contains($0.kind) && !$0.label.isEmpty && !$0.literal.isEmpty &&
+                    $0.sourceOrdinal > 0 && $0.sourceUnit == expectedUnit &&
+                    ($0.sourcePage.map { $0 > 0 } ?? true)
+            }
+    }
 }
 
 nonisolated public struct BankImportSectionDTO: Equatable, Sendable {
@@ -25,6 +51,19 @@ nonisolated public struct BankImportSectionDTO: Equatable, Sendable {
     public let source: BankStatementSectionPlanDTO
 }
 
+/// A transient request to record another complete representation of an
+/// existing legacy standalone statement. Its original projection stays intact;
+/// new correspondence is retained in the existing bank occurrence tables.
+nonisolated public struct BankStatementCorrespondenceRequirementDTO: Equatable, Sendable {
+    public let groupID: String
+    public let authoritativeProjectionID: String
+
+    public init(groupID: String, authoritativeProjectionID: String) {
+        self.groupID = groupID
+        self.authoritativeProjectionID = authoritativeProjectionID
+    }
+}
+
 nonisolated public struct BankImportPlanDTO: Equatable, Sendable {
     public let providerGeneration: ProviderGenerationToken
     public let workspace: WorkspaceDTO
@@ -32,12 +71,15 @@ nonisolated public struct BankImportPlanDTO: Equatable, Sendable {
     public let sections: [BankImportSectionDTO]
     public let transactions: [TransactionDTO]
     public let zeroActivityControl: StatementZeroActivityControlDTO?
+    public let statementCorrespondence: BankStatementCorrespondenceRequirementDTO?
 
     public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO,
                 history: ConfirmedImportHistoryTemplateDTO, sections: [BankImportSectionDTO],
-                transactions: [TransactionDTO], zeroActivityControl: StatementZeroActivityControlDTO? = nil) {
+                transactions: [TransactionDTO], zeroActivityControl: StatementZeroActivityControlDTO? = nil,
+                statementCorrespondence: BankStatementCorrespondenceRequirementDTO? = nil) {
         self.providerGeneration = providerGeneration; self.workspace = workspace; self.history = history
         self.sections = sections; self.transactions = transactions; self.zeroActivityControl = zeroActivityControl
+        self.statementCorrespondence = statementCorrespondence
     }
 }
 
@@ -175,7 +217,10 @@ enum BankImportDecision {
 
     static func resolve(_ plan: BankImportPlanDTO, accounts: [AccountDTO],
                         identifiers: [AccountIdentifierDTO], existingSections: [BankStatementSectionPlanDTO],
-                        transactions: [TransactionDTO], existingZeroControls: [StatementZeroActivityControlDTO] = []) throws -> Resolution {
+                        transactions: [TransactionDTO], existingZeroControls: [StatementZeroActivityControlDTO] = [],
+                        existingStatementGroups: [StatementEquivalenceGroupDTO] = [],
+                        existingStatementProjections: [StatementFinancialProjectionRecordDTO] = [],
+                        existingStatementMembers: [StatementEquivalenceMemberDTO] = []) throws -> Resolution {
         try plan.history.validateFingerprints()
         let history = plan.history
         let occurrences = plan.sections.flatMap(\.source.rows)
@@ -226,11 +271,16 @@ enum BankImportDecision {
             }
             if relationship {
                 guard section.sourceDetails?.recognizedRowCount == section.rows.count,
-                      section.sourceDetails?.regionSignature.count == 64,
+                      section.sourceDetails?.regionSignature?.count == 64,
                       let start = section.sourceRangeStart, let end = section.sourceRangeEnd, start > 0, start <= end,
                       plan.zeroActivityControl == nil else { throw BankImportHoldDTO("invalid_relationship_source_region", sectionID: section.id) }
-            } else if section.rows.isEmpty && plan.zeroActivityControl == nil {
-                throw BankImportHoldDTO("missing_zero_activity_source_evidence", sectionID: section.id)
+            } else {
+                guard section.sourceDetails?.isValidStandalone(sourceFormatCode: section.sourceEvidence.sourceFormatCode) ?? true else {
+                    throw BankImportHoldDTO("invalid_standalone_source_controls", sectionID: section.id)
+                }
+                if section.rows.isEmpty && plan.zeroActivityControl == nil {
+                    throw BankImportHoldDTO("missing_zero_activity_source_evidence", sectionID: section.id)
+                }
             }
             let axis = section.parserProfileId.hasPrefix("axis.")
             let institution = axis ? "Axis Bank" : "HDFC Bank"
@@ -325,7 +375,51 @@ enum BankImportDecision {
                 }
                 resolvedZeroControl = authorities.isEmpty ? zero : zero.withAuthorityRole("supporting")
             }
-            let existing = transactions.filter { $0.workspaceId == plan.workspace.id && $0.accountId == account.id }
+            var existing = transactions.filter { $0.workspaceId == plan.workspace.id && $0.accountId == account.id }
+            let requiredCanonicalIDs: Set<String>?
+            if let required = plan.statementCorrespondence {
+                guard standalone, plan.sections.count == 1, plan.zeroActivityControl == nil,
+                      let group = existingStatementGroups.first(where: { $0.id == required.groupID }),
+                      group.workspaceID == plan.workspace.id, group.accountID == account.id,
+                      group.authoritativeProjectionID == required.authoritativeProjectionID,
+                      group.institutionCode == (axis ? "axis" : "hdfc"),
+                      group.statementFamilyCode == (axis ? "axis.bank-account" : "hdfc.bank-account"),
+                      group.nativeCurrency == section.nativeCurrency,
+                      group.statementStartDateISO == section.sourceEvidence.statementStartDateISO,
+                      group.statementEndDateISO == section.sourceEvidence.statementEndDateISO,
+                      let authoritative = existingStatementProjections.first(where: {
+                          $0.projection.id == group.authoritativeProjectionID
+                      }),
+                      authoritative.workspaceID == group.workspaceID, authoritative.accountID == group.accountID,
+                      authoritative.projection.algorithmIdentifier == group.projectionAlgorithm,
+                      authoritative.projection.digest == group.projectionDigest,
+                      authoritative.projection.isValid(),
+                      authoritative.projection.eventCount == section.rows.count else {
+                    throw BankImportHoldDTO("statement_correspondence_evidence_unavailable", sectionID: section.id)
+                }
+                existing = existing.filter {
+                    $0.importSessionId == authoritative.importSessionID && $0.documentId == authoritative.documentID
+                }
+                guard existing.count == authoritative.projection.eventCount,
+                      Set(existing.map(\.id)).count == existing.count else {
+                    throw BankImportHoldDTO("statement_correspondence_evidence_unavailable", sectionID: section.id)
+                }
+                requiredCanonicalIDs = Set(existing.map(\.id))
+                let previouslyRecorded = existingStatementMembers.contains {
+                    $0.groupID == group.id && $0.sourceFormatCode == section.sourceEvidence.sourceFormatCode
+                } || existingSections.contains {
+                    $0.accountId == account.id && $0.nativeCurrency == section.nativeCurrency &&
+                        $0.sourceEvidence.statementStartDateISO == group.statementStartDateISO &&
+                        $0.sourceEvidence.statementEndDateISO == group.statementEndDateISO &&
+                        $0.sourceEvidence.sourceFormatCode == section.sourceEvidence.sourceFormatCode &&
+                        Set($0.rows.map(\.source.incomingTransactionId)) == requiredCanonicalIDs
+                }
+                guard !previouslyRecorded else {
+                    throw BankImportHoldDTO("statement_format_already_recorded", sectionID: section.id)
+                }
+            } else {
+                requiredCanonicalIDs = nil
+            }
             var candidatesByRow = [String: [TransactionDTO]]()
             for occurrence in section.rows {
                 let row = occurrence.source
@@ -351,10 +445,12 @@ enum BankImportDecision {
                     newTransactions.append(bind(incoming, accountID: account.id, history: history))
                     continue
                 }
+                // Each statement retains its own reported balance. Cross-source
+                // links identify the transaction, not an equal balance snapshot.
                 let matches = coarse.filter { candidate in
                     guard candidate.isTrusted, candidate.financialDateRole == incoming.financialDateRole,
                           candidate.valueDateISO == incoming.valueDateISO, candidate.amountDecimal == incoming.amountDecimal,
-                          candidate.direction == incoming.direction, candidate.runningBalanceMinor == incoming.runningBalanceMinor,
+                          candidate.direction == incoming.direction,
                           candidate.rawRows.count == 1, let profile = candidate.rawRows.first?.parserProfileId,
                           (relationshipProfiles + standaloneProfiles).contains(profile),
                           candidate.rawRows.first?.parserProfileVersion == supportedVersion(for: profile),
@@ -363,39 +459,30 @@ enum BankImportDecision {
                 }
                 guard !matches.isEmpty else {
                     let reason = coarse.contains { $0.valueDateISO != incoming.valueDateISO } ? "conflicting_value_date" :
-                        coarse.contains { $0.runningBalanceMinor != incoming.runningBalanceMinor } ? "conflicting_running_balance" : "missing_or_conflicting_linkage_evidence"
+                        "missing_or_conflicting_linkage_evidence"
                     throw BankImportHoldDTO(reason, sectionID: section.id, sourceOrdinal: row.sourceOrdinal)
                 }
                 candidatesByRow[row.normalizedRowId] = matches
             }
-            // Ordered one-to-one assignment within each authentic first source
-            // preserves reversal/retry multiplicity. More than one assignment
-            // is a hold, even when narration happens to look similar.
-            let groups = Set(candidatesByRow.values.flatMap { $0.compactMap(\.documentId) })
-            for documentID in groups.sorted() {
-                let relevant = section.rows.filter { occurrence in candidatesByRow[occurrence.normalizedRowId]?.contains(where: { $0.documentId == documentID }) == true }
-                var solutions: [[String: String]] = []
-                func assign(_ index: Int, _ lastOrdinal: Int, _ chosen: [String: String]) {
-                    guard solutions.count < 2 else { return }
-                    if index == relevant.count { solutions.append(chosen); return }
-                    let rowID = relevant[index].normalizedRowId
-                    for candidate in candidatesByRow[rowID] ?? [] where candidate.documentId == documentID {
-                        guard let ordinal = candidate.rawRows.first?.sourceOrdinal, ordinal > lastOrdinal,
-                              !chosen.values.contains(candidate.id) else { continue }
-                        var next = chosen; next[rowID] = candidate.id
-                        assign(index + 1, ordinal, next)
-                    }
-                }
-                assign(0, 0, [:])
-                guard solutions.count == 1 else { throw BankImportHoldDTO("ambiguous_occurrence_multiplicity_or_order", sectionID: section.id) }
-                for (rowID, canonicalID) in solutions[0] {
-                    guard links[rowID] == nil || links[rowID] == canonicalID else { throw BankImportHoldDTO("ambiguous_occurrence_identity", sectionID: section.id) }
-                    links[rowID] = canonicalID
-                }
+            // Transaction evidence, never printed order, determines overlap.
+            // Each occurrence consumes a different canonical transaction so
+            // genuine repeated payments are not collapsed into a single row.
+            // Source ordinals remain untouched as provenance in both sources.
+            guard let assignment = uniqueAssignment(candidatesByRow.mapValues { $0.map(\.id) }) else {
+                throw BankImportHoldDTO("ambiguous_occurrence_multiplicity", sectionID: section.id)
+            }
+            for (rowID, canonicalID) in assignment {
+                links[rowID] = canonicalID
             }
             guard section.rows.allSatisfy({ links[$0.normalizedRowId] != nil }),
                   Set(section.rows.compactMap { links[$0.normalizedRowId] }).count == section.rows.count else {
                 throw BankImportHoldDTO("ambiguous_occurrence_multiplicity", sectionID: section.id)
+            }
+            if let requiredCanonicalIDs {
+                guard Set(section.rows.compactMap { links[$0.normalizedRowId] }) == requiredCanonicalIDs,
+                      section.rows.count == requiredCanonicalIDs.count else {
+                    throw BankImportHoldDTO("conflicting_statement_occurrences", sectionID: section.id)
+                }
             }
             let stored = section.replacingCanonicalTransactions(links)
             observations.append(stored)
@@ -407,10 +494,229 @@ enum BankImportDecision {
                           zeroActivityControl: resolvedZeroControl)
     }
 
+    /// Returns a complete assignment only when every occurrence has exactly
+    /// one possible counterpart across the entire candidate graph. The sort
+    /// order makes traversal deterministic; it never supplies identity.
+    static func uniqueAssignment(_ candidates: [String: [String]]) -> [String: String]? {
+        let candidateIDs = candidates.mapValues { Array(Set($0)).sorted() }
+        let rowIDs = candidateIDs.keys.sorted {
+            let firstCount = candidateIDs[$0]?.count ?? 0
+            let secondCount = candidateIDs[$1]?.count ?? 0
+            return firstCount == secondCount ? $0 < $1 : firstCount < secondCount
+        }
+        guard rowIDs.allSatisfy({ candidateIDs[$0]?.isEmpty == false }) else { return nil }
+        if rowIDs.allSatisfy({ candidateIDs[$0]?.count == 1 }) {
+            let pairs = rowIDs.compactMap { rowID in candidateIDs[rowID]?.first.map { (rowID, $0) } }
+            guard Set(pairs.map(\.1)).count == pairs.count else { return nil }
+            return Dictionary(uniqueKeysWithValues: pairs)
+        }
+        func augment(_ rowID: String, excluding: (String, String)?,
+                     seen: inout Set<String>, owners: inout [String: String]) -> Bool {
+            for candidateID in candidateIDs[rowID] ?? [] {
+                if excluding?.0 == rowID && excluding?.1 == candidateID { continue }
+                guard seen.insert(candidateID).inserted else { continue }
+                if let owner = owners[candidateID],
+                   !augment(owner, excluding: excluding, seen: &seen, owners: &owners) { continue }
+                owners[candidateID] = rowID
+                return true
+            }
+            return false
+        }
+        var owners: [String: String] = [:]
+        for rowID in rowIDs {
+            var seen = Set<String>()
+            guard augment(rowID, excluding: nil, seen: &seen, owners: &owners) else { return nil }
+        }
+        let assignment = Dictionary(uniqueKeysWithValues: owners.map { ($0.value, $0.key) })
+        for rowID in rowIDs where (candidateIDs[rowID]?.count ?? 0) > 1 {
+            guard let candidateID = assignment[rowID] else { return nil }
+            var alternateOwners = owners
+            alternateOwners.removeValue(forKey: candidateID)
+            var seen = Set<String>()
+            if augment(rowID, excluding: (rowID, candidateID), seen: &seen, owners: &alternateOwners) {
+                return nil
+            }
+        }
+        return assignment
+    }
+
     static func referencesAgree(incoming: TransactionDTO, incomingProfile: String, existing: TransactionDTO, existingProfile: String) -> Bool {
-        if incomingProfile.hasPrefix("axis.") { return incoming.reference == existing.reference }
-        return hdfcReference(incoming.reference, narration: incoming.description ?? "", profile: incomingProfile) ==
-            hdfcReference(existing.reference, narration: existing.description ?? "", profile: existingProfile)
+        sourceLinkageAgrees(reference: incoming.reference, narration: incoming.description ?? "", profile: incomingProfile,
+                            otherReference: existing.reference, otherNarration: existing.description ?? "", otherProfile: existingProfile,
+                            postingDateISO: incoming.postedDateISO)
+    }
+
+    static func sourceLinkageAgrees(reference: String?, narration: String, profile: String,
+                                    otherReference: String?, otherNarration: String, otherProfile: String,
+                                    postingDateISO: String) -> Bool {
+        let first = profile.hasPrefix("axis.") ? reference : hdfcReference(reference, narration: narration, profile: profile)
+        let second = otherProfile.hasPrefix("axis.") ? otherReference : hdfcReference(otherReference, narration: otherNarration, profile: otherProfile)
+        let firstAbsent = first?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        let secondAbsent = second?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        if !firstAbsent && !secondAbsent { return first == second }
+        guard firstAbsent && secondAbsent, !narration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        if narration == otherNarration { return true }
+        let axisTabularProfiles = ["axis.bank-account.csv", "axis.bank-account.xls"]
+        if profile == "axis.bank-account.pdf", axisTabularProfiles.contains(otherProfile) {
+            return axisStandalonePDFNarrationAgrees(pdfNarration: narration, tabularNarration: otherNarration)
+        }
+        if otherProfile == "axis.bank-account.pdf", axisTabularProfiles.contains(profile) {
+            return axisStandalonePDFNarrationAgrees(pdfNarration: otherNarration, tabularNarration: narration)
+        }
+        let hdfcProfiles = ["hdfc.relationship-bank.pdf", "hdfc.bank-account.pdf", "hdfc.bank-account.xls"]
+        if hdfcProfiles.contains(profile), hdfcProfiles.contains(otherProfile),
+           let firstNarration = hdfcComparisonNarration(narration, profile: profile),
+           let secondNarration = hdfcComparisonNarration(otherNarration, profile: otherProfile) {
+            let firstText = bankComparisonText(firstNarration)
+            return !firstText.isEmpty && firstText == bankComparisonText(secondNarration)
+        }
+        // Axis prints friendly descriptions in the relationship PDF and coded
+        // descriptions in its standalone PDF/CSV/XLS. Compare shared evidence;
+        // neither source's stored narration is rewritten. Account/date/Money,
+        // supported versions and unique one-to-one assignment are checked by
+        // the caller before a source relationship can be accepted.
+        let axisStandalone = ["axis.bank-account.csv", "axis.bank-account.pdf", "axis.bank-account.xls"]
+        guard (profile == "axis.relationship-bank.pdf" && axisStandalone.contains(otherProfile)) ||
+              (otherProfile == "axis.relationship-bank.pdf" && axisStandalone.contains(profile)) else { return false }
+        if bankComparisonText(narration) == bankComparisonText(otherNarration) { return true }
+        let relationship = profile == "axis.relationship-bank.pdf" ? narration : otherNarration
+        let standalone = profile == "axis.relationship-bank.pdf" ? otherNarration : narration
+        guard let relationshipKey = axisRelationshipNarrationKey(relationship),
+              let standaloneKey = axisStandaloneNarrationKey(standalone, postingDateISO: postingDateISO) else { return false }
+        return relationshipKey == standaloneKey
+    }
+
+    /// The standalone PDF normalizer joins wrapped narration fragments with
+    /// spaces. Permit additional PDF spaces while preserving every tabular
+    /// word boundary and every non-whitespace character, including case.
+    /// The caller has already required two absent references; ownership,
+    /// transaction facts and unique occurrence assignment remain mandatory.
+    static func axisStandalonePDFNarrationAgrees(pdfNarration: String, tabularNarration: String) -> Bool {
+        let expected = Array(tabularNarration.split(whereSeparator: \.isWhitespace).joined(separator: " "))
+        let printed = pdfNarration.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !expected.isEmpty else { return false }
+        var index = 0
+        for character in printed {
+            if character == " ", index == expected.count || expected[index] != " " {
+                continue
+            }
+            guard index < expected.count, character == expected[index] else { return false }
+            index += 1
+        }
+        return index == expected.count
+    }
+
+    private static func bankComparisonText(_ text: String) -> String {
+        text.uppercased().filter { !$0.isWhitespace }
+    }
+
+    private static func hdfcComparisonNarration(_ text: String, profile: String) -> String? {
+        guard profile == "hdfc.relationship-bank.pdf" else { return text }
+        // Value date/reference are separate checked fields. Only the authentic
+        // trailing structural suffix is omitted from this narration comparison;
+        // it can directly follow the last word. Keep the stored literal intact.
+        guard let expression = try? NSRegularExpression(
+            pattern: #"Value\s*Dt\s*[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+Ref\s+.*)?$"#,
+            options: .caseInsensitive),
+              let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range, in: text) else { return nil }
+        return String(text[..<range.lowerBound])
+    }
+
+    private static func axisCaptures(_ pattern: String, in text: String) -> [String]? {
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              match.range.length == (text as NSString).length else { return nil }
+        return (1..<match.numberOfRanges).compactMap { index in
+            Range(match.range(at: index), in: text).map { String(text[$0]) }
+        }
+    }
+
+    private static func axisRelationshipNarrationKey(_ text: String) -> [String]? {
+        let text = text.uppercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        func key(_ operation: String, _ fields: [String]) -> [String] {
+            [operation] + fields.map(bankComparisonText)
+        }
+        if let fields = axisCaptures(#"^UPI TO MERCHANT : (.+) \(([0-9]{12})\)$"#, in: text) {
+            return key("UPI/P2M", [fields[1], fields[0]])
+        }
+        if let fields = axisCaptures(#"^UPI TRANSFER TO (.+) \(([0-9]{12})\)$"#, in: text) {
+            return key("UPI/P2A", [fields[1], fields[0]])
+        }
+        if let fields = axisCaptures(#"^IMPS (?:TRANSFER FROM|TO) ID: (.+) \(([0-9]{12})\)$"#, in: text) {
+            return key("IMPS/P2A", [fields[1], fields[0]])
+        }
+        if let fields = axisCaptures(#"^NEFT TRANSFER FROM (.+) \(([A-Z0-9]+)\)$"#, in: text) {
+            return key("NEFT", [fields[1], fields[0]])
+        }
+        if let fields = axisCaptures(#"^RTGS TRANSFER FROM (.+)\(([^()]+)\) \(([A-Z0-9]+)\)$"#, in: text) {
+            return key("RTGS", [fields[2], fields[0], fields[1]])
+        }
+        if let fields = axisCaptures(#"^CREDIT CARD BILL PAYMENT - ([0-9]{16})$"#, in: text) {
+            return key("CARD PAYMENT", fields)
+        }
+        if let fields = axisCaptures(#"^SELF TRANSFER VIA APP TO ([0-9]+) \(([0-9]+)\)$"#, in: text), fields[0] == fields[1] {
+            return key("SELF TRANSFER", fields)
+        }
+        if let fields = axisCaptures(#"^SELF FUND TRANSFER FROM (.+) \(([0-9]+)\)$"#, in: text) {
+            return key("SELF TRANSFER", fields)
+        }
+        if let fields = axisCaptures(#"^ATM WITHDRAWAL : (.+)-([^-]+)$"#, in: text) {
+            return key("ATM", fields)
+        }
+        if let fields = axisCaptures(#"^E-COMMERCE PURCHASE AT (.+)-([^-]+)$"#, in: text) {
+            return key("ECOM", fields)
+        }
+        return nil
+    }
+
+    private static func axisStandaloneNarrationKey(_ text: String, postingDateISO: String) -> [String]? {
+        let text = text.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let fields = text.components(separatedBy: "/").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        func key(_ operation: String, _ values: [String]) -> [String]? {
+            let values = values.map(bankComparisonText)
+            guard values.allSatisfy({ !$0.isEmpty }) else { return nil }
+            return [operation] + values
+        }
+        if fields.count >= 4, fields[0] == "UPI", ["P2A", "P2M"].contains(fields[1]),
+           fields[2].range(of: #"^[0-9]{12}$"#, options: .regularExpression) != nil {
+            return key("UPI/" + fields[1], [fields[2], fields[3]])
+        }
+        // Authentic IMPS tails print a remitter label, destination account or
+        // bank. The shared evidence is the operation, full reference and party;
+        // exact signed Money and unique occurrence assignment are checked above.
+        if fields.count >= 5, fields[0] == "IMPS", fields[1] == "P2A",
+           fields[2].range(of: #"^[0-9]{12}$"#, options: .regularExpression) != nil {
+            return key("IMPS/P2A", [fields[2], fields[3]])
+        }
+        if fields.count >= 3, fields[0] == "NEFT",
+           fields[1].range(of: #"^[A-Z0-9]+$"#, options: .regularExpression) != nil {
+            return key("NEFT", [fields[1], fields[2]])
+        }
+        if fields.count >= 4, fields[0] == "RTGS",
+           fields[1].range(of: #"^[A-Z0-9]+$"#, options: .regularExpression) != nil {
+            return key("RTGS", [fields[1], fields[2], fields[3]])
+        }
+        if let number = axisCaptures(#"^BRN-PYMT-CARD-([0-9]{16})$"#, in: text) {
+            return key("CARD PAYMENT", number)
+        }
+        if fields.count == 4, fields[0] == "MOB", fields[1] == "SELFFT",
+           bankComparisonText(fields[3]).range(of: #"^[0-9]{15}$"#, options: .regularExpression) != nil {
+            return key("SELF TRANSFER", [fields[2], fields[3]])
+        }
+        let dateParts = postingDateISO.split(separator: "-")
+        guard dateParts.count == 3, dateParts[0].count == 4, dateParts[1].count == 2, dateParts[2].count == 2 else { return nil }
+        let printedDate = String(dateParts[2]) + String(dateParts[1]) + String(dateParts[0].suffix(2))
+        if fields.count == 4, fields[0] == "ATM-CASH", fields[3] == printedDate {
+            let location = fields[1].hasPrefix("+") ? String(fields[1].dropFirst()) : fields[1]
+            return key("ATM", [location, fields[2]])
+        }
+        if fields.count == 6, fields[0] == "ECOM PUR", fields[3] == printedDate,
+           fields[4].range(of: #"^[0-9]{2}:[0-9]{2}$"#, options: .regularExpression) != nil,
+           fields[5].range(of: #"^[0-9]+$"#, options: .regularExpression) != nil {
+            return key("ECOM", [fields[1], fields[2]])
+        }
+        return nil
     }
 
     /// Qualified HDFC relationship/standalone representation rules, proven

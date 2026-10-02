@@ -1,5 +1,36 @@
 import Foundation
 
+/// The visible foreground ISP request shares MainActor with its synchronous
+/// commit entry. Cancel therefore either closes that entry or sees its saved
+/// result; it never promises to undo an already-committed holdings snapshot.
+@MainActor
+final class ZurichISPRefreshRequest {
+    private(set) var isCancelled = false
+    private(set) var didCommit = false
+
+    /// False means the synchronous publication already saved the holdings.
+    @discardableResult
+    func cancel() -> Bool {
+        guard !didCommit else { return false }
+        isCancelled = true
+        return true
+    }
+
+    func publish(_ operation: () throws -> ZurichISPHoldingsResult) throws -> ZurichISPHoldingsResult {
+        try Task.checkCancellation()
+        guard !isCancelled else { throw CancellationError() }
+        let result = try operation()
+        if result == .saved { didCommit = true }
+        return result
+    }
+
+    func resolved(_ outcome: BackgroundUpdateExecutor.Outcome) -> BackgroundUpdateExecutor.Outcome {
+        if didCommit { return .completed(.committedCurrentHoldings) }
+        if isCancelled { return .cancelled }
+        return outcome
+    }
+}
+
 /// Existing clients and native publication paths share one process-independent
 /// job lease. Network work never holds a SQLite or thread lock across await.
 actor BackgroundUpdateExecutor {
@@ -13,6 +44,7 @@ actor BackgroundUpdateExecutor {
     private let rates: AlDarCurrentReferenceProvider
     private let gmailTokens: GmailTokenBroker
     private let ispClient: ZurichISPClient
+    private let ibkrClient = IBKRFlexClient()
     private let origin: BackgroundJobOrigin
 
     init(provider: SQLiteRepositoryProvider, activation: LedgerActivationStamp, workspaceID: String,
@@ -26,8 +58,8 @@ actor BackgroundUpdateExecutor {
     }
 
     enum Outcome: Equatable, Sendable {
-        case alreadyRunning, notDue, completed(BackgroundJobCompletion), authorityRefused
-        case ispFailed(String)
+        case alreadyRunning, notDue, completed(BackgroundJobCompletion), authorityRefused, cancelled
+        case ispFailed(String), ibkrFailed(String)
     }
 
     func runAutomatic(configuration: BackgroundScheduleConfiguration, scheduledTarget: Date? = nil) async {
@@ -45,6 +77,7 @@ actor BackgroundUpdateExecutor {
         if configuration.gmailCollectionEnabled { _ = await collectGmail(configuration: configuration, manual: false) }
         if configuration.zurichISPHoldingsEnabled { _ = await refreshISP(configuration: configuration, manual: false) }
         _ = await refreshISP(configuration: configuration, manual: false, salaryCheck: true)
+        if configuration.ibkrFlexHoldingsEnabled { _ = await refreshIBKR(configuration: configuration, manual: false) }
     }
 
     private func withAuthority<T>(_ operation: () throws -> T) throws -> T {
@@ -68,7 +101,7 @@ actor BackgroundUpdateExecutor {
         let provider = provider, workspaceID = workspaceID
         let snapshot = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID) }
         let mappings = Set(snapshot.holdings.compactMap { holding -> InvestmentPriceMapping? in
-            guard let confirmed = InvestmentPriceRegistry.confirmedMapping(for: holding),
+            guard holding.ibkrObservationID == nil, let confirmed = InvestmentPriceRegistry.confirmedMapping(for: holding),
                   holding.priceMapping == nil || holding.priceMapping == confirmed else { return nil }
             return confirmed
         })
@@ -86,6 +119,17 @@ actor BackgroundUpdateExecutor {
             }
         }
         return identities
+    }
+
+    /// A retained retry can outlive the holding or its public-price mapping.
+    /// Only identities the current executor can service may wake foreground
+    /// fallback; otherwise an obsolete past retry repeatedly fires immediately.
+    func nextPublicRetry() async throws -> Date? {
+        let progress = try withAuthority { try BackgroundPublicProgressStore(database: provider.database).load() }
+        let identities = Set(try await publicIdentities(BackgroundScheduleConfiguration(), progress: progress))
+        return progress.values.filter {
+            identities.contains($0.identity) && !$0.succeeded && $0.attempts < 2
+        }.compactMap(\.retryAt).min()
     }
 
     /// Attempts suppress repeated failures within a slot. Native durable
@@ -249,8 +293,10 @@ actor BackgroundUpdateExecutor {
         } catch { return .authorityRefused }
     }
 
-    func refreshISP(configuration: BackgroundScheduleConfiguration, manual: Bool, salaryCheck: Bool = false) async -> Outcome {
+    func refreshISP(configuration: BackgroundScheduleConfiguration, manual: Bool, salaryCheck: Bool = false,
+                    request: ZurichISPRefreshRequest? = nil) async -> Outcome {
         do {
+            try Task.checkCancellation()
             guard let lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP) else { return .alreadyRunning }
             defer { withExtendedLifetime(lease) {} }
             let now = Date(), provider = provider, workspaceID = workspaceID
@@ -300,14 +346,21 @@ actor BackgroundUpdateExecutor {
                 try Task.checkCancellation()
                 let enrollment = enrollment, enrollmentStore = enrollmentStore, activation = activation
                 let result = try await MainActor.run {
-                    try provider.database.withExclusiveAccess {
-                        guard try provider.database.validatedActivationStamp() == activation,
-                              let workspace = try provider.workspaceRepo.workspace(id: workspaceID) else { throw LedgerAccessError.staleActivation }
-                        let publish = { provider.investmentRepo.saveZurichHoldings(.init(providerGeneration: provider.generationToken,
-                            workspace: workspace, baseline: baseline, source: source, backgroundJob: claim)) }
-                        if let enrollment { return try enrollmentStore.withValid(enrollment, publish) }
-                        return publish()
+                    let publish = {
+                        try provider.database.withExclusiveAccess {
+                            guard try provider.database.validatedActivationStamp() == activation,
+                                  let workspace = try provider.workspaceRepo.workspace(id: workspaceID) else { throw LedgerAccessError.staleActivation }
+                            let save = { provider.investmentRepo.saveZurichHoldings(.init(providerGeneration: provider.generationToken,
+                                workspace: workspace, baseline: baseline, source: source, backgroundJob: claim)) }
+                            if let enrollment { return try enrollmentStore.withValid(enrollment, save) }
+                            return save()
+                        }
                     }
+                    // This check is after the actor hop, at the actual synchronous
+                    // commit entry. Task cancellation also protects helper work.
+                    if let request { return try request.publish(publish) }
+                    try Task.checkCancellation()
+                    return try publish()
                 }
                 guard result == .saved else {
                     if case .rejected(let error) = result { throw error }
@@ -324,13 +377,82 @@ actor BackgroundUpdateExecutor {
                 Self.publishHint()
                 return .completed(.committedCurrentHoldings)
             } catch {
+                // Cancellation leaves an unfinished claim for the next lease
+                // owner. It is neither a holdings receipt nor a final failure.
+                if Task.isCancelled || error is CancellationError || (error as? ZurichISPClientError) == .cancelled {
+                    return .cancelled
+                }
                 if error is ZurichISPCredentialError { return finish(claim, .refusedCredentialInteraction) }
                 let outcome = finish(claim, .failedFinal)
                 guard outcome == .completed(.failedFinal) else { return outcome }
                 let message = Self.ispFailureMessage(error)
                 return .ispFailed(message)
             }
+        } catch {
+            return Task.isCancelled || error is CancellationError ? .cancelled : .authorityRefused
+        }
+    }
+
+    func refreshIBKR(configuration: BackgroundScheduleConfiguration, manual: Bool) async -> Outcome {
+        do {
+            guard let lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .ibkrFlex) else { return .alreadyRunning }
+            defer { withExtendedLifetime(lease) {} }
+            let provider = provider, workspaceID = workspaceID
+            let baseline = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID) }
+            guard let slot = BackgroundSchedule.latestOccurrence(of: configuration.ibkrFlexRule, at: Date()) else { return .notDue }
+            if !manual, try !simpleDue(.ibkrFlex, slot: slot, nativeSuccess: baseline.latestIBKRFlex?.fetchedAt) { return .notDue }
+            guard let claim = try withAuthority({ try provider.backgroundJobRepo.claim(.ibkrFlex, activation: activation, origin: origin, now: Date()) }) else { return .alreadyRunning }
+            do {
+                guard let credentials = try IBKRFlexCredentialStore(interaction: .forbidden).load() else { return finish(claim, .refusedCredentialInteraction) }
+                let source = try await ibkrClient.fetch(credentials: credentials)
+                try Task.checkCancellation()
+                let enrollment = enrollment, enrollmentStore = enrollmentStore, activation = activation
+                let result = try await MainActor.run {
+                    try provider.database.withExclusiveAccess {
+                        guard try provider.database.validatedActivationStamp() == activation,
+                              let workspace = try provider.workspaceRepo.workspace(id: workspaceID) else { throw LedgerAccessError.staleActivation }
+                        let publish = { provider.investmentRepo.saveIBKRFlexHoldings(.init(providerGeneration: provider.generationToken,
+                            workspace: workspace, baseline: baseline, source: source, backgroundJob: claim)) }
+                        if let enrollment { return try enrollmentStore.withValid(enrollment, publish) }
+                        return publish()
+                    }
+                }
+                guard result == .saved else {
+                    if case .rejected(let error) = result { throw error }
+                    throw InvestmentError.staleReview
+                }
+                Self.publishHint()
+                return .completed(.committedCurrentHoldings)
+            } catch {
+                if error is IBKRFlexCredentialError { return finish(claim, .refusedCredentialInteraction) }
+                let outcome = finish(claim, .failedFinal)
+                guard outcome == .completed(.failedFinal) else { return outcome }
+                return .ibkrFailed(Self.ibkrFailureMessage(error))
+            }
         } catch { return .authorityRefused }
+    }
+
+    nonisolated static func ibkrFailureMessage(_ error: Error) -> String {
+        switch error {
+        case let error as IBKRFlexSourceError: return error.localizedDescription
+        case let error as IBKRFlexClientError: return error.localizedDescription
+        case let error as IBKRFlexCredentialError: return error.localizedDescription
+        case let error as InvestmentError: return error.localizedDescription
+        default: return "The IBKR update failed. Previous holdings are retained."
+        }
+    }
+
+    func nextIBKRTarget(configuration: BackgroundScheduleConfiguration, now: Date = Date()) async throws -> Date? {
+        guard configuration.ibkrFlexHoldingsEnabled,
+              let slot = BackgroundSchedule.latestOccurrence(of: configuration.ibkrFlexRule, at: now),
+              let next = BackgroundSchedule.nextOccurrence(of: configuration.ibkrFlexRule, after: now) else { return nil }
+        let provider = provider, workspaceID = workspaceID
+        let last = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID).latestIBKRFlex?.fetchedAt }
+        guard try simpleDue(.ibkrFlex, slot: slot, nativeSuccess: last) else { return next }
+        let busy = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .ibkrFlex) == nil
+        // Recheck a due slot after a concurrent request releases its lease;
+        // contention must not defer a missed weekly update by another week.
+        return busy ? min(now.addingTimeInterval(60), next) : now
     }
 
     // Only fixed, app-owned descriptions enter presentation and diagnostics.
@@ -423,9 +545,17 @@ actor BackgroundUpdateExecutor {
            let next = BackgroundSchedule.nextOccurrence(of: configuration.zurichISPRule, after: now) {
             let provider = provider, workspaceID = workspaceID
             let last = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID).latestZioAccount?.fetchedAt }
-            let busy = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP) == nil
-            targets.append(try !busy && simpleDue(.zurichISP, slot: slot, nativeSuccess: last) ? now : next)
+            if try simpleDue(.zurichISP, slot: slot, nativeSuccess: last) {
+                let busy = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP) == nil
+                // Reuse the existing bounded ISP contention recheck. A connection
+                // check holds this lease but produces no holdings completion.
+                targets.append(busy ? min(now.addingTimeInterval(60), next) : now)
+            } else {
+                // Concurrent success and terminal failure still satisfy this slot.
+                targets.append(next)
+            }
         }
+        if let ibkrTarget = try await nextIBKRTarget(configuration: configuration, now: now) { targets.append(ibkrTarget) }
         return targets.min()
     }
 

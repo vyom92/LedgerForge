@@ -69,24 +69,28 @@ struct CategoryManagementView: View {
 #endif
 
     var body: some View {
-        LFPanel(title: "Category Management") {
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            LFSettingsPageHeader("Categories", subtitle: "Organise imported transactions with your own categories.")
+            LFPanel(title: "New category") {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    TextField("New category name", text: $newName)
-                        .lfTextField()
-                        .onSubmit(create)
-                    Button("Create", action: create)
-                        .lfPrimaryAction()
-                        .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.spacing.controlGap) { createControls }
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) { createControls }
                 }
+                Divider().overlay(theme.palette.divider)
 
                 if categoryStore.categories.isEmpty {
-                    LFEmptyState(
-                        title: "No categories yet",
-                        message: "Create a category to classify imported transactions manually.",
-                        systemImage: "tag"
-                    )
-                    .frame(minHeight: 150)
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        Image(systemName: "tag").font(theme.typography.sectionIcon)
+                            .foregroundStyle(theme.palette.secondaryText).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: theme.spacing.small) {
+                            Text("No categories yet").font(theme.typography.sectionTitle)
+                            Text("Create a category to classify imported transactions.")
+                                .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.vertical, theme.spacing.sectionGap)
                 } else {
                     categorySection(title: "Active", categories: categoryStore.activeCategories)
                     if !categoryStore.archivedCategories.isEmpty {
@@ -111,6 +115,8 @@ struct CategoryManagementView: View {
                     }
                 }
             }
+        }
+            .frame(maxWidth: 1000, alignment: .leading)
         }
         .onAppear {
             DatabaseActivityGate.shared.registerDraftOwner(restoreDraft) { [weak draft = restoreDraft] in draft?.hasDraft == true }
@@ -155,6 +161,12 @@ struct CategoryManagementView: View {
             Text(DevelopmentProfileAcknowledgementPresentation.message)
         }
 #endif
+    }
+
+    @ViewBuilder private var createControls: some View {
+        TextField("New category name", text: $newName).lfTextField().onSubmit(create)
+        Button("Create", action: create).lfPrimaryAction()
+            .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     @ViewBuilder

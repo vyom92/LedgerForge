@@ -13,6 +13,8 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
         return sources.count == 3 ? .init(policies: sources.sorted { $0.policyID < $1.policyID }) : nil
     }
 
+    var latestIBKRFlex: IBKRFlexAccountSnapshot? { containers.compactMap(\.ibkrSource).max { $0.fetchedAt < $1.fetchedAt } }
+
     /// Attached public price-routing metadata does not change a reviewed source import.
     /// Every financial, ownership, alias, date and provenance field remains exact.
     func hasSameSource(as other: Self) -> Bool {
@@ -43,7 +45,15 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
                   container.aliases.contains(container.identity), Set(container.aliases).count == container.aliases.count else {
                 throw InvestmentError.invalidPersistedState
             }
-            if let source = container.zioSource {
+            if let source = container.ibkrSource {
+                _ = try source.validated(expectedAccountID: container.identity, now: Date())
+                guard container.institution == "Interactive Brokers", container.identityKind == "account",
+                      container.zioSource == nil, container.lastZioAccount == nil,
+                      container.documentID == nil, container.importSessionID == nil,
+                      container.holdingsDate == source.reportDate, container.completeAtHoldingsDate else {
+                    throw InvestmentError.invalidPersistedState
+                }
+            } else if let source = container.zioSource {
                 try source.validate()
                 guard container.institution == "Zurich ISP", container.identity == source.policyID,
                       container.documentID == nil, container.importSessionID == nil,
@@ -68,7 +78,19 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
                   positionKeys.insert([holding.containerID, holding.instrumentIdentity, holding.currency].joined(separator: "\u{1F}")).inserted else {
                 throw InvestmentError.invalidPersistedState
             }
-            if let sourceID = holding.zioObservationID {
+            if let sourceID = holding.ibkrObservationID {
+                guard let source = container.ibkrSource, source.observationID == sourceID,
+                      let position = source.positions.first(where: { $0.instrumentIdentity == holding.instrumentIdentity }),
+                      holding.zioObservationID == nil, holding.zioFundCode == nil,
+                      holding.documentID == nil, holding.importSessionID == nil, holding.normalizedDocumentID == nil,
+                      holding.parserProfile == "ibkr.flex.open-positions", holding.units == position.units,
+                      holding.currency == position.currency, holding.holdingsDate == source.reportDate,
+                      holding.valuationDate == source.reportDate, holding.sourceOrdinal == position.sourceOrdinal,
+                      holding.averageCost == position.averageCost, holding.totalCost == position.totalCost,
+                      holding.costCurrency == position.currency,
+                      holding.averageCostLabel == "Reported cost basis price", holding.totalCostLabel == "Reported total cost",
+                      Set(position.sourceAliases).isSubset(of: Set(holding.sourceAliases)) else { throw InvestmentError.invalidPersistedState }
+            } else if let sourceID = holding.zioObservationID {
                 guard let source = container.zioSource, source.observationID == sourceID,
                       let fund = source.funds.first(where: { $0.code == holding.zioFundCode }),
                       holding.documentID == nil, holding.importSessionID == nil, holding.normalizedDocumentID == nil,
@@ -98,6 +120,14 @@ nonisolated public struct InvestmentSnapshot: Equatable, Sendable {
                 guard !mapping.provider.isEmpty, !mapping.code.isEmpty, mapping.currency == holding.currency else {
                     throw InvestmentError.invalidPersistedState
                 }
+            }
+        }
+        for container in containers where container.ibkrSource != nil {
+            let source = container.ibkrSource!
+            let actual = holdings.filter { $0.containerID == container.id }
+            guard actual.allSatisfy({ $0.ibkrObservationID == source.observationID }),
+                  Set(actual.map(\.instrumentIdentity)) == Set(source.positions.map(\.instrumentIdentity)) else {
+                throw InvestmentError.invalidPersistedState
             }
         }
         for container in containers where container.zioSource != nil {
@@ -197,6 +227,7 @@ public protocol InvestmentRepository {
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult
     func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult
     func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult
 }
 
 /// A mapping-only change. The exact reviewed source snapshot must still be current.
@@ -235,6 +266,7 @@ struct EmptyInvestmentRepository: InvestmentRepository {
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult { .persistenceUnavailable }
     func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult { .unavailable }
     func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult { .unavailable }
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult { .unavailable }
 }
 
 struct UnavailableInvestmentRepository: InvestmentRepository {
@@ -242,6 +274,7 @@ struct UnavailableInvestmentRepository: InvestmentRepository {
     func commitCurrentHoldings(_ plan: InvestmentImportPlan) -> InvestmentImportRepositoryResult { .persistenceUnavailable }
     func savePriceMappings(_ plan: InvestmentPriceMappingPlan) -> InvestmentPriceMappingResult { .unavailable }
     func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult { .unavailable }
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult { .unavailable }
 }
 
 /// Pure current-state replacement. Both providers re-run this under their transaction lock.
@@ -273,6 +306,7 @@ enum InvestmentUpdatePlanner {
                       prior == nil || prior?.id == chosen.id else { throw InvestmentError.identityChoiceRequired }
                 prior = chosen
             }
+            if prior?.ibkrSource != nil { throw InvestmentError.directSourceRetained }
             if let prior, scope.holdingsDate < prior.holdingsDate { throw InvestmentError.olderSnapshot }
             // An all-zero historical folio with no established container or
             // confirmed alias contributes no current holding. A shared ISIN in

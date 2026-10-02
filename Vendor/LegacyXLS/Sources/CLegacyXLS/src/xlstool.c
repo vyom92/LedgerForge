@@ -144,6 +144,31 @@ void verbose(char* str)
         printf("libxls : %s\n",str);
 }
 
+/* A producer records its first failure separately from text. This is never
+   inferred from a NULL blank or from any literal source string. */
+static char *xls_string_failure(xls_error_t *error, xls_error_t failure) {
+    if (error != NULL && *error == LIBXLS_OK)
+        *error = failure;
+    return NULL;
+}
+
+static char *xls_string_buffer(size_t size, xls_error_t *error) {
+    char *result = malloc(size);
+    if (result == NULL)
+        return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+    return result;
+}
+
+char *xls_strdup(const char *s, xlsWorkBook *pWB) {
+    if (s == NULL)
+        return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
+    size_t size = strlen(s) + 1;
+    char *result = xls_string_buffer(size, &pWB->string_error);
+    if (result != NULL)
+        memcpy(result, s, size);
+    return result;
+}
+
 #ifdef HAVE_ICONV
 
 struct codepage_entry_t {
@@ -197,101 +222,99 @@ static const char *encoding_for_codepage(WORD codepage) {
     return "WINDOWS-1252";
 }
 
-static char* unicode_decode_iconv(const char *s, size_t len, iconv_t ic) {
-    char* outbuf = 0;
+static char* unicode_decode_iconv(const char *s, size_t len, iconv_t ic,
+                                  xls_error_t *error) {
+    if (len == 0) {
+        char *empty = xls_string_buffer(1, error);
+        if (empty != NULL)
+            empty[0] = '\0';
+        return empty;
+    }
+    if (len == SIZE_MAX)
+        return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+    if (s == NULL || !ic || ic == (iconv_t)-1)
+        return xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
 
-    if(s && len && len < SIZE_MAX && ic && ic != (iconv_t)-1)
-    {
-        size_t outlenleft = len;
-        size_t outlen = len;
-        size_t inlenleft = len;
-        const char* src_ptr = s;
-        char* out_ptr = 0;
+    size_t outlenleft = len;
+    size_t outlen = len;
+    size_t inlenleft = len;
+    const char *src_ptr = s;
+    char *outbuf = xls_string_buffer(outlen + 1, error);
+    if (outbuf == NULL)
+        return NULL;
+    char *out_ptr = outbuf;
 
-        size_t st; 
-        outbuf = malloc(outlen + 1);
-
-		if(outbuf)
-        {
-            out_ptr = outbuf;
-            while(inlenleft)
-            {
-                st = iconv(ic, (ICONV_CONST char **)&src_ptr, &inlenleft, (char **)&out_ptr,(size_t *) &outlenleft);
-                if(st == (size_t)(-1))
-                {
-                    if(errno == E2BIG)
-                    {
-                        size_t diff = out_ptr - outbuf;
-                        if (inlenleft > SIZE_MAX - outlen - 1) {
-                            free(outbuf);
-                            return NULL;
-                        }
-                        outlen += inlenleft;
-                        outlenleft += inlenleft;
-                        char *grown = realloc(outbuf, outlen + 1);
-                        if(!grown)
-                        {
-                            free(outbuf);
-                            return NULL;
-                        }
-                        outbuf = grown;
-                        out_ptr = outbuf + diff;
-                    }
-                    else
-                    {
-                        free(outbuf), outbuf = NULL;
-                        break;
-                    }
+    while (inlenleft) {
+        size_t st = iconv(ic, (ICONV_CONST char **)&src_ptr, &inlenleft,
+                         &out_ptr, &outlenleft);
+        if (st == (size_t)-1) {
+            if (errno == E2BIG) {
+                size_t diff = (size_t)(out_ptr - outbuf);
+                if (inlenleft > SIZE_MAX - outlen - 1) {
+                    free(outbuf);
+                    return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
                 }
+                outlen += inlenleft;
+                outlenleft += inlenleft;
+                char *grown = realloc(outbuf, outlen + 1);
+                if (grown == NULL) {
+                    free(outbuf);
+                    return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+                }
+                outbuf = grown;
+                out_ptr = outbuf + diff;
+            } else {
+                free(outbuf);
+                return xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
             }
         }
-        outlen -= outlenleft;
-
-        if(outbuf)
-        {
-            outbuf[outlen] = 0;
-        }
     }
+    outbuf[outlen - outlenleft] = '\0';
     return outbuf;
 }
 
 #endif
 
 // Convert UTF-16 to UTF-8 without iconv
-static char *unicode_decode_wcstombs(const char *s, size_t len, xls_locale_t locale) {
-	// Do wcstombs conversion
+static char *unicode_decode_wcstombs(const char *s, size_t len,
+                                    xls_locale_t locale, xls_error_t *error) {
     char *converted = NULL;
     size_t count, count2;
     size_t i;
     wchar_t *w = NULL;
 
-    if (s == NULL || len / 2 > SIZE_MAX / sizeof(wchar_t) - 1)
-        return NULL;
-    w = malloc((len/2+1)*sizeof(wchar_t));
-    if (w == NULL)
-        return NULL;
-
-    for(i=0; i<len/2; i++)
-    {
-        w[i] = (BYTE)s[2*i] + ((BYTE)s[2*i+1] << 8);
+    if (len == 0) {
+        char *empty = xls_string_buffer(1, error);
+        if (empty != NULL)
+            empty[0] = '\0';
+        return empty;
     }
-    w[len/2] = '\0';
+    if (len / 2 > SIZE_MAX / sizeof(wchar_t) - 1)
+        return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+    if (s == NULL || len % 2 != 0 || locale == NULL)
+        return xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
+    w = malloc((len / 2 + 1) * sizeof(wchar_t));
+    if (w == NULL)
+        return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+
+    for (i = 0; i < len / 2; i++)
+        w[i] = (BYTE)s[2 * i] + ((BYTE)s[2 * i + 1] << 8);
+    w[len / 2] = '\0';
 
     count = xls_wcstombs_l(NULL, w, INT_MAX, locale);
-
-    if (count == 0 || count == (size_t)-1) {
+    if (count == (size_t)-1) {
+        xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
         goto cleanup;
     }
-
-    converted = calloc(count+1, sizeof(char));
-    if (converted == NULL)
+    converted = calloc(count + 1, sizeof(char));
+    if (converted == NULL) {
+        xls_string_failure(error, LIBXLS_ERROR_MALLOC);
         goto cleanup;
+    }
     count2 = xls_wcstombs_l(converted, w, count, locale);
-    if (count2 == 0 || count2 == (size_t)-1) {
-        printf("wcstombs failed (%lu)\n", (unsigned long)len/2);
+    if (count2 == (size_t)-1) {
         free(converted);
-        converted = NULL;
-        goto cleanup;
+        converted = xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
     }
 
 cleanup:
@@ -300,75 +323,82 @@ cleanup:
 }
 
 // Converts Latin-1 to UTF-8 the old-fashioned way
-static char *transcode_latin1_to_utf8(const char *str, size_t len)
-{
-	size_t utf8_chars = 0;
-	char *ret = NULL;
+static char *transcode_latin1_to_utf8(const char *str, size_t len,
+                                     xls_error_t *error) {
+    size_t utf8_chars = 0;
     size_t i;
 
-    if (str == NULL || len > (SIZE_MAX - 1) / 2)
-        return NULL;
-	
-    for(i=0; i<len; ++i) {
-        if(str[i] & (BYTE)0x80) {
+    if (len > (SIZE_MAX - 1) / 2)
+        return xls_string_failure(error, LIBXLS_ERROR_MALLOC);
+    if (str == NULL && len != 0)
+        return xls_string_failure(error, LIBXLS_ERROR_TEXT_CONVERSION);
+    for (i = 0; i < len; ++i) {
+        if (str[i] & (BYTE)0x80)
             ++utf8_chars;
-        }
     }
-	
-    char *out = ret = malloc(len+utf8_chars+1);
+
+    char *ret = xls_string_buffer(len + utf8_chars + 1, error);
     if (ret == NULL)
         return NULL;
-    // UTF-8 encoding inline
-    for(i=0; i<len; ++i) {
+    char *out = ret;
+    for (i = 0; i < len; ++i) {
         BYTE c = str[i];
-        if(c & (BYTE)0x80) {
+        if (c & (BYTE)0x80) {
             *out++ = (BYTE)0xC0 | (c >> 6);
             *out++ = (BYTE)0x80 | (c & 0x3F);
         } else {
             *out++ = c;
         }
     }
-    *out = 0;
-
-	return ret;
+    *out = '\0';
+    return ret;
 }
 
 // Convert BIFF5 string or compressed BIFF8 string to the encoding desired
-// by the workbook. Returns a NUL-terminated string
+// by the workbook. Returns a NUL-terminated string, including for empty text.
 char* codepage_decode(const char *s, size_t len, xlsWorkBook *pWB) {
+    if (len == 0)
+        return xls_strdup("", pWB);
     if (!pWB->is5ver && strcmp(pWB->charset, "UTF-8") == 0)
-        return transcode_latin1_to_utf8(s, len);
+        return transcode_latin1_to_utf8(s, len, &pWB->string_error);
 
 #ifdef HAVE_ICONV
     if (!pWB->converter) {
         const char *from_encoding = pWB->is5ver ? encoding_for_codepage(pWB->codepage) : "ISO-8859-1";
         iconv_t converter = iconv_open(pWB->charset, from_encoding);
-        if (converter == (iconv_t)-1) {
-            printf("conversion from '%s' to '%s' not available", from_encoding, pWB->charset);
-            return NULL;
-        }
+        if (converter == (iconv_t)-1)
+            return xls_string_failure(&pWB->string_error,
+                errno == ENOMEM ? LIBXLS_ERROR_MALLOC : LIBXLS_ERROR_TEXT_CONVERSION);
         pWB->converter = (void *)converter;
     }
-    return unicode_decode_iconv(s, len, pWB->converter);
+    return unicode_decode_iconv(s, len, pWB->converter, &pWB->string_error);
 #else
-    char *ret = malloc(len+1);
-    memcpy(ret, s, len);
-    ret[len] = 0;
+    if (len == SIZE_MAX)
+        return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_MALLOC);
+    if (s == NULL)
+        return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_TEXT_CONVERSION);
+    char *ret = xls_string_buffer(len + 1, &pWB->string_error);
+    if (ret != NULL) {
+        memcpy(ret, s, len);
+        ret[len] = '\0';
+    }
     return ret;
 #endif
 }
 
 // Convert unicode string to UTF-8
 char* transcode_utf16_to_utf8(const char *s, size_t len) {
+    xls_error_t error = LIBXLS_OK;
     xls_locale_t locale = xls_createlocale();
-    char *result = unicode_decode_wcstombs(s, len, locale);
+    char *result = unicode_decode_wcstombs(s, len, locale, &error);
     xls_freelocale(locale);
     return result;
 }
 
 // Convert unicode string to the encoding desired by the workbook
-char* unicode_decode(const char *s, size_t len, xlsWorkBook *pWB)
-{
+char* unicode_decode(const char *s, size_t len, xlsWorkBook *pWB) {
+    if (len == 0)
+        return xls_strdup("", pWB);
 #ifdef HAVE_ICONV
 #if defined(_AIX) || defined(__sun)
     const char *from_enc = "UTF-16le";
@@ -377,23 +407,21 @@ char* unicode_decode(const char *s, size_t len, xlsWorkBook *pWB)
 #endif
     if (!pWB->utf16_converter) {
         iconv_t converter = iconv_open(pWB->charset, from_enc);
-        if (converter == (iconv_t)-1) {
-            printf("conversion from '%s' to '%s' not available\n", from_enc, pWB->charset);
-            return NULL;
-        }
+        if (converter == (iconv_t)-1)
+            return xls_string_failure(&pWB->string_error,
+                errno == ENOMEM ? LIBXLS_ERROR_MALLOC : LIBXLS_ERROR_TEXT_CONVERSION);
         pWB->utf16_converter = (void *)converter;
     }
-    return unicode_decode_iconv(s, len, pWB->utf16_converter);
+    return unicode_decode_iconv(s, len, pWB->utf16_converter, &pWB->string_error);
 #else
     if (!pWB->utf8_locale) {
         xls_locale_t locale = xls_createlocale();
-        if (locale == NULL) {
-            printf("creation of UTF-8 locale failed\n");
-            return NULL;
-        }
+        if (locale == NULL)
+            return xls_string_failure(&pWB->string_error,
+                errno == ENOMEM ? LIBXLS_ERROR_MALLOC : LIBXLS_ERROR_TEXT_CONVERSION);
         pWB->utf8_locale = (void *)locale;
     }
-    return unicode_decode_wcstombs(s, len, pWB->utf8_locale);
+    return unicode_decode_wcstombs(s, len, pWB->utf8_locale, &pWB->string_error);
 #endif
 }
 
@@ -405,18 +433,21 @@ char *get_string(const char *s, size_t len, BYTE is2, xlsWorkBook* pWB)
     BYTE flag = 0;
     const char *str = s;
     char *ret = NULL;
+
+    if (s == NULL)
+        return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
 	
     if (is2) {
 		// length is two bytes
         if (ofs + 2 > len) {
-            return NULL;
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
         }
         ln= ((BYTE*)str)[0] + (((BYTE*)str)[1] << 8);
         ofs+=2;
     } else {
 		// single byte length
         if (ofs + 1 > len) {
-            return NULL;
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
         }
         ln=*(BYTE*)str;
         ofs++;
@@ -425,7 +456,7 @@ char *get_string(const char *s, size_t len, BYTE is2, xlsWorkBook* pWB)
 	if(!pWB->is5ver) {
 		// unicode strings have a format byte before the string
         if (ofs + 1 > len) {
-            return NULL;
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
         }
 		flag=*(BYTE*)(str+ofs);
 		ofs++;
@@ -442,12 +473,12 @@ char *get_string(const char *s, size_t len, BYTE is2, xlsWorkBook* pWB)
     }
     if(flag & 0x1) {
         if (ofs + 2*ln > len) {
-            return NULL;
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
         }
         ret = unicode_decode(str+ofs, ln*2, pWB);
     } else {
         if (ofs + ln > len) {
-            return NULL;
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
         }
         ret = codepage_decode(str+ofs, ln, pWB);
     }
@@ -675,13 +706,14 @@ char *xls_getfcell(xlsWorkBook* pWB, struct st_cell_data* cell, BYTE *label)
             offset += ((DWORD)label[2] << 16);
             offset += ((DWORD)label[3] << 24);
         }
-        if(offset < pWB->sst.count && pWB->sst.string[offset].str) {
-            ret = strdup(pWB->sst.string[offset].str);
-        }
+        if (offset >= pWB->sst.count || pWB->sst.string == NULL
+            || pWB->sst.string[offset].str == NULL)
+            return xls_string_failure(&pWB->string_error, LIBXLS_ERROR_PARSE);
+        ret = xls_strdup(pWB->sst.string[offset].str, pWB);
         break;
     case XLS_RECORD_BLANK:
     case XLS_RECORD_MULBLANK:
-        ret = strdup("");
+        ret = xls_strdup("", pWB);
         break;
     case XLS_RECORD_LABEL:
     case XLS_RECORD_RSTRING:
@@ -695,14 +727,18 @@ char *xls_getfcell(xlsWorkBook* pWB, struct st_cell_data* cell, BYTE *label)
         break;
     case XLS_RECORD_RK:
     case XLS_RECORD_NUMBER:
-        ret = malloc(retlen);
+        ret = xls_string_buffer(retlen, &pWB->string_error);
+        if (ret == NULL)
+            return NULL;
         snprintf(ret, retlen, "%lf", cell->d);
 		break;
 		//		if( RK || MULRK || NUMBER || FORMULA)
 		//		if (cell->id==0x27e || cell->id==0x0BD || cell->id==0x203 || 6 (formula))
     default:
         if (xf) {
-            ret = malloc(retlen);
+            ret = xls_string_buffer(retlen, &pWB->string_error);
+            if (ret == NULL)
+                return NULL;
             switch (xf->format)
             {
                 case XLS_FORMAT_GENERAL:

@@ -75,6 +75,7 @@ private enum SettingsSubsection: String {
     case appearance = "Appearance"
     case liveFX = "Live FX"
     case ispAccount = "ISP Account"
+    case ibkrAccount = "IBKR"
     case emailStatements = "Email Statements"
     case backgroundUpdates = "Background Updates"
     case backup = "Backup & Restore"
@@ -84,7 +85,7 @@ private enum SettingsSubsection: String {
         switch self {
         case .appearance: "paintpalette"
         case .liveFX: "arrow.triangle.2.circlepath"
-        case .ispAccount: "link"
+        case .ispAccount, .ibkrAccount: "link"
         case .emailStatements: "envelope"
         case .backgroundUpdates: "clock.arrow.circlepath"
         case .backup: "externaldrive"
@@ -173,7 +174,7 @@ enum ImportPresentationState {
     case validationFailed(PreparedImport)
     case committing(PreparedImport)
     case completed(ImportOutcomePresentation)
-    case skipped(fileName: String)
+    case skipped(fileName: String, retainedNewerHoldings: Bool = false)
     case cancelled(fileName: String)
     case failed(fileName: String, message: String, retrySourceURL: URL?)
 }
@@ -653,7 +654,7 @@ struct ImportIdentityReviewUIProjection: Equatable {
         case .liabilityAccountChoiceRequired(let eligibleLiabilityAccountIDs):
             presentation = ImportAccountOutcomePresentation(
                 label: "Choose a liability account",
-                explanation: "This Axis credit-card statement has no instrument sections. Choose an eligible existing liability account or create a separate one."
+                explanation: "Choose the account for this Axis card statement. Its printed card number will retain your confirmed account association."
             )
             iconName = "creditcard.badge.questionmark"
             tone = .warning
@@ -706,6 +707,8 @@ enum ImportAccountConfirmationPolicy {
     ) -> Bool {
         if let name = choice?.proposedAccountDisplayName,
            name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        if case .useExistingCardLiabilityAccountSections(_, let choices) = choice,
+           !ImportCardInstrumentChoice.hasDistinctExistingDestinations(choices) { return false }
         switch (review, choice) {
         case (.matchedExisting, _):
             return true
@@ -1284,8 +1287,10 @@ struct ImportOutcomePresentation: Equatable {
         var copy = self
         copy.recoveryRoute = .none
         copy.recoveryContextID = nil
-        copy.allowsViewingTransactions = !isSalaryImport && !isInvestmentImport
-        copy.persistenceStatus = isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded"
+        copy.allowsViewingTransactions = !isEquivalentSupportingSource && !isSalaryImport && !isInvestmentImport
+        copy.persistenceStatus = isEquivalentSupportingSource
+            ? "Equivalent Source Recorded"
+            : (isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded")
         copy.message = nil
         copy.iconName = "checkmark.circle.fill"
         copy.tone = .success
@@ -1391,11 +1396,11 @@ struct ImportActivityPresentation: Equatable {
                 tone: outcome.tone,
                 recordedAtText: ImportInstantFormatting.display(completedAttempt?.createdAtISO)
             )
-        case .skipped(let fileName):
+        case .skipped(let fileName, let retainedNewerHoldings):
             self.init(
                 title: fileName,
-                subtitle: "Statement skipped. No data was written.",
-                status: "Skipped",
+                subtitle: retainedNewerHoldings ? "Newer current holdings retained. No financial data was written." : "Statement skipped. No data was written.",
+                status: retainedNewerHoldings ? "No update needed" : "Skipped",
                 iconName: "forward.fill",
                 tone: .warning
             )
@@ -1439,7 +1444,7 @@ struct ImportActivityPresentation: Equatable {
     private init(durableAttempt: RepositoryImportAttempt) {
         let presentation = DurableImportAttemptPresentation(attempt: durableAttempt)
         self.init(
-            title: "Latest durable import",
+            title: "Last import attempt",
             subtitle: presentation.outcome.explanation,
             status: presentation.outcome.label,
             iconName: presentation.outcome.iconName,
@@ -1471,11 +1476,15 @@ struct ContentView: View {
     @ObservedObject private var alDarReferenceSession: AlDarReferenceSession
     @ObservedObject private var investmentPriceSession: InvestmentPriceSession
     @ObservedObject private var ispSyncSession: ZurichISPSyncSession
+    @ObservedObject private var ibkrFlexSession: IBKRFlexSyncSession
     @ObservedObject private var backgroundUpdates = BackgroundUpdatesSession.shared
     @State private var settingsSubsection: SettingsSubsection?
-    @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
+    @ObservedObject private var salaryViewModel: SalaryWorkspaceViewModel
     @StateObject private var dashboardViewModel: DashboardViewModel
-    @State private var dashboardShowsZeroBalances = false
+    @State private var netWorthShowsZeroBalances = false
+    @State private var dashboardSelectedReportRow: String?
+    @State private var dashboardDetailedAccount: String?
+    @State private var dashboardShowsPlanDetails = false
     @ObservedObject private var transactionViewModel: TransactionListViewModel
     private let transactionAmountMeasurement: TransactionAmountWidthMeasurement
     @StateObject private var accountsViewModel = AccountsViewModel()
@@ -1531,7 +1540,7 @@ struct ContentView: View {
             guard let outcome = item.outcome else { return .idle }
             return .completed(outcome)
         case .skipped:
-            return .skipped(fileName: item.displayFileName)
+            return .skipped(fileName: item.displayFileName, retainedNewerHoldings: item.retainedNewerHoldings)
         case .cancelled:
             return .cancelled(fileName: item.displayFileName)
         case .failed:
@@ -1601,18 +1610,45 @@ struct ContentView: View {
         }
     }
 
+    private var sidebarPendingImportStatus: String? {
+        if !importCentre.items.isEmpty, !importCentre.batchSummary.isComplete {
+            let remaining = importCentre.items.count - importCentre.terminalItems.count
+            switch importCentre.batchLifecycle {
+            case .cancelling: return "Finishing the current batch…"
+            case .awaitingUserAction: return "Batch needs attention · \(max(1, remaining)) remaining"
+            default: return "Batch in progress · \(remaining) of \(importCentre.items.count) remaining"
+            }
+        }
+        if !pendingBatchSourceURLs.isEmpty {
+            return "\(pendingBatchSourceURLs.count) selected for import"
+        }
+        let pendingEmails = emailIntake.batchSources.count
+        return pendingEmails > 0 ? "\(pendingEmails) email originals awaiting import" : nil
+    }
+
+    private var dashboardActionableImportStatus: String? {
+        if !importCentre.items.isEmpty, !importCentre.batchSummary.isComplete,
+           importCentre.batchLifecycle != .awaitingUserAction { return nil }
+        return sidebarPendingImportStatus
+    }
+
     init(transactionViewModel: TransactionListViewModel? = nil,
          transactionAmountMeasurement: TransactionAmountWidthMeasurement? = nil,
+         salaryViewModel: SalaryWorkspaceViewModel? = nil,
          alDarReferenceSession: AlDarReferenceSession? = nil,
          investmentPriceSession: InvestmentPriceSession? = nil,
-         ispSyncSession: ZurichISPSyncSession? = nil) {
+         ispSyncSession: ZurichISPSyncSession? = nil, ibkrFlexSession: IBKRFlexSyncSession? = nil) {
         let rates = alDarReferenceSession ?? AlDarReferenceSession(enabled: false)
         let prices = investmentPriceSession ?? InvestmentPriceSession(enabled: false)
+        let planner = salaryViewModel ?? SalaryWorkspaceViewModel()
         self.alDarReferenceSession = rates
         self.investmentPriceSession = prices
-        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(reportingRates: rates, reportingPrices: prices))
+        _dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(reportingRates: rates, reportingPrices: prices,
+            fundingMonth: planner.month, fundingWorkspace: planner))
         self.ispSyncSession = ispSyncSession ?? ZurichISPSyncSession(enabled: false)
+        self.ibkrFlexSession = ibkrFlexSession ?? IBKRFlexSyncSession(enabled: false)
         self.transactionViewModel = transactionViewModel ?? TransactionListViewModel()
+        self.salaryViewModel = planner
         self.transactionAmountMeasurement = transactionAmountMeasurement ?? TransactionAmountWidthMeasurement()
     }
 
@@ -1630,7 +1666,8 @@ struct ContentView: View {
                 AppShellSidebar(
                     selectedSection: selectedSection,
                     developerConsoleVisible: developerConsoleVisible,
-                    latestImportActivity: importActivityPresentation,
+                    pendingImportStatus: selectedSection == .dashboard && sidebarPendingImportStatus != nil
+                        ? nil : sidebarPendingImportStatus,
                     selectSection: { section in
 #if DEBUG
                         let timing = section == .transactions ? GmailQualificationTiming.begin(.navigationTransactions) : nil
@@ -1644,6 +1681,7 @@ struct ContentView: View {
                 )
             },
             toolbar: {
+                if selectedSection != .salary && selectedSection != .investments && selectedSection != .transactions && selectedSection != .settings && selectedSection != .developer {
                 AppShellToolbar(
                     section: selectedSection,
                     subtitle: toolbarSubtitle,
@@ -1651,12 +1689,16 @@ struct ContentView: View {
                         ? AnyView(DashboardLiveFXHeaderAccessory(session: alDarReferenceSession))
                         : nil
                 )
+                }
             },
             profileWarning: { profileWarning },
             availabilityBanner: { availabilityBanner },
             destination: { destinationContent }
         )
         .environment(\.lfTheme, theme)
+        .onReceive(salaryViewModel.$month) { month in
+            dashboardViewModel.selectFundingMonth(month)
+        }
         .onReceive(availability.$state) { state in
             transactionViewModel.synchronizePresentation(generation: availability.generation, availabilityState: state)
         }
@@ -1801,6 +1843,9 @@ struct ContentView: View {
                 planningReturnFilter = transactionViewModel.presentationFilter
                 transactionViewModel.presentationFilter = .empty
                 transactionViewModel.presentationFilter.canonicalTransactionIDs = ids
+                transactionViewModel.presentationFilter.accountIDs = Set(transactionViewModel.allPresentationRows.compactMap { row in
+                    row.transaction.repositoryTransactionId.map(ids.contains) == true ? row.accountID : nil
+                })
                 selectedSection = .transactions
             }) },
             settings: { settingsContent },
@@ -1817,30 +1862,30 @@ struct ContentView: View {
     private var dashboardContent: some View {
         GeometryReader { viewport in
             let contentWidth = max(0, viewport.size.width - theme.spacing.pagePadding * 2)
-            let usesColumns = contentWidth >= dashboardSupportingColumnWidth * 3 + theme.spacing.majorModuleGap * 2
-            let layout = usesColumns
-                ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.majorModuleGap))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.majorModuleGap))
+            let usesColumns = contentWidth >= max(1160, theme.typography.nativeFont(.body).pointSize * 72)
+            let investmentWidth = usesColumns ? (contentWidth - theme.spacing.sectionGap) * 0.58 : contentWidth
+            let columns = usesColumns
+                ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
             ScrollView {
                 VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                    dashboardPositionHeading
-                    dashboardPositionPanel(availableWidth: contentWidth)
                     DashboardNetWorthCard(report: dashboardViewModel.netWorthReport,
                         workspaceID: "default-workspace", permitsMutation: availability.permitsMutation,
-                        showsZeroBalances: $dashboardShowsZeroBalances)
-                    layout {
-                        salaryDashboardSummary
-                        DashboardInvestmentSnapshotCard(overview: investmentPriceSession.overview) {
+                        selectedRow: $dashboardSelectedReportRow, showsZeroBalances: $netWorthShowsZeroBalances)
+                    columns {
+                        DashboardInvestmentSnapshotCard(overview: investmentPriceSession.overview,
+                            report: dashboardViewModel.netWorthReport, selectedRow: $dashboardSelectedReportRow) {
                             selectedSection = .investments
                         }
-                        importActivityCard
+                        .frame(width: usesColumns ? investmentWidth : nil)
+                        salaryDashboardSummary
                     }
-                    if let attention = dashboardAttention {
-                        LFPanel(title: "Attention") {
-                            Label(attention.title, systemImage: attention.iconName)
-                                .foregroundStyle(attention.tone.color)
-                            Text(attention.explanation)
-                                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    columns {
+                        dashboardAccountPanel(isCard: false)
+                            .frame(width: usesColumns ? investmentWidth : nil)
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                            dashboardAccountPanel(isCard: true)
+                            importActivityCard
                         }
                     }
                 }
@@ -1856,29 +1901,9 @@ struct ContentView: View {
         return DashboardAttentionProjection.presentation(for: outcome.recoveryRoute)
     }
 
-    private var dashboardPositionHeading: some View {
-        HStack(spacing: theme.spacing.small) {
-            Text("Position by native currency")
-                .font(theme.typography.secondary)
-                .foregroundStyle(theme.palette.secondaryText)
-            if dashboardVisiblePositions.count == 1, let group = dashboardVisiblePositions.first {
-                Text(group.currency.code)
-                    .font(theme.typography.secondary.weight(.medium))
-            }
-            Spacer(minLength: theme.spacing.small)
-            if dashboardViewModel.positions.flatMap({ $0.banks + $0.cards }).contains(where: { $0.amount?.amount == 0 }) {
-                Toggle("Show zero balances", isOn: $dashboardShowsZeroBalances)
-                    .toggleStyle(.checkbox)
-                    .font(theme.typography.caption)
-                    .accessibilityIdentifier("dashboard.showZeroBalances")
-            }
-        }
-    }
-
     /// Hide only source-proven zero values. Totals and current eligibility are
     /// unchanged; unavailable balances are still part of the visible scope.
     private var dashboardVisiblePositions: [DashboardCurrencyPosition] {
-        guard !dashboardShowsZeroBalances else { return dashboardViewModel.positions }
         return dashboardViewModel.positions.compactMap { group in
             let banks = group.banks.filter { $0.amount?.amount != 0 }
             let cards = group.cards.filter { $0.amount?.amount != 0 }
@@ -1888,30 +1913,37 @@ struct ContentView: View {
         }
     }
 
-    private func dashboardPositionPanel(availableWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+    private func dashboardAccountPanel(isCard: Bool) -> some View {
+        let groups = dashboardVisiblePositions.filter { !(isCard ? $0.cards : $0.banks).isEmpty }
+        let positions = groups.flatMap { isCard ? $0.cards : $0.banks }
+        return LFPanel(contentSpacing: theme.spacing.small) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: theme.spacing.sectionGap) {
+                    Text(isCard ? "Credit cards" : "Bank accounts").font(theme.typography.sectionTitle)
+                    Spacer(minLength: theme.spacing.small)
+                    dashboardAccountSummary(groups, isCard: isCard)
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    Text(isCard ? "Credit cards" : "Bank accounts").font(theme.typography.sectionTitle)
+                    dashboardAccountSummary(groups, isCard: isCard)
+                }
+            }
             switch dashboardViewModel.positionState {
             case .loading:
-                dashboardState("Loading financial position…", loading: true)
+                dashboardState("Loading recorded balances…", loading: true)
             case .empty:
-                dashboardState("No bank or card accounts available.")
+                dashboardState(isCard ? "No card accounts available." : "No bank accounts available.")
             case .unavailable:
-                dashboardState("Data unavailable", detail: "Current bank and card positions are unavailable.")
+                dashboardState("Recorded balances unavailable")
             case .populated:
-                if dashboardVisiblePositions.isEmpty {
-                    dashboardState("All recorded bank and card balances are zero.")
-                } else if dashboardVisiblePositions.count == 1, let group = dashboardVisiblePositions.first {
-                    dashboardCurrencyGroup(group, availableWidth: availableWidth, allowsHorizontalDomains: true)
+                if positions.isEmpty {
+                    dashboardState(isCard ? "No non-zero card balances." : "No non-zero bank balances.")
                 } else {
-                    let count = dashboardVisiblePositions.count
-                    let columns = max(1, min(count, Int((availableWidth + theme.spacing.sectionGap)
-                                                       / (360 + theme.spacing.sectionGap))))
-                    let groupWidth = (availableWidth - CGFloat(columns - 1) * theme.spacing.sectionGap) / CGFloat(columns)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: theme.spacing.sectionGap, alignment: .top), count: columns),
-                              alignment: .leading, spacing: theme.spacing.sectionGap) {
-                        ForEach(dashboardVisiblePositions) { group in
-                            dashboardCurrencyGroup(group, availableWidth: groupWidth)
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                    VStack(spacing: 0) {
+                        ForEach(positions) { position in
+                            Divider().overlay(theme.palette.divider)
+                            dashboardAccountRow(position, isCard: isCard)
+                                .padding(.vertical, theme.spacing.small)
                         }
                     }
                 }
@@ -1919,122 +1951,78 @@ struct ContentView: View {
         }
     }
 
-    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition, availableWidth: CGFloat, allowsHorizontalDomains: Bool = false) -> some View {
-        let bankWidth = dashboardDomainMinimumWidth("Bank balances", total: group.bankTotal)
-        let cardWidth = dashboardDomainMinimumWidth("Card liabilities", total: group.cardTotal)
-        let horizontal = allowsHorizontalDomains && availableWidth >= bankWidth + cardWidth + theme.spacing.sectionGap
-        let layout = horizontal
-            ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
-            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
-        return VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-            if !allowsHorizontalDomains {
-                Text(group.currency.code)
-                    .font(theme.typography.secondary.weight(.medium))
-            }
-            layout {
-                if !group.banks.isEmpty {
-                    dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal, availableWidth: horizontal ? bankWidth : availableWidth)
-                        .frame(minWidth: horizontal ? bankWidth : 0, maxWidth: .infinity)
+    @ViewBuilder private func dashboardAccountSummary(_ groups: [DashboardCurrencyPosition], isCard: Bool) -> some View {
+        if isCard {
+            Text("Amount owed").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+        } else if dashboardViewModel.positionState == .populated {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                    ForEach(groups) { dashboardNativeTotal($0) }
                 }
-                if !group.cards.isEmpty {
-                    dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal, availableWidth: horizontal ? cardWidth : availableWidth)
-                        .frame(minWidth: horizontal ? cardWidth : 0, maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    ForEach(groups) { dashboardNativeTotal($0) }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func dashboardDomain(
-        _ title: String,
-        icon: String,
-        positions: [DashboardAccountPosition],
-        total: Money?,
-        availableWidth: CGFloat
-    ) -> some View {
-        let detailWidth = max(0, availableWidth - 2 * theme.spacing.panelPadding - 36 - theme.spacing.controlGap)
-        let amountWidth = positions.map {
-            dashboardTextWidth(dashboardMoneyText($0.amount), role: .body, tabular: true)
-        }.max() ?? 0
-        let identityWidth = positions.count == 1 ? detailWidth : max(0, detailWidth - amountWidth - theme.spacing.valueGutter)
-        return LFPanel(contentSpacing: theme.spacing.controlGap) {
-            HStack(spacing: theme.spacing.controlGap) {
-                Image(systemName: icon)
-                    .font(theme.typography.domainIcon)
-                    .frame(width: 36, height: 36)
-                    .foregroundStyle(theme.palette.secondaryText)
+    private func dashboardNativeTotal(_ group: DashboardCurrencyPosition) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(group.currency.code).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text(dashboardMoneyText(group.bankTotal)).font(theme.typography.tableMoney).monospacedDigit()
+                .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
+    private func dashboardAccountRow(_ position: DashboardAccountPosition, isCard: Bool) -> some View {
+        let credit = isCard && (position.amount?.amount ?? 0) < 0
+        let kind = credit ? "Card credit" : isCard ? "Card" : "Bank"
+        return Button { dashboardDetailedAccount = position.id } label: {
+            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+                Image(systemName: isCard ? "creditcard" : "building.columns")
+                    .font(theme.typography.rowTitle).foregroundStyle(theme.palette.secondaryText)
+                    .frame(width: 28).padding(.top, theme.spacing.micro)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                    Text(title)
-                        .font(theme.typography.secondary)
-                        .foregroundStyle(theme.palette.secondaryText)
-                    if !positions.isEmpty { dashboardMoney(total) }
-                }
-            }
-            if positions.isEmpty {
-                Text(title == "Bank balances" ? "No bank accounts" : "No card accounts")
-                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-            } else {
-                if positions.count > 1, total == nil {
-                    Text("Incomplete: a member position is unavailable.")
-                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                }
-                Group {
-                    if positions.count == 1 {
-                        ForEach(positions) { position in
-                            VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                                // The sole account's full amount is the domain headline.
-                                dashboardAccountIdentity(position, availableWidth: identityWidth)
-                                dashboardAccountContext(position, domain: title)
-                            }
-                        }
-                    } else {
-                        LFLabelValueGroup(rows: positions, rowSpacing: theme.spacing.controlGap, valueRole: .body) { position in
-                            dashboardAccountIdentity(position, availableWidth: identityWidth)
-                        } value: { position in
-                            dashboardAccountAmount(position)
-                        } context: { position in
-                            dashboardAccountContext(position, domain: title)
-                        }
+                    HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
+                        Text(position.displayName).font(theme.typography.body.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: theme.spacing.small)
+                        Text(dashboardMoneyText(position.amount)).font(theme.typography.font(.body, tabularDigits: true).weight(.semibold))
+                            .foregroundStyle(isCard && !credit && position.amount != nil ? theme.financialNegative : theme.palette.primaryText)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
+                    Text((credit ? "Credit balance · " : "") + dashboardSourceContextText(position))
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.leading, 36 + theme.spacing.controlGap)
             }
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func dashboardAccountName(_ position: DashboardAccountPosition) -> some View {
-        Text(position.displayName)
-            .font(theme.typography.body)
-            .foregroundStyle(theme.palette.primaryText)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func dashboardAccountIdentity(_ position: DashboardAccountPosition, availableWidth: CGFloat) -> some View {
-        let inlineWidth = dashboardTextWidth(position.displayName, role: .body)
-            + theme.spacing.controlGap
-            + dashboardTextWidth(dashboardSourceContextText(position), role: .caption)
-        let layout = inlineWidth <= availableWidth
-            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap))
-            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.micro))
-        return layout {
-            dashboardAccountName(position)
-            if position.amount != nil { dashboardSourceContext(position) }
-        }
-    }
-
-    private func dashboardAccountAmount(_ position: DashboardAccountPosition) -> some View {
-        Text(position.amount.map { MoneyFormatting.display($0) } ?? "Data unavailable")
-            .font(theme.typography.font(.body, tabularDigits: true))
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func dashboardAccountContext(_ position: DashboardAccountPosition, domain: String) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            if domain == "Card liabilities", let money = position.amount, money.amount < .zero {
-                Text("Card credit balance").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+        .buttonStyle(LFPlainActionStyle())
+        .accessibilityLabel(position.displayName + ", " + kind + ", " + dashboardMoneyText(position.amount) + ", " + dashboardSourceContextText(position) + ". Show source details")
+        .accessibilityIdentifier("dashboard.account." + position.id)
+        .help("Show exact balance and source dates")
+        .popover(isPresented: Binding(get: { dashboardDetailedAccount == position.id },
+            set: { if !$0 { dashboardDetailedAccount = nil } })) {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                HStack {
+                    Text(position.displayName).font(theme.typography.rowTitle)
+                    Spacer()
+                    Button("Close details", systemImage: "xmark") { dashboardDetailedAccount = nil }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                }
+                Text(position.institution + " · " + kind).font(theme.typography.secondary)
+                Text(dashboardMoneyText(position.amount)).font(theme.typography.headlineMoney).monospacedDigit()
+                if let date = position.asOf {
+                    Text("Statement balance as of " + date.presentation)
+                } else if let date = position.sourcePeriodEnd {
+                    Text("Statement period ends " + date.presentation)
+                    Text("Exact balance date unavailable")
+                } else { Text("Balance date unavailable") }
+                if let context = position.sourceContext { Text(context) }
             }
+            .font(theme.typography.body).padding(theme.spacing.panelPadding).frame(width: 430)
         }
     }
 
@@ -2049,119 +2037,150 @@ struct ContentView: View {
             + (position.sourceContext.map { " · \($0)" } ?? "")
     }
 
-    private func dashboardSourceContext(_ position: DashboardAccountPosition) -> some View {
-        Text(dashboardSourceContextText(position))
-        .help(position.asOf.map { "Statement balance as of \($0.presentation)" } ?? position.sourceContext ?? "Balance date unavailable")
-        .font(theme.typography.caption)
-        .foregroundStyle(theme.palette.secondaryText)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
     private func dashboardMoneyText(_ money: Money?) -> String {
-        money.map { MoneyFormatting.display($0) } ?? "Data unavailable"
-    }
-
-    private func dashboardTextWidth(_ text: String, role: LFFontRole, tabular: Bool = false) -> CGFloat {
-        ceil((text as NSString).size(withAttributes: [.font: theme.typography.nativeFont(role, tabularDigits: tabular)]).width)
-    }
-
-    private func dashboardDomainMinimumWidth(_ title: String, total: Money?) -> CGFloat {
-        let valueWidth = dashboardTextWidth(dashboardMoneyText(total), role: total == nil ? .body : .headlineMoney, tabular: true)
-        let labelWidth = dashboardTextWidth(title, role: .secondary)
-        return max(304, max(valueWidth, labelWidth) + 36 + theme.spacing.controlGap + 2 * theme.spacing.panelPadding)
-    }
-
-    private func dashboardMoney(_ money: Money?) -> some View {
-        let role: LFFontRole = money == nil ? .body : .headlineMoney
-        return LFCompleteValue(lineHeight: theme.typography.lineHeight(role)) {
-            Text(dashboardMoneyText(money))
-                .font(theme.typography.font(role, tabularDigits: true))
-        }
-    }
-
-    private func dashboardFundingText(_ metric: DashboardFundingMetric) -> String {
-        metric.money(in: dashboardViewModel.fundingCalculation).map { MoneyFormatting.display($0) }
-            ?? "\(metric.currencyCode) Unavailable"
-    }
-
-    private var dashboardSupportingColumnWidth: CGFloat {
-        // FX lives in the page header; rate-string changes must not resize the
-        // planning/investment column underneath it.
-        let minimumWidth: CGFloat = 336
-        guard dashboardViewModel.fundingState != .empty else { return minimumWidth }
-        let valueWidth = DashboardFundingMetric.allCases.map {
-            dashboardTextWidth(dashboardFundingText($0), role: .body, tabular: true)
-        }.max() ?? 0
-        let labelWidth = DashboardFundingMetric.allCases.map {
-            dashboardTextWidth($0.rawValue, role: .secondary)
-        }.max() ?? 0
-        return max(minimumWidth, labelWidth + theme.spacing.valueGutter + valueWidth + 2 * theme.spacing.panelPadding)
+        money.map { MoneyFormatting.display($0) } ?? "Unavailable"
     }
 
     private var salaryDashboardSummary: some View {
         LFPanel(contentSpacing: theme.spacing.controlGap) {
-            if dashboardViewModel.fundingState == .empty {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: theme.spacing.controlGap) {
+                    Text(dashboardViewModel.fundingPlanTitle).font(theme.typography.sectionTitle)
+                    Spacer(minLength: theme.spacing.small)
+                    dashboardRouteButton(.salary)
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    Text(dashboardViewModel.fundingPlanTitle).font(theme.typography.sectionTitle)
+                    dashboardRouteButton(.salary)
+                }
+            }
+            switch dashboardViewModel.fundingState {
+            case .empty:
+                dashboardState("No plan for \(dashboardViewModel.fundingMonthTitle).")
+            case .loading:
+                dashboardState("Loading monthly plan…", loading: true)
+            case .unavailable:
+                dashboardState(dashboardViewModel.fundingMessage ?? "Monthly plan unavailable")
+            case .populated:
+                let calculation = dashboardViewModel.fundingCalculation
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: theme.spacing.sectionGap) {
-                        dashboardMissingPlanMessage
-                        Spacer(minLength: theme.spacing.sectionGap)
-                        dashboardRouteButton(.salary)
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        dashboardBudgetMetric("Expected pay", calculation?.expectedNet, secondary: true)
+                        dashboardBudgetMetric("Available to transfer", calculation?.transferablePrincipal)
                     }
-                    VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                        dashboardMissingPlanMessage
-                        dashboardRouteButton(.salary)
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        dashboardBudgetMetric("Expected pay", calculation?.expectedNet, secondary: true)
+                        dashboardBudgetMetric("Available to transfer", calculation?.transferablePrincipal)
                     }
                 }
-            } else {
-                dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Budget Planning", icon: "calendar", font: theme.typography.body.weight(.medium))
-                if dashboardViewModel.fundingState == .loading {
-                    dashboardState("Loading Salary / Funding…", loading: true)
-                } else {
-                    Text("Planning estimates · saved \(dashboardViewModel.fundingMonthTitle) plan")
+                Divider()
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        dashboardIndiaRequirement(calculation)
+                        dashboardBudgetMetric("Left after funding India", calculation?.finalQARBuffer, emphasize: true)
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        dashboardIndiaRequirement(calculation)
+                        dashboardBudgetMetric("Left after funding India", calculation?.finalQARBuffer, emphasize: true)
+                    }
+                }
+                dashboardFundingAllocation(calculation)
+                HStack {
+                    Text("Planning estimates").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    Spacer(minLength: theme.spacing.small)
+                    Button("Rate details") { dashboardShowsPlanDetails.toggle() }
+                        .buttonStyle(.link).font(theme.typography.caption)
+                        .accessibilityIdentifier("dashboard.planRateDetails")
+                        .popover(isPresented: $dashboardShowsPlanDetails) {
+                            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                                Text(dashboardViewModel.fundingMonthTitle + " plan").font(theme.typography.rowTitle)
+                                Text(dashboardViewModel.fundingRateDetail ?? "Plan rate unavailable.")
+                                Text("These are planning amounts, not completed payments. The India equivalent and remaining amount use this plan’s rate, even when Live FX has a newer reference.")
+                                Text("Available transfer capacity reserves the configured fee. When no India transfer is needed, the unused fee stays in the remaining balance.")
+                                Button("Close") { dashboardShowsPlanDetails = false }.lfSecondaryAction()
+                            }
+                            .font(theme.typography.secondary).padding(theme.spacing.panelPadding).frame(width: 420)
+                        }
+                }
+                if let calculation, !calculation.incompleteReasons.isEmpty {
+                    Text("Complete missing plan entries to see all amounts.")
                         .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                    LFLabelValueGroup(rows: DashboardFundingMetric.allCases, rowSpacing: theme.spacing.controlGap, valueRole: .body) { metric in
-                        Text(metric.rawValue)
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(theme.palette.secondaryText)
-                    } value: { metric in
-                        Text(dashboardFundingText(metric))
-                            .font(theme.typography.font(.body, tabularDigits: true))
-                            .foregroundStyle(theme.palette.primaryText)
-                    } context: { _ in
-                        EmptyView()
-                    }
-                    if dashboardViewModel.fundingState == .unavailable {
-                        Text("Data unavailable").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                    } else if let calculation = dashboardViewModel.fundingCalculation,
-                              !calculation.incompleteReasons.isEmpty {
-                        Text("Missing required input. Affected outputs are unavailable.")
-                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                    }
                 }
-                dashboardRouteButton(.salary)
             }
         }
     }
 
-    private var dashboardMissingPlanMessage: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.small) {
-            dashboardSupportingHeading("\(dashboardViewModel.fundingMonthTitle) Budget Planning", icon: "calendar", font: theme.typography.secondary.weight(.medium))
-            Text("No saved plan for \(dashboardViewModel.fundingMonthTitle).")
-                .font(theme.typography.secondary)
-                .foregroundStyle(theme.palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private func dashboardIndiaRequirement(_ calculation: FundingPlanCalculation?) -> some View {
+        dashboardBudgetMetric("India still to fund", calculation?.indiaFundingShortfall,
+            note: calculation?.requiredQARPrincipal.map { MoneyFormatting.display($0) } ?? "QAR equivalent unavailable")
     }
 
-    private func dashboardSupportingHeading(_ title: String, icon: String, font: Font? = nil) -> some View {
-        HStack(spacing: theme.spacing.small) {
-            Image(systemName: icon)
-                .font(theme.typography.sectionIcon)
-                .foregroundStyle(theme.palette.secondaryText)
-                .accessibilityHidden(true)
-            Text(title)
-                .font(font ?? theme.typography.rowTitle)
+    private func dashboardBudgetMetric(_ title: String, _ amount: Money?, note: String? = nil,
+                                       emphasize: Bool = false, secondary: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            Text(dashboardMoneyText(amount))
+                .font(theme.typography.font(secondary ? .tableMoney : .headlineMoney, tabularDigits: true))
+                .foregroundStyle(emphasize && amount != nil
+                    ? ((amount?.amount ?? 0) < 0 ? theme.financialNegative : theme.financialPositive)
+                    : secondary ? theme.palette.secondaryText : theme.palette.primaryText)
+                .fixedSize(horizontal: true, vertical: false)
+            if let note {
+                Text(note).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func dashboardFundingAllocation(_ calculation: FundingPlanCalculation?) -> some View {
+        if let available = calculation?.transferablePrincipal,
+           let india = calculation?.requiredQARPrincipal,
+           let left = calculation?.finalQARBuffer,
+           available.currency.code == "QAR", india.currency == available.currency, left.currency == available.currency {
+            if india.amount == 0 {
+                Text("No India transfer needed")
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            } else if left.amount < 0 {
+                Text("Available transfer does not cover the planned funding.")
+                    .font(theme.typography.caption).foregroundStyle(theme.financialNegative)
+            } else if available.amount > 0, india.amount > 0, (try? india + left) == available {
+                let fraction = NSDecimalNumber(decimal: india.amount / available.amount).doubleValue
+                if fraction.isFinite, (0...1).contains(fraction) {
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        Text("Available transfer allocation · QAR")
+                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                        GeometryReader { geometry in
+                            HStack(spacing: 0) {
+                                Rectangle().fill(theme.palette.accent)
+                                    .frame(width: geometry.size.width * CGFloat(fraction))
+                                Rectangle().fill(theme.financialPositive)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
+                        }
+                        .frame(height: 16)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Planned transfer allocation")
+                        .accessibilityValue(dashboardMoneyText(india) + " for India; " + dashboardMoneyText(left) + " left")
+                        ViewThatFits(in: .horizontal) {
+                            HStack {
+                                Text(dashboardMoneyText(india) + " → India")
+                                Spacer(minLength: theme.spacing.small)
+                                Text(dashboardMoneyText(left) + " left").foregroundStyle(theme.financialPositive)
+                            }
+                            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                                Text(dashboardMoneyText(india) + " → India")
+                                Text(dashboardMoneyText(left) + " left").foregroundStyle(theme.financialPositive)
+                            }
+                        }
+                        .font(theme.typography.caption).monospacedDigit().foregroundStyle(theme.palette.secondaryText)
+                    }
+                    .accessibilityIdentifier("dashboard.transferAllocation")
+                }
+            } else {
+                Text("Transfer allocation unavailable")
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            }
         }
     }
 
@@ -2193,55 +2212,127 @@ struct ContentView: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
+    @State private var expandedAccountHistory: Set<String> = []
+
     private var accountsContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .top, spacing: 14) {
-                    ForEach(accountsViewModel.nativeBalanceSummaries) { summary in
-                        VStack(spacing: 14) {
-                            if !summary.banks.isEmpty {
-                                accountMetric("\(summary.currency.code) Bank balances",
-                                    value: summary.bankTotal.map { MoneyFormatting.display($0) } ?? "Unavailable",
-                                    detail: "\(summary.banks.count) current bank accounts" + (summary.bankTotal == nil ? " · missing balance evidence" : ""), icon: "building.columns")
-                            }
-                            if !summary.cards.isEmpty {
-                                accountMetric("\(summary.currency.code) Card liabilities",
-                                    value: summary.cardTotal.map { MoneyFormatting.display($0) } ?? "Unavailable",
-                                    detail: "Net amount owed across \(summary.cards.count) current card accounts" + (summary.cardTotal == nil ? " · missing balance evidence" : ""), icon: "creditcard")
-                            }
+        GeometryReader { geometry in
+            let width = geometry.size.width - theme.spacing.pagePadding * 2
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Current totals exclude history-only accounts")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    accountSummaryStrip(width: width)
+                    if accountsViewModel.accounts.isEmpty {
+                        LFEmptyState(title: "No accounts found", message: "Your accounts appear here after importing statements.",
+                            actionTitle: "Import Statement", systemImage: "wallet.pass") { requestFileSelection() }
+                    } else {
+                        let layout = width >= 1120 ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
+                            : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
+                        layout {
+                            accountGroups(width: width >= 1120 ? width - 362 : width)
+                                .frame(maxWidth: .infinity)
+                            accountDetailPanel.frame(width: width >= 1120 ? 344 : nil)
                         }
                     }
                 }
+                .padding(theme.spacing.pagePadding)
+            }
+        }
+    }
 
-                HStack(alignment: .top, spacing: 14) {
-                    LFPanel {
-                        VStack(alignment: .leading, spacing: 14) {
-                            accountTableHeader
+    private func accountSummaryStrip(width: CGFloat) -> some View {
+        let layout = width >= 820 ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
+        return LFPanel {
+            layout {
+                accountSummaryGroup(cards: false)
+                if width >= 820 { Divider() }
+                else { Divider().overlay(theme.palette.divider) }
+                accountSummaryGroup(cards: true)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
-                            if accountsViewModel.accounts.isEmpty {
-                                LFEmptyState(
-                                    title: "No accounts found",
-                                    message: "Trusted repository-backed accounts appear here after import.",
-                                    actionTitle: "Import Statement",
-                                    systemImage: "wallet.pass"
-                                ) {
-                                    requestFileSelection()
-                                }
-                            } else {
-                                ForEach(accountsViewModel.accounts) { account in
-                                    accountRow(account)
-                                }
+    private func accountSummaryGroup(cards: Bool) -> some View {
+        let summaries = accountsViewModel.nativeBalanceSummaries.filter { cards ? !$0.cards.isEmpty : !$0.banks.isEmpty }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(cards ? "Card amounts owed" : "Bank balances").font(theme.typography.rowTitle)
+            if summaries.isEmpty {
+                Text(cards ? "No current card accounts" : "No current bank accounts")
+                    .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), alignment: .leading)], alignment: .leading, spacing: 14) {
+                    ForEach(summaries) { summary in
+                        let total = cards ? summary.cardTotal : summary.bankTotal
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(summary.currency.code).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            Text(total.map { MoneyFormatting.number($0) } ?? "Unavailable")
+                                .font(theme.typography.headlineMoney.weight(.semibold)).monospacedDigit()
+                                .foregroundStyle(cards && (total?.amount ?? 0) > 0 ? theme.financialNegative : theme.palette.primaryText)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .accessibilityLabel(summary.currency.code + " " + (total.map { MoneyFormatting.number($0) } ?? "Unavailable"))
+                            if total == nil {
+                                Text("Missing balance evidence").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity)
-
-                    accountDetailPanel
-                        .frame(width: 344)
                 }
             }
-            .padding(theme.spacing.pagePadding)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func accountGroups(width: CGFloat) -> some View {
+        let layout = width >= 735 ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
+        return VStack(alignment: .leading, spacing: 18) {
+            layout {
+                accountGroup(title: "Bank accounts", icon: "building.columns", types: [.bank], key: "banks")
+                accountGroup(title: "Credit cards", icon: "creditcard", types: [.creditCard], key: "cards")
+            }
+            if accountsViewModel.accounts.contains(where: { ![AccountType.bank, .creditCard].contains($0.accountType) }) {
+                accountGroup(title: "Other accounts", icon: "wallet.pass", types: [.investment, .cash, .loan], key: "other")
+            }
         }
+    }
+
+    private func accountGroup(title: String, icon: String, types: Set<AccountType>, key: String) -> some View {
+        let accounts = accountsViewModel.accounts.filter { types.contains($0.accountType) }
+        let current = accounts.filter { !$0.isHistoryOnly }, historical = accounts.filter(\.isHistoryOnly)
+        return LFPanel(contentSpacing: 14) {
+            Label(title, systemImage: icon).font(theme.typography.sectionTitle)
+            HStack {
+                Text(types == [.creditCard] ? "Card" : "Account")
+                Spacer()
+                Text(types == [.creditCard] ? "Current amount owed" : "Recorded balance")
+            }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Divider().overlay(theme.palette.divider)
+            if current.isEmpty {
+                Text("No current accounts").font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+            }
+            ForEach(current) { account in
+                accountRow(account)
+                if account.id != current.last?.id { Divider().overlay(theme.palette.divider) }
+            }
+            if !historical.isEmpty {
+                Divider().overlay(theme.palette.divider)
+                DisclosureGroup(isExpanded: Binding(get: { expandedAccountHistory.contains(key) }, set: { expanded in
+                    if expanded { expandedAccountHistory.insert(key) } else { expandedAccountHistory.remove(key) }
+                })) {
+                    VStack(spacing: 6) {
+                        ForEach(historical) { account in accountRow(account) }
+                    }.padding(.top, 8)
+                } label: {
+                    HStack {
+                        Text("History only").font(theme.typography.rowTitle)
+                        Spacer()
+                        Text("Excluded from totals").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    }
+                }.tint(theme.palette.primaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var importWizardContent: some View {
@@ -2512,7 +2603,7 @@ struct ContentView: View {
                 if emailIntake.selectedSource != nil {
                     Button("Import selected") { _ = emailIntake.startSelectedEmailImport() }
                         .lfSecondaryAction()
-                        .disabled(emailIntake.isCollecting || emailIntake.selectedSource?.acquisition != .available || emailIntake.selectedSource?.dismissed == true)
+                        .disabled(!emailIntake.isReconciled || emailIntake.isCollecting || emailIntake.selectedSource?.acquisition != .available || emailIntake.selectedSource?.dismissed == true)
                     Button("Dismiss selected", action: emailIntake.dismissSelected).lfSecondaryAction()
                         .disabled(emailIntake.isCollecting)
                     Button("Revisit selected", action: emailIntake.revisitSelected).lfSecondaryAction()
@@ -2527,206 +2618,198 @@ struct ContentView: View {
     }
 
     private var settingsContent: some View {
-        let completedImports = SettingsPresentation.completedImports(
-            from: importAttemptStore.attempts,
-            persistenceState: DatabaseProvider.shared.persistenceState
-        )
-
-        return GeometryReader { geometry in
+        GeometryReader { geometry in
             let width = min(1320, max(0, geometry.size.width - theme.spacing.pagePadding * 2))
-            let informationLayout = width >= max(900, theme.typography.size(.secondary) * 60)
-                ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
-            VStack(alignment: .leading, spacing: 0) {
-                if settingsSubsection != nil {
-                    HStack(spacing: theme.spacing.controlGap) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                    if settingsSubsection != nil {
                         Button("Settings", systemImage: "chevron.left") { settingsSubsection = nil }
-                            .lfSecondaryAction()
-                            .accessibilityHint("Returns to the Settings overview")
-                        Spacer()
-                    }
-                    .padding(.horizontal, theme.spacing.pagePadding)
-                    .padding(.vertical, theme.spacing.sectionGap)
-                }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                        if settingsSubsection == .appearance {
-                            LFAppearanceIntroduction(appearance: appearance)
-                            LFAppearanceControls(appearance: appearance, availableWidth: width)
-                        } else if settingsSubsection == .liveFX {
-                            LiveFXSettingsView(rates: alDarReferenceSession, prices: investmentPriceSession,
-                                               backgroundUpdates: backgroundUpdates)
-                        } else if settingsSubsection == .ispAccount {
-                            ZurichISPSettingsView(session: ispSyncSession, backgroundUpdates: backgroundUpdates)
-                        } else if settingsSubsection == .emailStatements {
-                            EmailStatementsSettingsView(session: emailIntake)
-                        } else if settingsSubsection == .backgroundUpdates {
-                            BackgroundUpdatesSettingsView(session: backgroundUpdates)
-                        } else if settingsSubsection == .backup {
-                            BackupRestoreSettingsSection()
-                        } else if settingsSubsection == .categories {
-                            CategoryManagementView()
-                        } else {
-                        settingsDestinations
-
-                        LFPanel(title: "Application & data", systemImage: "info.circle") {
-                            informationLayout {
-#if DEBUG
-                                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                                    Text("Application").font(theme.typography.rowTitle)
-                                    Toggle("Developer Mode", isOn: Binding(
-                                        get: { developerDatabaseProfileViewModel.developerModeEnabled },
-                                        set: { updateDeveloperMode($0) }
-                                    ))
-                                    .toggleStyle(.switch)
-                                    .font(theme.typography.secondary)
-                                    if let message = developerDatabaseProfileViewModel.operationState.message {
-                                        Text(message)
-                                            .font(theme.typography.caption)
-                                            .foregroundStyle(LFTheme.warning)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-#endif
-                                VStack(alignment: .leading, spacing: theme.spacing.small) {
-                                    Text("System information").font(theme.typography.rowTitle)
-                                    LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary), textRole: .secondary)
-                                    LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName, textRole: .secondary)
-                                    Text(DatabaseProvider.shared.persistenceState.statusMessage)
-                                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                                    if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
-                                        Text(guidance).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                                    }
-                                    LFInfoRow(title: "Runtime state", value: dashboardViewModel.presentationState.message, textRole: .secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                VStack(alignment: .leading, spacing: theme.spacing.small) {
-                                    Text("Data summary").font(theme.typography.rowTitle)
-                                    LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)", textRole: .secondary)
-                                    LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.storedTransactionCount)", textRole: .secondary)
-                                    LFInfoRow(title: "Completed imports", value: completedImports.displayValue, textRole: .secondary)
-                                    if let partialValue = completedImports.secondaryValue {
-                                        LFInfoRow(title: "Partial imports", value: partialValue, textRole: .secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        }
-                    }
-                    .frame(maxWidth: 1320, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, theme.spacing.pagePadding)
-                    .padding(.top, settingsSubsection == nil ? theme.spacing.sectionGap : 0)
-                    .padding(.bottom, theme.spacing.pagePadding)
-                }
-                if settingsSubsection == .emailStatements {
-                    EmailStatementsFooter(session: emailIntake) { selectedSection = .imports }
-                }
-            }
-        }
-    }
-
-    private var settingsDestinations: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                    appearanceAndLiveFXCards
-                    backupAndCategoryCards
-                }
-                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                    appearanceAndLiveFXCards
-                    backupAndCategoryCards
-                }
-            }
-        }
-    }
-
-    private var appearanceAndLiveFXCards: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            settingsDestinationCard(
-                title: SettingsSubsection.appearance.rawValue,
-                summary: appearance.overrides.isEmpty ? "Dark · Default appearance" : "Dark · Custom appearance",
-                systemImage: SettingsSubsection.appearance.systemImage,
-                destination: .appearance
-            )
-            settingsDestinationCard(
-                title: SettingsSubsection.liveFX.rawValue,
-                summary: liveFXSummary,
-                systemImage: SettingsSubsection.liveFX.systemImage,
-                destination: .liveFX
-            )
-            settingsDestinationCard(
-                title: SettingsSubsection.ispAccount.rawValue,
-                summary: ispSyncSession.connectionSummary,
-                systemImage: SettingsSubsection.ispAccount.systemImage,
-                destination: .ispAccount
-            )
-            settingsDestinationCard(
-                title: SettingsSubsection.backgroundUpdates.rawValue,
-                summary: backgroundUpdates.status,
-                systemImage: SettingsSubsection.backgroundUpdates.systemImage,
-                destination: .backgroundUpdates
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var backupAndCategoryCards: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            settingsDestinationCard(
-                title: SettingsSubsection.backup.rawValue,
-                summary: backupRecovery.isBusy ? "Backup or restore in progress" : "Create or restore a verified ledger backup",
-                systemImage: SettingsSubsection.backup.systemImage,
-                destination: .backup
-            )
-            settingsDestinationCard(
-                title: SettingsSubsection.categories.rawValue,
-                summary: categorySummary,
-                systemImage: SettingsSubsection.categories.systemImage,
-                destination: .categories
-            )
-            settingsDestinationCard(
-                title: SettingsSubsection.emailStatements.rawValue,
-                summary: emailIntake.connectionSummary,
-                systemImage: SettingsSubsection.emailStatements.systemImage,
-                destination: .emailStatements
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func settingsDestinationCard(
-        title: String,
-        summary: String,
-        systemImage: String,
-        destination: SettingsSubsection
-    ) -> some View {
-        Button { settingsSubsection = destination } label: {
-            LFPanel(contentSpacing: theme.spacing.small) {
-                HStack(alignment: .top, spacing: theme.spacing.controlGap) {
-                    Image(systemName: systemImage)
-                        .font(theme.typography.sectionIcon)
-                        .foregroundStyle(theme.palette.accentHover)
-                        .frame(width: 24, alignment: .center)
-                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                        Text(title).font(theme.typography.rowTitle)
-                        Text(summary)
+                            .buttonStyle(.borderless)
                             .font(theme.typography.secondary)
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .tint(theme.palette.secondaryText)
+                            .accessibilityHint("Returns to the Settings overview")
                     }
+                    if settingsSubsection == .appearance {
+                        LFAppearanceIntroduction(appearance: appearance)
+                        LFAppearanceControls(appearance: appearance, availableWidth: width)
+                    } else if settingsSubsection == .liveFX {
+                        LiveFXSettingsView(rates: alDarReferenceSession, prices: investmentPriceSession,
+                                           backgroundUpdates: backgroundUpdates, availableWidth: width)
+                    } else if settingsSubsection == .ispAccount {
+                        ZurichISPSettingsView(session: ispSyncSession, backgroundUpdates: backgroundUpdates,
+                                              availableWidth: width)
+                    } else if settingsSubsection == .ibkrAccount {
+                        IBKRFlexSettingsView(session: ibkrFlexSession, backgroundUpdates: backgroundUpdates,
+                                             availableWidth: width)
+                    } else if settingsSubsection == .emailStatements {
+                        EmailStatementsSettingsView(session: emailIntake, availableWidth: width) {
+                            selectedSection = .imports
+                        }
+                    } else if settingsSubsection == .backgroundUpdates {
+                        BackgroundUpdatesSettingsView(session: backgroundUpdates, availableWidth: width)
+                    } else if settingsSubsection == .backup {
+                        BackupRestoreSettingsSection(availableWidth: width)
+                    } else if settingsSubsection == .categories {
+                        CategoryManagementView()
+                    } else {
+                        LFSettingsPageHeader("Settings", subtitle: "Preferences, connections and your ledger.")
+                        settingsOverview(availableWidth: width)
+                    }
+                }
+                .frame(maxWidth: 1320, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(theme.spacing.pagePadding)
+            }
+        }
+    }
+
+    private func settingsOverview(availableWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            LFSettingsColumns(availableWidth: availableWidth, leadingFraction: 0.44) {
+                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                    settingsDestinationGroup("Workspace", destinations: [.appearance, .backup, .categories])
+                    settingsApplicationPanel
+                }
+            } trailing: {
+                settingsDestinationGroup("Connections & updates", destinations: [
+                    .liveFX, .ispAccount, .ibkrAccount, .emailStatements, .backgroundUpdates
+                ])
+            }
+            settingsDataPanel(availableWidth: availableWidth)
+            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                Text(DatabaseProvider.shared.persistenceState.statusMessage)
+                if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance { Text(guidance) }
+                Text(dashboardViewModel.presentationState.message)
+            }
+            .font(theme.typography.secondary)
+            .foregroundStyle(theme.palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var settingsApplicationPanel: some View {
+        LFPanel(title: "Application") {
+#if DEBUG
+            Toggle("Developer Mode", isOn: Binding(
+                get: { developerDatabaseProfileViewModel.developerModeEnabled },
+                set: { updateDeveloperMode($0) }
+            ))
+            .toggleStyle(.switch)
+            .font(theme.typography.body)
+            if let message = developerDatabaseProfileViewModel.operationState.message {
+                Text(message).font(theme.typography.caption).foregroundStyle(LFTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Divider().overlay(theme.palette.divider)
+#endif
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap) {
+                    settingsVersion
                     Spacer(minLength: theme.spacing.small)
-                    Label("Open", systemImage: "chevron.right")
-                        .font(theme.typography.secondary)
-                        .foregroundStyle(theme.palette.secondaryText)
+                    settingsPersistence
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    settingsVersion
+                    settingsPersistence
                 }
             }
         }
-        .buttonStyle(.plain)
+    }
+
+    private var settingsVersion: some View {
+        Text("Version " + SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary))
+            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+    }
+
+    private var settingsPersistence: some View {
+        Text(DatabaseProvider.shared.persistenceState.displayName)
+            .font(theme.typography.secondary.weight(.semibold))
+            .foregroundStyle(DatabaseProvider.shared.persistenceState.isDurable ? LFTheme.success : LFTheme.warning)
+    }
+
+    private func settingsDataPanel(availableWidth: CGFloat) -> some View {
+        let imports = SettingsPresentation.completedImports(
+            from: importAttemptStore.attempts, persistenceState: DatabaseProvider.shared.persistenceState)
+        let partial: String
+        if case .available(_, let count) = imports { partial = count.formatted() }
+        else { partial = "Unavailable" }
+        let columns = availableWidth >= max(800, theme.typography.size(.headlineMoney) * 28) ? 4 : 2
+        return LFPanel(title: "Your data") {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: columns),
+                      alignment: .leading, spacing: theme.spacing.sectionGap) {
+                settingsDataValue("Accounts", value: dashboardViewModel.accounts.count.formatted())
+                settingsDataValue("Transactions", value: dashboardViewModel.storedTransactionCount.formatted())
+                settingsDataValue("Completed imports", value: imports.displayValue)
+                settingsDataValue("Partial imports", value: partial)
+            }
+        }
+    }
+
+    private func settingsDataValue(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(value).font(theme.typography.headlineMoney).monospacedDigit()
+            Text(title).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+        }
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("Open \(title)")
+        .accessibilityElement(children: .combine)
+    }
+
+    private func settingsDestinationGroup(_ title: String, destinations: [SettingsSubsection]) -> some View {
+        LFPanel(title: title, contentSpacing: theme.spacing.small) {
+            ForEach(destinations, id: \.self) { destination in
+                if destination != destinations.first { Divider().overlay(theme.palette.divider) }
+                settingsDestinationRow(destination)
+            }
+        }
+    }
+
+    private func settingsDestinationRow(_ destination: SettingsSubsection) -> some View {
+        let summary: String
+        switch destination {
+        case .appearance:
+            summary = appearance.overrides.isEmpty ? "Dark · Default appearance" : "Dark · Custom appearance"
+        case .backup:
+            summary = backupRecovery.isBusy ? "Backup or restore in progress" : "Create or restore a verified ledger backup"
+        case .liveFX: summary = liveFXSummary
+        case .categories: summary = categorySummary
+        case .ispAccount: summary = ispSyncSession.connectionSummary
+        case .emailStatements: summary = emailIntake.connectionSummary
+        case .ibkrAccount: summary = ibkrFlexSession.connectionSummary
+        case .backgroundUpdates: summary = backgroundUpdates.status
+        }
+        let needsAttention: Bool
+        switch destination {
+        case .ispAccount: needsAttention = !ispSyncSession.isConnectionAvailable
+        case .emailStatements: needsAttention = emailIntake.account != nil && !emailIntake.isConnected
+        case .backgroundUpdates: needsAttention = backgroundUpdates.configuration.enabled && !backgroundUpdates.activeSchedule
+        default: needsAttention = false
+        }
+        return Button { settingsSubsection = destination } label: {
+            HStack(spacing: theme.spacing.controlGap) {
+                Image(systemName: destination.systemImage)
+                    .font(theme.typography.sectionIcon)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                    Text(destination.rawValue).font(theme.typography.rowTitle)
+                    Text(summary).font(theme.typography.secondary)
+                        .foregroundStyle(needsAttention ? LFTheme.warning : theme.palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: theme.spacing.small)
+                Image(systemName: "chevron.right")
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(.vertical, theme.spacing.controlGap)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LFPlainActionStyle())
+        .accessibilityLabel("Open \(destination.rawValue)")
         .accessibilityHint(summary)
     }
 
@@ -2752,33 +2835,81 @@ struct ContentView: View {
     }
 
     private var importActivityCard: some View {
-        LFPanel(contentSpacing: theme.spacing.controlGap) {
-            dashboardSupportingHeading("Import Activity", icon: "square.and.arrow.down")
-            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                if availability.state == .loading {
-                    dashboardState("Loading import activity…", loading: true)
-                } else if availability.state == .unavailable || availability.state == .retainedNonCurrent {
-                    dashboardState("Data unavailable", detail: "Current import activity is unavailable.")
-                } else {
-                    let activity = importActivityPresentation
-                    VStack(alignment: .leading, spacing: theme.spacing.small) {
-                        Text(activity.title)
-                            .font(theme.typography.secondary.weight(.medium))
-                        Label(activity.status, systemImage: activity.iconName)
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(activity.tone.color)
-                        Text(activity.subtitle)
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let recordedAtText = activity.recordedAtText {
-                            Text(recordedAtText).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                        }
-                    }
+        LFPanel(contentSpacing: theme.spacing.small) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: theme.spacing.controlGap) {
+                    Text(dashboardImportTitle).font(theme.typography.rowTitle)
+                    Spacer(minLength: theme.spacing.small)
+                    dashboardRouteButton(.imports)
                 }
-                dashboardRouteButton(.imports)
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    Text(dashboardImportTitle).font(theme.typography.rowTitle)
+                    dashboardRouteButton(.imports)
+                }
+            }
+            if availability.state == .loading {
+                dashboardState("Loading import activity…", loading: true)
+            } else if availability.state == .unavailable || availability.state == .retainedNonCurrent {
+                dashboardState("Import activity unavailable")
+            } else if let pending = sidebarPendingImportStatus {
+                Label(pending, systemImage: "tray.full")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    .accessibilityIdentifier("dashboard.pendingImports")
+            } else if let attention = dashboardAttention {
+                Label(attention.title, systemImage: attention.iconName)
+                    .font(theme.typography.body).foregroundStyle(attention.tone.color)
+                    .help(attention.explanation).accessibilityHint(attention.explanation)
+            } else if dashboardShowsCurrentImport {
+                let current = importActivityPresentation
+                Label(current.status, systemImage: current.iconName)
+                    .font(theme.typography.body).foregroundStyle(current.tone.color)
+                Text(current.title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    .lineLimit(2).help(current.title + " · " + current.subtitle)
+                if let timestamp = current.recordedAtText {
+                    Text(timestamp).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                }
+            } else if let saved = dashboardLastCompletedImport {
+                let outcome = DurableImportAttemptPresentation(attempt: saved).outcome
+                Label(outcome.label, systemImage: outcome.iconName)
+                    .font(theme.typography.body).foregroundStyle(outcome.tone.color)
+                Text(ImportInstantFormatting.display(saved.createdAtISO))
+                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            } else {
+                Text("No completed imports yet")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
         }
+    }
+
+    private var dashboardImportTitle: String {
+        if dashboardActionableImportStatus != nil { return "Import needs attention" }
+        if sidebarPendingImportStatus != nil { return "Import in progress" }
+        if dashboardAttention != nil { return "Import needs attention" }
+        if dashboardShowsCurrentImport {
+            return importActivityPresentation.tone == .danger ? "Import needs attention" : "Latest import"
+        }
+        return "Last completed import"
+    }
+
+    private var dashboardShowsCurrentImport: Bool {
+        switch importState {
+        case .preparing, .previewReady, .validationFailed, .committing, .failed: return true
+        case .completed(let outcome): return outcome.tone != .success
+        case .idle:
+            return importHistoryViewModel.latestDurableAttempt.map {
+                DurableImportAttemptPresentation(attempt: $0).outcome.tone == .danger
+            } ?? false
+        case .skipped, .cancelled: return false
+        }
+    }
+
+    /// Reuse accepted outcome codes and timestamp ordering. A newer attempt
+    /// never borrows a date or a completed label from an earlier persisted result.
+    private var dashboardLastCompletedImport: RepositoryImportAttempt? {
+        let persisted = importHistoryViewModel.attempts.filter {
+            [.successfulImport, .partialImportCommitted, .cbqSourceOverlapCommitted].contains(ImportAttemptOutcome(rawValue: $0.outcomeCode))
+        }
+        return ImportActivityPresentation.latestDurableAttempt(from: persisted)
     }
 
     private var accountDetailPanel: some View {
@@ -2786,17 +2917,15 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 18) {
                 if let account = accountsViewModel.selectedAccount {
                     HStack(spacing: 12) {
-                        accountIcon(account.institution)
-                            .frame(width: 48, height: 48)
                         VStack(alignment: .leading, spacing: 2) {
                             if accountsViewModel.isEditingDisplayName {
                                 TextField("Display name", text: $accountsViewModel.displayNameDraft)
                                     .lfTextField()
                             } else {
                                 Text(account.displayName)
-                                    .font(theme.typography.rowTitle)
+                                    .font(theme.typography.sectionTitle)
                             }
-                            Text(account.institution)
+                            Text(accountContext(account))
                                 .font(theme.typography.secondary)
                                 .foregroundStyle(theme.palette.secondaryText)
                         }
@@ -2819,20 +2948,27 @@ struct ContentView: View {
                             accountsViewModel.beginDisplayNameEdit()
                         }
                         .lfSecondaryAction()
-                        if account.accountType == .creditCard && !account.isHistoryOnly {
+                        if account.isHistoryOnly {
+                            Button("Make current") { accountsViewModel.markAccountCurrent(accountID: account.id) }
+                                .lfSecondaryAction()
+                                .help("Include this account in current views and totals again.")
+                                .accessibilityIdentifier("accounts.makeCurrent")
+                        } else {
                             Button("Keep as history only…") {
                                 confirmsCardHistoryOnly = true
                             }
                             .lfSecondaryAction()
-                            .confirmationDialog("Is this card closed and fully settled?",
+                            .confirmationDialog(account.accountType == .creditCard
+                                                ? "Is this card closed and fully settled?"
+                                                : "Keep this account for history only?",
                                                 isPresented: $confirmsCardHistoryOnly,
                                                 titleVisibility: .visible) {
                                 Button("Keep history only") {
-                                    accountsViewModel.markCreditCardHistoryOnly(accountID: account.id)
+                                    accountsViewModel.markAccountHistoryOnly(accountID: account.id)
                                 }
                                 Button("Cancel", role: .cancel) { }
                             } message: {
-                                Text("This excludes the card from the current dashboard and totals. Its statements, transactions and historical balances stay available, and older statements can still be imported.")
+                                Text("This account will be excluded from default views and totals. Select it explicitly to review its history. You can make it current again here.")
                             }
                         }
                     }
@@ -2854,16 +2990,13 @@ struct ContentView: View {
                     }
 
                     if account.isHistoryOnly {
-                        Text("Closed and settled. Kept for history and excluded from current totals.")
+                        Text("History only · excluded from default views and totals.")
                             .font(theme.typography.secondary)
                             .foregroundStyle(theme.palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    LFInfoRow(title: "Institution", value: account.institution, textRole: .body)
-                    LFInfoRow(title: "Account number", value: account.accountNumberLabel ?? "Unavailable", textRole: .body)
                     LFInfoRow(title: "Account Type", value: account.accountTypeLabel, textRole: .body)
-                    LFInfoRow(title: "Currency", value: account.currencyCode, textRole: .body)
                     LFInfoRow(title: "Transactions", value: "\(accountsViewModel.transactionCount)", textRole: .body)
                     if let period = account.latestStatementPeriod {
                         LFInfoRow(title: "Latest Statement", value: period, textRole: .body)
@@ -2872,13 +3005,12 @@ struct ContentView: View {
                         LFInfoRow(title: account.isHistoryOnly ? "Historical Due Date" : "Due Date", value: dueDate, textRole: .body)
                     }
                     if let count = account.cardInstrumentCount {
-                        LFInfoRow(title: "Card Instruments", value: "\(count)", textRole: .body)
+                        LFInfoRow(title: "Cards", value: "\(count)", textRole: .body)
                     }
 
                     Divider().overlay(theme.palette.divider)
 
-                    Text("Recent Activity")
-                        .font(theme.typography.rowTitle)
+                    DisclosureGroup("Recent activity") {
 
                     if accountsViewModel.recentActivity.isEmpty {
                         LFCompactEmptyState(message: "No trusted activity for this account")
@@ -2901,10 +3033,11 @@ struct ContentView: View {
                         .font(theme.typography.secondary)
                     }
 
+                    }.font(theme.typography.body).tint(theme.palette.primaryText)
+
                     Divider().overlay(theme.palette.divider)
 
-                    Text("Verified Financial Identity")
-                        .font(theme.typography.rowTitle)
+                    DisclosureGroup("Verified financial identity") {
                     if account.identitySummaries.isEmpty {
                         LFCompactEmptyState(message: "No verified strong identifiers")
                     } else {
@@ -2919,10 +3052,11 @@ struct ContentView: View {
                         }
                     }
 
+                    }.font(theme.typography.body).tint(theme.palette.primaryText)
+
                     Divider().overlay(theme.palette.divider)
 
-                    Text("Import History")
-                        .font(theme.typography.rowTitle)
+                    DisclosureGroup("Import history") {
                     if accountsViewModel.importHistory.isEmpty {
                         LFCompactEmptyState(message: "No trusted import history for this account")
                     } else {
@@ -2968,6 +3102,7 @@ struct ContentView: View {
                             LFInfoRow(title: "Parser", value: parserVersion, textRole: .body)
                         }
                     }
+                    }.font(theme.typography.body).tint(theme.palette.primaryText)
                 } else {
                     LFCompactEmptyState(message: "Select an account after importing trusted data")
                 }
@@ -3091,53 +3226,40 @@ struct ContentView: View {
     }
 
     private func accountRow(_ account: AccountsAccountPresentation) -> some View {
-        Button {
+        let selected = accountsViewModel.selectedRepositoryAccountID == account.id
+        return Button {
             accountsViewModel.selectAccount(repositoryAccountID: account.id)
         } label: {
-            HStack(spacing: 12) {
-                accountIcon(account.institution)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(account.displayName)
-                        .font(theme.typography.body.weight(.semibold))
-                    Text(account.currencyCode)
-                        .font(theme.typography.secondary)
-                        .foregroundStyle(theme.palette.secondaryText)
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(account.displayName).font(theme.typography.body.weight(selected ? .semibold : .regular))
+                        .foregroundStyle(account.isHistoryOnly && !selected ? theme.palette.secondaryText : theme.palette.primaryText)
+                    Text(accountContext(account)).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                if account.isHistoryOnly {
+                    if selected { Text("Selected").font(theme.typography.secondary).foregroundStyle(theme.palette.accentHover) }
+                } else {
+                    Text(account.currentBalance.map { formatCurrency($0, currencyCode: account.currencyCode) } ?? "Unavailable")
+                        .font(theme.typography.rowTitle).monospacedDigit()
+                        .foregroundStyle(account.accountType == .creditCard ? accountBalanceColor(account) : theme.palette.primaryText)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(account.accountNumberLabel ?? "Unavailable")
-                    .font(theme.typography.body)
-                    .monospacedDigit()
-                    .frame(width: 125, alignment: .leading)
-
-                Text(account.institution)
-                    .frame(width: 160, alignment: .leading)
-
-                Text(account.accountTypeLabel)
-                    .font(theme.typography.secondary)
-                    .foregroundStyle(theme.palette.primaryText)
-                    .padding(.horizontal, theme.spacing.small)
-                    .padding(.vertical, theme.spacing.micro)
-                    .background(theme.interaction.dataBadge, in: RoundedRectangle(cornerRadius: theme.radius.control))
-                    .frame(width: 100, alignment: .leading)
-
-                Text(account.isHistoryOnly ? "History only" : account.currentBalance.map { formatCurrency($0, currencyCode: account.currencyCode) } ?? "Unavailable")
-                    .font(theme.typography.body.weight(.semibold))
-                    .foregroundStyle(accountBalanceColor(account))
-                    .monospacedDigit()
-                    .frame(width: 140, alignment: .trailing)
             }
-            .font(theme.typography.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 14)
-            .background(
-                accountsViewModel.selectedRepositoryAccountID == account.id
-                    ? theme.interaction.dataRow(selected: true, active: appearsActive)
-                    : theme.palette.contentSurface
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 10).padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .background(selected ? theme.interaction.dataRow(selected: true, active: appearsActive) : Color.clear,
+                in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay(RoundedRectangle(cornerRadius: theme.radius.control)
+                .strokeBorder(selected ? theme.palette.accent.opacity(0.7) : Color.clear, lineWidth: 1))
         }
         .buttonStyle(LFPlainActionStyle())
+        .accessibilityIdentifier("accounts.row." + account.id)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func accountContext(_ account: AccountsAccountPresentation) -> String {
+        [account.institution, account.accountNumberLabel, account.currencyCode].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func accountIcon(_ institution: String) -> some View {
@@ -3175,11 +3297,12 @@ struct ContentView: View {
     private var importCurrentFileHeader: some View {
         let presentation = ImportActivityPresentation(importState: importState, latestDurableAttempt: nil)
         return importedFileRow(
-            name: selectedFile,
+            name: activeStatementPasswordChallenge?.fileName ?? selectedFile,
             subtitle: importCurrentReviewMessage ?? presentation.subtitle,
             icon: activeStatementPasswordChallenge == nil ? presentation.iconName : "lock.doc",
             color: presentation.tone.color
         )
+        .id(displayedImportItem?.id)
     }
 
     private var importCurrentReviewMessage: String? {
@@ -3570,6 +3693,11 @@ struct ContentView: View {
                     tone: projection.tone
                 )
 
+                if let number = preparedImport.financialDocument.cardStatementEvidence?
+                    .accountSourceIdentityObservations.first(where: { $0.kind == .axisPrimaryMaskedCardNumber })?.value {
+                    LFInfoRow(title: "Printed card number", value: number)
+                }
+
                 if let matchedAccountID = projection.matchedAccountID,
                    let account = accountsViewModel.accounts.first(where: { $0.id == matchedAccountID }) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -3927,13 +4055,31 @@ struct ContentView: View {
         return (parts.isEmpty ? "Card details unavailable" : parts.joined(separator: " · ")) + " · " + context
     }
 
+    private func cardNumbers(_ group: CardInstrumentLineage.Group) -> [String] {
+        let members = Set(group.members)
+        let observations = cardStore.snapshot.instruments.filter { members.contains($0.id) }.flatMap(\.sourceObservations)
+            + cardStore.snapshot.statements.flatMap(\.sections).filter { members.contains($0.instrumentID) }.flatMap(\.sourceObservations)
+        return Set(observations.map(\.value)).sorted()
+    }
+
+    private func continuingCardLabel(_ group: CardInstrumentLineage.Group, printed: String?) -> String {
+        let numbers = cardNumbers(group)
+        let labels = numbers.sorted { left, right in
+            if (left == printed) != (right == printed) { return left == printed }
+            return left < right
+        }.map { AccountDisplayText.maskedNumber($0) ?? $0 }
+        return labels.isEmpty ? "Card details unavailable" : "Card " + labels.joined(separator: " · ")
+    }
+
     private func cardSectionSelection(
         section: CardInstrumentSectionEvidence, allSectionIDs: [String],
         accountID: String, instruments: [CardInstrument]
     ) -> some View {
+        let observation = section.sourceIdentityObservations.first
+        let groups = cardStore.snapshot.continuingCardGroups(accountID: accountID)
         let draft = cardSectionDraftChoices[section.documentScopedSectionID]
         let selection: CardSelection = switch draft {
-        case .reuseExistingInstrument(let id): .existing(id)
+        case .reuseExistingInstrument(let id): .existing(groups.first { $0.members.contains(id) }?.id ?? id)
         case .createNewInstrument: .new
         case nil: .pending
         }
@@ -3943,28 +4089,64 @@ struct ContentView: View {
         }
         let labels = instruments.map(cardLabel)
         let ambiguousLabels = Set(Dictionary(grouping: labels, by: { $0 }).filter { $0.value.count > 1 }.keys)
-        return VStack(alignment: .leading, spacing: 9) {
-            Text(section.holderLabel ?? "Card section \(section.sourceOrdinal)")
-                .font(theme.typography.formBody.weight(.semibold))
-            if let observed = section.sourceIdentityObservations.first?.value {
-                Text(observed).font(theme.typography.formCaption.monospaced())
-                    .foregroundStyle(theme.palette.secondaryText)
+        let usedElsewhere = Set(cardSectionDraftChoices.compactMap { id, choice -> String? in
+            guard id != section.documentScopedSectionID,
+                  case .reuseExistingInstrument(let instrumentID) = choice else { return nil }
+            return instrumentID
+        })
+        var choices = groups.compactMap { group -> (group: CardInstrumentLineage.Group, instrumentID: String, title: String)? in
+            guard let id = cardStore.snapshot.instrumentForSelection(group: group, observation: observation) else { return nil }
+            return (group, id, continuingCardLabel(group, printed: observation?.value))
+        }
+        let shortCollisions = Set(Dictionary(grouping: choices, by: \.title).filter { $0.value.count > 1 }.keys)
+        choices = choices.map { choice in
+            guard shortCollisions.contains(choice.title) else { return choice }
+            let exact = cardNumbers(choice.group).joined(separator: " / ")
+            return (choice.group, choice.instrumentID, exact.isEmpty ? choice.title : exact)
+        }
+        let ambiguousChoices = Set(Dictionary(grouping: choices, by: \.title).filter { $0.value.count > 1 }.keys)
+        return VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Card printed on this statement")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                Text(observation?.value ?? "Card number unavailable")
+                    .font(theme.typography.sectionTitle).monospaced()
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("import.printedCard." + section.documentScopedSectionID)
+                if let holder = section.holderLabel { Text(holder).font(theme.typography.body) }
             }
-            Picker("Card", selection: Binding(get: { selection }, set: { choice in
+            Picker("Use saved card", selection: Binding(get: { selection }, set: { choice in
                 switch choice {
-                case .existing(let id): update(.reuseExistingInstrument(instrumentId: id))
+                case .existing(let id):
+                    if let choice = choices.first(where: { $0.group.id == id }) {
+                        update(.reuseExistingInstrument(instrumentId: choice.instrumentID))
+                    }
                 case .new: update(.createNewInstrument())
                 case .pending: break
                 }
             })) {
                 Text("Choose a card").tag(CardSelection.pending)
-                ForEach(instruments) { instrument in
-                    Text("Reuse · " + cardLabel(instrument)).tag(CardSelection.existing(instrument.id))
-                        .disabled(ambiguousLabels.contains(cardLabel(instrument)))
+                ForEach(choices, id: \.group.id) { choice in
+                    Text(choice.title + (cardNumbers(choice.group).contains(observation?.value ?? "") ? " · Number matches statement" : ""))
+                        .tag(CardSelection.existing(choice.group.id))
+                        .disabled(ambiguousChoices.contains(choice.title) || usedElsewhere.contains(choice.instrumentID))
                 }
-                Text("Create new card").tag(CardSelection.new)
+                Text("Add a different card or replacement").tag(CardSelection.new)
             }
-            if Set(labels).count != labels.count {
+            if case .reuseExistingInstrument(let id) = draft,
+               let group = groups.first(where: { $0.members.contains(id) }) {
+                Text("Known numbers: " + cardNumbers(group).joined(separator: " · "))
+                    .font(theme.typography.body).fixedSize(horizontal: false, vertical: true)
+                if group.members.count > 1 {
+                    Text("Includes the replacement history you confirmed.")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                }
+            }
+            if case .reuseExistingInstrument(let id) = draft, usedElsewhere.contains(id) {
+                Text("This recorded card is selected for another section. Choose a different card, or create a new card for this section.")
+                    .font(theme.typography.formBody).foregroundStyle(LFTheme.warning)
+            }
+            if !ambiguousChoices.isEmpty {
                 Text("Some recorded cards have indistinguishable source details. They need your identification before reuse or a relationship can be selected; those choices are unavailable.")
                     .font(theme.typography.formCaption).foregroundStyle(LFTheme.warning)
             }

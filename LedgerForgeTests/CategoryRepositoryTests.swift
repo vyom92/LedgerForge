@@ -6,6 +6,48 @@ import Testing
 @MainActor
 struct CategoryRepositoryTests {
 
+    @Test func historicalCategoryPreviewShowsAutomaticRemovalsByDefault() {
+        let removed = CategoryEvaluation.Decision(transactionID: "automatic", categoryID: nil,
+            outcome: .noMatch, matches: [], explanation: "No enabled rule matches.")
+        let unclassified = CategoryEvaluation.Decision(transactionID: "unclassified", categoryID: nil,
+            outcome: .noMatch, matches: [], explanation: "No enabled rule matches.")
+        let protected = CategoryEvaluation.Decision(transactionID: "manual", categoryID: nil,
+            outcome: .protected, matches: [], explanation: "Manual choice kept.")
+        let cleared = CategoryEvaluation.Decision(transactionID: "cleared", categoryID: nil,
+            outcome: .protected, matches: [], explanation: "Deliberate clear kept.")
+        let assignments = ["automatic": "category", "manual": "category"]
+        let intents: [String: CategoryIntent] = [
+            "automatic": .init(kind: .automatic, categoryID: "category", matches: []),
+            "manual": .init(kind: .manual, categoryID: "category", matches: []),
+            "cleared": .init(kind: .deliberatelyCleared, categoryID: nil, matches: [])
+        ]
+        let preview = CategoryHistoricalPreview(evaluation: .init(rules: [], activeCategoryIDs: ["category"],
+            decisions: [removed, unclassified, protected, cleared]), assignments: assignments, intents: intents)
+        #expect(preview.removalCount == 1)
+        #expect(!preview.isUnchanged(removed))
+        #expect(preview.unchangedCount == 3)
+        #expect(preview.decisions.filter { !preview.isUnchanged($0) } == [removed])
+        #expect(preview.matches(assignments: assignments, intents: intents))
+        #expect(!preview.matches(assignments: ["manual": "category"], intents: intents))
+        var changedIntent = intents
+        changedIntent["automatic"] = .init(kind: .manual, categoryID: "category", matches: [])
+        #expect(!preview.matches(assignments: assignments, intents: changedIntent))
+    }
+
+    @Test func historicalCategoryPreviewLabelsConflictingAutomaticRemoval() {
+        let conflict = CategoryEvaluation.Decision(transactionID: "automatic", categoryID: nil,
+            outcome: .conflict, matches: [], explanation: "Matching rules disagree.")
+        let legacy = CategoryEvaluation.Decision(transactionID: "legacy", categoryID: nil,
+            outcome: .protected, matches: [], explanation: "Existing category is protected.")
+        let preview = CategoryHistoricalPreview(evaluation: .init(rules: [], activeCategoryIDs: ["category"],
+            decisions: [conflict, legacy]), assignments: ["automatic": "category", "legacy": "category"],
+            intents: ["automatic": .init(kind: .automatic, categoryID: "category", matches: [])])
+        #expect(preview.removesCategory(conflict))
+        #expect(!preview.isUnchanged(conflict))
+        #expect(!preview.removesCategory(legacy))
+        #expect(preview.unchangedCount == 1)
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func coordinatorCreatesFirstCategoryBeforeAnyImportAndHydratesIt() throws {
         let provider = DatabaseProvider(inMemory: true)

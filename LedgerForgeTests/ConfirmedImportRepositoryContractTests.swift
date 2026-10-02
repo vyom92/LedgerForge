@@ -79,6 +79,73 @@ struct ConfirmedImportRepositoryContractTests {
         #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: sqlitePlan.workspace.id).count == sqlitePlan.transactionTemplates.count)
     }
 
+    @Test(.globalRuntimeStateIsolation)
+    func authenticConfirmedImportNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-ConfirmedNamespace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("contention.sqlite").path
+        let sqlite = try SQLiteRepositoryProvider(path: databasePath)
+        defer { sqlite.database.close() }
+        let plan = try await confirmedImportPlan(generationToken: sqlite.generationToken)
+        let before = try SQLiteNamespaceContentionSnapshot(database: sqlite.database)
+
+        let result = try withHeldNamespaceLock(databasePath: databasePath) {
+            sqlite.confirmedImportRepo.commitConfirmedImport(plan)
+        }
+        #expect(result == .retryableContention)
+        let unchanged = try SQLiteNamespaceContentionSnapshot(database: sqlite.database) == before
+        #expect(unchanged, "Namespace contention changed durable tables, connection writes or activation.")
+        #expect(try sqlite.importSessionRepo.importSession(id: plan.historyTemplate.importSession.id) == nil)
+        #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: plan.workspace.id).isEmpty)
+
+        // The unchanged authentic plan is valid and remains usable after the
+        // external lock leaves; contention must not consume or corrupt it.
+        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(plan) == .committed(receipt(for: plan)))
+        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(plan) == .exactDuplicate)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func authenticStandaloneBankNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-BankNamespace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("contention.sqlite").path
+        let sqlite = try SQLiteRepositoryProvider(path: databasePath)
+        defer { sqlite.database.close() }
+        // Establish the account from the first unchanged registered original.
+        // The incoming plan comes from the other registered original period.
+        let accepted = try await confirmedImportPlan(generationToken: sqlite.generationToken)
+        try #require(sqlite.confirmedImportRepo.commitConfirmedImport(accepted) == .committed(receipt(for: accepted)))
+        let account = try #require(try sqlite.accountRepo.account(id: accepted.proposedAccount.id))
+        let owner = try await AuthenticSourceTestSupport.preparedAxisBankCSV(providerGeneration: sqlite.generationToken, alternatePeriod: true)
+        defer { owner.cancel() }
+        let prepared = owner.preparedImport
+        let plan = try ImportPersistenceMapper().standaloneBankImportPlan(
+            financialDocument: prepared.financialDocument, importSession: prepared.importSession,
+            validation: prepared.validation, fingerprintSet: prepared.fingerprintSet,
+            providerGeneration: sqlite.generationToken, account: account)
+        guard case .ready(let reviewed) = sqlite.confirmedImportRepo.reviewBankImport(plan) else {
+            Issue.record("The unchanged alternate original did not produce a ready bank plan.")
+            return
+        }
+        let before = try SQLiteNamespaceContentionSnapshot(database: sqlite.database)
+
+        let result = try withHeldNamespaceLock(databasePath: databasePath) {
+            sqlite.confirmedImportRepo.commitBankImport(reviewed)
+        }
+        #expect(result == .retryableContention)
+        let unchanged = try SQLiteNamespaceContentionSnapshot(database: sqlite.database) == before
+        #expect(unchanged, "Namespace contention changed the earlier accepted ledger.")
+        #expect(try sqlite.importSessionRepo.importSession(id: plan.history.importSession.id) == nil)
+
+        guard case .committed = sqlite.confirmedImportRepo.commitBankImport(reviewed) else {
+            Issue.record("The unchanged reviewed bank plan did not commit after namespace contention ended.")
+            return
+        }
+        #expect(sqlite.confirmedImportRepo.commitBankImport(reviewed) == .exactDuplicate)
+    }
+
     private func receipt(for plan: ConfirmedImportPlanDTO) -> ConfirmedImportReceiptDTO {
         ConfirmedImportReceiptDTO(
             workspaceId: plan.workspace.id,

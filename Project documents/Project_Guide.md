@@ -5,6 +5,8 @@
 
 This is the documentation entry map. Read the task index, choose one primary task, then read only its named sections and evidence. Name any necessary secondary task. The complete current prompt remains execution authority; if classification or authority conflicts, clarify with Chat. Do not read the whole folder by default. Exit the chosen playbook at its END marker.
 
+Before development work affecting the adopted ledger's data, persistence or schema, read the [protected-ledger procedure](LedgerForge_Standing_Execution_Harness_Guide.md#protected-adopted-ledger). The adopted database is protected user data, not disposable; the [owner's adoption decision](SCOPE_DECISIONS.md#personal-v1-adoption-and-protected-ledger-20261003) defines that boundary. <!-- user-specified -->
+
 <a id="pg-01"></a>
 ## PG-01 — Task index
 

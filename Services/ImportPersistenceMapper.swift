@@ -436,7 +436,8 @@ struct ImportPersistenceMapper {
     /// Source controls stay optional; no relationship geometry is fabricated.
     func standaloneBankImportPlan(financialDocument: FinancialDocument, importSession: ImportSession,
             validation: ImportValidationResult, fingerprintSet: PreparedDocumentFingerprintSet,
-            providerGeneration: ProviderGenerationToken, account: AccountDTO) throws -> BankImportPlanDTO {
+            providerGeneration: ProviderGenerationToken, account: AccountDTO,
+            statementCorrespondence: BankStatementCorrespondenceRequirementDTO? = nil) throws -> BankImportPlanDTO {
         guard let profile = financialDocument.parserProfileID, BankImportDecision.standaloneProfiles.contains(profile),
               let version = BankImportDecision.supportedVersion(for: profile), financialDocument.parserProfileVersion == version,
               let source = financialDocument.sourceStatementEvidence,
@@ -473,7 +474,12 @@ struct ImportPersistenceMapper {
             identityPatterns: [.init(kind: profile.hasPrefix("axis.") ? "axis_account_number" : "hdfc_account_number", pattern: identities[0].normalizedValue)],
             sourceRangeStart: rows.map(\.sourceOrdinal).min() ?? financialDocument.zeroActivityEvidence?.financialRegionStartOrdinal,
             sourceRangeEnd: rows.map(\.sourceOrdinal).max() ?? financialDocument.zeroActivityEvidence?.financialRegionEndOrdinal,
-            productLabel: "Bank account", rows: rows)
+            productLabel: "Bank account", rows: rows,
+            sourceDetails: source.printedControls.isEmpty ? nil : .init(
+                firstPage: nil, lastPage: nil, regionDescriptor: nil, regionSignature: nil, recognizedRowCount: nil,
+                controls: source.printedControls.map { .init(kind: $0.kind.rawValue, label: $0.label,
+                    literal: $0.literal, sourceOrdinal: $0.sourceOrdinal, sourcePage: $0.sourcePage,
+                    sourceUnit: $0.sourceUnit.rawValue) }))
         let attempt = ImportAttemptDTO(workspaceId: workspaceId, createdAtISO: payload.completedAtISO,
             outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
             accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue, guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
@@ -485,7 +491,8 @@ struct ImportPersistenceMapper {
                 completedAtISO: payload.completedAtISO, successfulAttempt: attempt, normalizedDocument: payload.normalizedDocument,
                 normalizedRows: payload.normalizedRows),
             sections: [.init(proposedAccount: account, accountChoice: .useExistingAccount(accountId: account.id), identifiers: identities, source: section)],
-            transactions: payload.transactions, zeroActivityControl: payload.zeroActivityControl)
+            transactions: payload.transactions, zeroActivityControl: payload.zeroActivityControl,
+            statementCorrespondence: statementCorrespondence)
     }
 
     func confirmedImportPlan(
@@ -652,6 +659,12 @@ struct ImportPersistenceMapper {
         }
         let bankSectionPlan: BankStatementSectionPlanDTO?
         switch payload.normalizedDocument.profileId {
+        case let profile where BankImportDecision.standaloneProfiles.contains(profile) && !financialDocument.transactions.isEmpty:
+            // Preserve the source's reported controls and literal row evidence
+            // alongside the unchanged historical projection on a first import.
+            bankSectionPlan = try standaloneBankImportPlan(financialDocument: financialDocument,
+                importSession: importSession, validation: validation, fingerprintSet: fingerprintSet,
+                providerGeneration: providerGeneration, account: payload.account).sections.first?.source
         case "cbq.current-account.legacy.pdf", "cbq.current-account.usd-monthly.pdf", "cbq.savings-account.legacy.pdf", "cbq.savings-account.monthly.pdf", "cbq.e-savings-account.monthly.pdf":
             guard let evidence = cbqStatementEvidence else { throw ImportPersistenceError.missingTransactionProvenance }
             bankSectionPlan = BankStatementSectionPlanDTO(
@@ -778,7 +791,10 @@ struct ImportPersistenceMapper {
             evidence.instrumentSections.isEmpty &&
             evidence.accountSourceIdentityObservations.count == 1
         guard isAxis
-            ? evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.isEmpty
+            ? evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.count <= 1 &&
+                evidence.accountSourceIdentityObservations.allSatisfy({
+                    $0.kind == .axisPrimaryMaskedCardNumber && $0.subject == .liabilityAccount
+                })
             : (isAccountOnlyAmexZero ||
                (!evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.count == 1)) else {
             throw ImportPersistenceError.conflictingTransactionProvenance

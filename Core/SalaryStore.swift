@@ -25,10 +25,12 @@ final class FundingPlanStore: ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     @ObserverAtomicPublished private(set) var plans: [FundingPlan] = []
     private(set) var generation: ProviderGenerationToken?
+    private(set) var scratchpads: [MonthlyPlanScratchpad] = []
 
     init() {}
 
-    func installWithoutObservation(_ value: [FundingPlan], generation: ProviderGenerationToken? = nil) {
+    func installWithoutObservation(_ value: [FundingPlan], generation: ProviderGenerationToken? = nil, scratchpads: [MonthlyPlanScratchpad] = []) {
+        self.scratchpads = scratchpads
         self.generation = generation
         _plans.installWithoutObservation(value)
     }

@@ -214,6 +214,20 @@ nonisolated final class AxisCreditCardPDFNormalizer {
             }
             return !activeSourceKeys.contains(String(key))
         }
+        // The statement's primary card number identifies the owner-confirmed
+        // liability account. Later `Card No:` headings can describe add-on
+        // cards and must not replace this header or change row ownership.
+        if let firstPage = pageTexts.first {
+            // PDFKit's native header keeps this label/value pair together.
+            // The positioned rendering repeats the same header across columns,
+            // so flattening both forms creates a false malformed second value.
+            if let number = try Self.primaryMaskedCardNumber(
+                in: firstPage, isAppLayout: isAppLayout,
+                pageEvidence: pageEvidence?.first
+            ) {
+                fragments.append(.init(sourceOrdinal: 0, text: "PRIMARY_MASKED_CARD_NUMBER\t\(number)"))
+            }
+        }
         fragments.append(.init(sourceOrdinal: 0, text: "FORMAT\tpdf"))
         return AxisCreditCardPDFNormalizationResult(
             document: document,
@@ -1452,6 +1466,104 @@ nonisolated final class AxisCreditCardPDFNormalizer {
         if let value = captureMoney(after: "Total Payment Due", in: all) { add("TOTAL_PAYMENT_DUE", value) }
         if let value = captureDate(after: "Payment Due Date", in: all) { add("PAYMENT_DUE_DATE", value) }
         return fragments
+    }
+
+    nonisolated private static func primaryMaskedCardNumber(
+        in text: String, isAppLayout: Bool, pageEvidence: RawPDFPageEvidence?
+    ) throws -> String? {
+        let source = clean(text)
+        let labels = try NSRegularExpression(pattern: #"Credit Card Number\s*:?\s*"#, options: .caseInsensitive)
+        // End at the last printed digit, then reject any continued numeric or
+        // masked token. A trailing whitespace repetition could otherwise
+        // backtrack and accept a valid-length prefix of a malformed number.
+        let number = try NSRegularExpression(pattern: #"^((?:[0-9]\s*){6}(?:[Xx*]\s*){6}(?:[0-9]\s*){3}[0-9])(?=$|\s(?!\s*[0-9Xx*]))"#)
+        let appMask = try NSRegularExpression(pattern: #"^((?:[0-9]\s*){4}(?:[Xx*]\s*){8}(?:[0-9]\s*){3}[0-9])(?=$|\s(?!\s*[0-9Xx*]))"#)
+        let fieldPrefix = try NSRegularExpression(pattern: #"^((?:[0-9]\s*){6}(?:[Xx*]\s*){6}(?:[0-9]\s*){3}[0-9])(?=$|\s)"#)
+        let labelMatches = labels.matches(in: source, range: NSRange(source.startIndex..., in: source))
+        var values = Set<String>()
+        var reusableValue: String?
+        for label in labelMatches {
+            guard let range = Range(label.range, in: source) else { continue }
+            let suffix = String(source[range.upperBound...])
+            let sourceRange = NSRange(suffix.startIndex..., in: suffix)
+            var reusableMatch = number.firstMatch(in: suffix, range: sourceRange)
+            let appMatch = isAppLayout ? appMask.firstMatch(in: suffix, range: sourceRange) : nil
+            if reusableMatch == nil, appMatch == nil, !isAppLayout,
+               labelMatches.count == 1, let pageEvidence {
+                // Native text can interleave a payment value from another
+                // printed row after this mask without a newline. Only the
+                // complete, header-bounded card field can resolve that case.
+                let positionedValue = try traditionalPrimaryMaskedCardNumber(in: pageEvidence)
+                guard let candidate = fieldPrefix.firstMatch(in: suffix, range: sourceRange),
+                      let candidateRange = Range(candidate.range(at: 1), in: suffix),
+                      compactWhitespace(String(suffix[candidateRange])).uppercased()
+                        .replacingOccurrences(of: "*", with: "X") == positionedValue else {
+                    throw AxisCreditCardPDFNormalizationError.malformedSummary
+                }
+                reusableMatch = candidate
+            }
+            guard let match = reusableMatch ?? appMatch,
+                  let valueRange = Range(match.range(at: 1), in: suffix) else {
+                throw AxisCreditCardPDFNormalizationError.malformedSummary
+            }
+            let value = compactWhitespace(String(suffix[valueRange])).uppercased()
+                .replacingOccurrences(of: "*", with: "X")
+            values.insert(value)
+            if reusableMatch != nil { reusableValue = value }
+        }
+        guard values.count <= 1 else { throw AxisCreditCardPDFNormalizationError.malformedSummary }
+        // The authentic app layout prints four leading digits and eight mask
+        // characters. Keep that exact evidence in the unchanged original;
+        // it is not the six-leading-digit observation supported by the stored
+        // mapping contract. Its existing explicit account choice remains.
+        return reusableValue
+    }
+
+    nonisolated private static func traditionalPrimaryMaskedCardNumber(
+        in page: RawPDFPageEvidence
+    ) throws -> String {
+        let cardLabels = [
+            "Credit Card Number", "Credit Limit", "Available Credit Limit", "Available Cash Limit"
+        ]
+        let balanceLabels = [
+            "Previous Balance", "Payments", "Credits", "Purchase",
+            "Cash Advance", "Other Debit/Charges"
+        ]
+        guard let header = uniqueRectangularHeaderOccurrence(labels: cardLabels, in: [page]),
+              let nextHeader = uniqueRectangularHeaderOccurrence(labels: balanceLabels, in: [page]),
+              nextHeader.rowIndex > header.rowIndex,
+              let band = horizontalBand(
+                for: "Credit Card Number", orderedLabels: cardLabels, columns: header.columns
+              ) else {
+            throw AxisCreditCardPDFNormalizationError.malformedSummary
+        }
+        var parts: [String] = []
+        for row in header.rows[(header.rowIndex + 1)..<nextHeader.rowIndex] {
+            guard row.allSatisfy(Self.hasCanonicalGeometry) else {
+                throw AxisCreditCardPDFNormalizationError.malformedSummary
+            }
+            // Do not truncate a token that crosses the source-owned column.
+            if let upper = band.upper, row.contains(where: {
+                guard let geometry = $0.geometry else { return true }
+                return geometry.minX < upper && geometry.maxX >= upper
+            }) {
+                throw AxisCreditCardPDFNormalizationError.malformedSummary
+            }
+            // Other columns can have an intervening label row with no text
+            // in the primary field. Keep every fragment the primary band owns.
+            if let part = rectangularOwnedText(
+                label: "Credit Card Number", orderedLabels: cardLabels,
+                columns: header.columns, in: row
+            ) {
+                parts.append(part)
+            }
+        }
+        let value = compactWhitespace(parts.joined(separator: " ")).uppercased()
+            .replacingOccurrences(of: "*", with: "X")
+        guard value.range(of: #"^[0-9]{6}X{6}[0-9]{4}$"#, options: .regularExpression) != nil else {
+            throw AxisCreditCardPDFNormalizationError.malformedSummary
+        }
+        return value
     }
 
     nonisolated fileprivate static func selectedStatementMonth(in text: String) -> String? {

@@ -384,7 +384,17 @@ nonisolated final class AxisBankAccountPDFNormalizer {
             closingBalance: try Money(canonicalDecimal: closingBalance, currency: currency.code),
             openingSourceOrdinal: opening.index + 1,
             totalsSourceOrdinal: transactionTotal.index + 1,
-            closingSourceOrdinal: closing.index + 1
+            closingSourceOrdinal: closing.index + 1,
+            literalControls: [
+                .init(kind: .openingBalance, label: Self.openingPrefix, literal: opening.values[0],
+                      sourceOrdinal: opening.index + 1, sourceUnit: .line),
+                .init(kind: .debitTotal, label: Self.totalPrefix, literal: transactionTotal.values[0],
+                      sourceOrdinal: transactionTotal.index + 1, sourceUnit: .line),
+                .init(kind: .creditTotal, label: Self.totalPrefix, literal: transactionTotal.values[1],
+                      sourceOrdinal: transactionTotal.index + 1, sourceUnit: .line),
+                .init(kind: .closingBalance, label: Self.closingPrefix, literal: closing.values[0],
+                      sourceOrdinal: closing.index + 1, sourceUnit: .line)
+            ]
         )
         let financialRegion = try NormalizedDocument.ExhaustedFinancialRegionEvidence(
             descriptor: "Axis PDF table from initial header through closing balance",

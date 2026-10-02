@@ -8,6 +8,11 @@ import XCTest
 /// statements, financial DTO graphs, prices, rates, holdings or Gmail originals.
 @MainActor
 final class BackgroundPersistenceTests: XCTestCase {
+    @MainActor
+    private final class PublicationProbe {
+        var count = 0
+    }
+
     private func location() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-background-mechanics-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
@@ -204,6 +209,44 @@ final class BackgroundPersistenceTests: XCTestCase {
         XCTAssertEqual(try reopened.backgroundPublicCacheRepo.snapshot(now: now), .empty)
     }
 
+    func testObsoletePriceRetryCannotWakeForegroundOrHelperAfterReopen() async throws {
+        let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-30T22:00:00Z"))
+        let retry = now.addingTimeInterval(60)
+        let orphan = BackgroundPublicLegProgress(identity: "retired-price-identity",
+            slot: BackgroundSchedule.publicSlot(at: now), attempts: 1,
+            retryAt: now.addingTimeInterval(-60), manuallyRequested: true)
+        var current = BackgroundPublicLegProgress(identity: "aldar:INR",
+            slot: BackgroundSchedule.publicSlot(at: now), attempts: 1,
+            retryAt: retry, manuallyRequested: true)
+        let progress = BackgroundPublicProgressStore(database: provider.database)
+        try progress.save(orphan)
+        try progress.save(current)
+        try provider.database.checkpointAndClose()
+
+        let reopened = try SQLiteRepositoryProvider(path: url.path)
+        defer { reopened.database.close() }
+        let stamp = try XCTUnwrap(reopened.database.currentActivationStamp)
+        let executor = BackgroundUpdateExecutor(provider: reopened, activation: stamp, workspaceID: "mechanics")
+        var configuration = BackgroundScheduleConfiguration(enabled: true,
+            alDarCurrencyRatesEnabled: false, investmentPublicPricesEnabled: false,
+            gmailCollectionEnabled: false, zurichISPHoldingsEnabled: false)
+        configuration.ibkrFlexHoldingsEnabled = false
+        let foreground = try await executor.nextPublicRetry()
+        let helper = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertEqual(foreground, retry)
+        XCTAssertEqual(helper, retry)
+
+        current.attempts = 2; current.retryAt = nil
+        try BackgroundPublicProgressStore(database: reopened.database).save(current)
+        let foregroundAfterCompletion = try await executor.nextPublicRetry()
+        let helperAfterCompletion = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertNil(foregroundAfterCompletion)
+        XCTAssertNil(helperAfterCompletion)
+        XCTAssertEqual(try BackgroundPublicProgressStore(database: reopened.database).load()[orphan.identity], orphan)
+        XCTAssertEqual(try reopened.backgroundPublicCacheRepo.snapshot(now: now), .empty)
+    }
+
     func testLongGapPublicAndISPUseOneCurrentCatchUpThenTheirNextConfiguredTarget() async throws {
         let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
         defer { provider.database.close() }
@@ -246,6 +289,200 @@ final class BackgroundPersistenceTests: XCTestCase {
         let ispSuccessor = try await executor.nextAutomaticTarget(configuration: publicConfiguration, now: now)
         let expectedISPSuccessor = try XCTUnwrap(ISO8601DateFormatter().date(from: "2027-04-01T00:00:00Z"))
         XCTAssertEqual(ispSuccessor, expectedISPSuccessor)
+    }
+
+    func testDueISPLeaseContentionRechecksWithoutCompletionAndReleasePreservesCatchUp() async throws {
+        let provider = try SQLiteRepositoryProvider(path: location().path)
+        defer { provider.database.close() }
+        let stamp = try XCTUnwrap(provider.database.currentActivationStamp)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2027-03-20T12:00:00Z"))
+        let configuration = BackgroundScheduleConfiguration(enabled: true,
+            alDarCurrencyRatesEnabled: false, investmentPublicPricesEnabled: false,
+            gmailCollectionEnabled: false, zurichISPHoldingsEnabled: true)
+        try provider.backgroundScheduleRepo.saveConfiguration(configuration)
+        let executor = BackgroundUpdateExecutor(provider: provider, activation: stamp, workspaceID: "mechanics")
+        var lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP)
+        XCTAssertNotNil(lease)
+        let busy = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertEqual(busy, now.addingTimeInterval(60))
+        // The real refresh route refuses at the lease, before any credential or
+        // financial read. A connection check similarly has no completion receipt.
+        let contention = await executor.refreshISP(configuration: configuration, manual: false)
+        XCTAssertEqual(contention, .alreadyRunning)
+        XCTAssertNil(try provider.backgroundJobRepo.jobRecord(.zurichISP))
+        lease = nil
+        let afterRelease = try await executor.nextAutomaticTarget(configuration: configuration, now: now.addingTimeInterval(60))
+        XCTAssertEqual(afterRelease, now.addingTimeInterval(60))
+        XCTAssertEqual(try provider.backgroundScheduleRepo.configuration(), configuration)
+        for kind in BackgroundJobKind.allCases { XCTAssertNil(try provider.backgroundJobRepo.jobRecord(kind)) }
+    }
+
+    func testCompletedISPReceiptAndFinalFailureKeepConfiguredSuccessorEvenWhenLeaseIsBusy() async throws {
+        // Receipt/clock mechanics only: no holdings snapshot is manufactured.
+        let completions: [BackgroundJobCompletion] = [.committedCurrentHoldings, .failedFinal, .refusedCredentialInteraction]
+        for completion in completions {
+            let provider = try SQLiteRepositoryProvider(path: location().path)
+            defer { provider.database.close() }
+            let stamp = try XCTUnwrap(provider.database.currentActivationStamp)
+            let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2027-03-20T12:00:00Z"))
+            let configuration = BackgroundScheduleConfiguration(enabled: true,
+                alDarCurrencyRatesEnabled: false, investmentPublicPricesEnabled: false,
+                gmailCollectionEnabled: false, zurichISPHoldingsEnabled: true)
+            let next = try XCTUnwrap(BackgroundSchedule.nextOccurrence(of: configuration.zurichISPRule, after: now))
+            let executor = BackgroundUpdateExecutor(provider: provider, activation: stamp, workspaceID: "mechanics")
+            var lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP)
+            XCTAssertNotNil(lease)
+            let claim = try XCTUnwrap(provider.backgroundJobRepo.claim(.zurichISP, activation: stamp, origin: .foreground, now: now))
+            try provider.backgroundJobRepo.finish(claim, outcome: completion, now: now)
+            let busy = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+            XCTAssertEqual(busy, next)
+            lease = nil
+            let afterRelease = try await executor.nextAutomaticTarget(configuration: configuration, now: now.addingTimeInterval(60))
+            XCTAssertEqual(afterRelease, next)
+            XCTAssertEqual(try provider.backgroundJobRepo.jobRecord(.zurichISP)?.outcome, completion)
+        }
+    }
+
+    func testHelperCredentialRefusalStillAllowsForegroundOpportunityAfterContention() async throws {
+        let provider = try SQLiteRepositoryProvider(path: location().path)
+        defer { provider.database.close() }
+        let stamp = try XCTUnwrap(provider.database.currentActivationStamp)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2027-03-20T12:00:00Z"))
+        let configuration = BackgroundScheduleConfiguration(enabled: true,
+            alDarCurrencyRatesEnabled: false, investmentPublicPricesEnabled: false,
+            gmailCollectionEnabled: false, zurichISPHoldingsEnabled: true)
+        let foreground = BackgroundUpdateExecutor(provider: provider, activation: stamp, workspaceID: "mechanics", origin: .foreground)
+        let helper = BackgroundUpdateExecutor(provider: provider, activation: stamp, workspaceID: "mechanics", origin: .helper)
+        var lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP)
+        XCTAssertNotNil(lease)
+        let claim = try XCTUnwrap(provider.backgroundJobRepo.claim(.zurichISP, activation: stamp, origin: .helper, now: now))
+        try provider.backgroundJobRepo.finish(claim, outcome: .refusedCredentialInteraction, now: now)
+        let foregroundBusy = try await foreground.nextAutomaticTarget(configuration: configuration, now: now)
+        let helperBusy = try await helper.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertEqual(foregroundBusy, now.addingTimeInterval(60))
+        XCTAssertEqual(helperBusy, BackgroundSchedule.nextOccurrence(of: configuration.zurichISPRule, after: now))
+        lease = nil
+        let foregroundReleased = try await foreground.nextAutomaticTarget(configuration: configuration, now: now.addingTimeInterval(60))
+        XCTAssertEqual(foregroundReleased, now.addingTimeInterval(60))
+    }
+
+    func testISPContentionRecheckDoesNotPassAnEarlierConfiguredSlotOrEnableDisabledScope() async throws {
+        let provider = try SQLiteRepositoryProvider(path: location().path)
+        defer { provider.database.close() }
+        let stamp = try XCTUnwrap(provider.database.currentActivationStamp)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2027-03-31T23:59:40Z"))
+        var configuration = BackgroundScheduleConfiguration(enabled: true,
+            alDarCurrencyRatesEnabled: false, investmentPublicPricesEnabled: false,
+            gmailCollectionEnabled: false, zurichISPHoldingsEnabled: true)
+        let executor = BackgroundUpdateExecutor(provider: provider, activation: stamp, workspaceID: "mechanics")
+        let lease = try XCTUnwrap(BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP))
+        defer { withExtendedLifetime(lease) {} }
+        let target = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertEqual(target, now.addingTimeInterval(20))
+        configuration.zurichISPHoldingsEnabled = false
+        let disabled = try await executor.nextAutomaticTarget(configuration: configuration, now: now)
+        XCTAssertNil(disabled)
+        for kind in BackgroundJobKind.allCases { XCTAssertNil(try provider.backgroundJobRepo.jobRecord(kind)) }
+    }
+
+    func testReloadRebindsSameProviderActivationAndCancelsRetiredISPRequest() async throws {
+        let url = try location()
+        let initial = try SQLiteRepositoryProvider(path: url.path)
+        try initial.database.closeChecked()
+        let gate = DatabaseActivityGate.shared
+        let wasUnavailable = gate.isUnavailable
+        guard gate.beginExclusive(allowUnavailable: true) else {
+            return XCTFail("The mechanics test requires its own activity-gate interval")
+        }
+        let savedProvider = DatabaseProvider.shared
+        defer {
+            DatabaseProvider.shared = savedProvider
+            if wasUnavailable { gate.enterUnavailable() }
+            else { gate.finishExclusive(providerChanged: false) }
+        }
+        let authority = LedgerAccessCoordinator.shared(path: url.path)
+        let permit = try authority.beginLifecycle()
+        let provider = try SQLiteRepositoryProvider(path: url.path, migrations: allMigrations,
+            access: .existing, lifecyclePermit: permit)
+        defer { provider.database.close() }
+        DatabaseProvider.shared = .verifiedSQLite(provider)
+        let generation = provider.generationToken
+        let pending = try provider.database.validatedActivationStamp()
+        XCTAssertTrue(pending.transitioning)
+        let enrollment = BackgroundEnrollmentStore(url: url.deletingLastPathComponent().appendingPathComponent("enrollment.json"))
+        let adapter = BackgroundUpdatesSession(networkEnabled: false, enrollmentStore: enrollment)
+        defer { _ = adapter.invalidateISPRequest() }
+        // The gate prevents reload's hydration/Gmail follow-up; no shared sessions
+        // are started, and the empty ledger has no observations or credentials.
+        adapter.reload()
+        let retired = try XCTUnwrap(adapter.executorForTesting)
+        XCTAssertFalse(adapter.activeSchedule)
+        let session = ZurichISPSyncSession()
+        adapter.installSharedISPHandlers(on: session) { _ in XCTFail("No native fetch is requested") }
+        let entered = expectation(description: "Retired request entered")
+        let drained = expectation(description: "Retired request observed cancellation")
+        let publications = PublicationProbe()
+        adapter.startISPRequest { request in
+            entered.fulfill()
+            do { try await Task.sleep(for: .seconds(60)) } catch { }
+            let taskCancelled = Task.isCancelled
+            // A late callback in a fresh task still meets the cancelled request's
+            // publication gate; it cannot write after the authority is replaced.
+            await Task { @MainActor in
+                XCTAssertTrue(taskCancelled)
+                XCTAssertTrue(request.isCancelled)
+                XCTAssertFalse(Task.isCancelled)
+                do {
+                    _ = try request.publish { publications.count += 1; return .saved }
+                    XCTFail("A retired request must not publish")
+                } catch {
+                    XCTAssertTrue(error is CancellationError)
+                }
+                drained.fulfill()
+            }.value
+            return .cancelled
+        }
+        let enteredResult = await XCTWaiter.fulfillment(of: [entered], timeout: 2)
+        XCTAssertEqual(enteredResult, .completed)
+        XCTAssertTrue(session.isBusy)
+
+        let stable = try permit.finish(schemaVersion: allMigrations.count)
+        try provider.database.adoptCompletedLifecycle(stable)
+        XCTAssertEqual(provider.generationToken, generation)
+        XCTAssertFalse(stable.transitioning)
+        XCTAssertNotEqual(stable, pending)
+        // This is the real ISP path through salaryMetadata, before claim or
+        // credentials. No pending salary makes the valid executor stop notDue.
+        let staleOutcome = await retired.refreshISP(configuration: .init(), manual: true, salaryCheck: true)
+        XCTAssertEqual(staleOutcome, .authorityRefused)
+        XCTAssertNil(try provider.backgroundJobRepo.jobRecord(.zurichISP))
+
+        adapter.reload()
+        let current = try XCTUnwrap(adapter.executorForTesting)
+        XCTAssertFalse(current === retired)
+        XCTAssertFalse(session.isBusy)
+        let drainedResult = await XCTWaiter.fulfillment(of: [drained], timeout: 2)
+        XCTAssertEqual(drainedResult, .completed)
+        if drainedResult != .completed {
+            // The red variant must also retire and drain its still-running task.
+            let unfinished = adapter.invalidateISPRequest()
+            await unfinished?.value
+        }
+        XCTAssertEqual(publications.count, 0)
+        let currentOutcome = await current.refreshISP(configuration: .init(), manual: true, salaryCheck: true)
+        XCTAssertEqual(currentOutcome, .notDue)
+        XCTAssertNil(try provider.backgroundJobRepo.jobRecord(.zurichISP))
+        adapter.reload()
+        XCTAssertTrue(try XCTUnwrap(adapter.executorForTesting) === current)
+
+        // Unowned transition metadata must still clear the executor, rather than
+        // silently adopting authority which this provider is not permitted to use.
+        let blocked = try authority.beginLifecycle()
+        adapter.reload()
+        XCTAssertNil(adapter.executorForTesting)
+        XCTAssertFalse(adapter.available)
+        let recovered = try blocked.finish(schemaVersion: allMigrations.count)
+        try provider.database.adoptCompletedLifecycle(recovered)
     }
 
     func testConfigurationReopenAndRestoreReconciliation() throws {

@@ -1,11 +1,12 @@
 import Foundation
 
 /// Durable, non-financial background work identity. A value names one of the
-/// three owner-approved update paths; it is not a generic task framework.
+/// owner-approved update paths; it is not a generic task framework.
 nonisolated enum BackgroundJobKind: String, Codable, CaseIterable, Sendable {
     case publicReferences = "public_references"
     case gmailCollection = "gmail_collection"
     case zurichISP = "zurich_isp"
+    case ibkrFlex = "ibkr_flex"
 }
 
 nonisolated struct BackgroundScheduleConfiguration: Codable, Equatable, Sendable {
@@ -13,6 +14,9 @@ nonisolated struct BackgroundScheduleConfiguration: Codable, Equatable, Sendable
     static let defaultPublicRule = BackgroundScheduleRule.selectedWeekdays(weekdays: allWeekdays, timesUTC: [0, 6 * 60, 12 * 60, 18 * 60])
     static let defaultGmailRule = BackgroundScheduleRule.selectedWeekdays(weekdays: allWeekdays, timesUTC: [0])
     static let defaultISPRule = BackgroundScheduleRule.monthly(daysUTC: [1], timesUTC: [0])
+    static let defaultIBKRRule = BackgroundScheduleRule.selectedWeekdays(weekdays: [2], timesUTC: [6 * 60])
+    var ibkrFlexHoldingsEnabled = false
+    var ibkrFlexRule: BackgroundScheduleRule = Self.defaultIBKRRule
     var enabled: Bool
     var alDarCurrencyRatesEnabled: Bool
     var investmentPublicPricesEnabled: Bool
@@ -37,10 +41,30 @@ nonisolated struct BackgroundScheduleConfiguration: Codable, Equatable, Sendable
         self.zurichISPRule = zurichISPRule
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case enabled, alDarCurrencyRatesEnabled, investmentPublicPricesEnabled, gmailCollectionEnabled,
+             zurichISPHoldingsEnabled, publicReferencesRule, gmailRule, zurichISPRule,
+             ibkrFlexHoldingsEnabled, ibkrFlexRule
+    }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try values.decode(Bool.self, forKey: .enabled)
+        alDarCurrencyRatesEnabled = try values.decode(Bool.self, forKey: .alDarCurrencyRatesEnabled)
+        investmentPublicPricesEnabled = try values.decode(Bool.self, forKey: .investmentPublicPricesEnabled)
+        gmailCollectionEnabled = try values.decode(Bool.self, forKey: .gmailCollectionEnabled)
+        zurichISPHoldingsEnabled = try values.decode(Bool.self, forKey: .zurichISPHoldingsEnabled)
+        publicReferencesRule = try values.decode(BackgroundScheduleRule.self, forKey: .publicReferencesRule)
+        gmailRule = try values.decode(BackgroundScheduleRule.self, forKey: .gmailRule)
+        zurichISPRule = try values.decode(BackgroundScheduleRule.self, forKey: .zurichISPRule)
+        ibkrFlexHoldingsEnabled = try values.decodeIfPresent(Bool.self, forKey: .ibkrFlexHoldingsEnabled) ?? false
+        ibkrFlexRule = try values.decodeIfPresent(BackgroundScheduleRule.self, forKey: .ibkrFlexRule) ?? Self.defaultIBKRRule
+    }
+
     func validated() throws -> Self {
         try publicReferencesRule.validated()
         try gmailRule.validated()
         try zurichISPRule.validated()
+        try ibkrFlexRule.validated()
         return self
     }
 }

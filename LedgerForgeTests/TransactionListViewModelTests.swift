@@ -11,6 +11,7 @@ enum Sprint89TransactionPresentationOracle {
         let transaction: Transaction
         let stableID: String
         let accountID: String?
+        let historyOnly: Bool
         let accountName: String
         let institution: String
         let categoryID: String?
@@ -26,12 +27,12 @@ enum Sprint89TransactionPresentationOracle {
     }
 
     /// The accepted canonical database is presentation input. No statement is read or copied.
-    static func verify(hydrated: RepositoryRuntimeSnapshot) throws -> [String] {
+    static func verify(hydrated: RepositoryRuntimeSnapshot, historyOnlyAccountIDs: Set<String>) throws -> [String] {
         var missingCases = [String]()
         guard hydrated.providerGeneration != nil else {
             throw Failure(reason: "hydrated snapshot has no provider generation")
         }
-        let rows = independentRows(hydrated)
+        let rows = independentRows(hydrated, historyOnlyAccountIDs: historyOnlyAccountIDs)
         try require(!rows.isEmpty, "empty authenticated transaction projection")
 
         var empty = TransactionPresentationFilterSpec.empty
@@ -186,7 +187,7 @@ enum Sprint89TransactionPresentationOracle {
         try require(actual.state == expected && actual.rows.isEmpty && actual.totals == .empty, "\(name) invalid state")
     }
 
-    private static func independentRows(_ hydrated: RepositoryRuntimeSnapshot) -> [Row] {
+    private static func independentRows(_ hydrated: RepositoryRuntimeSnapshot, historyOnlyAccountIDs: Set<String>) -> [Row] {
         let accounts = Dictionary(uniqueKeysWithValues: hydrated.accounts.compactMap { account in
             account.repositoryAccountId.map { ($0, account) }
         })
@@ -222,6 +223,7 @@ enum Sprint89TransactionPresentationOracle {
                 stableID: transaction.repositoryTransactionId.map { "durable:" + $0 }
                     ?? "runtime:" + transaction.id.uuidString.lowercased(),
                 accountID: transaction.repositoryAccountId,
+                historyOnly: transaction.repositoryAccountId.map(historyOnlyAccountIDs.contains) == true,
                 accountName: account.map(expectedAccountTitle) ?? "Unavailable",
                 institution: account.map { shortInstitution($0.institution) } ?? "Unavailable",
                 categoryID: categoryID,
@@ -233,16 +235,15 @@ enum Sprint89TransactionPresentationOracle {
         }
     }
 
-    // Owner display contract: a nickname wins; identifier-only names use the
-    // retained product label; all visible institution names abbreviate CBQ.
+    // Owner display contract: a saved nickname is shown verbatim. Account
+    // context belongs in a separate label, never reconstructed into its name.
     // Keep this independent of the production presentation engine/accessors.
     private static func expectedAccountTitle(_ account: Account) -> String {
         if let nickname = account.nickname, nickname.contains(where: { !$0.isWhitespace }) {
-            return shortInstitution(nickname)
+            return nickname
         }
-        let identifierOnly = account.name.range(of: "^[0-9Xx* \\-]+$", options: .regularExpression) != nil
-        let label = identifierOnly ? (account.sourceProductName ?? account.institution + " account") : account.name
-        return shortInstitution(label)
+        if account.name.contains(where: { !$0.isWhitespace }) { return account.name }
+        return shortInstitution(account.sourceProductName ?? account.institution + " account")
     }
 
     private static func shortInstitution(_ text: String) -> String {
@@ -254,7 +255,8 @@ enum Sprint89TransactionPresentationOracle {
         let visible = [row.transaction.description, row.accountName, row.institution, row.categoryName]
             .map(normalize).joined(separator: " ")
         guard terms.allSatisfy({ visible.contains($0) }) else { return false }
-        guard filter.accountIDs.isEmpty || row.accountID.map(filter.accountIDs.contains) == true else { return false }
+        guard !filter.excludesAllAccounts else { return false }
+        guard filter.accountIDs.isEmpty ? !row.historyOnly : row.accountID.map(filter.accountIDs.contains) == true else { return false }
         guard filter.currencies.isEmpty || filter.currencies.contains(row.transaction.money.currency) else { return false }
         let category = row.categoryID.map(TransactionPresentationCategoryChoice.categoryID) ?? .uncategorized
         guard filter.categories.isEmpty || filter.categories.contains(category) else { return false }
@@ -409,10 +411,118 @@ struct TransactionListViewModelTests {
         #expect(try TransactionPeriodChoice.all.range(relativeTo: january) == nil)
     }
 
+    @Test
+    func relativePeriodRefreshAdvancesMonthAndYearAtLocalMidnight() throws {
+        let model = TransactionListViewModel(transactionStore: TransactionStore(),
+            importSessionStore: ImportSessionStore(), accountStore: AccountStore(), categoryStore: CategoryStore())
+        let timeZone = try #require(TimeZone(identifier: "Asia/Qatar"))
+        let before = try #require(ISO8601DateFormatter().date(from: "2025-12-31T20:59:59Z"))
+        let after = try #require(ISO8601DateFormatter().date(from: "2025-12-31T21:00:00Z"))
+        let cases: [(TransactionPeriodChoice, String, String, String, String)] = [
+            (.thisMonth, "2025-12-01", "2025-12-31", "2026-01-01", "2026-01-31"),
+            (.lastMonth, "2025-11-01", "2025-11-30", "2025-12-01", "2025-12-31"),
+            (.yearToDate, "2025-01-01", "2025-12-31", "2026-01-01", "2026-01-01")
+        ]
+        model.presentationFilter.searchText = "retained search"
+        for (period, oldStart, oldEnd, newStart, newEnd) in cases {
+            model.presentationControls.period = period
+            model.refreshRelativePeriod(isOverview: false, now: before, timeZone: timeZone)
+            #expect(model.presentationFilter.statementDateRange == .init(
+                start: try StatementDate(canonical: oldStart), end: try StatementDate(canonical: oldEnd)))
+            model.refreshRelativePeriod(isOverview: false, now: after, timeZone: timeZone)
+            #expect(model.presentationFilter.statementDateRange == .init(
+                start: try StatementDate(canonical: newStart), end: try StatementDate(canonical: newEnd)))
+            #expect(model.presentationFilter.searchText == "retained search")
+            #expect(model.presentationControls.period == period)
+            #expect(model.presentationControls.dateInputError == nil)
+        }
+    }
+
+    @Test
+    func relativePeriodRefreshRevalidatesSamePresetAfterSpendingDrilldownRestoration() throws {
+        let model = TransactionListViewModel(transactionStore: TransactionStore(),
+            importSessionStore: ImportSessionStore(), accountStore: AccountStore(), categoryStore: CategoryStore())
+        let timeZone = try #require(TimeZone(identifier: "Asia/Qatar"))
+        let before = try #require(ISO8601DateFormatter().date(from: "2026-09-30T20:59:59Z"))
+        let after = try #require(ISO8601DateFormatter().date(from: "2026-09-30T21:00:00Z"))
+        model.presentationControls.period = .thisMonth
+        model.presentationFilter.searchText = "retained original criteria"
+        model.refreshRelativePeriod(isOverview: false, now: before, timeZone: timeZone)
+        let retained = (filter: model.presentationFilter, controls: model.presentationControls)
+
+        // The drilldown clears controls, then the owner selects the same preset.
+        model.presentationFilter = .empty
+        model.presentationControls = TransactionPresentationControls()
+        model.presentationControls.period = .thisMonth
+        model.refreshRelativePeriod(isOverview: false, now: after, timeZone: timeZone)
+        let periodBeforeRestoration = model.presentationControls.period
+
+        // Restoring equal preset values does not produce a period-change event.
+        model.presentationFilter = retained.filter
+        model.presentationControls = retained.controls
+        #expect(model.presentationControls.period == periodBeforeRestoration)
+        #expect(model.presentationFilter.statementDateRange == .init(
+            start: try StatementDate(canonical: "2026-09-01"), end: try StatementDate(canonical: "2026-09-30")))
+        model.refreshRelativePeriod(isOverview: false, now: after, timeZone: timeZone)
+        #expect(model.presentationFilter.statementDateRange == .init(
+            start: try StatementDate(canonical: "2026-10-01"), end: try StatementDate(canonical: "2026-10-31")))
+        #expect(model.presentationControls.period == .thisMonth)
+        #expect(model.presentationFilter.searchText == "retained original criteria")
+    }
+
+    @Test
+    func yearToDateRefreshAdvancesOnCalendarDayWithinTheSameMonth() throws {
+        let model = TransactionListViewModel(transactionStore: TransactionStore(),
+            importSessionStore: ImportSessionStore(), accountStore: AccountStore(), categoryStore: CategoryStore())
+        let timeZone = try #require(TimeZone(identifier: "Asia/Qatar"))
+        let before = try #require(ISO8601DateFormatter().date(from: "2024-02-28T20:59:59Z"))
+        let after = try #require(ISO8601DateFormatter().date(from: "2024-02-28T21:00:00Z"))
+        model.presentationControls.period = .yearToDate
+        model.refreshRelativePeriod(isOverview: false, now: before, timeZone: timeZone)
+        #expect(model.presentationFilter.statementDateRange == .init(
+            start: try StatementDate(canonical: "2024-01-01"), end: try StatementDate(canonical: "2024-02-28")))
+        model.refreshRelativePeriod(isOverview: false, now: after, timeZone: timeZone)
+        #expect(model.presentationFilter.statementDateRange == .init(
+            start: try StatementDate(canonical: "2024-01-01"), end: try StatementDate(canonical: "2024-02-29")))
+    }
+
+    @Test
+    func relativePeriodRefreshPreservesAllCustomAndPeriodOverviewDates() throws {
+        let model = TransactionListViewModel(transactionStore: TransactionStore(),
+            importSessionStore: ImportSessionStore(), accountStore: AccountStore(), categoryStore: CategoryStore())
+        let timeZone = try #require(TimeZone(identifier: "Asia/Qatar"))
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-01-01T12:00:00Z"))
+        let selectedRange = TransactionPresentationStatementDateRange(
+            start: try StatementDate(canonical: "2024-02-01"), end: try StatementDate(canonical: "2024-02-29"))
+        model.presentationFilter.searchText = "retained search"
+        model.refreshRelativePeriod(isOverview: false, now: now, timeZone: timeZone)
+        #expect(model.presentationControls.period == .all)
+        #expect(model.presentationFilter.statementDateRange == nil)
+        model.presentationControls.period = .custom
+        model.presentationControls.customStart = "invalid pending edit"
+        model.presentationControls.customEnd = "2024-02-29"
+        model.presentationControls.dateInputError = "Use a valid source date in YYYY-MM-DD format."
+        model.presentationFilter.statementDateRange = selectedRange
+        let filter = model.presentationFilter
+        model.refreshRelativePeriod(isOverview: false, now: now, timeZone: timeZone)
+        #expect(model.presentationFilter == filter)
+        #expect(model.presentationControls.customStart == "invalid pending edit")
+        #expect(model.presentationControls.customEnd == "2024-02-29")
+        #expect(model.presentationControls.dateInputError == "Use a valid source date in YYYY-MM-DD format.")
+
+        let overview = model.makePeriodOverview()
+        // The overview guard remains effective even if a relative control is
+        // later retained alongside its independently selected date bounds.
+        overview.presentationControls.period = .thisMonth
+        overview.refreshRelativePeriod(isOverview: true, now: now, timeZone: timeZone)
+        #expect(overview.presentationFilter == filter)
+        #expect(model.presentationFilter == filter)
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func acceptedCanonicalSnapshotMatchesIndependentInMemoryOracle() async throws {
         let context = try await authenticTransactionListContext()
-        let missing = try Sprint89TransactionPresentationOracle.verify(hydrated: context.snapshot)
+        let missing = try Sprint89TransactionPresentationOracle.verify(hydrated: context.snapshot, historyOnlyAccountIDs: context.historyOnlyAccountIDs)
         let amounts = context.transactionStore.transactions.map(\.money)
         for localeID in ["en_US", "en_IN", "ar_QA"] {
             let locale = Locale(identifier: localeID)
@@ -450,7 +560,7 @@ struct TransactionListViewModelTests {
     @Test(.globalRuntimeStateIsolation)
     func creditAndDebitFiltersUseUnchangedAuthenticTransactions() async throws {
         let context = try await authenticTransactionListContext()
-        let allTransactions = context.transactionStore.transactions
+        let allTransactions = context.transactionStore.transactions.filter { $0.repositoryAccountId.map(context.historyOnlyAccountIDs.contains) != true }
         let bankIDs = Set(context.accountStore.accounts.filter { $0.type == .bank }.compactMap(\.repositoryAccountId))
         let bankTransactions = allTransactions.filter {
             $0.cardLiabilityEffect == nil && $0.repositoryAccountId.map(bankIDs.contains) == true
@@ -500,6 +610,7 @@ struct TransactionListViewModelTests {
         })
         let categoriesByID = Dictionary(uniqueKeysWithValues: context.categoryStore.categories.map { ($0.id, $0) })
         let expected = transactions.filter { row in
+            guard row.repositoryAccountId.map(context.historyOnlyAccountIDs.contains) != true else { return false }
             let account = row.repositoryAccountId.flatMap { accountsByID[$0] }
             let category = row.repositoryTransactionId
                 .flatMap { context.categoryStore.snapshot.assignments[$0] }
@@ -683,6 +794,7 @@ struct TransactionListViewModelTests {
         )
         var filter = TransactionPresentationFilterSpec.empty
         filter.categories = [.categoryID(category.id)]
+        filter.accountIDs = [try #require(transaction.repositoryAccountId)]
 
         let result = TransactionPresentationEngine.evaluate(
             transactions: context.transactionStore.transactions,
@@ -766,7 +878,7 @@ struct TransactionListViewModelTests {
             generation: context.provider.generationToken,
             availabilityState: .current
         )
-        let firstID = try #require(viewModel.allPresentationRows.first?.stableID)
+        let firstID = try #require(viewModel.transactionPresentationResult.rows.first?.stableID)
 
         viewModel.selectPresentationRow(id: firstID)
         #expect(viewModel.selectedPresentationRowID == firstID)
@@ -812,7 +924,7 @@ struct TransactionListViewModelTests {
         #expect(model.queryEvaluationCount == 1)
         model.presentationFilter.searchText = "post94-no-displayed-match-85746"
         #expect(model.transactionPresentationResult.state == .validEmpty)
-        #expect(model.allPresentationRows.count == ids.count)
+        #expect(model.allPresentationRows.count == context.snapshot.transactions.count)
         #expect(model.canonicalProjectionBuildCount == 1)
         #expect(model.queryEvaluationCount == 2)
         model.presentationFilter = .empty
@@ -834,12 +946,14 @@ struct TransactionListViewModelTests {
             accountStore: accounts, categoryStore: context.categoryStore
         )
         model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let canonicalRows = model.allPresentationRows
         let original = model.transactionPresentationResult
         let revision = model.canonicalContentRevision
         let accountID = try #require(original.rows.first?.accountID)
         var renamed = accounts.accounts
         let index = try #require(renamed.firstIndex { $0.repositoryAccountId == accountID })
-        renamed[index].name = "Post94 review label"
+        let savedName = "Commercial Bank of Qatar / My eSavings — HISTORY!"
+        renamed[index].name = savedName
         accounts.replaceAccounts(renamed)
         for _ in 0..<100 where model.canonicalContentRevision == revision {
             try await Task.sleep(for: .milliseconds(10))
@@ -847,11 +961,15 @@ struct TransactionListViewModelTests {
         #expect(model.canonicalContentRevision > revision)
         #expect(model.transactionPresentationResult.rows.count == original.rows.count)
         #expect(model.transactionPresentationResult.totals == original.totals)
-        #expect(model.allPresentationRows.filter { $0.accountID == accountID }.allSatisfy { $0.accountDisplayName == "Post94 review label" })
-        model.presentationFilter.searchText = "Post94 review label"
+        #expect(model.allPresentationRows.filter { $0.accountID == accountID }.allSatisfy { $0.accountDisplayName == savedName })
+        let updated = try #require(model.allPresentationRows.first { $0.accountID == accountID })
+        #expect(model.detailPresentation(for: updated.transaction).accountDisplayName == savedName)
+        #expect(Dictionary(uniqueKeysWithValues: model.allPresentationRows.map { ($0.stableID, $0.transaction.description) }) ==
+            Dictionary(uniqueKeysWithValues: canonicalRows.map { ($0.stableID, $0.transaction.description) }))
+        model.presentationFilter.searchText = savedName
         #expect(!model.transactionPresentationResult.rows.isEmpty)
         #expect(model.transactionPresentationResult.rows.allSatisfy { $0.accountID == accountID })
-        #expect(model.allPresentationRows.count == original.rows.count)
+        #expect(model.allPresentationRows.count == canonicalRows.count)
     }
 
     @Test
@@ -867,6 +985,73 @@ struct TransactionListViewModelTests {
         #expect(calls == 2)
         #expect(measurement.value(revision: 2, font: .systemFont(ofSize: 18)) { calls += 1; return 290 } == 290)
         #expect(calls == 3)
+    }
+
+    @Test
+    func periodOverviewRollingRangesUseLocalTodayAndCalendarMonthOffsets() throws {
+        let today = try StatementDate(canonical: "2026-09-29")
+        #expect(PeriodOverviewRange.three.dates(ending: today) == .init(
+            start: try StatementDate(canonical: "2026-06-29"), end: today))
+        #expect(PeriodOverviewRange.one.dates(ending: try StatementDate(canonical: "2026-03-31"))?.start ==
+            (try StatementDate(canonical: "2026-02-28")))
+        let instant = try #require(ISO8601DateFormatter().date(from: "2026-09-29T22:30:00Z"))
+        #expect(PeriodOverviewRange.today(now: instant, timeZone: try #require(TimeZone(identifier: "Asia/Qatar"))) ==
+            (try StatementDate(canonical: "2026-09-30")))
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func periodOverviewKeepsOriginAndIndependentOverridesOverAuthenticRows() async throws {
+        let context = try await authenticTransactionListContext()
+        let origin = TransactionListViewModel(transactionStore: context.transactionStore,
+            importSessionStore: context.importSessionStore, accountStore: context.accountStore, categoryStore: context.categoryStore)
+        origin.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let first = try #require(origin.transactionPresentationResult.rows.first)
+        let accountID = try #require(first.accountID)
+        origin.presentationFilter.accountIDs = [accountID]
+        origin.presentationFilter.currencies = [first.transaction.money.currency]
+        origin.presentationSort = .init(key: .nativeAmount, direction: .ascending)
+        origin.selectPresentationRow(id: first.stableID)
+        let filter = origin.presentationFilter
+        let selected = origin.selectedPresentationRowID
+        let overview = origin.makePeriodOverview()
+        #expect(overview.presentationFilter == filter)
+        #expect(overview.presentationSort == origin.presentationSort)
+        #expect(overview.selectedPresentationRowID == selected)
+        let dates = try #require(PeriodOverviewRange.three.dates(ending: StatementDate(canonical: "2026-09-29")))
+        overview.presentationFilter.statementDateRange = dates
+        #expect(overview.presentationFilter.accountIDs == [accountID])
+        overview.presentationFilter.accountIDs = []
+        #expect(overview.presentationFilter.statementDateRange == dates)
+        #expect(overview.presentationFilter.currencies == filter.currencies)
+        overview.presentationFilter.excludesAllAccounts = true
+        #expect(overview.transactionPresentationResult.state == .validEmpty)
+        #expect(origin.presentationFilter == filter)
+        #expect(origin.selectedPresentationRowID == selected)
+        #expect(origin.presentationSort == .init(key: .nativeAmount, direction: .ascending))
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func periodOverviewDailyTotalsKeepNativePartitionsAndOnlyObservedDates() async throws {
+        let context = try await authenticTransactionListContext()
+        let model = TransactionListViewModel(transactionStore: context.transactionStore,
+            importSessionStore: context.importSessionStore, accountStore: context.accountStore, categoryStore: context.categoryStore)
+        model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let rows = model.transactionPresentationResult.rows
+        #expect(!rows.isEmpty)
+        let days = PeriodOverviewDay.observed(in: rows)
+        #expect(Set(days.map(\.date)) == Set(rows.compactMap(\.sourceCivilDate)))
+        for day in days {
+            let observed = rows.filter { $0.sourceCivilDate == day.date }
+            for (key, total) in day.totals.partitions {
+                let matching = observed.filter {
+                    $0.transaction.money.currency == key.currency && $0.domain == key.domain && $0.effect == key.effect
+                }
+                #expect(!matching.isEmpty)
+                #expect(total.amount == matching.reduce(Decimal.zero) { $0 + $1.transaction.money.amount })
+            }
+            #expect(day.totals.withheldUnknownDomainCount == observed.filter { $0.domain == .unknown }.count)
+            #expect(day.totals.withheldUnknownEffectCount == observed.filter { $0.domain != .unknown && $0.effect == .unknown }.count)
+        }
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -952,6 +1137,31 @@ struct TransactionListViewModelTests {
         }
     }
 
+    @Test
+    func sourceDocumentLabelsKeepOriginalImportAndPreferredEvidenceSeparate() {
+        // These are filename/availability mechanics, not statement or DTO inputs.
+        let separate = TransactionSourceDocumentsPresentation(
+            originalImportDocumentName: "original.csv", preferredSourceDocumentName: "later.pdf")
+        #expect(separate.originalImportDocumentName == "original.csv")
+        #expect(separate.preferredSourceDocumentName == "later.pdf")
+
+        let missingOriginal = TransactionSourceDocumentsPresentation(
+            originalImportDocumentName: nil, preferredSourceDocumentName: "later.pdf")
+        #expect(missingOriginal.originalImportDocumentName == "Unavailable")
+        #expect(missingOriginal.preferredSourceDocumentName == "later.pdf")
+
+        let blankPreferred = TransactionSourceDocumentsPresentation(
+            originalImportDocumentName: " original.csv ", preferredSourceDocumentName: " \n ")
+        #expect(blankPreferred.originalImportDocumentName == "original.csv")
+        #expect(blankPreferred.preferredSourceDocumentName == nil)
+
+        // Equal filenames do not prove that the two source owners are identical.
+        let sameNames = TransactionSourceDocumentsPresentation(
+            originalImportDocumentName: "statement.pdf", preferredSourceDocumentName: "statement.pdf")
+        #expect(sameNames.originalImportDocumentName == "statement.pdf")
+        #expect(sameNames.preferredSourceDocumentName == "statement.pdf")
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func authenticDurableRelationshipsProduceTransactionDetail() async throws {
         let context = try await authenticTransactionListContext()
@@ -965,8 +1175,8 @@ struct TransactionListViewModelTests {
 
         let presentation = viewModel.detailPresentation(for: transaction)
 
-        let sourceName = transaction.repositoryPreferredSourceDocumentName ?? transaction.repositorySourceDocumentName
-        #expect(presentation.sourceDocumentName == sourceName)
+        #expect(presentation.sourceDocumentName == transaction.repositorySourceDocumentName)
+        #expect(presentation.preferredSourceDocumentName == transaction.repositoryPreferredSourceDocumentName)
         #expect(presentation.accountDisplayName != "Unavailable")
         #expect(presentation.institution != "Unavailable")
         #expect(presentation.importedAt != nil)
@@ -994,6 +1204,7 @@ private struct AuthenticTransactionListContext {
     let provider: SQLiteRepositoryProvider
     let workspaceID: String
     let snapshot: RepositoryRuntimeSnapshot
+    let historyOnlyAccountIDs: Set<String>
     let accountStore: AccountStore
     let transactionStore: TransactionStore
     let categoryStore: CategoryStore
@@ -1054,6 +1265,7 @@ private func authenticTransactionListContext() async throws -> AuthenticTransact
         provider: provider,
         workspaceID: workspaceID,
         snapshot: snapshot,
+        historyOnlyAccountIDs: Set(try provider.accountRepo.accounts(workspaceId: workspaceID).filter { $0.closedAtISO != nil }.map(\.id)),
         accountStore: accountStore,
         transactionStore: transactionStore,
         categoryStore: categoryStore,

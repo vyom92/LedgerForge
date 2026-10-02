@@ -7,6 +7,8 @@ struct PlanningFundingEditor: View {
     let plan: FundingPlan
     let metadata: FinancialIntelligenceSnapshot?
     let accounts: [IntelligenceAccountContext]
+    var availableAccountIDs: Set<String>? = nil
+    var excludedHistoryAccountIDs: Set<String> = []
     let rows: [SpendingSourceRow]
     let onApply: (PlanAssistance) -> Void
     @State private var draft: PlanAssistance?
@@ -26,7 +28,16 @@ struct PlanningFundingEditor: View {
     @State private var search = ""
     @State private var message: String?
 
-    private var cards: [IntelligenceAccountContext] { FinancialIntelligenceStore.shared.sources.accounts.filter { $0.domain == "credit_card" } }
+    private var scopedDraft: PlanAssistance? {
+        draft?.excludingHistoryAccounts(excludedHistoryAccountIDs, reserves: metadata?.reserves ?? [])
+    }
+    private func isVisible(_ bill: FundingPlanCommitment) -> Bool {
+        bill.included && bill.isInAccountScope(excluding: excludedHistoryAccountIDs, fundingOverrides: draft?.billFundingAccounts)
+    }
+    private var cards: [IntelligenceAccountContext] { FinancialIntelligenceStore.shared.sources.accounts.filter { $0.domain == "credit_card" && !excludedHistoryAccountIDs.contains($0.id) } }
+    private func fundingAccounts(retaining selectedID: String? = nil) -> [IntelligenceAccountContext] {
+        accounts.filter { !excludedHistoryAccountIDs.contains($0.id) && (availableAccountIDs?.contains($0.id) != false || $0.id == selectedID) }
+    }
     private var latestCard: CardStatement? {
         CardStore.shared.snapshot.statements.filter { $0.liabilityAccountID == cardID }.max {
             (($0.statementDate ?? $0.period?.end)?.canonical ?? "") < (($1.statementDate ?? $1.period?.end)?.canonical ?? "")
@@ -45,7 +56,7 @@ struct PlanningFundingEditor: View {
                 actualLinks
                 Toggle("I have reviewed this month’s reserve allocation, including any zero contributions", isOn: Binding(get: { draft?.reserveAllocationReviewed ?? false }, set: { draft?.reserveAllocationReviewed = $0 }))
                 Button("Apply funding assumptions to draft") { if let draft { onApply(draft) } }.lfPrimaryAction()
-                Text("Use Save in the monthly plan to keep these choices. Nothing here sends money or changes an imported transaction.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                Text("Applying keeps these choices for this month. Imported transactions stay unchanged.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
             if let message { Text(message).foregroundStyle(LFTheme.warning) }
         }.onAppear { draft = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: plan.month.canonical) }
@@ -54,24 +65,22 @@ struct PlanningFundingEditor: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Funding banks for this month’s bills").font(theme.typography.sectionTitle)
             Text("The monthly worksheet’s related card identifies a liability. Choose the bank which supplies the cash here.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-            ForEach((plan.qatarCommitments + plan.indiaCommitments).filter(\.included)) { bill in
-                Picker(bill.label, selection: Binding(get: { draft?.billFundingAccounts?[bill.id] ?? (accounts.contains { $0.id == bill.fundingAccountID } ? bill.fundingAccountID ?? "" : "") }, set: { value in
+            ForEach((plan.qatarCommitments + plan.indiaCommitments).filter(isVisible)) { bill in
+                LFAccountPicker(label: bill.label, placeholder: "Choose funding bank", selection: Binding(get: { draft?.billFundingAccounts?[bill.id] ?? (accounts.contains { $0.id == bill.fundingAccountID } ? bill.fundingAccountID ?? "" : "") }, set: { value in
                     if draft?.billFundingAccounts == nil { draft?.billFundingAccounts = [:] }
                     draft?.billFundingAccounts?[bill.id] = value.isEmpty ? nil : value
-                })) {
-                    Text("Choose funding bank").tag("")
-                    ForEach(accounts.filter { $0.currency == bill.money.currency.code }) { Text($0.selectionTitle).tag($0.id) }
-                }
+                }), options: fundingAccounts(retaining: draft?.billFundingAccounts?[bill.id] ?? bill.fundingAccountID).filter { $0.currency == bill.money.currency.code }.map {
+                    .init(id: $0.id, title: $0.title, detail: $0.selectionContext)
+                })
             }
         }
     }
     private var cardFunding: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Review remaining card payment").font(theme.typography.sectionTitle)
-            Picker("Card account", selection: $cardID) {
-                Text("Choose card").tag("")
-                ForEach(cards) { Text($0.selectionTitle).tag($0.id) }
-            }.onChange(of: cardID) { _, _ in
+            LFAccountPicker(label: "Card account", placeholder: "Choose card", selection: $cardID,
+                options: cards.map { .init(id: $0.id, title: $0.title, detail: $0.selectionContext) })
+            .onChange(of: cardID) { _, _ in
                 confirmedCard = false
                 cardAmount = latestCard?.newBalance.flatMap { try? $0.canonicalDecimalString() } ?? ""
                 cardDate = latestCard?.dueDate?.canonical ?? ""
@@ -81,11 +90,11 @@ struct PlanningFundingEditor: View {
                 Text("Statement \((latestCard.statementDate ?? latestCard.period?.end)?.presentation ?? "date unavailable") · reported balance \(latestCard.newBalance.map { MoneyFormatting.display($0) } ?? "unavailable")")
                     .font(theme.typography.secondary).textSelection(.enabled)
             }
-            Picker("Pay from", selection: $fundingID) {
-                Text("Choose bank").tag("")
-                ForEach(accounts.filter { $0.currency == cards.first(where: { $0.id == cardID })?.currency }) { Text($0.selectionTitle).tag($0.id) }
-            }
-            TextField("Remaining bank payment · native amount", text: $cardAmount).textFieldStyle(.roundedBorder)
+            LFAccountPicker(label: "Pay from", placeholder: "Choose bank", selection: $fundingID,
+                options: fundingAccounts().filter { $0.currency == cards.first(where: { $0.id == cardID })?.currency }.map {
+                    .init(id: $0.id, title: $0.title, detail: $0.selectionContext)
+                })
+            TextField("Remaining bank payment", text: $cardAmount).textFieldStyle(.roundedBorder)
             TextField("Payment date · YYYY-MM-DD", text: $cardDate).textFieldStyle(.roundedBorder)
             Picker("Replace an existing related bill", selection: $replacedBillID) {
                 Text("Separate cash need").tag("")
@@ -111,16 +120,12 @@ struct PlanningFundingEditor: View {
     private var transfers: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Planned own-account funding").font(theme.typography.sectionTitle)
-            Picker("From bank", selection: $fromID) {
-                Text("Choose bank").tag("")
-                ForEach(accounts) { Text($0.selectionTitle).tag($0.id) }
-            }
-            Picker("To bank", selection: $toID) {
-                Text("Choose bank").tag("")
-                ForEach(accounts.filter { destination in accounts.first(where: { $0.id == fromID }).map { PlanningIntelligence.permitsPlanningRoute(from: $0, to: destination, retentionAccountID: metadata?.preferences?.retentionAccountID) } ?? false }) {
-                    Text($0.selectionTitle).tag($0.id)
-                }
-            }
+            LFAccountPicker(label: "From bank", placeholder: "Choose bank", selection: $fromID,
+                options: fundingAccounts().map { .init(id: $0.id, title: $0.title, detail: $0.selectionContext) })
+            LFAccountPicker(label: "To bank", placeholder: "Choose bank", selection: $toID,
+                options: fundingAccounts().filter { destination in accounts.first(where: { $0.id == fromID }).map { PlanningIntelligence.permitsPlanningRoute(from: $0, to: destination, retentionAccountID: metadata?.preferences?.retentionAccountID) } ?? false }.map {
+                    .init(id: $0.id, title: $0.title, detail: $0.selectionContext)
+                })
             TextField("Amount needed in receiving bank’s currency", text: $receivedText).textFieldStyle(.roundedBorder)
             TextField("Funding date · YYYY-MM-DD", text: $transferDate).textFieldStyle(.roundedBorder)
             if let preview = try? transferPreview() {
@@ -138,7 +143,7 @@ struct PlanningFundingEditor: View {
                         conversionBasis: plan.referenceMode == .manual ? "Month-local manual rate" : "Month-local Al Dar reference"))
                 }
             }.lfSecondaryAction()
-            ForEach(draft?.transfers ?? []) { value in
+            ForEach(scopedDraft?.transfers ?? []) { value in
                 HStack {
                     Text("\(value.date) · \(value.sent.decimal) \(value.sent.currency) → \(value.received.decimal) \(value.received.currency)")
                     Spacer()
@@ -151,7 +156,7 @@ struct PlanningFundingEditor: View {
     private var actualLinks: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Replace dated forecasts with recorded actuals").font(theme.typography.sectionTitle)
-            ForEach(draft?.datedAdjustments ?? []) { value in
+            ForEach(scopedDraft?.datedAdjustments ?? []) { value in
                 HStack {
                     Text("\(value.date) · \(value.title) · \(value.amount.decimal) \(value.amount.currency)")
                     Spacer()
@@ -177,7 +182,8 @@ struct PlanningFundingEditor: View {
                 Toggle(isOn: Binding(get: { selected.contains(row.id) }, set: { if $0 { selected.insert(row.id) } else { selected.remove(row.id) } })) {
                     VStack(alignment: .leading) {
                         Text(row.transaction.description)
-                        Text(row.accountTitle + " · " + (row.date?.presentation ?? "Date unavailable") + " · " + MoneyFormatting.display(row.transaction.money)).font(theme.typography.secondary)
+                        Text(row.accountTitle).font(theme.typography.body)
+                        Text((row.date?.presentation ?? "Date unavailable") + " · " + MoneyFormatting.display(row.transaction.money)).font(theme.typography.secondary)
                     }
                 }
             }

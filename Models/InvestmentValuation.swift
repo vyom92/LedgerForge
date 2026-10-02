@@ -341,11 +341,11 @@ nonisolated struct InvestmentValuation: Equatable, Sendable {
     let simpleReturn: InvestmentSimpleReturn?
     let issue: String?
 
-    init(holding: InvestmentHolding, quote: InvestmentQuote?) {
+    init(holding: InvestmentHolding, quote: InvestmentQuote?, reportedValue: Decimal? = nil) {
         self.quote = quote?.mapping == holding.priceMapping && quote?.mapping.currency == holding.currency ? quote : nil
         var value: Decimal?, cost: Decimal?, basis: CostBasis?, gain: Decimal?, issue: String?
         do {
-            if let quote = self.quote { value = try InvestmentArithmetic.multiply(holding.units.value, quote.price.value) }
+            if let quote = self.quote { value = try reportedValue ?? InvestmentArithmetic.multiply(holding.units.value, quote.price.value) }
             else { issue = holding.priceMapping == nil ? "Price mapping required" : "No successful price yet" }
         } catch { issue = "Current value out of range" }
         do {

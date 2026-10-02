@@ -109,8 +109,8 @@ nonisolated struct NetWorthTarget: Identifiable, Equatable, Sendable {
     var label: String {
         if arithmeticFailure { return "Total out of range" }
         if amount == nil { return "Value unavailable" }
-        if isPartial { return isStale ? "Known subtotal · stale inputs" : "Known subtotal" }
-        return isStale ? "Stale estimate" : "Available within recorded scope"
+        if isPartial { return isStale ? "Some values unavailable or older" : "Some values unavailable" }
+        return isStale ? "Some values are older" : "Recorded values"
     }
 }
 

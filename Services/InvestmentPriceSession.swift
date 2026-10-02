@@ -95,7 +95,7 @@ final class InvestmentPriceSession: ObservableObject {
 
     var configuredMappings: [InvestmentPriceMapping] {
         let mappings = snapshot.holdings.compactMap { holding -> InvestmentPriceMapping? in
-            guard let mapping = holding.priceMapping,
+            guard holding.ibkrObservationID == nil, let mapping = holding.priceMapping,
                   InvestmentPriceRegistry.confirmedMapping(for: holding) == mapping else { return nil }
             return mapping
         }
@@ -105,7 +105,7 @@ final class InvestmentPriceSession: ObservableObject {
         let providers = Set(configuredMappings.map(\.provider))
         return InvestmentPriceRegistry.providerOrder.filter { providers.contains($0) }
     }
-    var unmappedCount: Int { snapshot.holdings.filter { InvestmentPriceRegistry.confirmedMapping(for: $0) != $0.priceMapping || $0.priceMapping == nil }.count }
+    var unmappedCount: Int { snapshot.holdings.filter { $0.ibkrObservationID == nil && (InvestmentPriceRegistry.confirmedMapping(for: $0) != $0.priceMapping || $0.priceMapping == nil) }.count }
 
     func activate(store: InvestmentStore = .shared) {
         guard self.store !== store else { return }
@@ -138,7 +138,7 @@ final class InvestmentPriceSession: ObservableObject {
             requests.removeAll(); refreshing.removeAll(); failures.removeAll(); feedback.removeAll()
         }
         rebuild()
-        mappingPersistenceNeeded = snapshot.holdings.contains { $0.priceMapping == nil && InvestmentPriceRegistry.confirmedMapping(for: $0) != nil }
+        mappingPersistenceNeeded = snapshot.holdings.contains { $0.ibkrObservationID == nil && $0.priceMapping == nil && InvestmentPriceRegistry.confirmedMapping(for: $0) != nil }
     }
 
     func notifyInstalledValue() {
@@ -160,7 +160,7 @@ final class InvestmentPriceSession: ObservableObject {
               generation == store?.generation, ApplicationAvailability.shared.permitsMutation,
               let workspaceID = snapshot.containers.first?.workspaceID else { return }
         let assignments = Dictionary(uniqueKeysWithValues: snapshot.holdings.compactMap { holding -> (String, InvestmentPriceMapping)? in
-            guard let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding), holding.priceMapping != mapping else { return nil }
+            guard holding.ibkrObservationID == nil, let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding), holding.priceMapping != mapping else { return nil }
             // Never replace a conflicting existing mapping without its own explicit decision.
             guard holding.priceMapping == nil else { return nil }
             return (holding.id, mapping)
@@ -278,6 +278,14 @@ final class InvestmentPriceSession: ObservableObject {
             return $0.sourceOrdinal != $1.sourceOrdinal ? $0.sourceOrdinal < $1.sourceOrdinal : $0.id < $1.id
         }
         valuations = Dictionary(uniqueKeysWithValues: rows.map { holding in
+            if let sourceID = holding.ibkrObservationID,
+               let source = snapshot.containers.first(where: { $0.id == holding.containerID })?.ibkrSource,
+               source.observationID == sourceID,
+               let position = source.positions.first(where: { $0.instrumentIdentity == holding.instrumentIdentity }) {
+                let quote = source.quote(for: position)
+                var routed = holding; routed.priceMapping = quote.mapping
+                return (holding.id, InvestmentValuation(holding: routed, quote: quote, reportedValue: position.reportedValue.value))
+            }
             let mapping = holding.priceMapping
             let quote = mapping.flatMap { InvestmentPriceRegistry.confirmedMapping(for: holding) == $0 ? quotes[$0.identity] : nil }
             return (holding.id, InvestmentValuation(holding: holding, quote: quote))

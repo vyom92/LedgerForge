@@ -175,11 +175,11 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
         }
 
         let summary = try summaryEvidence(
-            in: document.sourceContext.postTransactionFragments
+            in: document.sourceContext.postTransactionFragments,
+            sourceUnit: fileFormat == .xls ? .row : .line
         )
         let currency = try CurrencyCode("INR")
         var transactions: [Transaction] = []
-        var runningBalance = summary.openingBalance
         var debitCount = 0
         var creditCount = 0
         var debitTotal = Decimal.zero
@@ -256,24 +256,15 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
             }
 
             if let withdrawal {
-                runningBalance -= withdrawal
                 debitCount += 1
                 debitTotal += withdrawal
             } else if let deposit {
-                runningBalance += deposit
                 creditCount += 1
                 creditTotal += deposit
             }
-            guard runningBalance == closingBalance else {
-                if transactions.isEmpty {
-                    throw HDFCBankAccountXLSParserError.openingBalanceMismatch(
-                        sourceOrdinal: row.rowNumber
-                    )
-                }
-                throw HDFCBankAccountXLSParserError.runningBalanceMismatch(
-                    sourceOrdinal: row.rowNumber
-                )
-            }
+            // The printed debit/credit column owns direction. Preserve the
+            // row balance as source evidence without making its arithmetic
+            // agreement an admission condition.
 
             let signedAmount = withdrawal.map { -$0 } ?? deposit ?? .zero
             transactions.append(
@@ -322,27 +313,28 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
         guard creditCount == summary.creditCount else {
             throw HDFCBankAccountXLSParserError.creditCountMismatch
         }
-        guard debitTotal == summary.debitTotal else {
-            throw HDFCBankAccountXLSParserError.debitTotalMismatch
-        }
-        guard creditTotal == summary.creditTotal else {
-            throw HDFCBankAccountXLSParserError.creditTotalMismatch
-        }
-        let terminalBalanceMatches = transactions.last.map {
-            $0.balance == summary.closingBalance
-        } ?? (summary.openingBalance == summary.closingBalance)
-        guard runningBalance == summary.closingBalance,
-              terminalBalanceMatches,
-              summary.openingBalance + summary.creditTotal - summary.debitTotal
-                  == summary.closingBalance else {
-            throw HDFCBankAccountXLSParserError.closingBalanceMismatch
+        // Printed row counts still prove occurrence completeness. For a
+        // nonempty table, movement totals and balances are literal controls,
+        // not substitutes for the independently extracted transaction facts.
+        // An empty table still needs the original zero-activity proof.
+        if transactions.isEmpty {
+            guard debitTotal == summary.debitTotal else {
+                throw HDFCBankAccountXLSParserError.debitTotalMismatch
+            }
+            guard creditTotal == summary.creditTotal else {
+                throw HDFCBankAccountXLSParserError.creditTotalMismatch
+            }
+            guard summary.openingBalance == summary.closingBalance,
+                  summary.openingBalance + summary.creditTotal - summary.debitTotal
+                      == summary.closingBalance else {
+                throw HDFCBankAccountXLSParserError.closingBalanceMismatch
+            }
         }
 
         let openingMoney = try Money(amount: summary.openingBalance, currency: currency)
         let closingMoney = try Money(amount: summary.closingBalance, currency: currency)
-        // Empty rows alone are not evidence of a zero-activity statement. The
-        // complete printed summary has already reconciled counts, movement
-        // totals, and opening/closing balances above.
+        // Empty rows alone are not evidence of a zero-activity statement.
+        // The empty-table branch above retains all printed zero controls.
         let zeroEvidence = transactions.isEmpty
             ? try ZeroActivityStatementEvidence(
                 profileID: parserProfileID,
@@ -373,7 +365,8 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
                 statementBoundaryDate: period.end,
                 period: period,
                 openingBalance: openingMoney,
-                closingBalance: closingMoney
+                closingBalance: closingMoney,
+                printedControls: summary.printedControls
             ),
             zeroActivityEvidence: zeroEvidence
         )
@@ -448,14 +441,16 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
     }
 
     private func summaryEvidence(
-        in fragments: [NormalizedDocument.SourceFragment]
+        in fragments: [NormalizedDocument.SourceFragment],
+        sourceUnit: FinancialRegionSourceUnit
     ) throws -> (
         openingBalance: Decimal,
         debitCount: Int,
         creditCount: Int,
         debitTotal: Decimal,
         creditTotal: Decimal,
-        closingBalance: Decimal
+        closingBalance: Decimal,
+        printedControls: [SourceStatementControl]
     ) {
         let titles = fragments.filter {
             Self.semanticKey(Self.sourceText($0)).contains("statementsummary")
@@ -478,9 +473,9 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
             )
         }
 
-        var structuredAmounts: [(ordinal: Int, values: (Decimal, Decimal, Decimal, Decimal))] = []
-        var structuredCounts: [(ordinal: Int, values: (Int, Int))] = []
-        var compactValues: [(ordinal: Int, values: (Decimal, Int, Int, Decimal, Decimal, Decimal))] = []
+        var structuredAmounts: [(ordinal: Int, values: (Decimal, Decimal, Decimal, Decimal), literals: [String])] = []
+        var structuredCounts: [(ordinal: Int, values: (Int, Int), literals: [String])] = []
+        var compactValues: [(ordinal: Int, values: (Decimal, Int, Int, Decimal, Decimal, Decimal), literals: [String])] = []
         for fragment in eligible {
             if let cells = Self.structuredValues(fragment) {
                 if Self.matches(cells[0], Self.moneyPattern),
@@ -491,12 +486,13 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
                    let debits = try optionalMoney(cells[4], sourceOrdinal: fragment.sourceOrdinal),
                    let credits = try optionalMoney(cells[5], sourceOrdinal: fragment.sourceOrdinal),
                    let closing = try optionalMoney(cells[6], sourceOrdinal: fragment.sourceOrdinal) {
-                    structuredAmounts.append((fragment.sourceOrdinal, (opening, debits, credits, closing)))
+                    structuredAmounts.append((fragment.sourceOrdinal, (opening, debits, credits, closing),
+                                              [cells[0], cells[4], cells[5], cells[6]]))
                 }
                 if let debitCount = Int(cells[4]), debitCount >= 0,
                    let creditCount = Int(cells[5]), creditCount >= 0,
                    cells[0].isEmpty, cells[6].isEmpty {
-                    structuredCounts.append((fragment.sourceOrdinal, (debitCount, creditCount)))
+                    structuredCounts.append((fragment.sourceOrdinal, (debitCount, creditCount), [cells[4], cells[5]]))
                 }
             }
             let tokens = Self.sourceText(fragment)
@@ -513,11 +509,23 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
                let debits = try optionalMoney(tokens[3], sourceOrdinal: fragment.sourceOrdinal),
                let credits = try optionalMoney(tokens[4], sourceOrdinal: fragment.sourceOrdinal),
                let closing = try optionalMoney(tokens[5], sourceOrdinal: fragment.sourceOrdinal) {
-                compactValues.append((fragment.sourceOrdinal, (opening, debitCount, creditCount, debits, credits, closing)))
+                compactValues.append((fragment.sourceOrdinal, (opening, debitCount, creditCount, debits, credits, closing), tokens))
             }
         }
+        func controls(amounts: [String], amountOrdinal: Int, counts: [String], countOrdinal: Int) -> [SourceStatementControl] {
+            [
+                .init(kind: .openingBalance, label: "Opening Balance", literal: amounts[0], sourceOrdinal: amountOrdinal, sourceUnit: sourceUnit),
+                .init(kind: .debitCount, label: "Dr Count", literal: counts[0], sourceOrdinal: countOrdinal, sourceUnit: sourceUnit),
+                .init(kind: .creditCount, label: "Cr Count", literal: counts[1], sourceOrdinal: countOrdinal, sourceUnit: sourceUnit),
+                .init(kind: .debitTotal, label: "Debits", literal: amounts[1], sourceOrdinal: amountOrdinal, sourceUnit: sourceUnit),
+                .init(kind: .creditTotal, label: "Credits", literal: amounts[2], sourceOrdinal: amountOrdinal, sourceUnit: sourceUnit),
+                .init(kind: .closingBalance, label: "Closing Bal", literal: amounts[3], sourceOrdinal: amountOrdinal, sourceUnit: sourceUnit)
+            ]
+        }
         if compactValues.count == 1, let compact = compactValues.first {
-            return compact.values
+            return (compact.values.0, compact.values.1, compact.values.2, compact.values.3, compact.values.4, compact.values.5,
+                    controls(amounts: [compact.literals[0], compact.literals[3], compact.literals[4], compact.literals[5]],
+                             amountOrdinal: compact.ordinal, counts: [compact.literals[1], compact.literals[2]], countOrdinal: compact.ordinal))
         }
         guard structuredAmounts.count == 1, let amounts = structuredAmounts.first,
               structuredCounts.count == 1, let counts = structuredCounts.first else {
@@ -531,7 +539,9 @@ nonisolated final class HDFCBankAccountXLSParser: StatementParser {
             counts.values.1,
             amounts.values.1,
             amounts.values.2,
-            amounts.values.3
+            amounts.values.3,
+            controls(amounts: amounts.literals, amountOrdinal: amounts.ordinal,
+                     counts: counts.literals, countOrdinal: counts.ordinal)
         )
     }
 

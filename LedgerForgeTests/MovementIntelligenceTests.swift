@@ -388,7 +388,14 @@ struct MovementIntelligenceTests {
         #expect(rows.count == 8036)
         let names = Set(snapshot.accounts.compactMap(\.sourceProductName))
         #expect(names == ["Axis NRE", "Axis NRO", "HDFC NRE", "HDFC NRO"])
-        for account in snapshot.accounts where account.sourceProductName != nil { #expect(account.preferredDisplayName == account.sourceProductName) }
+        let savedNames = Dictionary(uniqueKeysWithValues: try sqlite.database.query(
+            sql: "SELECT id,name FROM accounts WHERE workspace_id=?;", params: [workspace]
+        ) { (try #require($0.string(at: 0)), try #require($0.string(at: 1))) })
+        for account in snapshot.accounts where account.sourceProductName != nil {
+            let repositoryID = try #require(account.repositoryAccountId)
+            let savedName = try #require(savedNames[repositoryID])
+            #expect(account.preferredDisplayName == savedName)
+        }
         for observed in try sqlite.importSessionRepo.cbqSourceCoveragePeriods(workspaceId: workspace) {
             #expect(snapshot.financialSources.hasCompleteCoverage(accountID: observed.accountID, start: try StatementDate(canonical: observed.startISO), end: try StatementDate(canonical: observed.endISO)))
         }

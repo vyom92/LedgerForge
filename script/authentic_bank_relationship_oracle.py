@@ -205,6 +205,7 @@ def standalone_hdfc_oracle(path, password):
                 break
             lines = lines_for(page)
             flat = '\n'.join(words_text(words) for _, words in lines)
+            assert re.search(r'Currency\s*:\s*INR\b', flat), 'HDFC standalone native currency'
             identity = re.search(r'AccountNo\s*:\s*(\d{14})', flat).group(1)
             assert account in (None, identity)
             account = identity
@@ -250,6 +251,7 @@ def standalone_axis_oracles(password):
                     match = re.search(r'Statement\s+of\s+Axis\s+Account\s+No:\s*(\d{15})', flat)
                     assert match, 'standalone Axis identity'
                     identity = match.group(1)
+                    assert re.search(r'Currency\s*:\s*INR\b', flat), 'Axis standalone native currency'
                 for _, words in lines:
                     if 'Particulars' in words_text(words):
                         edges = grid_edges(page, words, ('tran', 'chq', 'particulars', 'debit', 'credit', 'balance', 'init.'))
@@ -276,6 +278,134 @@ def iso_date(value):
     pattern = '%d-%m-%Y' if '-' in value else ('%d/%m/%y' if len(value) == 8 else '%d/%m/%Y')
     return datetime.datetime.strptime(value, pattern).date().isoformat()
 
+def compact(value):
+    # Preserve punctuation and every identifier digit.
+    return re.sub(r"\s+", "", value).upper()
+
+
+def genuine_relation_narration(row, family):
+    narration = " ".join(row["narration"])
+    if family == "hdfc":
+        # The authentic structural marker can directly follow the last word.
+        tail = re.search(
+            r"Value\s*Dt\s*" + re.escape(row["valueDate"])
+            + r"(?:\s+Ref\s+.*)?$", narration)
+        assert tail is not None, "HDFC structural suffix missing"
+        narration = narration[:tail.start()].strip()
+    return narration
+
+
+def independent_reference(row, family, relationship):
+    if family == "axis":
+        raw = " ".join(row["cheque"]) if relationship else row["reference"] or ""
+        return compact(raw) or None
+    raw = row.get("reference")
+    if raw is not None:
+        reference = compact(raw)
+        if not relationship and reference == "000000000000000":
+            return None
+        if relationship and re.fullmatch(r"(?:[0-9]{4}|[0-9]{12})", reference):
+            return reference.zfill(16)
+        if relationship and re.fullmatch(r"I[0-9]{11}", reference):
+            return "0000" + reference
+        return reference or None
+
+    if relationship:
+        narration = compact(genuine_relation_narration(row, family))
+        references = re.findall(r"(?:HDFCR5|HDFCN5|FDRLN5)[0-9]{16}(?![0-9])", narration)
+        if len(references) == 1 and re.match(r"(?:RTGS|NEFT)(?:DR|CR)-", narration):
+            return references[0]
+    return None
+
+
+def axis_representation_proof(relationship_row, standalone_row):
+    """Return a named, original-observed form only when all shared fields agree.
+
+    Call only after family, compatible source account, INR currency, posting date,
+    value-date role, and exact signed Money agree, and both printed cheque/ref
+    cells are absent. A proof does not replace either source's narration.
+    """
+    left = " ".join(relationship_row["narration"]).upper()
+    right = standalone_row["narration"].upper()
+    signed = Decimal(relationship_row["signed"])
+    parts = right.split("/")
+
+    def same(a, b):
+        return bool(compact(a)) and compact(a) == compact(b)
+
+    match = re.fullmatch(r"UPI TRANSFER TO (.+) \((\d{12})\)", left)
+    if match and len(parts) >= 4 and parts[:2] == ["UPI", "P2A"] and signed < 0:
+        return "UPI P2A" if match[2] == compact(parts[2]) and same(match[1], parts[3]) else None
+
+    match = re.fullmatch(r"UPI TO MERCHANT\s*:\s*(.+) \((\d{12})\)", left)
+    if match and len(parts) >= 4 and parts[:2] == ["UPI", "P2M"] and signed < 0:
+        return "UPI P2M" if match[2] == compact(parts[2]) and same(match[1], parts[3]) else None
+
+    match = re.fullmatch(r"IMPS (TO ID:|TRANSFER FROM ID:) (.+) \((\d{12})\)", left)
+    direction_agrees = match and (
+        (match[1] == "TO ID:" and signed < 0)
+        or (match[1] == "TRANSFER FROM ID:" and signed > 0))
+    if direction_agrees and len(parts) >= 4 and parts[:2] == ["IMPS", "P2A"]:
+        return "IMPS P2A" if match[3] == compact(parts[2]) and same(match[2], parts[3]) else None
+
+    match = re.fullmatch(r"NEFT TRANSFER FROM (.+) \(([^()]+)\)", left)
+    if match and len(parts) >= 3 and parts[0] == "NEFT" and signed > 0:
+        return "NEFT" if same(match[2], parts[1]) and same(match[1], parts[2]) else None
+
+    match = re.fullmatch(r"RTGS TRANSFER FROM (.+)\(([^()]+)\) \(([^()]+)\)", left)
+    if match and len(parts) >= 4 and parts[0] == "RTGS" and signed > 0:
+        return "RTGS" if same(match[3], parts[1]) and same(match[1], parts[2]) and same(match[2], parts[3]) else None
+
+    match = re.fullmatch(r"SELF FUND TRANSFER FROM (.+) \((\d{15})\)", left)
+    if match and len(parts) == 4 and parts[:2] == ["MOB", "SELFFT"] and signed > 0:
+        return "Self transfer" if same(match[1], parts[2]) and match[2] == compact(parts[3]) else None
+
+    match = re.fullmatch(r"SELF TRANSFER VIA APP TO (\d{15}) \((\d{15})\)", left)
+    if match and len(parts) == 4 and parts[:2] == ["MOB", "SELFFT"] and signed < 0:
+        return "Self transfer" if match[1] == match[2] == compact(parts[2]) == compact(parts[3]) else None
+
+    match = re.fullmatch(r"E-COMMERCE PURCHASE AT (.+)-([^-]+)", left)
+    if (match and len(parts) == 6 and parts[0] == "ECOM PUR" and signed < 0
+            and re.fullmatch(r"\d{6}", compact(parts[3]))
+            and re.fullmatch(r"\d{2}:\d{2}", compact(parts[4]))
+            and re.fullmatch(r"\d+", compact(parts[5]))):
+        event_date = datetime.datetime.strptime(compact(parts[3]), "%d%m%y").date().isoformat()
+        if event_date != standalone_row["date"] or event_date != iso_date(relationship_row["date"]):
+            return None
+        return "E-commerce" if same(match[1], parts[1]) and same(match[2], parts[2]) else None
+
+    match = re.fullmatch(r"ATM WITHDRAWAL\s*:\s*(.+)-([^-]+)", left)
+    if (match and len(parts) == 4 and parts[0] == "ATM-CASH"
+            and parts[1].startswith("+") and signed < 0
+            and re.fullmatch(r"\d{6}", compact(parts[3]))):
+        event_date = datetime.datetime.strptime(compact(parts[3]), "%d%m%y").date().isoformat()
+        if event_date != standalone_row["date"] or event_date != iso_date(relationship_row["date"]):
+            return None
+        return "ATM" if same(match[1], parts[1][1:]) and same(match[2], parts[2]) else None
+
+    match = re.fullmatch(r"CREDIT CARD BILL PAYMENT - (\d{16})", left)
+    other = re.fullmatch(r"BRN-PYMT-CARD-(\d{16})", right)
+    if match and other and signed < 0:
+        return "Card bill" if match[1] == other[1] else None
+    return None
+
+
+def source_linkage(relationship_row, standalone_row, family):
+    """Additional evidence after the independent coarse financial fields agree."""
+    left_reference = independent_reference(relationship_row, family, True)
+    right_reference = independent_reference(standalone_row, family, False)
+    if left_reference is not None and right_reference is not None:
+        return left_reference == right_reference
+    if left_reference is not None or right_reference is not None:
+        return False
+    left = compact(genuine_relation_narration(relationship_row, family))
+    raw_right = standalone_row["narration"]
+    right = compact(" ".join(raw_right) if isinstance(raw_right, list) else raw_right)
+    if left and left == right:
+        return True
+    return family == "axis" and axis_representation_proof(relationship_row, standalone_row) is not None
+
+
 def overlap_proofs(relationships, passwords):
     originals = standalone_axis_oracles(passwords['axis'])
     for original in originals: original['family'] = 'axis'
@@ -287,42 +417,45 @@ def overlap_proofs(relationships, passwords):
     for original in originals:
         for row in original['rows']:
             row['sha256'] = original['sha256']; row['family'] = original['family']; rows.append(row)
-    links, used, counts = [], set(), []
+    links, counts = [], []
     for original in relationships:
-        matched, outside, conflicts = 0,0,0
-        for section_index, section in enumerate(original['sections'],1):
-            positions = []
-            for index,row in enumerate(section['rows'],1):
+        # Counterparts may support more than one original. Multiplicity belongs
+        # to one incoming parent, never a global consumption set or row order.
+        qualified, coarse_by_occurrence, outside = {}, {}, 0
+        for section_index, section in enumerate(original['sections'], 1):
+            assert section['currency'] == 'INR', 'independent native currency'
+            for index, row in enumerate(section['rows'], 1):
                 identity = section['account']
-                candidates = [r for r in rows if r['family']==original['family'] and len(identity)==len(r['account']) and all(a=='X' or a==b for a,b in zip(identity,r['account'])) and r['date']==iso_date(row['date']) and r.get('valueDate')==(iso_date(row['valueDate']) if row.get('valueDate') else None) and r['signed']==Decimal(row['signed'])]
-                if not candidates: outside+=1; continue
-                exact = [r for r in candidates if r['balance']==Decimal(row['balance'].replace(',',''))]
-                if not exact:
-                    conflicts+=1
-                    for r in candidates:
-                        links.append(dict(relationshipSHA=original['sha256'],sectionOrdinal=section_index,occurrenceIndex=index,standaloneSHA=r['sha256'],standaloneOrdinal=r['ordinal'],conflict=True))
+                coarse = [r for r in rows if r['family'] == original['family']
+                    and len(identity) == len(r['account'])
+                    and all(a == 'X' or a == b for a, b in zip(identity, r['account']))
+                    and r['date'] == iso_date(row['date']) and r['signed'] == Decimal(row['signed'])]
+                if not coarse:
+                    outside += 1
                     continue
-                remaining = [r for r in exact if (r['sha256'],r['ordinal']) not in used]
-                assert remaining, 'counterpart multiplicity excess'
-                chosen=remaining[0]; used.add((chosen['sha256'],chosen['ordinal']))
-                positions.append((chosen['sha256'],chosen['ordinal']))
-                left = ' '.join(row['cheque']) or None if original['family']=='axis' else row['reference']
-                right = chosen['reference']
-                reference_agrees = left==right
-                if original['family']=='hdfc' and not reference_agrees:
-                    reference_agrees = ((left is None and right=='000000000000000') or
-                        (left is not None and re.fullmatch(r'(?:[0-9]{4}|[0-9]{12})',left) and right==left.zfill(16)) or
-                        (left is not None and re.fullmatch(r'I[0-9]{11}',left) and right=='0000'+left) or
-                        (left is None and re.fullmatch(r'(?:HDFCR5|HDFCN5|FDRLN5)[0-9]{16}',right) and re.match(r'(?:RTGS|NEFT)\s+(?:Dr|Cr)-',row['narration'][0]) and right in re.sub(r'\s+','', ' '.join(row['narration']))))
-                assert reference_agrees, 'unproved reference representation'
-                links.append(dict(relationshipSHA=original['sha256'],sectionOrdinal=section_index,occurrenceIndex=index,standaloneSHA=chosen['sha256'],standaloneOrdinal=chosen['ordinal'],conflict=False))
-                matched+=1
-            for sha in {p[0] for p in positions}:
-                order=[p[1] for p in positions if p[0]==sha]
-                assert order==sorted(order), 'counterpart order differs'
-        counts.append(dict(sha256=original['sha256'],matched=matched,outside=outside,conflicts=conflicts))
-    assert sum(c['matched'] for c in counts)==314 and sum(c['conflicts'] for c in counts)==33
-    return dict(standalone=[dict(sha256=s['sha256'],family=s['family'],rowCount=len(s['rows'])) for s in originals],relationships=counts,links=links)
+                key = (section_index, index)
+                coarse_by_occurrence[key] = coarse
+                qualified[key] = [r for r in coarse
+                    if r.get('valueDate') == (iso_date(row['valueDate']) if row.get('valueDate') else None)
+                    and source_linkage(row, r, original['family'])]
+        # Every accepted edge in this authentic corpus is independently unique.
+        # Zero/multiple candidates or reuse stays held; never choose candidates[0]
+        # as a tie-breaker or infer identity from a printed balance.
+        targets = collections.Counter((matches[0]['sha256'], matches[0]['ordinal'])
+            for matches in qualified.values() if len(matches) == 1)
+        matched, conflicts = 0, 0
+        for (section_index, index), candidates in qualified.items():
+            unique = len(candidates) == 1 and targets[(candidates[0]['sha256'], candidates[0]['ordinal'])] == 1
+            matched += int(unique); conflicts += int(not unique)
+            for counterpart in candidates if unique else coarse_by_occurrence[(section_index, index)]:
+                links.append(dict(relationshipSHA=original['sha256'], sectionOrdinal=section_index,
+                    occurrenceIndex=index, standaloneSHA=counterpart['sha256'],
+                    standaloneOrdinal=counterpart['ordinal'], conflict=not unique))
+        assert matched + outside + conflicts == sum(len(s['rows']) for s in original['sections'])
+        counts.append(dict(sha256=original['sha256'], matched=matched, outside=outside, conflicts=conflicts))
+    return dict(semantics='independent-source-meaning-injective-per-parent-v2',
+        standalone=[dict(sha256=s['sha256'], family=s['family'], rowCount=len(s['rows'])) for s in originals],
+        relationships=counts, links=links)
 
 def main():
     request = json.load(sys.stdin)

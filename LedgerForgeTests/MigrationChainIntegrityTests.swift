@@ -61,7 +61,9 @@ struct MigrationChainIntegrityTests {
         #expect(migrationV25.version == 25)
         #expect(migrationV26.version == 26)
         #expect(migrationV28.version == 28)
-        #expect(migrationV29.version == allMigrations.count)
+        #expect(migrationV29.version == 29)
+        #expect(migrationV30.version == 30)
+        #expect(migrationV32.version == allMigrations.count)
     }
 
     @Test
@@ -83,6 +85,7 @@ struct MigrationChainIntegrityTests {
                 ,"bank_statement_sections"
                 ,"bank_section_identity_observations"
                 ,"bank_transaction_occurrences"
+                ,"monthly_plan_scratchpads"
             ]
             let placeholders = requiredTables.map { _ in "?" }.joined(separator: ",")
             let installed = try provider.database.query(
@@ -92,6 +95,7 @@ struct MigrationChainIntegrityTests {
             #expect(Set(installed) == Set(requiredTables))
             #expect(try provider.database.queryInt("SELECT COUNT(*) FROM statement_financial_projections;") == 0)
             #expect(try provider.database.queryInt("SELECT COUNT(*) FROM card_statements;") == 0)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM monthly_plan_scratchpads;") == 0)
             #expect(try provider.database.queryInt("SELECT COUNT(*) FROM statement_zero_activity_controls;") == 0)
             #expect(try provider.database.queryInt("PRAGMA legacy_alter_table;") == 0)
             try provider.database.checkpointAndClose()

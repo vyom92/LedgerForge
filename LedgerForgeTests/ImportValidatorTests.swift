@@ -12,7 +12,7 @@ struct ImportValidatorTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func authenticDocumentAndTransactionValidationAgree() async throws {
+    func authenticValidationPreservesSourceControlsAndOccurrenceAccounting() async throws {
         let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
         defer { preparedOwner.cancel() }
         let prepared = preparedOwner.preparedImport
@@ -24,8 +24,19 @@ struct ImportValidatorTests {
         #expect(documentValidation.passed == transactionValidation.passed)
         #expect(documentValidation.debitTotalMoney == transactionValidation.debitTotalMoney)
         #expect(documentValidation.creditTotalMoney == transactionValidation.creditTotalMoney)
-        #expect(documentValidation.openingBalanceMoney == transactionValidation.openingBalanceMoney)
-        #expect(documentValidation.closingBalanceMoney == transactionValidation.closingBalanceMoney)
+        let source = try #require(document.sourceStatementEvidence)
+        #expect(documentValidation.openingBalanceMoney == source.openingBalance)
+        #expect(documentValidation.closingBalanceMoney == source.closingBalance)
+        // This authentic CSV has row-associated balances and no printed
+        // opening/closing controls. Do not derive substitutes from row order.
+        #expect(source.openingBalance == nil)
+        #expect(source.closingBalance == nil)
+        #expect(transactionValidation.openingBalanceMoney == nil)
+        #expect(transactionValidation.closingBalanceMoney == nil)
+        let ordinals = document.transactions.flatMap(\.sourceProvenance).map(\.sourceOrdinal)
+        #expect(ordinals.count == document.transactions.count)
+        #expect(Set(ordinals).count == ordinals.count)
+        #expect(documentValidation.rowsRead == document.transactions.count)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -41,6 +52,10 @@ struct ImportValidatorTests {
         let references = document.transactions.map(\.reference)
         let descriptions = document.transactions.map(\.description)
         let identifiers = document.financialIdentifiers
+        let sourceEvidence = document.sourceStatementEvidence
+        let provenance = document.transactions.map(\.sourceProvenance)
+        let debit = document.transactions.map(\.debitMoney)
+        let credit = document.transactions.map(\.creditMoney)
         let profile = document.parserName
         let created = document.createdAt
         let reasons = document.selectionReasons
@@ -52,6 +67,10 @@ struct ImportValidatorTests {
         #expect(document.transactions.map(\.reference) == references)
         #expect(document.transactions.map(\.description) == descriptions)
         #expect(document.financialIdentifiers == identifiers)
+        #expect(document.sourceStatementEvidence == sourceEvidence)
+        #expect(document.transactions.map(\.sourceProvenance) == provenance)
+        #expect(document.transactions.map(\.debitMoney) == debit)
+        #expect(document.transactions.map(\.creditMoney) == credit)
         #expect(document.parserName == profile)
         #expect(document.createdAt == created)
         #expect(document.selectionReasons == reasons)

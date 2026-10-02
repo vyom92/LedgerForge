@@ -10,7 +10,8 @@ enum AppShellSizing {
     static func minimumSize(for section: AppShellSection) -> CGSize {
         switch section {
         case .dashboard: CGSize(width: 640, height: 608)
-        case .transactions, .investments: CGSize(width: 1024, height: 736)
+        case .transactions: CGSize(width: 1024, height: 736)
+        case .investments: CGSize(width: 760, height: 608)
         case .settings: CGSize(width: 760, height: 608)
         case .salary: CGSize(width: 760, height: 608)
         default: CGSize(width: 1180, height: 760)
@@ -139,7 +140,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                     Spacer()
                     Text(
                         availabilityState == .loading
-                            ? "Loading canonical data…"
+                            ? "Loading your data…"
                             : "Data is unavailable"
                     )
                     .font(theme.typography.formTitle)
@@ -147,7 +148,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                     Spacer()
                 }
             }
-            .frame(minWidth: [.transactions, .dashboard, .settings, .salary].contains(selectedSection) ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: [.transactions, .dashboard, .settings, .salary, .investments].contains(selectedSection) ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(
             minWidth: AppShellSizing.minimumSize(for: selectedSection).width,
@@ -186,7 +187,7 @@ struct AppShellSidebar: View {
     @Environment(\.lfTheme) private var theme
     let selectedSection: AppShellSection
     let developerConsoleVisible: Bool
-    let latestImportActivity: ImportActivityPresentation
+    let pendingImportStatus: String?
     let selectSection: (AppShellSection) -> Void
     var isCollapsed = false
     var allowsCollapse = false
@@ -251,19 +252,20 @@ struct AppShellSidebar: View {
 
     private var sidebarFooter: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !isCollapsed {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Last import")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
-                    Text(latestImportActivity.title)
-                        .font(theme.typography.caption.weight(.semibold))
-                        .lineLimit(2)
-                    Label(latestImportActivity.status, systemImage: latestImportActivity.iconName)
-                        .font(theme.typography.caption)
-                        .foregroundStyle(latestImportActivity.tone.color)
-                        .lineLimit(2)
+            if !isCollapsed, let pendingImportStatus {
+                Button { selectSection(.imports) } label: {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Pending imports", systemImage: "tray.full")
+                            .font(theme.typography.caption.weight(.semibold))
+                        Text(pendingImportStatus)
+                            .font(theme.typography.caption)
+                            .foregroundStyle(theme.palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .buttonStyle(LFPlainActionStyle())
+                .help("Open Import Centre")
             }
             Divider().overlay(theme.palette.divider)
             if allowsCollapse {

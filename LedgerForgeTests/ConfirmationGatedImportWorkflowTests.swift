@@ -9,7 +9,7 @@ import Testing
 struct ConfirmationGatedImportWorkflowTests {
 
     @Test(.globalRuntimeStateIsolation)
-    func capturedPlanningBalancesRefreshFromLaterOriginalWithoutSavingOrOverwritingManualInput() async throws {
+    func capturedPlanningBalancesRefreshFromLaterOriginalWithoutOverwritingManualInput() async throws {
         let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY"]))
         let password = try await HDFCBankAccountAuthenticAcceptanceTests()
             .sourceOraclePassword(ProcessInfo.processInfo.environment)
@@ -80,7 +80,7 @@ struct ConfirmationGatedImportWorkflowTests {
                 await backup.createBackup(to: destination)
                 let package = try #require(backup.lastBackupURL)
                 let manifest = try BackupFiles.verifyPackage(package)
-                #expect(manifest.schemaVersion == 29)
+                #expect(manifest.schemaVersion == BackupCompatibility.supportedSchemaVersion)
                 let restoredURL = folder.appendingPathComponent("restored.sqlite")
                 _ = try BackupCompatibility.prepareCandidate(package: package, manifest: manifest, destination: restoredURL)
                 let restored = try SQLiteRepositoryProvider(path: restoredURL.path)
@@ -109,8 +109,11 @@ struct ConfirmationGatedImportWorkflowTests {
             let refreshMatchesCurrent = refreshed.money == latest.currentBalanceMoney && refreshed.included && model.isDirty
             #expect(refreshMatchesCurrent)
             #expect(refreshed.financialBalanceDate == nil, "Automatic changed-amount draft refresh requires explicit date recapture")
-            let savedPlanUnchanged = try provider.fundingPlanRepo.plans(workspaceId: workspace) == saved
-            #expect(savedPlanUnchanged)
+            model.flushPendingEntries()
+            let automaticallyPublished = try #require(provider.fundingPlanRepo.plans(workspaceId: workspace).first)
+            let currentDecimal = try latest.currentBalanceMoney.canonicalDecimalString()
+            #expect(automaticallyPublished.balances.first?.amountDecimal == currentDecimal)
+            #expect(automaticallyPublished.balances.first?.financialBalanceDateISO == nil)
 
             model.setManualBalance(latest, text: "-")
             model.refreshCapturedAccountBalances()

@@ -13,7 +13,7 @@ nonisolated struct InvestmentPriceDefinition: Sendable {
 
 nonisolated enum InvestmentPriceRegistry {
     static let providerNames = ["amfi": "AMFI", "nasdaq": "Nasdaq", "fe": "Zurich / FE",
-        "fidelity": "Fidelity", "blackrock": "BlackRock", "franklin": "Franklin Templeton"]
+        "fidelity": "Fidelity", "blackrock": "BlackRock", "franklin": "Franklin Templeton", "ibkr-flex": "IBKR Flex"]
     static let providerOrder = ["amfi", "nasdaq", "fe", "fidelity", "blackrock", "franklin"]
 
     static let definitions: [InvestmentPriceDefinition] = {

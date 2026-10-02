@@ -262,6 +262,16 @@ struct StatementDropIntakeAdapterTests {
                         errorMessage: nil
                     ))
                 },
+                acknowledgeValidationFailure: { _ in
+                    Issue.record("The opaque drop harness only returns validation-passing review state.")
+                    return ImportOutcomePresentation(result: ImportEngineResult(
+                        fileName: "opaque",
+                        transactionCount: 0,
+                        validationPassed: false,
+                        persisted: false,
+                        errorMessage: "Unexpected opaque rejection"
+                    ))
+                },
                 cancelPreparation: { probe.cancel($0) },
                 cancelPasswordChallenge: { _ in },
                 failureSummary: { _ in

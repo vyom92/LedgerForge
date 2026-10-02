@@ -3415,7 +3415,120 @@ nonisolated public let migrationV29 = Migration(version: 29, name: "Captured pla
 ALTER TABLE funding_plan_balances ADD COLUMN financial_balance_date DATE;
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29]
+nonisolated public let migrationV30 = Migration(version: 30, name: "Monthly planning scratchpads", sql: """
+CREATE TABLE monthly_plan_scratchpads (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  plan_month TEXT NOT NULL,
+  state_json TEXT NOT NULL,
+  PRIMARY KEY(workspace_id, plan_month)
+);
+""")
+
+nonisolated public let migrationV31 = Migration(version: 31, name: "Axis printed card account associations", sql: """
+DROP TRIGGER validate_card_source_identity;
+ALTER TABLE card_source_identity_observations RENAME TO card_source_identity_observations_v30;
+CREATE TABLE card_source_identity_observations (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  subject_kind TEXT NOT NULL CHECK(subject_kind IN ('liability_account', 'instrument')),
+  subject_id TEXT NOT NULL,
+  observation_kind TEXT NOT NULL CHECK(observation_kind IN (
+    'amex_membership_number', 'amex_card_account_number',
+    'cbq_card_account_reference', 'cbq_masked_card_number', 'axis_primary_masked_card_number'
+  )),
+  source_value TEXT NOT NULL CHECK(length(source_value) > 0),
+  association_authority TEXT NOT NULL CHECK(association_authority IN ('user_confirmed', 'prior_user_confirmed_mapping', 'parser_strong_evidence')),
+  created_at DATETIME NOT NULL,
+  CHECK(observation_kind != 'axis_primary_masked_card_number' OR (
+    subject_kind = 'liability_account' AND parser_profile_id IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+    parser_profile_version = '1' AND association_authority IN ('user_confirmed', 'prior_user_confirmed_mapping') AND
+    length(source_value) = 16 AND substr(source_value,7,6) = 'XXXXXX' AND
+    substr(source_value,1,6) NOT GLOB '*[^0-9]*' AND substr(source_value,13,4) NOT GLOB '*[^0-9]*'
+  )),
+  UNIQUE(document_id, subject_kind, observation_kind),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+INSERT INTO card_source_identity_observations SELECT * FROM card_source_identity_observations_v30;
+DROP TABLE card_source_identity_observations_v30;
+CREATE INDEX idx_card_source_identity_subject ON card_source_identity_observations(workspace_id, subject_kind, subject_id, observation_kind, source_value);
+CREATE TRIGGER validate_card_source_identity
+BEFORE INSERT ON card_source_identity_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card observation source relationship invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'liability_account' AND NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.subject_id AND a.workspace_id = NEW.workspace_id AND a.account_type = 'credit_card'
+      AND (NEW.observation_kind != 'axis_primary_masked_card_number' OR (a.institution_id = 'Axis Bank' AND a.native_currency = 'INR'))
+  ) THEN RAISE(ABORT, 'card observation liability account invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'instrument' AND NOT EXISTS (
+    SELECT 1 FROM card_instruments i WHERE i.id = NEW.subject_id AND i.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'card observation instrument invalid') END;
+END;
+""")
+
+// IBKR Flex is a distinct authenticated source; retain every existing ID,
+// reporting exclusion, receipt and statement document during the table rebuild.
+nonisolated public let migrationV32 = Migration(version: 32, name: "ibkr_flex_current_holdings", sql: """
+PRAGMA legacy_alter_table = ON;
+CREATE TABLE investment_containers_v32 (
+ id TEXT PRIMARY KEY NOT NULL,
+ workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+ document_id TEXT REFERENCES documents(id),
+ import_session_id TEXT REFERENCES import_sessions(id),
+ source_kind TEXT NOT NULL DEFAULT 'statement' CHECK(source_kind IN ('statement','zurich-zio','ibkr-flex')),
+ record_json TEXT NOT NULL CHECK(json_valid(record_json)),
+ CHECK((source_kind='statement' AND document_id IS NOT NULL AND import_session_id IS NOT NULL)
+    OR (source_kind IN ('zurich-zio','ibkr-flex') AND document_id IS NULL AND import_session_id IS NULL))
+);
+INSERT INTO investment_containers_v32 SELECT * FROM investment_containers;
+CREATE TABLE investment_holdings_v32 (
+ id TEXT PRIMARY KEY NOT NULL,
+ container_id TEXT NOT NULL REFERENCES investment_containers(id),
+ document_id TEXT REFERENCES documents(id),
+ import_session_id TEXT REFERENCES import_sessions(id),
+ normalized_document_id TEXT REFERENCES normalized_documents(id),
+ source_kind TEXT NOT NULL DEFAULT 'statement' CHECK(source_kind IN ('statement','zurich-zio','ibkr-flex')),
+ record_json TEXT NOT NULL CHECK(json_valid(record_json)),
+ CHECK((source_kind='statement' AND document_id IS NOT NULL AND import_session_id IS NOT NULL AND normalized_document_id IS NOT NULL)
+    OR (source_kind IN ('zurich-zio','ibkr-flex') AND document_id IS NULL AND import_session_id IS NULL AND normalized_document_id IS NULL))
+);
+INSERT INTO investment_holdings_v32 SELECT * FROM investment_holdings;
+DROP TABLE investment_holdings;
+DROP TABLE investment_containers;
+ALTER TABLE investment_containers_v32 RENAME TO investment_containers;
+ALTER TABLE investment_holdings_v32 RENAME TO investment_holdings;
+CREATE INDEX investment_containers_workspace ON investment_containers(workspace_id);
+CREATE INDEX investment_holdings_container ON investment_holdings(container_id);
+CREATE TABLE background_update_receipts_v32 (
+ job_kind TEXT PRIMARY KEY NOT NULL CHECK(job_kind IN ('public_references','gmail_collection','zurich_isp','ibkr_flex')),
+ claim_id TEXT NOT NULL,
+ activation_epoch TEXT NOT NULL,
+ claimed_at TEXT NOT NULL,
+ completed_at TEXT,
+ outcome TEXT,
+ origin TEXT NOT NULL CHECK(origin IN ('foreground','helper')),
+ CHECK((completed_at IS NULL AND outcome IS NULL) OR (completed_at IS NOT NULL AND outcome IS NOT NULL))
+);
+INSERT INTO background_update_receipts_v32 SELECT * FROM background_update_receipts;
+DROP TABLE background_update_receipts;
+ALTER TABLE background_update_receipts_v32 RENAME TO background_update_receipts;
+PRAGMA legacy_alter_table = OFF;
+""", preflightChecks: [], requiresForeignKeysDisabled: true)
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29, migrationV30, migrationV31, migrationV32]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

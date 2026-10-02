@@ -48,6 +48,67 @@ struct NetWorthReportTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func historyOnlyBankChangesOnlyItsExactCurrentContribution() throws {
+        let source = try context(); defer { source.provider.database.close() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-history-delta-\(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("qualification.sqlite").path
+        try source.provider.database.createBackup(at: path)
+        let sqlite = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing, migrateExisting: true)
+        defer { sqlite.database.close() }
+        let runtime = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
+        let hydrator = RepositoryStoreHydrator(databaseProvider: runtime, workspaceId: source.workspaceID,
+            participatesInLifecycleGate: false)
+        let before = try hydrator.stageHydration()
+        let positions = DashboardPositionProjection.make(accounts: before.accounts, transactions: before.transactions, cardSnapshot: before.cardSnapshot)
+        let native = try #require(positions.first { $0.currency.code == "QAR" })
+        let selected = try #require(native.banks.filter { $0.amount != nil }.max { $0.amount!.amount < $1.amount!.amount })
+        let selectedMoney = try #require(selected.amount)
+        let originalAccount = try #require(before.accounts.first { $0.repositoryAccountId == selected.id })
+        let originalRecord = try #require(try runtime.accountRepo.account(id: selected.id))
+        let preserved = try NetWorthTestSupport.financialDigest(sqlite.database, excluding: ["accounts"])
+        let membership = try runtime.netWorthMembershipRepo.snapshot(workspaceID: source.workspaceID)
+        func report(_ snapshot: RepositoryRuntimeSnapshot) -> NetWorthReport {
+            NetWorthProjection.make(accounts: snapshot.accounts,
+                positions: DashboardPositionProjection.make(accounts: snapshot.accounts, transactions: snapshot.transactions, cardSnapshot: snapshot.cardSnapshot),
+                investments: snapshot.investments, valuations: source.valuations, membership: membership,
+                currencies: ReportingCurrency.allCases, legs: source.cache.alDarLegs,
+                rateFailures: [], priceFailures: [], scopeNotes: [], now: source.now)
+        }
+        let priorReport = report(before)
+        #expect(!membership.excluded.contains(.account(selected.id)))
+        #expect(try runtime.accountRepo.markAccountHistoryOnly(accountId: selected.id, workspaceId: source.workspaceID,
+            markedAtISO: ISO8601DateFormatter().string(from: source.now)))
+        let after = try hydrator.stageHydration()
+        let next = try #require(DashboardPositionProjection.make(accounts: after.accounts, transactions: after.transactions,
+            cardSnapshot: after.cardSnapshot).first { $0.currency.code == "QAR" })
+        #expect(!next.banks.contains { $0.id == selected.id })
+        #expect(next.cards == native.cards && next.cardTotal == native.cardTotal)
+        #expect(try Money.aggregate(next.banks.compactMap(\.amount) + [selectedMoney]) == native.bankTotal)
+        let retained = try #require(after.accounts.first { $0.repositoryAccountId == selected.id })
+        #expect(retained.isHistoryOnly && retained.currentBalanceMoney == originalAccount.currentBalanceMoney)
+        #expect(retained.preferredDisplayName == originalAccount.preferredDisplayName)
+        let savedRecord = try #require(try runtime.accountRepo.account(id: selected.id))
+        #expect(savedRecord.name == originalRecord.name && savedRecord.description == originalRecord.description)
+        #expect(savedRecord.institutionId == originalRecord.institutionId && savedRecord.accountType == originalRecord.accountType)
+        #expect(savedRecord.nativeCurrency == originalRecord.nativeCurrency && savedRecord.createdAtISO == originalRecord.createdAtISO)
+        #expect(try runtime.accountRepo.accounts(workspaceId: source.workspaceID).filter { $0.id != selected.id }
+            == source.provider.accountRepo.accounts(workspaceId: source.workspaceID).filter { $0.id != selected.id })
+        let nextReport = report(after)
+        for target in priorReport.targets {
+            let following = try #require(nextReport.targets.first { $0.currency == target.currency })
+            let old = try #require(target.amount), current = try #require(following.amount)
+            let removed = try #require(target.contributions.first { $0.memberID == .account(selected.id) }?.amount)
+            let restored = try NetWorthArithmetic.sum([.init(numerator: current.numerator, denominator: current.denominator), removed])
+            #expect(try InvestmentArithmetic.product(old.numerator, restored.denominator)
+                == InvestmentArithmetic.product(restored.numerator, old.denominator))
+            #expect(following.contributions == target.contributions.filter { $0.memberID != .account(selected.id) })
+        }
+        #expect(try NetWorthTestSupport.financialDigest(sqlite.database, excluding: ["accounts"]) == preserved)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func authenticAccountsKeepBankCashSeparateFromSourceCardLiabilities() throws {
         let source = try context(); defer { source.provider.database.close() }
         let accounts = AccountStore(), transactions = TransactionStore(), cards = CardStore()
@@ -166,7 +227,7 @@ struct NetWorthReportTests {
         for target in report.targets {
             #expect(target.isPartial)
             #expect(target.missingCount == expected.values.filter { $0.1 == nil }.count)
-            print("S99_REPORT \(target.currency.rawValue) \(target.amount?.display ?? "unavailable") missing=\(target.missingCount) stale=\(target.isStale)")
+            print("S99_REPORT \(target.currency.rawValue) exact arithmetic verified; coverage and freshness checked")
         }
         #expect(pricesWithoutCost > 0)
         // Source-qualified container ownership stays visible while the genuine
@@ -189,8 +250,9 @@ struct NetWorthReportTests {
             #expect(fund.holdingIDs == [holding.id] && fund.quote == nil)
             #expect(fund.scope.priceCount == 0 && fund.scope.gainCount == 0)
         }
-        #expect(overview.total == InvestmentOverview.build(holdings: snapshot.investments.holdings,
-            valuations: source.valuations, legs: source.cache.alDarLegs).total)
+        let totalsMatch = overview.total == InvestmentOverview.build(holdings: snapshot.investments.holdings,
+            valuations: source.valuations, legs: source.cache.alDarLegs).total
+        #expect(totalsMatch, "Identical holdings, quotes and FX produce an identical total regardless of portfolio grouping")
         #expect(try NetWorthTestSupport.financialDigest(source.provider.database) == digest)
     }
 

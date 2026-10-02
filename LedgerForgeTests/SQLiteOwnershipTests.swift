@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+import SQLite3
 import Synchronization
 import Testing
 @testable import LedgerForge
@@ -9,6 +10,40 @@ import Testing
 /// financial statement or domain graph is authored by this suite.
 @Suite(.serialized)
 struct SQLiteOwnershipTests {
+    @Test
+    func scalarQueryPreservesRowsAndSuccessfulEmptyResults() throws {
+        let database = SQLiteDatabase(path: ":memory:")
+        try database.open()
+        defer { database.close() }
+
+        #expect(try database.queryInt("SELECT 17;") == 17)
+        #expect(try database.queryInt("SELECT 0;") == 0)
+        #expect(try database.queryInt("SELECT -9;") == -9)
+        #expect(try database.queryInt("SELECT 1 WHERE 0;") == 0)
+    }
+
+    @Test
+    func scalarQueryExecutionFailureCannotBecomeZeroAndConnectionRemainsUsable() throws {
+        let database = SQLiteDatabase(path: ":memory:")
+        try database.open()
+        defer { database.close() }
+
+        // SQLite prepares this expression successfully, then reports integer
+        // overflow during step. This probes execution, not missing SQL syntax.
+        do {
+            _ = try database.queryInt("SELECT abs(-9223372036854775808);")
+            Issue.record("scalar execution failure unexpectedly returned a value")
+        } catch let SQLiteDatabaseError.execution(error) {
+            #expect(error.primaryCode == SQLITE_ERROR)
+            #expect(error.extendedCode == SQLITE_ERROR)
+            #expect(error.operation == .query)
+        } catch {
+            Issue.record("scalar execution failure returned an unexpected error: \(error)")
+        }
+        #expect(try database.queryInt("SELECT 23;") == 23)
+        try database.closeChecked()
+    }
+
     @Test
     func escapedRowsRemainOwnedAfterQuerySecondQueryAndCheckedClose() throws {
         let root = try temporaryDirectory(named: "SQLiteRowOwnership")

@@ -22,6 +22,9 @@ nonisolated struct GmailInboxSource: Codable, Equatable, Identifiable, Sendable 
     var sha256: String?
     var attention: Attention
     var dismissed: Bool
+    /// Inbox-only disposition of a verified, single-scope older holdings source.
+    /// Optional for existing cached inboxes; it never means financially imported.
+    var retainedNewerHoldings: Bool? = nil
 
     static func deliveryID(account: String, messageID: String, partID: String) -> String {
         digest(Data((account.lowercased() + "\0" + messageID + "\0" + partID).utf8))

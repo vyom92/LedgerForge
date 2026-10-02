@@ -536,7 +536,7 @@ struct GmailAuthenticAcceptanceTests {
             let parity = memory == sqlite
             #expect(parity, "Overlap canonical source fields differ between providers.")
         }
-        print("Relationship overlap campaign: 87 retained originals and 17 standalone representations; both providers and both import orders, exact source occurrence links, immutable first financial fields, genuine Axis whole-parent holds, replay, reopen and populated backup/restore passed.")
+        print("Relationship overlap campaign: 87 retained originals and 17 standalone representations; both providers and both import orders, independent source-meaning dispositions, exact occurrence links, immutable first financial fields, replay, reopen and populated backup/restore passed.")
     }
 
     private func makeLocalBankEngine(provider: DatabaseProvider, password: String, stores: GmailQualificationStores) -> ImportEngine {
@@ -707,7 +707,8 @@ struct GmailAuthenticAcceptanceTests {
         if standaloneFirst { try await importStandalone(); try await importRelationships() }
         else { try await importRelationships(); try await importStandalone() }
         if standaloneFirst {
-            #expect(relationshipHolds == 10 && allNew > 0 && mixed > 0 && supporting > 0)
+            let expectedHolds = oracle.overlap.relationships.filter { $0.conflicts > 0 }.count
+            #expect(relationshipHolds == expectedHolds && allNew > 0 && mixed > 0 && supporting > 0)
         } else {
             let expectedHolds = standalone.filter { original in oracle.overlap.links.contains { $0.standaloneSHA == original.equivalentPDFSHA && $0.conflict } }.count
             #expect(standaloneHolds == expectedHolds && relationshipHolds == 0)
@@ -1202,6 +1203,16 @@ struct GmailAuthenticAcceptanceTests {
             selected.map { (source: $0.1, bytes: $0.2) })
     }
 
+    @Test(.globalRuntimeStateIsolation)
+    func retainedSalaryNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
+        // An existing initial-campaign nomination, resolved through the retained
+        // history. The hash selects unchanged original bytes, not expectations.
+        let nominatedSHA = "1da1ad5a1fd1fba3a7312705e0d8dd82dfcf9cb81ca94c5f7684bdd430b82181"
+        let original = try #require(historicalOriginals(family: .salary).first { $0.0.sha256 == nominatedSHA })
+        try await SalaryAuthenticCorpusAcceptanceTests().qualifyGmailNamespaceContention(
+            (source: original.0, bytes: original.1))
+    }
+
     /// Differential gate only: five already nominated/qualified initial Gmail
     /// bank/card originals, not the wider 18- or 416-original Gmail corpus.
     @Test(.globalRuntimeStateIsolation)
@@ -1417,6 +1428,195 @@ struct GmailAuthenticAcceptanceTests {
         try await allRetainedCardOriginalsUseIndependentComparisons(family: .axisCard)
     }
 
+    @Test func axisPrintedPrimaryCardRetainsConfirmedAccountAcrossStatements() async throws {
+        let hashes = [
+            "8e7a8c07419ba2cb9463214ea8330d72b4d33c4b13c69bcc24cdde753f75d7d7",
+            "3b06aabf3844dc2191673c1adcd034d96a0788c074c060d374a26b2d2c0af1e0"
+        ]
+        let originals = try historicalOriginals(family: .axisCard)
+        var cases: [SourceCase] = []
+        for hash in hashes {
+            let original = try #require(originals.first { $0.0.sha256 == hash })
+            cases.append(try await bankAndCardCase(source: original.0, bytes: original.1,
+                family: "axis_card_traditional"))
+        }
+        for durable in [false, true] {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("LedgerForge-Axis-Account-Association-\(UUID())")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let path = directory.appendingPathComponent("qualification.sqlite").path
+            var sqlite = durable ? try SQLiteRepositoryProvider(path: path) : nil
+            defer { sqlite?.database.close() }
+            var provider = sqlite.map { DatabaseProvider.verifiedSQLite($0, protectsGeneration: false) }
+                ?? DatabaseProvider(inMemory: true)
+            var accountID: String?
+            var primaryMask: String?
+            var expectedRows: [String] = []
+            for (index, original) in cases.enumerated() {
+                let sha = try #require(original.source.sha256)
+                var inbox = try provider.gmailInboxRepo.load(account: original.source.account)
+                inbox.sources[original.source.id] = original.source
+                _ = try provider.gmailInboxRepo.save(inbox, originals: [sha: original.bytes], expectedRevision: inbox.revision)
+                let stores = GmailQualificationStores()
+                let engine = makeEngine(provider: provider, password: original.password, stores: stores)
+                let url = try #require(original.source.importURL)
+                let prepared = try await engine.prepareImport(from: url)
+                defer { engine.cancelPreparedImport(prepared) }
+                try original.compare(prepared)
+                let incomingMask = try #require(prepared.financialDocument.cardStatementEvidence?
+                    .accountSourceIdentityObservations.first?.value)
+                let review = try engine.reviewPreparedImport(prepared)
+                if let accountID {
+                    #expect(review == .matchedExisting(accountId: accountID))
+                    let primaryMaskMatches = incomingMask == primaryMask
+                    #expect(primaryMaskMatches, "The source primary observation must match the confirmed account mapping")
+                } else {
+                    guard case .liabilityAccountChoiceRequired = review else { throw CampaignError.sourceMismatch }
+                    primaryMask = incomingMask
+                }
+                let result = await engine.commitPreparedImport(prepared,
+                    accountChoice: index == 0 ? .createNewAccount(displayName: "Axis CC") : nil)
+                guard result.hydrationOutcome == .committedAndHydrated else { throw CampaignError.commitFailed }
+                if let accountID { #expect(result.accountId == accountID) }
+                else { accountID = try #require(result.accountId) }
+                expectedRows += rowProjection(prepared.financialDocument.transactions)
+                let accounts = try provider.accountRepo.accounts(workspaceId: "default-workspace")
+                #expect(accounts.count == 1 && accounts.first?.id == accountID && accounts.first?.name == "Axis CC")
+                try verifyCardEvidence(provider, prepared: prepared, sessionID: prepared.importSession.id.uuidString)
+                let cardGraph = try provider.cardRepo.snapshot(workspaceId: "default-workspace")
+                #expect(cardGraph.instruments.isEmpty && cardGraph.sections.isEmpty)
+                let observation = try #require(cardGraph.sourceObservations.first {
+                    $0.importSessionId == prepared.importSession.id.uuidString
+                })
+                let sourceObservationMatches = observation.subjectId == accountID && observation.sourceValue == primaryMask
+                #expect(sourceObservationMatches, "The durable source observation must retain the exact confirmed mapping")
+                #expect(observation.associationAuthority == (index == 0 ? "user_confirmed" : "prior_user_confirmed_mapping"))
+                let replay = try await engine.prepareImport(from: url)
+                let duplicate = await engine.commitPreparedImport(replay)
+                #expect(duplicate.previousImport != nil && !duplicate.persisted)
+                let graphUnchanged = try provider.cardRepo.snapshot(workspaceId: "default-workspace") == cardGraph
+                #expect(graphUnchanged)
+                let financialFields = rowProjection(try stores.hydrator(provider).stageHydration().transactions)
+                let rowsUnchanged = financialFields.sorted() == expectedRows.sorted()
+                #expect(rowsUnchanged)
+                // Reopen between statements so the second match cannot rely on
+                // a preparation or view-model cache from the first import.
+                if let open = sqlite {
+                    try open.database.checkpointAndClose()
+                    let reopened = try SQLiteRepositoryProvider(path: path)
+                    sqlite = reopened
+                    provider = DatabaseProvider.verifiedSQLite(reopened, protectsGeneration: false)
+                    let restoredGraph = try provider.cardRepo.snapshot(workspaceId: "default-workspace") == cardGraph
+                    #expect(restoredGraph)
+                    try BackupCompatibility.verifyDatabase(reopened.database)
+                }
+            }
+        }
+    }
+
+    @Test func axisIdentityMigrationPreservesExistingAuthenticCardEvidence() async throws {
+        let original = try #require(historicalOriginals(family: .amex).first {
+            $0.0.sha256 == "bb06263ab2a34bfc04e1b9b946ccb7973c5cd9a15437de4b7c02d9fc6cf41518"
+        })
+        let source = try await bankAndCardCase(source: original.0, bytes: original.1, family: "amex_card")
+        _ = try await run(source, sqlite: true, index: 0, initialMigrations: Array(allMigrations.prefix(30)))
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func bankHistoryAndExactNicknameSurviveNewImportReplayAndBackup() async throws {
+        let originals = try historicalOriginals(family: .cbqBank)
+        var cases: [SourceCase] = []
+        for hash in ["ce377d9e559713a77318c88d2f37b7ed57a5edb3f114e489e86340e550180d68",
+                     "1ba36237ffb7d7b27439eb7bf2140b927a0ed02b248b6f2de8563a94286240b2"] {
+            let source = try #require(originals.first { $0.0.sha256 == hash })
+            cases.append(try await bankAndCardCase(source: source.0, bytes: source.1, family: "cbq_bank"))
+        }
+        let nickname = "Commercial Bank of Qatar / eSavings — HISTORY!"
+        for durable in [false, true] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Bank-History-\(UUID())")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let path = directory.appendingPathComponent("qualification.sqlite")
+            let sqlite = durable ? try SQLiteRepositoryProvider(path: path.path) : nil
+            defer { sqlite?.database.close() }
+            let provider = sqlite.map { DatabaseProvider.verifiedSQLite($0, protectsGeneration: false) } ?? DatabaseProvider(inMemory: true)
+            let stores = GmailQualificationStores()
+            let hydrator = stores.hydrator(provider)
+            let metadata = AccountMetadataCoordinator(databaseProvider: provider, developerConsole: nil,
+                acknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
+            var accountID: String?
+            var closedAt: String?
+            var expectedRows: [String] = []
+            for (index, original) in cases.enumerated() {
+                let sha = try #require(original.source.sha256)
+                var inbox = try provider.gmailInboxRepo.load(account: original.source.account)
+                inbox.sources[original.source.id] = original.source
+                _ = try provider.gmailInboxRepo.save(inbox, originals: [sha: original.bytes], expectedRevision: inbox.revision)
+                let engine = makeEngine(provider: provider, password: original.password, stores: stores)
+                let url = try #require(original.source.importURL)
+                let prepared = try await engine.prepareImport(from: url)
+                defer { engine.cancelPreparedImport(prepared) }
+                try original.compare(prepared)
+                if let accountID { #expect(try engine.reviewPreparedImport(prepared) == .matchedExisting(accountId: accountID)) }
+                let result = await engine.commitPreparedImport(prepared,
+                    accountChoice: index == 0 ? .createNewAccount(displayName: "Bank history qualification") : nil)
+                guard result.hydrationOutcome == .committedAndHydrated else { throw CampaignError.commitFailed }
+                expectedRows += rowProjection(prepared.financialDocument.transactions)
+                if accountID == nil {
+                    accountID = result.accountId
+                    let importedID = try #require(accountID)
+                    let importedValue = try provider.accountRepo.account(id: importedID)
+                    let imported = try #require(importedValue)
+                    #expect(try metadata.updateDisplayName(accountId: imported.id, workspaceId: imported.workspaceId, displayName: nickname))
+                    #expect(try metadata.markAccountHistoryOnly(accountId: imported.id, workspaceId: imported.workspaceId))
+                    closedAt = try provider.accountRepo.account(id: imported.id)?.closedAtISO
+                    _ = try provider.accountRepo.upsertAccount(imported)
+                }
+                #expect(result.accountId == accountID)
+                let replay = try await engine.prepareImport(from: url)
+                let duplicate = await engine.commitPreparedImport(replay)
+                #expect(duplicate.previousImport != nil && !duplicate.persisted)
+                try verifyBankSectionEvidence(provider, prepared: prepared)
+                let snapshot = try hydrator.stageHydration()
+                let fieldsPreserved = rowProjection(snapshot.transactions).sorted() == expectedRows.sorted()
+                #expect(fieldsPreserved)
+                #expect(snapshot.accounts.count == 1 && snapshot.accounts.first?.isHistoryOnly == true)
+                #expect(snapshot.accounts.first?.preferredDisplayName == nickname)
+                #expect(DashboardPositionProjection.make(accounts: snapshot.accounts, transactions: snapshot.transactions,
+                    cardSnapshot: snapshot.cardSnapshot).isEmpty)
+                #expect(try provider.accountRepo.account(id: try #require(accountID))?.closedAtISO == closedAt)
+            }
+            if let sqlite {
+                let previous = DatabaseProvider.shared
+                DatabaseProvider.shared = provider
+                defer { DatabaseProvider.shared = previous }
+                let recovery = BackupRestoreCoordinator(testingAt: path)
+                recovery.installTestProvider(sqlite)
+                defer { try? recovery.closeTestProvider() }
+                let folder = directory.appendingPathComponent("backups")
+                try BackupFiles.createDirectory(folder)
+                await recovery.createBackup(to: folder)
+                let package = try #require(recovery.lastBackupURL)
+                await recovery.verifyRestore(from: package)
+                await recovery.replaceLedger()
+                guard recovery.restoredReceipt?.phase == .activated else { throw CampaignError.commitFailed }
+                let restored = try GmailQualificationStores().hydrator(DatabaseProvider.shared).stageHydration()
+                let retained = rowProjection(restored.transactions).sorted() == expectedRows.sorted()
+                #expect(retained && restored.accounts.first?.isHistoryOnly == true)
+                #expect(restored.accounts.first?.preferredDisplayName == nickname)
+                try recovery.closeTestProvider()
+                let reopened = try SQLiteRepositoryProvider(path: path.path)
+                defer { reopened.database.close() }
+                let final = DatabaseProvider.verifiedSQLite(reopened, protectsGeneration: false)
+                #expect(try final.accountRepo.account(id: try #require(accountID))?.closedAtISO == closedAt)
+                #expect(try final.accountRepo.account(id: try #require(accountID))?.name == nickname)
+                let finalFields = rowProjection(try GmailQualificationStores().hydrator(final).stageHydration().transactions).sorted() == expectedRows.sorted()
+                #expect(finalFields)
+            }
+        }
+    }
+
     @Test(.timeLimit(.minutes(20))) func completeRetainedCardCorpusHasSourceBoundedDispositions() async throws {
         try await qualifyRetainedCardCorpus(families: [.amex, .axisCard, .cbqCard])
     }
@@ -1526,10 +1726,18 @@ struct GmailAuthenticAcceptanceTests {
                 let sha = try #require(source.sha256)
                 let familyName = family == .amex ? "amex_card" : family == .axisCard ? "axis_card_traditional" : "cbq_card"
                 print("GMAIL_CARD_SOURCE_BEGIN sha=\(sha) family=\(family.rawValue) stage=independent-source-comparison")
-                let candidate = try await bankAndCardCase(source: source, bytes: bytes, family: familyName)
-                let memory = try await run(candidate, sqlite: false, index: index)
-                let durable = try await run(candidate, sqlite: true, index: index)
-                #expect(memory == durable)
+                var phase = "independent-source-comparison"
+                do {
+                    let candidate = try await bankAndCardCase(source: source, bytes: bytes, family: familyName)
+                    phase = "in-memory-preparation-commit-comparison"
+                    let memory = try await run(candidate, sqlite: false, index: index)
+                    phase = "sqlite-preparation-commit-reopen-comparison"
+                    let durable = try await run(candidate, sqlite: true, index: index)
+                    #expect(memory == durable)
+                } catch {
+                    Issue.record("Retained Gmail card \(sha.prefix(12)) failed during \(phase): \(safeFailureKind(error)).")
+                    throw error
+                }
                 qualified += 1
                 print("GMAIL_DISPOSITION \(sha) SUPPORTED_AND_QUALIFIED \(familyName) both-providers-replay-reopen")
             }
@@ -2152,12 +2360,13 @@ struct GmailAuthenticAcceptanceTests {
         throw CampaignError.sourceUnavailable
     }
 
-    private func run(_ original: SourceCase, sqlite durable: Bool, index: Int, historyOnly: Bool = false) async throws -> [String] {
+    private func run(_ original: SourceCase, sqlite durable: Bool, index: Int, historyOnly: Bool = false,
+        initialMigrations: [Migration] = allMigrations) async throws -> [String] {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Gmail-Authentic-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: directory) }
         let path = directory.appendingPathComponent("qualification.sqlite").path
-        let sqlite = durable ? try SQLiteRepositoryProvider(path: path) : nil
+        let sqlite = durable ? try SQLiteRepositoryProvider(path: path, migrations: initialMigrations) : nil
         defer { sqlite?.database.close() }
         let provider = sqlite.map { DatabaseProvider.verifiedSQLite($0, protectsGeneration: false) } ?? DatabaseProvider(inMemory: true)
         var inbox = GmailInboxState(account: original.source.account)
@@ -2211,11 +2420,11 @@ struct GmailAuthenticAcceptanceTests {
                 metadataCoordinator: metadata, cardStore: stores.cards, acknowledgementGate: gate)
             // Exercise the same entry point as the Accounts confirmation, then
             // prove cancelled and stale acknowledgements cannot perform it.
-            presentation.markCreditCardHistoryOnly(accountID: account.id)
+            presentation.markAccountHistoryOnly(accountID: account.id)
             #expect(presentation.requiresDevelopmentProfileAcknowledgement)
             presentation.cancelDevelopmentProfileAcknowledgement()
             #expect(try provider.accountRepo.account(id: account.id)?.closedAtISO == nil)
-            presentation.markCreditCardHistoryOnly(accountID: account.id)
+            presentation.markAccountHistoryOnly(accountID: account.id)
             profileState = DevelopmentProfileAcknowledgementState(
                 providerGeneration: ProviderGenerationToken(), profileKind: .persistentDebug)
             presentation.approveDevelopmentProfileAcknowledgement()
@@ -2223,12 +2432,15 @@ struct GmailAuthenticAcceptanceTests {
             #expect(try provider.accountRepo.account(id: account.id)?.closedAtISO == nil)
             profileState = DevelopmentProfileAcknowledgementState(
                 providerGeneration: provider.generationToken, profileKind: .persistentDebug)
-            presentation.markCreditCardHistoryOnly(accountID: account.id)
+            presentation.markAccountHistoryOnly(accountID: account.id)
             presentation.approveDevelopmentProfileAcknowledgement()
             #expect(presentation.presentationState == .ready)
+            let defaultScopeIsEmpty = presentation.selectedAccount == nil && presentation.visibleAccounts.isEmpty
+            #expect(defaultScopeIsEmpty)
+            presentation.selectAccount(repositoryAccountID: account.id)
             #expect(presentation.selectedAccount?.isHistoryOnly == true)
             classificationTime = try #require(provider.accountRepo.account(id: account.id)?.closedAtISO)
-            #expect(try !metadata.markCreditCardHistoryOnly(accountId: account.id, workspaceId: account.workspaceId))
+            #expect(try !metadata.markAccountHistoryOnly(accountId: account.id, workspaceId: account.workspaceId))
             // Reusing the authentic pre-classification account snapshot must
             // not clear the later owner metadata in either provider.
             _ = try provider.accountRepo.upsertAccount(account)
@@ -2265,6 +2477,9 @@ struct GmailAuthenticAcceptanceTests {
                 transactionStore: currentStores.transactions, importSessionStore: currentStores.sessions,
                 metadataCoordinator: metadata, cardStore: currentStores.cards,
                 acknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
+            let defaultScopeIsEmpty = presentation.selectedAccount == nil && presentation.visibleAccounts.isEmpty
+            #expect(defaultScopeIsEmpty)
+            presentation.selectAccount(repositoryAccountID: accountID)
             #expect(presentation.selectedAccount?.isHistoryOnly == true)
             #expect(presentation.selectedAccount?.currentBalanceLabel == "Historical Statement Balance")
             #expect(presentation.nativeBalanceSummaries.isEmpty)
@@ -2691,20 +2906,16 @@ struct GmailAuthenticAcceptanceTests {
                 observer.verificationMilliseconds += Int(Date().timeIntervalSince(verificationStarted) * 1_000)
                 return ImportOutcomePresentation(result: result)
             },
+            acknowledgeValidationFailure: {
+                ImportOutcomePresentation(result: engine.acknowledgeValidationFailure($0))
+            },
             cancelPreparation: { engine.cancelPreparedImport($0) },
             cancelPasswordChallenge: { StatementPasswordChallengeController.shared.cancel(challengeID: $0) },
             failureSummary: { error in
                 print("Bounded cohort preparation/review failure: \(self.safeFailureKind(error)).")
                 return ImportFailureSummary.from(error)
             },
-            isRetryablePreparationFailure: { error in
-                guard let importError = error as? ImportError else { return false }
-                switch importError {
-                case .readerFailure, .unknown: return true
-                case .unsupportedFile, .passwordRequired, .incorrectPassword, .readerUnavailable,
-                        .invalidDocument, .unsupportedStatement, .cancelled: return false
-                }
-            },
+            isRetryablePreparationFailure: { ImportCentreCoordinator<PreparedImport>.isRetryablePreparationFailure($0) },
             isAutomaticallyCommittable: { preparation, review in
                 guard review.validationPassed else { return false }
                 let salaryOrInvestment = preparation.financialDocument.salaryStatementEvidence != nil
@@ -2725,6 +2936,9 @@ struct GmailAuthenticAcceptanceTests {
                 case .ordinaryFullImport, .eligible, .unsupportedEvidence: return true
                 case .fullSupportedOverlap, .repeatedIncomingEvidence, .ownershipConflict, .repositoryIntegrityConflict: return false
                 }
+            },
+            requiredCardSectionIDs: {
+                $0.financialDocument.cardStatementEvidence?.instrumentSections.map(\.documentScopedSectionID)
             }
         ))
     }

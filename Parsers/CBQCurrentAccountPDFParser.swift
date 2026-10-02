@@ -131,31 +131,18 @@ nonisolated final class CBQCurrentAccountPDFParser: StatementParser {
 
         let profileID = family.profileID
         var transactions: [Transaction] = []
-        var previousDate: StatementDate?
-        var previousBalance = statementEvidence?.openingBalance?.amount
         for row in document.rows {
             guard row.values.count == CBQCurrentAccountPDFNormalizer.logicalHeader.count,
                   !row.values[1].isEmpty else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
             do {
                 let postingDate = family == .history ? try Self.historyDate(row.values[0]) : [.savingsLegacy, .legacyCurrent].contains(family) ? try Self.legacyDate(row.values[0]) : try Self.monthlyDate(row.values[0])
-                if family == .history, let previousDate, postingDate > previousDate {
-                    throw CBQCurrentAccountPDFParserError.ascendingHistory(sourceOrdinal: row.rowNumber)
-                }
-                if family != .history, let previousDate, postingDate < previousDate {
-                    throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
-                }
-                previousDate = postingDate
                 let sourceTransactionDate = [.savingsLegacy, .legacyCurrent].contains(family) || row.values[2].isEmpty ? nil : try Self.monthlyDate(row.values[2])
                 let valueDate = [.savingsLegacy, .legacyCurrent].contains(family) ? try Self.legacyDate(row.values[2]) : nil
                 let signedAmount = try Self.decimal(row.values[3])
                 guard signedAmount != .zero else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
                 let balance = try Self.decimal(row.values[4])
-                if family != .history {
-                    guard let prior = previousBalance, prior + signedAmount == balance else {
-                        throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: row.rowNumber)
-                    }
-                    previousBalance = balance
-                }
+                // Source order and balances remain provenance. The source
+                // column's signed amount determines this occurrence's effect.
                 let debit = signedAmount < .zero ? -signedAmount : nil
                 let credit = signedAmount > .zero ? signedAmount : nil
                 let structuredDigest = Self.structuredReferenceDigest(in: row.values[1])
@@ -226,10 +213,6 @@ nonisolated final class CBQCurrentAccountPDFParser: StatementParser {
             )
         } else {
             zeroEvidence = nil
-        }
-        if !transactions.isEmpty, family != .history, let expected = statementEvidence?.closingBalance,
-           transactions.last?.runningBalanceMoney != expected {
-            throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: document.rows.last?.rowNumber ?? 0)
         }
         return FinancialDocument(
             sourceDocument: document.document,

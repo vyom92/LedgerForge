@@ -32,6 +32,7 @@
         "GmailLiveAcquisitionTests",
         "GmailAuthenticAcceptanceTests",
         "HDFCBankAccountAuthenticAcceptanceTests",
+        "IBKRFlexQualificationTests",
         "ImportRepositoryIntegrationTests/exactAxisReimportIsBlockedDurablyWithBoundedProvenance()",
         "InvestmentRAMOriginalTests",
         "InvestmentPriceQualificationTests",

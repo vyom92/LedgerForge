@@ -34,6 +34,24 @@ struct LedgerForgeSubprocessProbe {
             Darwin.close(fd)
             exit(slot: slot, with: obtained ? "acquired" : "contention")
         }
+        if CommandLine.arguments.count == 5, CommandLine.arguments[2] == "authority-hold" {
+            // Hold only the stable namespace lock. No SQLite open, lifecycle
+            // transition, source content or financial operation occurs here.
+            let fd = Darwin.open(CommandLine.arguments[1] + ".access.lock", O_RDWR | O_NOFOLLOW)
+            guard fd >= 0 else { exit(slot: slot, with: "unavailable") }
+            guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+                Darwin.close(fd)
+                exit(slot: slot, with: "contention")
+            }
+            writeLine("READY")
+            guard readLine() == "GO" else {
+                Darwin.close(fd)
+                exit(slot: slot, with: "rejected")
+            }
+            let unlocked = flock(fd, LOCK_UN) == 0
+            let closed = Darwin.close(fd) == 0
+            exit(slot: slot, with: unlocked && closed ? "released" : "unavailable")
+        }
         if CommandLine.arguments.count == 5, CommandLine.arguments[2] == "authority-open" {
             let database = SQLiteDatabase(path: CommandLine.arguments[1])
             do { try database.open(access: .existing); database.close(); exit(slot: slot, with: "opened") }

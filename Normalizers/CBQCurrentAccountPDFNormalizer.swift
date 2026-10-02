@@ -390,8 +390,6 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
         }
 
         var rows: [NormalizedRow] = []
-        var previousBalance = Self.decimal(openingBalance)
-        var previousPosting = periodStart
         for block in blocks {
             let tokens = block.lines.flatMap(\.tokens)
             let layout = block.layout
@@ -411,18 +409,12 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
             guard !narration.isEmpty, valueDates.count == 1, (debits.count == 1) != (credits.count == 1), balances.count == 1,
                   let amount = Self.decimal(debits.first?.text ?? credits.first!.text), amount > .zero,
                   let balanceText = Self.legacyBalanceText(balances[0].text, family: family),
-                  let balance = Self.decimal(balanceText) else {
+                  Self.decimal(balanceText) != nil else {
                 throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
             }
-            let signed = debits.count == 1 ? -abs(amount) : abs(amount)
-            if let previousBalance, previousBalance + signed != balance {
-                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
-            }
-            if let previousPosting, let previous = Self.legacyDateKey(previousPosting), let current = Self.legacyDateKey(block.start.text), current < previous {
-                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
-            }
-            previousBalance = balance
-            previousPosting = block.start.text
+            // Column ownership establishes direction. Retain dates, physical
+            // ordinals and literal balances without requiring chronological or
+            // arithmetic agreement between independent occurrences.
             rows.append(.init(rowNumber: block.start.sourceOrdinal,
                               values: [block.start.text, narration, valueDates[0].text,
                                        debits.count == 1 ? "-\(debits[0].text)" : credits[0].text, balanceText],
@@ -430,9 +422,8 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
                                           debits.count == 1 ? "-\(debits[0].text)" : credits[0].text, balances[0].text],
                               sourcePage: block.pageIndex + 1))
         }
-        let terminalBalance = rows.last.flatMap { Self.decimal($0.values.last ?? "") } ?? Self.decimal(openingBalance)
         guard let closingOrdinal, let closingRegionEnd,
-              terminalBalance == Self.decimal(closingBalance),
+              (!rows.isEmpty || Self.decimal(openingBalance) == Self.decimal(closingBalance)),
               let headerPage = headers.keys.min(), let headerOrdinal = headers[headerPage]?.tokens.first?.sourceOrdinal else {
             throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
         }
@@ -585,8 +576,6 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
 
         var normalizedRows: [NormalizedRow] = []
         var openingBalance = undatedOpening?.balance
-        var previousBalance = undatedOpening.flatMap { Self.decimal($0.balance) }
-        var previousPostingDate: String?
         var openingSourceOrdinal = undatedOpening?.ordinal
         for block in blocks {
             let layout = block.layout
@@ -619,8 +608,6 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
                 }
                 openingBalance = balances[0].text
                 openingSourceOrdinal = block.start.sourceOrdinal
-                previousBalance = Self.decimal(openingBalance!)
-                previousPostingDate = block.start.text
                 continue
             }
             guard openingBalance != nil,
@@ -630,22 +617,9 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
                   balances.count == 1,
                   let amount = Self.decimal(debits.first?.text ?? credits.first!.text),
                   amount > .zero,
-                  let balance = Self.decimal(balances[0].text),
-                  let prior = previousBalance else {
+                  Self.decimal(balances[0].text) != nil else {
                 throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
             }
-            let signed = debits.count == 1 ? -abs(amount) : abs(amount)
-            guard prior + signed == balance else {
-                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
-            }
-            if let previousPostingDate,
-               let previous = Self.monthlyDateKey(previousPostingDate),
-               let currentDate = Self.monthlyDateKey(block.start.text),
-               currentDate < previous {
-                throw CBQCurrentAccountPDFNormalizationError.malformedTransaction(sourceOrdinal: block.start.sourceOrdinal)
-            }
-            previousPostingDate = block.start.text
-            previousBalance = balance
             let signedText = debits.count == 1
                 ? "-\(debits[0].text.replacingOccurrences(of: "-", with: ""))"
                 : credits[0].text
@@ -656,9 +630,9 @@ nonisolated final class CBQCurrentAccountPDFNormalizer {
                 sourcePage: block.pageIndex + 1
             ))
         }
-        guard let openingBalance, let openingSourceOrdinal,
-              let closingSourceOrdinal, let closingRegionEndOrdinal,
-              Self.decimal(normalizedRows.last?.values.last ?? openingBalance) == Self.decimal(closingBalance) else {
+        guard let openingBalance, Self.decimal(openingBalance) != nil,
+              let openingSourceOrdinal, let closingSourceOrdinal, let closingRegionEndOrdinal,
+              (!normalizedRows.isEmpty || Self.decimal(openingBalance) == Self.decimal(closingBalance)) else {
             throw CBQCurrentAccountPDFNormalizationError.malformedPreamble
         }
 

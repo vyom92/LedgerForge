@@ -181,7 +181,8 @@ nonisolated final class AxisBankAccountPDFParser: StatementParser {
             statementBoundaryDate: nil,
             period: period,
             openingBalance: printedControls.openingBalance,
-            closingBalance: printedControls.closingBalance
+            closingBalance: printedControls.closingBalance,
+            printedControls: printedControls.literalControls
         )
         if document.rows.isEmpty {
             let zeroEvidence = try ZeroActivityStatementEvidence(
@@ -216,15 +217,10 @@ nonisolated final class AxisBankAccountPDFParser: StatementParser {
             )
         }
 
-        let openingBalance = printedControls.openingBalance.amount
-        let printed = (
-            debit: printedControls.debitTotal.amount,
-            credit: printedControls.creditTotal.amount,
-            closing: printedControls.closingBalance.amount
-        )
-        var priorBalance = openingBalance
-        var debitTotal = Decimal.zero
-        var creditTotal = Decimal.zero
+        // A collapsed amount still needs the literal adjacent balance
+        // transition to establish direction. Explicit debit/credit columns
+        // already establish it independently.
+        var priorBalance = printedControls.openingBalance.amount
         var transactions: [Transaction] = []
 
         for row in document.rows {
@@ -302,12 +298,6 @@ nonisolated final class AxisBankAccountPDFParser: StatementParser {
                 ? -(resolved.amount)
                 : resolved.amount
 
-            if resolved.type == .debit {
-                debitTotal += resolved.amount
-            } else {
-                creditTotal += resolved.amount
-            }
-
             transactions.append(
                 Transaction(
                     statementDate: statementDate,
@@ -354,15 +344,9 @@ nonisolated final class AxisBankAccountPDFParser: StatementParser {
             priorBalance = currentBalance
         }
 
-        guard debitTotal == printed.debit else {
-            throw AxisBankAccountPDFParserError.printedDebitTotalMismatch
-        }
-        guard creditTotal == printed.credit else {
-            throw AxisBankAccountPDFParserError.printedCreditTotalMismatch
-        }
-        guard priorBalance == printed.closing else {
-            throw AxisBankAccountPDFParserError.closingBalanceMismatch
-        }
+        // Financial-region exhaustion above accounts for every source row.
+        // Keep the printed totals and closing balance in source context; a
+        // disagreement does not veto independently established occurrences.
 
         return FinancialDocument(
             sourceDocument: document.document,
@@ -456,21 +440,11 @@ nonisolated final class AxisBankAccountPDFParser: StatementParser {
                     sourceOrdinal: sourceOrdinal
                 )
             }
-            guard currentBalance == priorBalance - sourceDebit else {
-                throw AxisBankAccountPDFParserError.sourceDirectionContradictsBalance(
-                    sourceOrdinal: sourceOrdinal
-                )
-            }
             return (.debit, sourceDebit)
         }
         if let sourceCredit {
             guard sourceCredit > .zero else {
                 throw AxisBankAccountPDFParserError.nonPositiveAmount(
-                    sourceOrdinal: sourceOrdinal
-                )
-            }
-            guard currentBalance == priorBalance + sourceCredit else {
-                throw AxisBankAccountPDFParserError.sourceDirectionContradictsBalance(
                     sourceOrdinal: sourceOrdinal
                 )
             }

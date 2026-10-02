@@ -75,7 +75,7 @@ struct GmailAuthorizationTests {
     @Test func loopbackCallbackRequiresExactStateHostAndUniqueCode() {
         let redirect = "http://127.0.0.1:40123/oauth/callback"
         let valid = "GET /oauth/callback?state=opaque-state&code=opaque-code HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n"
-        #expect(GmailOAuthAuthorization.validateCallback(valid, expectedState: "opaque-state", redirectURI: redirect) == "opaque-code")
+        #expect(GmailOAuthAuthorization.validateCallback(valid, expectedState: "opaque-state", redirectURI: redirect) == .code("opaque-code"))
         for invalid in [valid.replacingOccurrences(of: "opaque-state", with: "wrong"),
                         valid.replacingOccurrences(of: "Host: 127.0.0.1", with: "Host: remote.invalid"),
                         valid.replacingOccurrences(of: "&code=", with: "&state=opaque-state&code="),
@@ -84,6 +84,151 @@ struct GmailAuthorizationTests {
                         valid.replacingOccurrences(of: "&code=", with: "&error=access_denied&code=")] {
             #expect(GmailOAuthAuthorization.validateCallback(invalid, expectedState: "opaque-state", redirectURI: redirect) == nil)
         }
+    }
+
+    @Test @MainActor func verifiedDenialDispatchFinishesOnceAndCleansUpPromptly() async {
+        let flow = GmailOAuthAuthorization()
+        let redirect = "http://127.0.0.1:40123/oauth/callback"
+        let denial = "GET /oauth/callback?state=opaque-state&error=access_denied HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n"
+        var cleanups = 0
+        var responses: [Bool] = []
+        var firstDispatch = false
+        var repeatedDispatch = true
+        var cleanupsDuringResponse: Int?
+        var cleanupsAfterDispatch: Int?
+        await #expect(throws: GmailIntakeError.authorizationFailed) {
+            try await flow.waitForCallback(timeoutDuration: .seconds(1), start: {
+                firstDispatch = flow.dispatchCallback(denial, expectedState: "opaque-state", redirectURI: redirect) { accepted in
+                    cleanupsDuringResponse = cleanups
+                    responses.append(accepted)
+                }
+                cleanupsAfterDispatch = cleanups
+                repeatedDispatch = flow.dispatchCallback(denial, expectedState: "opaque-state", redirectURI: redirect) { responses.append($0) }
+            }, cleanup: { cleanups += 1 })
+        }
+        #expect(firstDispatch && !repeatedDispatch)
+        #expect(cleanupsDuringResponse == 0)
+        #expect(cleanupsAfterDispatch == 1)
+        #expect(cleanups == 1)
+        #expect(responses == [true])
+    }
+
+    @Test @MainActor func invalidCallbacksLeaveTheWaitOpenForAValidCode() async throws {
+        let flow = GmailOAuthAuthorization()
+        let redirect = "http://127.0.0.1:40123/oauth/callback"
+        let denial = "GET /oauth/callback?state=opaque-state&error=access_denied HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n"
+        let valid = "GET /oauth/callback?state=opaque-state&code=opaque%2Bcode HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n"
+        let invalid = [
+            denial.replacingOccurrences(of: "opaque-state", with: "wrong-state"),
+            denial.replacingOccurrences(of: "state=opaque-state&", with: ""),
+            denial.replacingOccurrences(of: "&error=", with: "&state=opaque-state&error="),
+            denial.replacingOccurrences(of: "&error=", with: "&code=opaque-code&error="),
+            denial.replacingOccurrences(of: "&error=", with: "&error=server_error&error="),
+            denial.replacingOccurrences(of: "access_denied", with: ""),
+            denial.replacingOccurrences(of: "access_denied", with: "%20"),
+            denial.replacingOccurrences(of: "access_denied", with: "%GG"),
+            denial.replacingOccurrences(of: "access_denied", with: "access_denied#fragment"),
+            denial.replacingOccurrences(of: "GET ", with: "POST "),
+            denial.replacingOccurrences(of: "/oauth/callback", with: "/unexpected"),
+            denial.replacingOccurrences(of: "Host: 127.0.0.1", with: "Host: remote.invalid"),
+            denial.replacingOccurrences(of: "40123\r\n", with: "40123\r\nHost: 127.0.0.1:40123\r\n"),
+            denial.replacingOccurrences(of: "\r\nHost:", with: "\r\n\r\nHost:"),
+            denial.replacingOccurrences(of: "\r\n\r\n", with: "\r\n"),
+            denial.replacingOccurrences(of: "&error=access_denied", with: ""),
+            valid.replacingOccurrences(of: "&code=", with: "&code=another&code=")
+        ]
+        var cleanups = 0
+        var responses: [Bool] = []
+        let code = try await flow.waitForCallback(timeoutDuration: .seconds(1), start: {
+            for request in invalid {
+                #expect(!flow.dispatchCallback(request, expectedState: "opaque-state", redirectURI: redirect) { responses.append($0) })
+                #expect(cleanups == 0)
+            }
+            #expect(flow.dispatchCallback(valid, expectedState: "opaque-state", redirectURI: redirect) { responses.append($0) })
+            #expect(!flow.dispatchCallback(denial, expectedState: "opaque-state", redirectURI: redirect))
+        }, cleanup: { cleanups += 1 })
+        #expect(code.code == "opaque+code")
+        #expect(code.redirectURI == redirect)
+        #expect(responses == Array(repeating: false, count: invalid.count) + [true])
+        #expect(cleanups == 1)
+    }
+
+    @Test @MainActor func callbackTimeoutFinishesOnceAndRejectsLateSuccess() async {
+        let flow = GmailOAuthAuthorization()
+        var cleanups = 0
+        await #expect(throws: GmailIntakeError.timedOut) {
+            try await flow.waitForCallback(timeoutDuration: .milliseconds(1), start: {}, cleanup: { cleanups += 1 })
+        }
+        #expect(!flow.dispatchCallback(
+            "GET /oauth/callback?state=opaque-state&code=late-code HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n",
+            expectedState: "opaque-state", redirectURI: "http://127.0.0.1:40123/oauth/callback"))
+        #expect(cleanups == 1)
+    }
+
+    @Test @MainActor func callbackCancellationFinishesOnceAndRejectsLateDenial() async {
+        let flow = GmailOAuthAuthorization()
+        let started = AsyncStream<Void>.makeStream()
+        defer { started.continuation.finish() }
+        var cleanups = 0
+        let pending = Task {
+            try await flow.waitForCallback(start: { started.continuation.yield(()) }, cleanup: { cleanups += 1 })
+        }
+        var iterator = started.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        pending.cancel()
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        pending.cancel()
+        #expect(!flow.dispatchCallback(
+            "GET /oauth/callback?state=opaque-state&error=access_denied HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n",
+            expectedState: "opaque-state", redirectURI: "http://127.0.0.1:40123/oauth/callback"))
+        #expect(cleanups == 1)
+    }
+
+    @Test @MainActor func deniedConnectionPreservesTheGrantAndAllowsAnotherAttempt() async throws {
+        let original = grant()
+        let store = AuthorizationStoreProbe(original)
+        let transport = AuthorizationHTTPProbe(try response())
+        let broker = GmailTokenBroker(store: store, transport: transport)
+        let suite = "LedgerForge.OAuth.Callback.\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let session = GmailIntakeSession(tokens: broker, preferences: preferences)
+        let flow = GmailOAuthAuthorization()
+        var cleanups = 0
+        let attempt = try #require(session.connect {
+            try await broker.reauthorizeExistingConnection { current, _ in
+                _ = try await flow.waitForCallback(timeoutDuration: .seconds(1), start: {
+                    #expect(flow.dispatchCallback(
+                        "GET /oauth/callback?state=opaque-state&error=access_denied HTTP/1.1\r\nHost: 127.0.0.1:40123\r\n\r\n",
+                        expectedState: "opaque-state", redirectURI: "http://127.0.0.1:40123/oauth/callback"))
+                }, cleanup: { cleanups += 1 })
+                Issue.record("A denied callback continued authorization.")
+                return current
+            }
+        })
+        #expect(session.isChecking)
+        await attempt.value
+        #expect(!session.isChecking)
+        #expect(!session.isConnected)
+        #expect(session.needsAuthorization)
+        #expect(!session.needsClientConfiguration)
+        #expect(session.message == GmailIntakeError.authorizationFailed.localizedDescription)
+        #expect(cleanups == 1)
+        #expect(store.updates == 0)
+        #expect(try store.load() == original)
+        #expect(await transport.requests.isEmpty)
+
+        var retried = false
+        let retry = try #require(session.connect {
+            retried = true
+            throw GmailIntakeError.authorizationFailed
+        })
+        #expect(session.isChecking)
+        await retry.value
+        #expect(retried)
+        #expect(!session.isChecking)
+        #expect(session.needsAuthorization)
+        #expect(store.updates == 0)
     }
 
     @Test func cancelledRefreshDoesNotWriteAnUnobservedGrant() async throws {

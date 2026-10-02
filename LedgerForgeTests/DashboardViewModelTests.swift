@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 @testable import LedgerForge
@@ -59,7 +60,7 @@ struct DashboardViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func historyOnlyCardLeavesDashboardPositionsButKeepsCanonicalHistory() throws {
+    func historyOnlyAccountScopePreservesCanonicalHistoryAndSavedPlanning() throws {
         let source = try dashboardCurrentDatabaseContext()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-dashboard-history-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
@@ -70,12 +71,14 @@ struct DashboardViewModelTests {
         defer { sqlite.database.close() }
         let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
         let accounts = AccountStore(), transactions = TransactionStore(), cards = CardStore()
-        let categories = CategoryStore(), funding = FundingPlanStore()
+        let categories = CategoryStore(), funding = FundingPlanStore(), salary = SalaryStore()
+        let intelligence = FinancialIntelligenceStore()
         let hydrator = RepositoryStoreHydrator(accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo, cardRepo: provider.cardRepo,
             salaryRepo: provider.salaryRepo, fundingPlanRepo: provider.fundingPlanRepo, investmentRepo: provider.investmentRepo,
+            intelligenceRepo: provider.intelligenceRepo,
             accountStore: accounts, transactionStore: transactions, categoryStore: categories, cardStore: cards,
-            salaryStore: SalaryStore(), fundingPlanStore: funding, investmentStore: InvestmentStore(),
+            salaryStore: salary, fundingPlanStore: funding, investmentStore: InvestmentStore(), intelligenceStore: intelligence,
             importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(), workspaceId: source.workspaceID,
             persistenceState: .verifiedSQLite, providerGeneration: provider.generationToken, participatesInLifecycleGate: false)
         let before = try hydrator.stageHydration()
@@ -90,17 +93,337 @@ struct DashboardViewModelTests {
         let metadata = AccountMetadataCoordinator(provider: { provider }, developerConsole: nil,
             forcedHydration: { _, _ in try hydrator.hydrateIfNeeded(forceRefresh: true) },
             acknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
-        #expect(try metadata.markCreditCardHistoryOnly(accountId: accountID, workspaceId: source.workspaceID))
+        #expect(try metadata.markAccountHistoryOnly(accountId: accountID, workspaceId: source.workspaceID))
         let availability = ApplicationAvailability()
         availability.didHydrate(before.hydrationResult, generation: provider.generationToken)
         let model = DashboardViewModel(accountStore: accounts, transactionStore: transactions, cardStore: cards,
             fundingPlanStore: funding, availability: availability, workspaceID: source.workspaceID)
         model.refreshPresentation()
         #expect(model.positions.flatMap(\.cards).allSatisfy { $0.id != accountID })
-        #expect(transactions.transactions.map(\.repositoryTransactionId) == before.transactions.map(\.repositoryTransactionId))
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows)
-        #expect(try provider.cardRepo.snapshot(workspaceId: source.workspaceID) == durableCards)
+        check(transactions.transactions.map(\.repositoryTransactionId) == before.transactions.map(\.repositoryTransactionId), "Canonical transaction inventory survives history-only metadata")
+        check(try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows, "Durable transactions are unchanged")
+        check(try provider.cardRepo.snapshot(workspaceId: source.workspaceID) == durableCards, "Durable card evidence is unchanged")
         #expect(accounts.accounts.first { $0.repositoryAccountId == accountID }?.isHistoryOnly == true)
+        let hidden = try hydrator.stageHydration()
+        let expectedHistoryIDs = Set(durableRows.filter { $0.accountId == accountID }.map(\.id))
+        #expect(!expectedHistoryIDs.isEmpty)
+        func visibleIDs(_ filter: TransactionPresentationFilterSpec) -> Set<String> {
+            Set(TransactionPresentationEngine.evaluate(transactions: hidden.transactions, accounts: hidden.accounts,
+                categories: hidden.categorySnapshot.categories, assignments: hidden.categorySnapshot.assignments,
+                filter: filter, sort: .init(), availability: .available).rows.compactMap { $0.transaction.repositoryTransactionId })
+        }
+        check(visibleIDs(.empty).isDisjoint(with: expectedHistoryIDs), "Default transactions exclude historical account rows")
+        var explicitHistory = TransactionPresentationFilterSpec.empty
+        explicitHistory.accountIDs = [accountID]
+        check(visibleIDs(explicitHistory) == expectedHistoryIDs, "Explicit history selection restores exact transaction membership")
+        #expect(try metadata.markAccountCurrent(accountId: accountID, workspaceId: source.workspaceID))
+        model.refreshPresentation()
+        #expect(model.positions.flatMap(\.cards).contains { $0.id == accountID })
+        #expect(accounts.accounts.first { $0.repositoryAccountId == accountID }?.isHistoryOnly == false)
+        check(try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows, "Returning to current preserves durable transactions")
+        check(try provider.cardRepo.snapshot(workspaceId: source.workspaceID) == durableCards, "Returning to current preserves card evidence")
+
+        // Continue with an actual saved plan and its nonzero bank balance. All
+        // financial inputs come from the approved normal database backup.
+        func required<T>(_ value: T?, _ label: String) throws -> T {
+            let present = value != nil
+            try #require(present, "\(label)")
+            return value!
+        }
+        let bankBefore = try hydrator.stageHydration()
+        let month = try SelectedStatementMonth(canonical: "2026-09")
+        let savedPlan = try required(bankBefore.fundingPlans.first { $0.month == month }, "Authentic saved September plan is present")
+        let planningMetadata = try required(bankBefore.intelligence, "Authentic planning metadata is present")
+        let manualExclusions = planningMetadata.preferences?.excludedPlanningAccountIDs ?? []
+        let includedBalance = try required(savedPlan.balances.first { balance in
+            balance.included && balance.nativeCurrency.code == "QAR" && balance.money.map { $0.amount != 0 } == true &&
+            !manualExclusions.contains(balance.accountID) && bankBefore.accounts.contains {
+                $0.repositoryAccountId == balance.accountID && $0.type == .bank && !$0.isHistoryOnly && $0.currentBalanceAsOfISO != nil
+            }
+        }, "Saved plan includes a nonzero genuine current bank balance")
+        let bankID = includedBalance.accountID
+        let includedMoney = try required(includedBalance.money, "Saved balance has exact Money")
+        let savedClock = try required(ISO8601DateFormatter().date(from: savedPlan.updatedAtISO), "Saved plan has a valid update timestamp")
+        let plansBefore = try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID)
+        let accountsBefore = try provider.accountRepo.accounts(workspaceId: source.workspaceID)
+        let financialDigest = try NetWorthTestSupport.financialDigest(sqlite.database, excluding: ["accounts"])
+        let bankTransactionIDs = Set(durableRows.filter { $0.accountId == bankID }.map(\.id))
+        #expect(!bankTransactionIDs.isEmpty)
+
+        func worksheet() -> SalaryWorkspaceViewModel {
+            SalaryWorkspaceViewModel(month: savedPlan.month, workspaceID: source.workspaceID, provider: { provider },
+                accountStore: accounts, transactionStore: transactions, salaryStore: salary, fundingPlanStore: funding,
+                intelligenceStore: intelligence, locale: Locale(identifier: "en_US_POSIX"), now: { savedClock },
+                refresh: { _ in _ = try hydrator.hydrateIfNeeded(forceRefresh: true) })
+        }
+        func projected(_ snapshot: RepositoryRuntimeSnapshot, selecting historyIDs: Set<String> = []) throws -> PlanningProjection {
+            let metadata = try required(snapshot.intelligence, "Planning metadata survives scope changes")
+            let anchors: [PlanningAccountAnchor] = snapshot.accounts.compactMap { account in
+                guard [.bank, .creditCard].contains(account.type), let id = account.repositoryAccountId else { return nil }
+                let date = account.currentBalanceAsOfISO.flatMap { try? StatementDate(canonical: String($0.prefix(10))) }
+                return .init(id: id, title: account.preferredDisplayName, currency: account.currencyCode,
+                    domain: account.type == .bank ? "bank" : "credit_card", amount: date == nil ? nil : account.currentBalance,
+                    date: date, historyOnly: account.isHistoryOnly)
+            }
+            let rows = try SpendingIntelligence.rows(transactions: snapshot.transactions, sources: snapshot.financialSources,
+                cards: snapshot.cardSnapshot, categories: snapshot.categorySnapshot, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+            return try PlanningIntelligence.project(plan: savedPlan, anchors: anchors, rows: rows, metadata: metadata,
+                sources: snapshot.financialSources, cards: snapshot.cardSnapshot, today: savedPlan.recurringStart,
+                selectedHistoryAccountIDs: historyIDs)
+        }
+        func unchangedFinancialState() throws {
+            check(try provider.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows, "Scope preserves every durable transaction")
+            check(try provider.cardRepo.snapshot(workspaceId: source.workspaceID) == durableCards, "Scope preserves every card source fact")
+            check(try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID) == plansBefore, "Scope never rewrites saved plans")
+            check(try NetWorthTestSupport.financialDigest(sqlite.database, excluding: ["accounts"]) == financialDigest, "Only account metadata changes")
+        }
+
+        let baselineWorksheet = worksheet()
+        check(baselineWorksheet.plan == savedPlan, "Retained worksheet agrees with the saved authentic plan")
+        #expect(baselineWorksheet.fieldErrors.isEmpty)
+        let baselineCalculation = baselineWorksheet.calculation
+        let baselineQAR = try required(baselineCalculation.selectedQARLiquidity, "Saved worksheet has complete QAR liquidity")
+        let baselineProjection = try projected(bankBefore)
+        let baselineRunway = try required(baselineProjection.runways.first { $0.id == bankID }, "Current bank has a source-backed runway")
+        check(baselineRunway.anchor.date != nil && baselineRunway.anchor.amount != nil, "Authentic runway has dated balance evidence")
+        let baselineActualIDs = Set(baselineProjection.actualTransactionIDs.values.flatMap { $0 })
+        if baselineActualIDs.isDisjoint(with: bankTransactionIDs) {
+            notObserved("saved-plan-selected-bank-spending-shape")
+        }
+        try unchangedFinancialState()
+
+        #expect(try metadata.markAccountHistoryOnly(accountId: bankID, workspaceId: source.workspaceID))
+        let bankHidden = try hydrator.stageHydration()
+        let historyIDs = Set(try provider.accountRepo.accounts(workspaceId: source.workspaceID).filter { $0.closedAtISO != nil }.map(\.id))
+        let expectedDefaultIDs = Set(durableRows.filter { $0.accountId.map { !historyIDs.contains($0) } ?? true }.map(\.id))
+        func bankVisibleIDs(_ selected: Set<String>) -> Set<String> {
+            var filter = TransactionPresentationFilterSpec.empty
+            filter.accountIDs = selected
+            return Set(TransactionPresentationEngine.evaluate(transactions: bankHidden.transactions, accounts: bankHidden.accounts,
+                categories: bankHidden.categorySnapshot.categories, assignments: bankHidden.categorySnapshot.assignments,
+                filter: filter, sort: .init(), availability: .available).rows.compactMap { $0.transaction.repositoryTransactionId })
+        }
+        check(bankVisibleIDs([]) == expectedDefaultIDs, "Default scope matches independent durable closed-at membership")
+        check(bankVisibleIDs([bankID]) == bankTransactionIDs, "Explicit selection restores all historical bank rows")
+        check(Set(bankHidden.transactions.compactMap(\.repositoryTransactionId)) == Set(durableRows.map(\.id)), "Hydration keeps the complete financial inventory")
+        let hiddenProjection = try projected(bankHidden)
+        check(!hiddenProjection.runways.contains { $0.id == bankID }, "Default projection hides the historical bank runway")
+        check(Set(hiddenProjection.actualTransactionIDs.values.flatMap { $0 }).isDisjoint(with: bankTransactionIDs), "Default planning excludes historical bank activity")
+        let scopedWorksheet = worksheet()
+        let expectedCurrentQAR = try baselineQAR - includedMoney
+        check(scopedWorksheet.calculation.selectedQARLiquidity == expectedCurrentQAR, "Default worksheet removes exactly the saved included Money")
+        check(scopedWorksheet.plan == savedPlan, "Default scope retains the complete saved plan")
+        check(!scopedWorksheet.eligibleAccounts.contains { $0.repositoryAccountId == bankID }, "Default worksheet hides the historical account row")
+        try unchangedFinancialState()
+
+        scopedWorksheet.setHistoryAccountSelected(bankID, selected: true)
+        check(scopedWorksheet.calculation == baselineCalculation, "Explicit history restores the complete worksheet result")
+        let explicitProjection = try projected(bankHidden, selecting: [bankID])
+        let restored = try required(explicitProjection.runways.first { $0.id == bankID }, "Explicit history restores the runway")
+        check(restored.anchor.amount == baselineRunway.anchor.amount && restored.anchor.date == baselineRunway.anchor.date, "Restored runway retains the exact source anchor")
+        check(restored.points.map(\.id) == baselineRunway.points.map(\.id) && restored.points.map(\.date) == baselineRunway.points.map(\.date), "Restored points retain identity, dates and order")
+        check(restored.points.map(\.balance) == baselineRunway.points.map(\.balance), "Restored points retain exact balances")
+        check(restored.points.map(\.isForecast) == baselineRunway.points.map(\.isForecast) && restored.points.map(\.transactionIDs) == baselineRunway.points.map(\.transactionIDs), "Restored points retain forecast meaning and provenance")
+        check(restored.events.map(\.id) == baselineRunway.events.map(\.id) && restored.events.map(\.date) == baselineRunway.events.map(\.date), "Restored events retain identity, dates and order")
+        check(restored.events.map(\.change) == baselineRunway.events.map(\.change), "Restored events retain exact cash effects")
+        check(restored.events.map(\.kind) == baselineRunway.events.map(\.kind) && restored.events.map(\.transactionIDs) == baselineRunway.events.map(\.transactionIDs), "Restored events retain meaning and provenance")
+        check(restored.reserveFloor == baselineRunway.reserveFloor && restored.limitations == baselineRunway.limitations, "Restored runway retains reserves and limitations")
+        check(explicitProjection.actualSpending == baselineProjection.actualSpending && explicitProjection.actualTransactionIDs == baselineProjection.actualTransactionIDs, "Explicit history restores exact planning activity and membership")
+        check(explicitProjection.plannedCommitments == baselineProjection.plannedCommitments, "Explicit history restores planned totals")
+        scopedWorksheet.selectCurrentAccountScope()
+        check(scopedWorksheet.calculation.selectedQARLiquidity == expectedCurrentQAR, "Returning to current restores default worksheet scope")
+        try unchangedFinancialState()
+        #expect(try metadata.markAccountCurrent(accountId: bankID, workspaceId: source.workspaceID))
+        check(try provider.accountRepo.accounts(workspaceId: source.workspaceID) == accountsBefore, "Metadata roundtrip restores every account exactly")
+        try unchangedFinancialState()
+
+        // A subsequent, intentional editor phase checks invalid historical raw
+        // input without constructing financial fixtures or replacement Money.
+        #expect(try metadata.markAccountHistoryOnly(accountId: bankID, workspaceId: source.workspaceID))
+        let editor = worksheet()
+        if let quote = savedPlan.effectiveAlDarReference {
+            check(quote.submittedQAR.amount == 1, "Saved reference is a unit quote")
+            let reference = try AlDarUnitReference(currency: .inr, rawToken: quote.returnedINR.rawToken, fetchedAtISO: quote.fetchedAtISO)
+            check(try reference.planningQuote() == quote, "Editor reuses the exact saved quote")
+            editor.receiveSharedReference(reference)
+        }
+        editor.plannerOpened()
+        editor.flushPendingEntries()
+        let editBaseline = editor.plan
+        let plansAtEditStart = try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID)
+        let planTables = Set(try sqlite.database.query(sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'funding_plan%' OR name = 'monthly_plan_scratchpads');") { $0.string(at: 0)! })
+        let editExcludedTables = planTables.union(["accounts"])
+        let sourceDigest = try NetWorthTestSupport.financialDigest(sqlite.database, excluding: editExcludedTables)
+        let historyBank = try required(accounts.accounts.first { $0.repositoryAccountId == bankID }, "Historical bank remains available")
+        editor.setHistoryAccountSelected(bankID, selected: true)
+        let balanceKey = "balance.\(bankID)"
+        editor.setManualBalance(historyBank, text: "-")
+        let retainedError = try required(editor.fieldErrors[balanceKey], "Invalid UI input retains its error")
+        #expect(!editor.canSave)
+        editor.flushPendingEntries()
+        check(try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID) == plansAtEditStart, "Invalid text cannot change canonical financial inputs")
+        editor.selectCurrentAccountScope()
+        #expect(editor.hasValidCalculation && editor.canSave)
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        check(editor.rawText[balanceKey] == "-" && editor.fieldErrors[balanceKey] == retainedError, "Scope and metadata refresh preserve hidden invalid input")
+
+        let currentHistoryIDs = Set(try provider.accountRepo.accounts(workspaceId: source.workspaceID).filter { $0.closedAtISO != nil }.map(\.id))
+        let bills = editor.plan.qatarCommitments.map { ("qatar", $0) } + editor.plan.indiaCommitments.map { ("india", $0) }
+        let selectedBill = try required(bills.first { _, bill in
+            (bill.fundingAccountID.map { !currentHistoryIDs.contains($0) } ?? true) &&
+            (editor.plan.assistance?.billFundingAccounts?[bill.id].map { !currentHistoryIDs.contains($0) } ?? true)
+        }, "Saved plan contains a current commitment")
+        let (region, bill) = selectedBill
+        let remark = bill.remark == "History scope check" ? "History scope check completed" : "History scope check"
+        var expectedEdit = editBaseline
+        if region == "qatar" {
+            let index = try required(expectedEdit.qatarCommitments.firstIndex { $0.id == bill.id }, "Existing Qatar commitment is retained")
+            expectedEdit.qatarCommitments[index].remark = remark
+        } else {
+            let index = try required(expectedEdit.indiaCommitments.firstIndex { $0.id == bill.id }, "Existing India commitment is retained")
+            expectedEdit.indiaCommitments[index].remark = remark
+        }
+        expectedEdit.updatedAtISO = ISO8601DateFormatter().string(from: savedClock)
+        editor.setCommitmentDetails(region: region, id: bill.id, remark: remark)
+        editor.flushPendingEntries()
+        #expect(editor.saveState == .saved)
+        let plansAfterEdit = try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID)
+        let savedAfterEdit = try required(plansAfterEdit.first { $0.id == editBaseline.id }, "Edited plan remains durable")
+        check(savedAfterEdit == (try expectedEdit.persistenceDTO()), "Current publication changes only the intended remark and timestamp")
+        check(plansAfterEdit.filter { $0.id != savedPlan.id } == plansAtEditStart.filter { $0.id != savedPlan.id }, "Current edit leaves all other months unchanged")
+        let scratchDTO = try required(try provider.fundingPlanRepo.scratchpads(workspaceId: source.workspaceID).first { $0.month == month.canonical }, "Invalid history input is retained durably")
+        let scratch = try MonthlyPlanScratchpad.decode(scratchDTO)
+        check(scratch.rawText[balanceKey] == "-" && scratch.fieldErrors[balanceKey] == retainedError, "Current publication retains hidden raw input and validation")
+        check(scratch.canonical == expectedEdit, "Retained draft references the newly saved canonical plan")
+        editor.setHistoryAccountSelected(bankID, selected: true)
+        check(editor.rawText[balanceKey] == "-" && editor.fieldErrors[balanceKey] == retainedError, "Explicit reselection restores the invalid input")
+        #expect(!editor.hasValidCalculation && !editor.canSave)
+        check(try NetWorthTestSupport.financialDigest(sqlite.database, excluding: editExcludedTables) == sourceDigest, "Current remark edit and retained draft leave all source facts unchanged")
+        sqlite.database.close()
+        let reopened = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing, migrateExisting: false)
+        defer { reopened.database.close() }
+        check(try reopened.fundingPlanRepo.plans(workspaceId: source.workspaceID) == plansAfterEdit, "Reopening preserves exact saved plans")
+        check(try reopened.transactionRepo.trustedTransactions(workspaceId: source.workspaceID) == durableRows, "Reopening preserves complete financial history")
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func retainedPlanPresentationWithholdsIncompleteEntriesAndRespectsPlanningExclusions() throws {
+        let source = try dashboardCurrentDatabaseContext()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-dashboard-retained-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("qualification.sqlite").path
+        try source.provider.database.createBackup(at: path)
+        let sqlite = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing, migrateExisting: true)
+        defer { sqlite.database.close() }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
+        let accounts = AccountStore(), transactions = TransactionStore(), cards = CardStore()
+        let funding = FundingPlanStore(), salary = SalaryStore(), intelligence = FinancialIntelligenceStore()
+        let hydrator = RepositoryStoreHydrator(accountRepo: provider.accountRepo, importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo, categoryRepo: provider.categoryRepo, cardRepo: provider.cardRepo,
+            salaryRepo: provider.salaryRepo, fundingPlanRepo: provider.fundingPlanRepo, investmentRepo: provider.investmentRepo,
+            intelligenceRepo: provider.intelligenceRepo, accountStore: accounts, transactionStore: transactions,
+            categoryStore: CategoryStore(), cardStore: cards, salaryStore: salary, fundingPlanStore: funding,
+            investmentStore: InvestmentStore(), intelligenceStore: intelligence,
+            importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(), workspaceId: source.workspaceID,
+            persistenceState: .verifiedSQLite, providerGeneration: provider.generationToken, participatesInLifecycleGate: false)
+        let initial = try hydrator.stageHydration()
+        hydrator.publish(initial)
+        func required<T>(_ value: T?, _ message: String) throws -> T {
+            let present = value != nil
+            try #require(present, "\(message)")
+            return value!
+        }
+        let month = try SelectedStatementMonth(canonical: "2026-09")
+        let savedPlan = try required(initial.fundingPlans.first { $0.month == month }, "The genuine saved September plan is available")
+        let oldPreferences = try required(initial.intelligence?.preferences, "The genuine planning preferences are available")
+        let account = try required(initial.accounts.first { account in
+            guard let id = account.repositoryAccountId else { return false }
+            return account.type == .bank && !account.isHistoryOnly && !(oldPreferences.excludedPlanningAccountIDs ?? []).contains(id) &&
+                savedPlan.balances.contains { $0.accountID == id && $0.included && $0.money != nil }
+        }, "The saved plan includes a genuine current bank balance")
+        let accountID = try required(account.repositoryAccountId, "The selected account has durable identity")
+        let clock = try required(ISO8601DateFormatter().date(from: savedPlan.updatedAtISO), "The saved plan has a valid timestamp")
+        let plansBefore = try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID)
+        let sourceDigest = try NetWorthTestSupport.financialDigest(sqlite.database,
+            excluding: ["monthly_plan_scratchpads", "intelligence_preferences"])
+        let availability = ApplicationAvailability()
+        availability.didHydrate(initial.hydrationResult, generation: provider.generationToken)
+        var editor: SalaryWorkspaceViewModel? = SalaryWorkspaceViewModel(month: month, workspaceID: source.workspaceID,
+            provider: { provider }, accountStore: accounts, transactionStore: transactions, salaryStore: salary,
+            fundingPlanStore: funding, intelligenceStore: intelligence, locale: Locale(identifier: "en_US_POSIX"),
+            now: { clock }, refresh: { _ in _ = try hydrator.hydrateIfNeeded(forceRefresh: true) })
+        if let quote = savedPlan.effectiveAlDarReference {
+            check(quote.submittedQAR.amount == 1, "The genuine saved reference is a unit quote")
+            editor!.receiveSharedReference(try AlDarUnitReference(currency: .inr,
+                rawToken: quote.returnedINR.rawToken, fetchedAtISO: quote.fetchedAtISO))
+        }
+        editor!.plannerOpened()
+        editor!.flushPendingEntries()
+        check(editor!.plan == savedPlan, "Opening the genuine plan does not change its financial inputs")
+        let dashboard = DashboardViewModel(accountStore: accounts, transactionStore: transactions, cardStore: cards,
+            fundingPlanStore: funding, intelligenceStore: intelligence, availability: availability,
+            workspaceID: source.workspaceID, fundingMonth: month, fundingWorkspace: editor, now: { clock })
+        editor!.setManualBalance(account, text: "-")
+        #expect(editor!.retentionPending)
+        dashboard.refreshPresentation()
+        check(dashboard.fundingState == .unavailable && dashboard.fundingCalculation == nil,
+            "Pending retention withholds Dashboard amounts")
+        editor!.flushPendingEntries()
+        #expect(!editor!.retentionPending)
+        dashboard.refreshPresentation()
+        check(dashboard.fundingState == .unavailable && dashboard.fundingCalculation == nil,
+            "Retained incomplete entries withhold Dashboard amounts")
+        let balanceKey = "balance.\(accountID)"
+        let error = try required(editor!.fieldErrors[balanceKey], "Invalid editor text has an explicit retained error")
+        if case .retained(let scratch) = editor!.retainedPlanPresentation(for: month, workspaceID: source.workspaceID,
+            generation: provider.generationToken, canonical: savedPlan) {
+            check(scratch.rawText[balanceKey] == "-" && scratch.fieldErrors[balanceKey] == error,
+                "The bridge returns the successfully retained raw entry and error")
+        } else { Issue.record("Matching ownership must expose the retained scratchpad") }
+        let otherMonth = try SelectedStatementMonth(canonical: "2026-10")
+        check(editor!.retainedPlanPresentation(for: otherMonth, workspaceID: source.workspaceID,
+            generation: provider.generationToken, canonical: savedPlan) == nil,
+            "Another month cannot use this editor's retained entries")
+        check(editor!.retainedPlanPresentation(for: month, workspaceID: "another-workspace",
+            generation: provider.generationToken, canonical: savedPlan) == nil,
+            "Another workspace cannot use this editor's retained entries")
+        if case .unavailable = editor!.retainedPlanPresentation(for: month, workspaceID: source.workspaceID,
+            generation: ProviderGenerationToken(), canonical: savedPlan) {} else {
+            Issue.record("A different provider generation must withhold retained amounts")
+        }
+        if case .unavailable = editor!.retainedPlanPresentation(for: month, workspaceID: source.workspaceID,
+            generation: provider.generationToken, canonical: nil) {} else {
+            Issue.record("A different canonical base must withhold retained amounts")
+        }
+        // Release the editor before the preference publication: its existing
+        // preference subscriber would otherwise clear the live field error.
+        editor = nil
+        var excludedPreferences = oldPreferences
+        excludedPreferences.excludedPlanningAccountIDs = (oldPreferences.excludedPlanningAccountIDs ?? []).union([accountID])
+        try provider.intelligenceRepo.applyPlanning(.preferences(excludedPreferences, replacing: oldPreferences))
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        let coldDashboard = DashboardViewModel(accountStore: accounts, transactionStore: transactions, cardStore: cards,
+            fundingPlanStore: funding, intelligenceStore: intelligence, availability: availability,
+            workspaceID: source.workspaceID, fundingMonth: month, now: { clock })
+        coldDashboard.refreshPresentation()
+        check(coldDashboard.fundingState == .populated && coldDashboard.fundingCalculation != nil,
+            "An excluded account's incomplete entry does not withhold Dashboard amounts")
+        let retained = try required(funding.scratchpads.first { $0.plan.month == month }, "Hydration retains the actual scratchpad")
+        check(retained.rawText[balanceKey] == "-" && retained.fieldErrors[balanceKey] == error,
+            "Excluding an account masks its balance error without erasing retained input")
+        check(retained.canonical == savedPlan && retained.plan.effectiveAlDarReference == savedPlan.effectiveAlDarReference,
+            "The cold Dashboard uses the retained canonical base and plan-local FX")
+        try provider.intelligenceRepo.applyPlanning(.preferences(oldPreferences, replacing: excludedPreferences))
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        coldDashboard.refreshPresentation()
+        check(coldDashboard.fundingState == .unavailable && coldDashboard.fundingCalculation == nil,
+            "Reincluding the account restores withholding for its incomplete entry")
+        check(try provider.fundingPlanRepo.plans(workspaceId: source.workspaceID) == plansBefore,
+            "Invalid raw input and planning scope leave canonical plans unchanged")
+        check(try NetWorthTestSupport.financialDigest(sqlite.database,
+            excluding: ["monthly_plan_scratchpads", "intelligence_preferences"]) == sourceDigest,
+            "The retained-entry check leaves all imported financial and source facts unchanged")
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -128,7 +451,20 @@ struct DashboardViewModelTests {
             return
         }
 
-        let expected = FundingPlanCalculator.calculate(plan)
+        // Derive the expected scope from durable account metadata, independently
+        // of the presentation scope helper. The saved plan stays untouched.
+        let historyIDs = Set(try context.provider.accountRepo.accounts(workspaceId: context.workspaceID)
+            .filter { $0.closedAtISO != nil }.map(\.id))
+        let excluded = historyIDs.union(context.snapshot.intelligence?.preferences?.excludedPlanningAccountIDs ?? [])
+        var currentPlan = plan
+        currentPlan.balances.removeAll { excluded.contains($0.accountID) }
+        currentPlan.qatarCommitments.removeAll { $0.fundingAccountID.map(historyIDs.contains) == true || plan.assistance?.billFundingAccounts?[$0.id].map(historyIDs.contains) == true }
+        currentPlan.indiaCommitments.removeAll { $0.fundingAccountID.map(historyIDs.contains) == true || plan.assistance?.billFundingAccounts?[$0.id].map(historyIDs.contains) == true }
+        if currentPlan.assistance?.payslipFunding.map({ historyIDs.contains($0.accountID) }) == true {
+            currentPlan.assistance?.payslipFunding = nil
+        }
+        let expected = FundingPlanCalculator.calculate(currentPlan,
+            salaryReceipt: PayslipReceiptState.resolve(plan: currentPlan, transactions: context.snapshot.transactions, excludedAccounts: excluded))
         guard let actual = viewModel.fundingCalculation else {
             check(false, "Saved current-month plan produces a dashboard calculation")
             return
@@ -268,7 +604,7 @@ struct DashboardViewModelTests {
             check(presentation.iconName == "tray", "Idle Import Activity uses the tray icon")
             notObserved("durable-import-attempt")
         } else {
-            check(presentation.title == "Latest durable import", "Idle Import Activity uses the latest durable attempt")
+            check(presentation.title == "Last import attempt", "Idle Import Activity uses the latest durable attempt")
             check(!presentation.status.isEmpty && !presentation.subtitle.isEmpty, "Durable Import Activity has bounded presentation fields")
         }
     }
@@ -301,14 +637,12 @@ struct DashboardViewModelTests {
             workspaceID: "day-change-regression",
             now: { probe.now() }
         )
-        defer { withExtendedLifetime(viewModel) {} }
+        let observation = viewModel.$storedTransactionCount.dropFirst().sink { _ in probe.didRefresh() }
+        defer { withExtendedLifetime((viewModel, observation)) {} }
 
-        try await pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) {
-            probe.refreshCount == 1
-        }
-        check(probe.refreshCount == 1, "Initial current-value emissions reuse the one initial snapshot refresh")
-        check(probe.observedMonths.allSatisfy { $0 == beforeMonth }, "Initial store emissions observe the initial month")
-        probe.resetObservation()
+        await drainDashboardMainQueue()
+        check(probe.refreshCount == 0, "Initial current-value emissions reuse the initial snapshot refresh")
+        check(viewModel.fundingMonthTitle == SalaryWorkspaceViewModel.monthTitle(beforeMonth), "The initial funding month follows the selected month")
         probe.advance(to: boundaries.after)
 
         let postFinished = DispatchGroup()
@@ -322,7 +656,10 @@ struct DashboardViewModelTests {
         try await pumpDashboardMainRunLoopUntil(.backgroundNotificationTimeout) {
             postFinished.wait(timeout: .now()) == .success && probe.refreshCount > 0
         }
-        check(probe.observedMonths.last == afterMonth, "Background calendar notification refreshes the newly applicable month")
+        check(probe.refreshCount == 1, "The background calendar notification publishes one refresh on MainActor")
+        check(viewModel.fundingMonthTitle == SalaryWorkspaceViewModel.monthTitle(beforeMonth), "Calendar rollover preserves the selected funding month")
+        viewModel.selectFundingMonth(afterMonth)
+        check(viewModel.fundingMonthTitle == SalaryWorkspaceViewModel.monthTitle(afterMonth), "An explicit month selection updates the funding month")
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -337,20 +674,22 @@ struct DashboardViewModelTests {
             fundingPlanStore: context.fundingPlanStore, availability: availability,
             workspaceID: context.workspaceID, now: { probe.now() }
         )
-        check(probe.refreshCount == 1, "One initial coherent projection")
+        let observation = model.$storedTransactionCount.dropFirst().sink { _ in probe.didRefresh() }
+        defer { withExtendedLifetime((model, observation)) {} }
+        await drainDashboardMainQueue()
+        check(probe.refreshCount == 0, "The initial coherent projection has no redundant refresh")
         context.accountStore.notifyAccountsOfInstalledValue()
         context.transactionStore.notifyTransactionsOfInstalledValues()
         context.categoryStore.notifySnapshotOfInstalledValue()
-        try await pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) { probe.refreshCount == 2 }
-        check(probe.refreshCount == 2, "One refresh for the coherently installed store notifications")
+        try await pumpDashboardMainRunLoopUntil(.initialEmissionsDrainedTimeout) { probe.refreshCount == 1 }
+        check(probe.refreshCount == 1, "One refresh for the coherently installed store notifications")
         context.accountStore.notifyAccountsOfInstalledValue()
         availability.begin()
         check(model.positionState == .loading, "Loading invalidates synchronously")
         check(model.positions.isEmpty, "Old positions are withdrawn immediately")
         check(model.fundingCalculation == nil, "Old aggregates are withdrawn immediately")
-        try await Task.sleep(for: .milliseconds(30))
-        check(probe.refreshCount == 2, "Withdrawal cancels the previously queued refresh")
-        withExtendedLifetime(model) {}
+        await drainDashboardMainQueue()
+        check(probe.refreshCount == 1, "Withdrawal cancels the previously queued refresh")
     }
 }
 
@@ -368,7 +707,7 @@ private enum DashboardDayChangeTestError: Error {
 @MainActor
 private final class DashboardDayChangeProbe {
     private(set) var currentDate: Date
-    private(set) var observedMonths: [SelectedStatementMonth] = []
+    private(set) var refreshCount = 0
 
     init(currentDate: Date) {
         self.currentDate = currentDate
@@ -376,20 +715,23 @@ private final class DashboardDayChangeProbe {
 
     func now() -> Date {
         MainActor.assertIsolated()
-        if let month = DashboardViewModel.currentMonth(at: currentDate) {
-            observedMonths.append(month)
-        }
         return currentDate
     }
 
-    var refreshCount: Int { observedMonths.count }
-
-    func resetObservation() {
-        observedMonths.removeAll()
+    func didRefresh() {
+        MainActor.assertIsolated()
+        refreshCount += 1
     }
 
     func advance(to date: Date) {
         currentDate = date
+    }
+}
+
+@MainActor
+private func drainDashboardMainQueue() async {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.main.async { continuation.resume() }
     }
 }
 

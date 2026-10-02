@@ -25,6 +25,7 @@ struct BankRelationshipAuthenticOracle {
             let relationshipSHA: String; let sectionOrdinal: Int; let occurrenceIndex: Int
             let standaloneSHA: String; let standaloneOrdinal: Int; let conflict: Bool
         }
+        let semantics: String
         let standalone: [Standalone]; let relationships: [Relationship]; let links: [Link]
     }
     struct Source: Decodable {
@@ -56,11 +57,41 @@ struct BankRelationshipAuthenticOracle {
 
     static func loadWithOverlap() throws -> (sources: [String: Source], overlap: Overlap) {
         let envelope = try loadEnvelope()
-        guard let overlap = envelope.overlap, overlap.standalone.count == 7,
-              overlap.relationships.count == 87,
-              overlap.relationships.reduce(0, { $0 + $1.matched }) == 314,
-              overlap.relationships.reduce(0, { $0 + $1.conflicts }) == 33 else { throw Failure.invalidEnvelope }
-        return (Dictionary(uniqueKeysWithValues: envelope.sources.map { ($0.sha256, $0) }), overlap)
+        guard let overlap = envelope.overlap,
+              overlap.semantics == "independent-source-meaning-injective-per-parent-v2",
+              overlap.standalone.count == 7, Set(overlap.standalone.map(\.sha256)).count == 7,
+              overlap.relationships.count == envelope.sources.count,
+              Set(overlap.relationships.map(\.sha256)) == Set(envelope.sources.map(\.sha256)),
+              overlap.standalone.allSatisfy({ $0.rowCount > 0 && ["axis", "hdfc"].contains($0.family) }) else {
+            throw Failure.invalidEnvelope
+        }
+        let sources = Dictionary(uniqueKeysWithValues: envelope.sources.map { ($0.sha256, $0) })
+        let standalone = Dictionary(uniqueKeysWithValues: overlap.standalone.map { ($0.sha256, $0) })
+        for link in overlap.links {
+            guard let source = sources[link.relationshipSHA], let other = standalone[link.standaloneSHA],
+                  source.family == other.family, link.sectionOrdinal > 0, link.sectionOrdinal <= source.sections.count,
+                  link.occurrenceIndex > 0,
+                  link.occurrenceIndex <= source.sections[link.sectionOrdinal - 1].rows.count,
+                  (1...other.rowCount).contains(link.standaloneOrdinal) else { throw Failure.invalidEnvelope }
+        }
+        for proof in overlap.relationships {
+            guard let source = sources[proof.sha256], proof.matched >= 0, proof.outside >= 0, proof.conflicts >= 0,
+                  proof.matched + proof.outside + proof.conflicts == source.sections.reduce(0, { $0 + $1.rows.count }) else {
+                throw Failure.invalidEnvelope
+            }
+            let links = overlap.links.filter { $0.relationshipSHA == proof.sha256 }
+            let matches = links.filter { !$0.conflict }, conflicts = links.filter(\.conflict)
+            func occurrence(_ link: Overlap.Link) -> String { "\(link.sectionOrdinal):\(link.occurrenceIndex)" }
+            let matchedOccurrences = Set(matches.map(occurrence))
+            let conflictingOccurrences = Set(conflicts.map(occurrence))
+            guard matches.count == proof.matched, matchedOccurrences.count == matches.count,
+                  conflictingOccurrences.count == proof.conflicts,
+                  matchedOccurrences.isDisjoint(with: conflictingOccurrences),
+                  Set(matches.map { "\($0.standaloneSHA):\($0.standaloneOrdinal)" }).count == matches.count else {
+                throw Failure.invalidEnvelope
+            }
+        }
+        return (sources, overlap)
     }
 
     private static func loadEnvelope() throws -> Envelope {
@@ -190,7 +221,7 @@ struct BankRelationshipAuthenticOracle {
                     canonical.financialDateRole == FinancialDateRole.transactionDate.rawValue &&
                     canonical.amountMinor == row.source.signedAmountMinor &&
                     canonical.nativeCurrency == row.source.nativeCurrency &&
-                    canonical.runningBalanceMinor == row.source.runningBalanceMinor
+                    (canonical.documentId != actual.documentId || canonical.runningBalanceMinor == row.source.runningBalanceMinor)
                 let firstSourceMatches = !requiresFirstSource ||
                     (canonical.documentId == actual.documentId && canonical.importSessionId == actual.importSessionId &&
                      canonical.description == row.literalNarration && canonical.reference == row.literalReference &&

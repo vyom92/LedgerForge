@@ -153,6 +153,10 @@ nonisolated enum AxisBankAccountCSVProfileV3 {
 
 nonisolated enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case missingHeader
+    case missingCurrencyEvidence
+    case malformedCurrencyEvidence(sourceOrdinal: Int)
+    case conflictingCurrencyEvidence
+    case unsupportedCurrencyEvidence
     case malformedTransactionRow(rowNumber: Int)
     case invalidDate(rowNumber: Int)
     case invalidMonetaryValue(role: AxisBankCSVColumnRole, rowNumber: Int)
@@ -174,6 +178,14 @@ nonisolated enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
         switch self {
         case .missingHeader:
             return "The supported Axis CSV header is missing."
+        case .missingCurrencyEvidence:
+            return "The Axis CSV statement is missing its printed currency."
+        case .malformedCurrencyEvidence(let sourceOrdinal):
+            return "Axis CSV currency evidence on source row \(sourceOrdinal) is malformed."
+        case .conflictingCurrencyEvidence:
+            return "The Axis CSV statement contains conflicting printed currencies."
+        case .unsupportedCurrencyEvidence:
+            return "The printed Axis CSV currency is not supported by this profile."
         case .malformedTransactionRow(let rowNumber):
             return "Axis CSV transaction row \(rowNumber) does not match the resolved layout."
         case .invalidDate(let rowNumber):
@@ -252,7 +264,9 @@ nonisolated final class AxisBankAccountParser: StatementParser {
         document: NormalizedDocument
     ) throws -> FinancialDocument {
 
-        let currency = try CurrencyCode("INR")
+        let currency = try Self.printedCurrency(
+            from: document.sourceContext.preTransactionFragments
+        )
 
         let financialIdentifiers = try Self.financialIdentifiers(
             from: document.sourceContext.preTransactionFragments
@@ -329,6 +343,19 @@ nonisolated final class AxisBankAccountParser: StatementParser {
                 )
             }
             guard row.hasConsistentRawValues else {
+                throw AxisBankAccountParserError.malformedTransactionRow(
+                    rowNumber: row.rowNumber
+                )
+            }
+            // The closed header maps every supported cell through maximumIndex.
+            // A genuine empty suffix is inert CSV packaging, but populated
+            // unmapped cells cannot be dropped from a transaction's meaning.
+            let firstUnmappedIndex = mapping.maximumIndex + 1
+            guard row.values.dropFirst(firstUnmappedIndex).allSatisfy({
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }), (row.rawValues ?? []).dropFirst(firstUnmappedIndex).allSatisfy({
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }) else {
                 throw AxisBankAccountParserError.malformedTransactionRow(
                     rowNumber: row.rowNumber
                 )
@@ -462,6 +489,46 @@ nonisolated final class AxisBankAccountParser: StatementParser {
             financialIdentifiers: financialIdentifiers,
             sourceStatementEvidence: sourceStatementEvidence
         )
+    }
+
+    private static func printedCurrency(
+        from fragments: [NormalizedDocument.SourceFragment]
+    ) throws -> CurrencyCode {
+        let label = try NSRegularExpression(
+            pattern: #"^Currency\b"#,
+            options: [.caseInsensitive]
+        )
+        let field = try NSRegularExpression(
+            pattern: #"^Currency\s*:-\s*([A-Z]{3})$"#,
+            options: [.caseInsensitive]
+        )
+        var printedCodes = Set<String>()
+
+        for fragment in fragments {
+            let text = fragment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let range = NSRange(text.startIndex..., in: text)
+            guard label.firstMatch(in: text, range: range) != nil else {
+                continue
+            }
+            guard let match = field.firstMatch(in: text, range: range),
+                  let codeRange = Range(match.range(at: 1), in: text) else {
+                throw AxisBankAccountParserError.malformedCurrencyEvidence(
+                    sourceOrdinal: fragment.sourceOrdinal
+                )
+            }
+            printedCodes.insert(String(text[codeRange]).uppercased())
+        }
+
+        guard !printedCodes.isEmpty else {
+            throw AxisBankAccountParserError.missingCurrencyEvidence
+        }
+        guard printedCodes.count == 1, let code = printedCodes.first else {
+            throw AxisBankAccountParserError.conflictingCurrencyEvidence
+        }
+        guard code == "INR" else {
+            throw AxisBankAccountParserError.unsupportedCurrencyEvidence
+        }
+        return try CurrencyCode(code)
     }
 
     private static func decimal(

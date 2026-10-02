@@ -16,6 +16,50 @@ enum MoneyFormatting {
         display(money, formatter: formatter(for: money.currency, locale: locale))
     }
 
+    /// For a total whose surrounding label already names its currency.
+    nonisolated static func number(_ money: Money, locale: Locale = .current) -> String {
+        let numberFormatter = formatter(for: money.currency, locale: locale)
+        numberFormatter.numberStyle = .decimal
+        numberFormatter.minimumFractionDigits = displayFractionDigits
+        numberFormatter.maximumFractionDigits = displayFractionDigits
+        numberFormatter.groupingSeparator = ","
+        numberFormatter.groupingSize = 3
+        numberFormatter.secondaryGroupingSize = money.currency.code == "INR" ? 2 : 3
+        return display(money, formatter: numberFormatter)
+    }
+
+    /// Spoken presentation of the same decimal rounding used by the visible
+    /// amount. No localized-string parsing or floating-point conversion.
+    nonisolated static func amountInWords(_ money: Money, fractionDigits: Int = displayFractionDigits) -> String? {
+        guard ["INR", "QAR", "USD"].contains(money.currency.code), (0...2).contains(fractionDigits) else { return nil }
+        var amount = money.amount, rounded = Decimal()
+        NSDecimalRound(&rounded, &amount, fractionDigits, .plain)
+        let token = NSDecimalNumber(decimal: abs(rounded)).stringValue
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard let first = parts.first, let whole = UInt64(first) else { return nil }
+        let small = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+        let tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+        let scales: [(UInt64, String)] = money.currency.code == "INR"
+            ? [(10_000_000, "crore"), (100_000, "lakh"), (1_000, "thousand"), (100, "hundred")]
+            : [(1_000_000_000_000_000_000, "quintillion"), (1_000_000_000_000_000, "quadrillion"),
+               (1_000_000_000_000, "trillion"), (1_000_000_000, "billion"), (1_000_000, "million"),
+               (1_000, "thousand"), (100, "hundred")]
+        func words(_ value: UInt64) -> String {
+            for (unit, name) in scales where value >= unit {
+                return words(value / unit) + " " + name + (value % unit == 0 ? "" : " " + words(value % unit))
+            }
+            if value < 20 { return small[Int(value)] }
+            return tens[Int(value / 10)] + (value % 10 == 0 ? "" : "-" + small[Int(value % 10)])
+        }
+        var result = (rounded < 0 ? "minus " : "") + words(whole)
+        if fractionDigits > 0, parts.count == 2, parts[1].contains(where: { $0 != "0" }) {
+            let fraction = String(parts[1]).padding(toLength: fractionDigits, withPad: "0", startingAt: 0)
+            guard fraction.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+            result += " point " + fraction.compactMap(\.wholeNumberValue).map { small[$0] }.joined(separator: " ")
+        }
+        return result.prefix(1).uppercased() + result.dropFirst()
+    }
+
     /// One call owns its formatters; none are shared across tasks or actors.
     /// Used for native column measurement over a canonical row snapshot.
     nonisolated static func display(_ values: [Money], locale: Locale = .current) -> [String] {

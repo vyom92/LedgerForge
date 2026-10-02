@@ -27,7 +27,11 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                           value.documentID == row.string(at: 2), value.importSessionID == row.string(at: 3) else {
                         throw InvestmentError.invalidPersistedState
                     }
-                    if value.zioSource != nil {
+                    if value.ibkrSource != nil {
+                        guard row.string(at: 8) == "ibkr-flex", value.documentID == nil, value.importSessionID == nil else {
+                            throw InvestmentError.invalidPersistedState
+                        }
+                    } else if value.zioSource != nil {
                         guard row.string(at: 8) == "zurich-zio", value.documentID == nil, value.importSessionID == nil else {
                             throw InvestmentError.invalidPersistedState
                         }
@@ -54,7 +58,12 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
                     guard value.id == row.string(at: 0), value.containerID == row.string(at: 2),
                           value.documentID == row.string(at: 3), value.importSessionID == row.string(at: 4),
                           value.normalizedDocumentID == row.string(at: 5) else { throw InvestmentError.invalidPersistedState }
-                    if value.zioObservationID != nil {
+                    if value.ibkrObservationID != nil {
+                        guard row.string(at: 14) == "ibkr-flex", value.documentID == nil,
+                              value.importSessionID == nil, value.normalizedDocumentID == nil else {
+                            throw InvestmentError.invalidPersistedState
+                        }
+                    } else if value.zioObservationID != nil {
                         guard row.string(at: 14) == "zurich-zio", value.documentID == nil,
                               value.importSessionID == nil, value.normalizedDocumentID == nil else {
                             throw InvestmentError.invalidPersistedState
@@ -147,12 +156,45 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
         } catch { return .unavailable }
     }
 
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult {
+        do {
+
+        return try db.withExclusiveAccess {
+            guard supportsDirectSources else { return .unavailable }
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                let updated = try plan.applying(to: snapshot(workspaceID: plan.workspace.id), now: Date())
+                try db.executePrepared(sql: "INSERT INTO workspaces (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING;",
+                    params: [plan.workspace.id, plan.workspace.name, plan.workspace.createdAtISO, plan.workspace.updatedAtISO])
+                for container in updated.containers where container.identity == plan.source.accountID && container.institution == "Interactive Brokers" {
+                    try replace(container, holdings: updated.holdings.filter { $0.containerID == container.id })
+                }
+                guard try snapshot(workspaceID: plan.workspace.id) == updated else { throw InvestmentError.invalidPersistedState }
+                if let job = plan.backgroundJob {
+                    try SQLiteBackgroundJobRepository.finishWithinTransaction(database: db, record: job,
+                        outcome: .committedCurrentHoldings, now: Date())
+                }
+                try db.execute(sql: "COMMIT;")
+                return .saved
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                if let error = error as? InvestmentError { return .rejected(error) }
+                if let error = error as? SQLiteExecutionError, error.isRetryableContention { return .retryableContention }
+                if case SQLiteDatabaseError.execution(let execution) = error, execution.isRetryableContention { return .retryableContention }
+                return .unavailable
+            }
+        }
+
+        } catch { return .unavailable }
+    }
+
     private func replace(_ container: InvestmentContainer, holdings: [InvestmentHolding]) throws {
         let kindColumn = supportsDirectSources ? ",source_kind" : ""
         let kindValue = supportsDirectSources ? ",?" : ""
         let kindUpdate = supportsDirectSources ? ",source_kind=excluded.source_kind" : ""
         var containerValues: [Any?] = [container.id, container.workspaceID, container.documentID, container.importSessionID, try encode(container)]
-        if supportsDirectSources { containerValues.append(container.zioSource == nil ? "statement" : "zurich-zio") }
+        if supportsDirectSources { containerValues.append(container.ibkrSource != nil ? "ibkr-flex" : container.zioSource == nil ? "statement" : "zurich-zio") }
         try db.executePrepared(sql: """
             INSERT INTO investment_containers (id,workspace_id,document_id,import_session_id,record_json\(kindColumn))
             VALUES (?,?,?,?,?\(kindValue)) ON CONFLICT(id) DO UPDATE SET
@@ -162,7 +204,7 @@ final class SQLiteInvestmentRepository: InvestmentRepository {
         for holding in holdings {
             var values: [Any?] = [holding.id, holding.containerID, holding.documentID, holding.importSessionID,
                                   holding.normalizedDocumentID, try encode(holding)]
-            if supportsDirectSources { values.append(holding.zioObservationID == nil ? "statement" : "zurich-zio") }
+            if supportsDirectSources { values.append(holding.ibkrObservationID != nil ? "ibkr-flex" : holding.zioObservationID == nil ? "statement" : "zurich-zio") }
             try db.executePrepared(sql: """
                 INSERT INTO investment_holdings (id,container_id,document_id,import_session_id,normalized_document_id,record_json\(kindColumn))
                 VALUES (?,?,?,?,?,?\(kindValue));

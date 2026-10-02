@@ -172,7 +172,7 @@ struct ZurichISPSessionCommandTests {
         #expect(!session.isBusy)
         #expect(session.message == nil)
         session.cancel()
-        #expect(session.message == "Cancelled. Previous ISP holdings are retained.")
+        #expect(session.message == nil) // No running request can be called cancelled.
     }
 
     @Test func sharedFetchExplainsKnownFailuresWithoutExposingArbitraryErrorContent() {
@@ -185,5 +185,201 @@ struct ZurichISPSessionCommandTests {
         let privateError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "private-response-marker"])
         #expect(!BackgroundUpdateExecutor.ispFailureMessage(privateError).contains("private-response-marker"))
         #expect(!BackgroundUpdateExecutor.ispFailureMessage(InvestmentError.missingSourceField("private-field-marker")).contains("private-field-marker"))
+    }
+}
+
+/// These checks exercise the production installed shared command/task owner and
+/// its synchronous publication gate using only counters and outcome markers.
+/// No financial source, holdings DTO, provider, Keychain or network is involved.
+@MainActor
+@Suite("Zurich ISP shared request ownership")
+struct ZurichISPSharedRequestOwnershipTests {
+    @Test(.timeLimit(.minutes(1))) func cancelReachesTheOwningTaskRejectsLateCallbackAndAllowsSubsequentFetch() async {
+        let session = ZurichISPSyncSession()
+        let adapter = BackgroundUpdatesSession(networkEnabled: false)
+        let firstGate = ISPRequestMechanicsGate(), secondGate = ISPRequestMechanicsGate()
+        let probe = ISPRequestMechanicsProbe()
+        var requests = 0
+        adapter.installSharedISPHandlers(on: session) { manual in
+            #expect(manual)
+            requests += 1
+            let gate = requests == 1 ? firstGate : secondGate
+            adapter.startISPRequest { request in
+                await gate.wait()
+                let cancelled = Task.isCancelled
+                // A late callback can arrive in a fresh uncancelled task. The
+                // request's publication gate must still refuse that callback.
+                return await Task { @MainActor in
+                    probe.taskCancellations.append(cancelled)
+                    #expect(!Task.isCancelled)
+                    do {
+                        _ = try request.publish { probe.publications += 1; return .saved }
+                        return BackgroundUpdateExecutor.Outcome.completed(.committedCurrentHoldings)
+                    } catch {
+                        return BackgroundUpdateExecutor.Outcome.ispFailed("Late callback after cancellation")
+                    }
+                }.value
+            } completion: { outcome in probe.finish(outcome) }
+        }
+
+        session.fetchHoldings()
+        await firstGate.waitUntilEntered()
+        #expect(session.isBusy)
+        session.cancel()
+        #expect(session.isBusy)
+        #expect(session.message == "Cancelling ISP update…")
+        session.fetchHoldings()
+        #expect(requests == 1)
+        #expect(session.message == ZurichISPClientError.inFlight.localizedDescription)
+        await firstGate.open()
+        await probe.waitForCompletions(1)
+        #expect(probe.outcomes == [.cancelled])
+        #expect(probe.publications == 0)
+        #expect(!session.isBusy)
+        #expect(session.message == "Cancelled. Previous ISP holdings are retained.")
+
+        session.fetchHoldings()
+        await secondGate.waitUntilEntered()
+        #expect(requests == 2)
+        #expect(session.isBusy)
+        #expect(session.message == "Updating ISP holdings…")
+        await secondGate.open()
+        await probe.waitForCompletions(2)
+        #expect(probe.taskCancellations == [true, false])
+        #expect(probe.publications == 1)
+        #expect(probe.outcomes == [.cancelled, .completed(.committedCurrentHoldings)])
+        #expect(!session.isBusy)
+        #expect(session.message == "ISP holdings updated.")
+        session.cancel()
+        #expect(session.message == "ISP holdings updated.")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func cancelAfterSynchronousCommitReportsSavedAndDoesNotCancelFinishingTask() async {
+        let session = ZurichISPSyncSession()
+        let adapter = BackgroundUpdatesSession(networkEnabled: false)
+        let gate = ISPRequestMechanicsGate()
+        let probe = ISPRequestMechanicsProbe()
+        adapter.installSharedISPHandlers(on: session) { _ in
+            adapter.startISPRequest { request in
+                do {
+                    _ = try await MainActor.run {
+                        try request.publish { probe.publications += 1; return .saved }
+                    }
+                } catch { return .cancelled }
+                // Model only the post-commit asynchronous metadata interval.
+                await gate.wait()
+                let cancelled = Task.isCancelled
+                await MainActor.run { probe.taskCancellations.append(cancelled) }
+                return .completed(.committedCurrentHoldings)
+            } completion: { outcome in probe.finish(outcome) }
+        }
+        session.fetchHoldings()
+        await gate.waitUntilEntered()
+        #expect(probe.publications == 1)
+        session.cancel()
+        #expect(session.isBusy)
+        #expect(session.message == "ISP holdings were already updated. Finishing the refresh…")
+        await gate.open()
+        await probe.waitForCompletions(1)
+        #expect(probe.taskCancellations == [false])
+        #expect(probe.outcomes == [.completed(.committedCurrentHoldings)])
+        #expect(session.message == "ISP holdings updated.")
+        #expect(!session.isBusy)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func invalidatedRequestsCannotClearOrCompleteTheirSuccessor() async {
+        let session = ZurichISPSyncSession()
+        let adapter = BackgroundUpdatesSession(networkEnabled: false)
+        let firstGate = ISPRequestMechanicsGate(), secondGate = ISPRequestMechanicsGate()
+        let probe = ISPRequestMechanicsProbe()
+        var requests = 0
+        adapter.installSharedISPHandlers(on: session) { _ in
+            requests += 1
+            let gate = requests == 1 ? firstGate : secondGate
+            adapter.startISPRequest { request in
+                await gate.wait()
+                return await Task { @MainActor in
+                    do {
+                        _ = try request.publish { probe.publications += 1; return .saved }
+                        return BackgroundUpdateExecutor.Outcome.completed(.committedCurrentHoldings)
+                    } catch { return BackgroundUpdateExecutor.Outcome.cancelled }
+                }.value
+            } completion: { outcome in probe.finish(outcome) }
+        }
+        session.fetchHoldings()
+        await firstGate.waitUntilEntered()
+        let retiredTask = adapter.invalidateISPRequest()
+        #expect(!session.isBusy)
+        session.fetchHoldings()
+        await secondGate.waitUntilEntered()
+        await firstGate.open()
+        await retiredTask?.value
+        #expect(probe.publications == 0)
+        #expect(probe.outcomes.isEmpty)
+        #expect(session.isBusy)
+        #expect(session.message == "Updating ISP holdings…")
+        await secondGate.open()
+        await probe.waitForCompletions(1)
+        #expect(probe.publications == 1)
+        #expect(probe.outcomes == [.completed(.committedCurrentHoldings)])
+        #expect(!session.isBusy)
+    }
+
+    @Test func rejectedPublicationRemainsCancellableAndCannotBeReportedAsSaved() throws {
+        let request = ZurichISPRefreshRequest()
+        let rejected = try request.publish { .unavailable }
+        #expect(rejected == .unavailable)
+        #expect(!request.didCommit)
+        #expect(request.cancel())
+        var entered = false
+        #expect(throws: CancellationError.self) {
+            try request.publish { entered = true; return .saved }
+        }
+        #expect(!entered)
+        #expect(request.resolved(.ispFailed("Publication refused")) == .cancelled)
+    }
+}
+
+private actor ISPRequestMechanicsGate {
+    private var entered = false
+    private var opened = false
+    private var entry: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        entered = true
+        entry?.resume(); entry = nil
+        if opened { return }
+        await withCheckedContinuation { release = $0 }
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { entry = $0 }
+    }
+
+    func open() {
+        opened = true
+        release?.resume(); release = nil
+    }
+}
+
+@MainActor
+private final class ISPRequestMechanicsProbe {
+    var publications = 0
+    var taskCancellations: [Bool] = []
+    private(set) var outcomes: [BackgroundUpdateExecutor.Outcome] = []
+    private var awaitedCount = 0
+    private var completion: CheckedContinuation<Void, Never>?
+
+    func finish(_ outcome: BackgroundUpdateExecutor.Outcome) {
+        outcomes.append(outcome)
+        if outcomes.count >= awaitedCount { completion?.resume(); completion = nil }
+    }
+
+    func waitForCompletions(_ count: Int) async {
+        if outcomes.count >= count { return }
+        awaitedCount = count
+        await withCheckedContinuation { completion = $0 }
     }
 }

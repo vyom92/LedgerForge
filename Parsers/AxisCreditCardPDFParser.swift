@@ -121,12 +121,16 @@ nonisolated enum AxisCreditCardParserSupport {
             let dueDate = try date(rawDueDate)
             summary.append(.dueDate(dueDate))
         }
+        let accountObservations = try fragments["PRIMARY_MASKED_CARD_NUMBER"].map {
+            [try CardSourceIdentityObservation(kind: .axisPrimaryMaskedCardNumber,
+                subject: .liabilityAccount, value: $0)]
+        } ?? []
         return try CardStatementEvidence(
             statementDate: statementDate,
             declaredStatementPeriod: period,
             selectedStatementMonth: selectedMonth,
             nativeCurrency: currency,
-            accountSourceIdentityObservations: [],
+            accountSourceIdentityObservations: accountObservations,
             instrumentSections: [],
             transactionAnnotations: annotations,
             summaryComponents: summary,

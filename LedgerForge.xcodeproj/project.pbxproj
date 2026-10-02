@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10002012610020000000001 /* LFSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10002002610020000000001 /* LFSettingsLayout.swift */; };
+		E10000022026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
+		E10000032026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
+		E10000042026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
+
 		009F33FAAF444AB6A8AF668D /* BackupRestoreSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */; };
 		0A614FE65C3C309A9C072E97 /* PlanningEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538A81C295CEEE6CBCECD5E4 /* PlanningEditors.swift */; };
 		1068B853B5FEEE84604D020F /* CategoryAutomationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCDDA8542AE7AECDC97273B /* CategoryAutomationRepository.swift */; };
@@ -60,6 +65,7 @@
 		286D69052FFFF87B0078AAC5 /* LFInlineBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D69042FFFF87B0078AAC5 /* LFInlineBadge.swift */; };
 		2872790D2FFD286100468973 /* ParserSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790C2FFD286100468973 /* ParserSelection.swift */; };
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
+		28877C70306BB00800619089 /* SalaryHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28877C6F306BB00800619089 /* SalaryHistoryView.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -195,6 +201,10 @@
 		9968CFD7D98BDE8F0482D23E /* Services/BackgroundEnrollment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743FDFD616A3B39B1A25A519 /* Services/BackgroundEnrollment.swift */; };
 		9CDBE9163BDA3CEA474A89E8 /* GmailCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98000000000000000000006 /* GmailCollector.swift */; };
 		9F233E631FF6914276F707F1 /* Services/BackgroundCredentialPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756E115ACB99743E0D8BF9B8 /* Services/BackgroundCredentialPolicy.swift */; };
+		A10000300000000000000002 /* PeriodOverviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000300000000000000001 /* PeriodOverviewComponents.swift */; };
+		A10030000000000000000002 /* FundingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10030000000000000000001 /* FundingPlan.swift */; };
+		A10030000000000000000003 /* FundingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10030000000000000000001 /* FundingPlan.swift */; };
+		A10030000000000000000004 /* FundingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10030000000000000000001 /* FundingPlan.swift */; };
 		A1695317A71872E3321B494C /* FinancialIntelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891033BEAF952174ECFE631F /* FinancialIntelligence.swift */; };
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
@@ -275,6 +285,18 @@
 		AE482F873215DA13FD63A799 /* InvestmentPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000002 /* InvestmentPersistence.swift */; };
 		AF8DE57D0C475D86AB1AB8B9 /* Services/BackgroundCredentialPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756E115ACB99743E0D8BF9B8 /* Services/BackgroundCredentialPolicy.swift */; };
 		B023CB87655A8AC295BA947F /* Services/BackgroundUpdatesSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898075C80078CAB7723F3B92 /* Services/BackgroundUpdatesSession.swift */; };
+		B100A0000000000000000001 /* IBKRFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000001 /* IBKRFlex.swift */; };
+		B100A0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */; };
+		B100A0000000000000000003 /* IBKRFlexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000003 /* IBKRFlexClient.swift */; };
+		B100A0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000004 /* IBKRFlexCredentialStore.swift */; };
+		B100A0000000000000000005 /* IBKRFlexSyncSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000005 /* IBKRFlexSyncSession.swift */; };
+		B100A0000000000000000006 /* IBKRFlexSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000006 /* IBKRFlexSettingsView.swift */; };
+		B100B0000000000000000001 /* IBKRFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000001 /* IBKRFlex.swift */; };
+		B100B0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */; };
+		B100B0000000000000000003 /* IBKRFlexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000003 /* IBKRFlexClient.swift */; };
+		B100B0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000004 /* IBKRFlexCredentialStore.swift */; };
+		B100C0000000000000000001 /* IBKRFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000001 /* IBKRFlex.swift */; };
+		B100C0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */; };
 		B2263365EE33570ADFD78920 /* FinancialIntelligenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 932964CD75632B3457E823CA /* FinancialIntelligenceCoordinator.swift */; };
 		B35DBEA7C5FE493BC1300CB2 /* PlanningMetadataRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7CEEBF0FC99AE82D81FBBAF /* PlanningMetadataRepository.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
@@ -423,6 +445,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C10002002610020000000001 /* LFSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSettingsLayout.swift; sourceTree = "<group>"; };
+		E10000012026100200000001 /* CardInstrumentLineage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInstrumentLineage.swift; sourceTree = "<group>"; };
 		041CBF52CAC0F55B8849EE45 /* BackgroundWorker/BackgroundActivityBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BackgroundWorker/BackgroundActivityBridge.h; sourceTree = "<group>"; };
 		05FCB90FD46EAAA328488D62 /* BackgroundWorker/RepositoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWorker/RepositoryDiagnostics.swift; sourceTree = "<group>"; };
 		07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingAndMovementView.swift; sourceTree = "<group>"; };
@@ -475,6 +499,7 @@
 		286D69042FFFF87B0078AAC5 /* LFInlineBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFInlineBadge.swift; sourceTree = "<group>"; };
 		2872790C2FFD286100468973 /* ParserSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSelection.swift; sourceTree = "<group>"; };
 		2872790E2FFD287300468973 /* StatementParserSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserSelector.swift; sourceTree = "<group>"; };
+		28877C6F306BB00800619089 /* SalaryHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryHistoryView.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -585,6 +610,8 @@
 		91AA00012026091400000001 /* LFAppearancePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFAppearancePreferences.swift; sourceTree = "<group>"; };
 		91AA00032026091400000001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		932964CD75632B3457E823CA /* FinancialIntelligenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialIntelligenceCoordinator.swift; sourceTree = "<group>"; };
+		A10000300000000000000001 /* PeriodOverviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodOverviewComponents.swift; sourceTree = "<group>"; };
+		A10030000000000000000001 /* FundingPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundingPlan.swift; sourceTree = "<group>"; };
 		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
 		A94000000000000000000001 /* AlDarReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarReference.swift; sourceTree = "<group>"; };
 		A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlDarCurrentReferenceProvider.swift; sourceTree = "<group>"; };
@@ -640,6 +667,12 @@
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		AB1700010000000000000002 /* PlannerInputCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputCodec.swift; sourceTree = "<group>"; };
 		AB1700010000000000000003 /* DurableStartupEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurableStartupEvidence.swift; sourceTree = "<group>"; };
+		B100F0000000000000000001 /* IBKRFlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlex.swift; sourceTree = "<group>"; };
+		B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlexHoldingsPersistence.swift; sourceTree = "<group>"; };
+		B100F0000000000000000003 /* IBKRFlexClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlexClient.swift; sourceTree = "<group>"; };
+		B100F0000000000000000004 /* IBKRFlexCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlexCredentialStore.swift; sourceTree = "<group>"; };
+		B100F0000000000000000005 /* IBKRFlexSyncSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlexSyncSession.swift; sourceTree = "<group>"; };
+		B100F0000000000000000006 /* IBKRFlexSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IBKRFlexSettingsView.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
 		B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteConfirmedImportRepository.swift; sourceTree = "<group>"; };
@@ -868,6 +901,7 @@
 				286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */,
 				286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */,
 				286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */,
+				C10002002610020000000001 /* LFSettingsLayout.swift */,
 				286D68FE2FFFF6E60078AAC5 /* LFEmptyState.swift */,
 				286D69002FFFF7030078AAC5 /* LFIconTile.swift */,
 				286D69022FFFF7210078AAC5 /* LFActionRow.swift */,
@@ -931,12 +965,14 @@
 				891033BEAF952174ECFE631F /* FinancialIntelligence.swift */,
 				D37683672DFC895F322F1F16 /* PlanningIntelligence.swift */,
 				A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */,
+				A10030000000000000000001 /* FundingPlan.swift */,
 				7A790000307A000000000001 /* Salary.swift */,
 				A94000000000000000000001 /* AlDarReference.swift */,
 				760000133076000000000001 /* Card.swift */,
 				D57000013057000000000001 /* Category.swift */,
 				3A4400013004000000000001 /* Money.swift */,
 				28B87B3C2FFBBFC8009BEE8C /* Account.swift */,
+				E10000012026100200000001 /* CardInstrumentLineage.swift */,
 				28B87B362FFBB591009BEE8C /* ImportSession.swift */,
 				28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */,
 				288EB1312FF7E3C600F09BC9 /* ColumnType.swift */,
@@ -951,6 +987,7 @@
 				A97000000000000000000001 /* InvestmentValuation.swift */,
 				A97000000000000000000007 /* InvestmentOverview.swift */,
 				A97000000000000000000009 /* ZurichISP.swift */,
+				B100F0000000000000000001 /* IBKRFlex.swift */,
 				A96000000000000000000001 /* Investment.swift */,
 			);
 			path = Models;
@@ -1016,8 +1053,11 @@
 				A97000000000000000000004 /* InvestmentPriceSession.swift */,
 				A97000000000000000000006 /* OnlineRefreshCoordinator.swift */,
 				A9700000000000000000000D /* ZurichISPSyncSession.swift */,
+				B100F0000000000000000005 /* IBKRFlexSyncSession.swift */,
 				A9700000000000000000000C /* ZurichISPCredentialStore.swift */,
+				B100F0000000000000000004 /* IBKRFlexCredentialStore.swift */,
 				A9700000000000000000000B /* ZurichISPClient.swift */,
+				B100F0000000000000000003 /* IBKRFlexClient.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1095,6 +1135,7 @@
 				3DD77E39DF15E63F949699B4 /* CategoryRulesView.swift */,
 				D57000043057000000000001 /* CategoryManagementView.swift */,
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
+				A10000300000000000000001 /* PeriodOverviewComponents.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
 				286D68F12FFFF60E0078AAC5 /* Common */,
@@ -1104,8 +1145,10 @@
 				A97000000000000000000012 /* DashboardInvestmentSnapshotCard.swift */,
 				A97000000000000000000011 /* ImportBatchRunView.swift */,
 				A9700000000000000000000E /* ZurichISPSettingsView.swift */,
+				B100F0000000000000000006 /* IBKRFlexSettingsView.swift */,
 				A96000000000000000000008 /* InvestmentListView.swift */,
 				A96000000000000000000009 /* InvestmentImportReviewView.swift */,
+				28877C6F306BB00800619089 /* SalaryHistoryView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1135,6 +1178,7 @@
 				281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */,
 				A98000000000000000000004 /* GmailInboxRepository.swift */,
 				A9700000000000000000000A /* ZurichISPHoldingsPersistence.swift */,
+				B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */,
 				A96000000000000000000002 /* InvestmentPersistence.swift */,
 				A96000000000000000000003 /* SQLiteInvestmentRepository.swift */,
 			);
@@ -1524,11 +1568,17 @@
 				A97010000000000000000012 /* DashboardInvestmentSnapshotCard.swift in Sources */,
 				A97010000000000000000011 /* ImportBatchRunView.swift in Sources */,
 				A9701000000000000000000E /* ZurichISPSettingsView.swift in Sources */,
+				B100A0000000000000000006 /* IBKRFlexSettingsView.swift in Sources */,
 				A9701000000000000000000D /* ZurichISPSyncSession.swift in Sources */,
+				B100A0000000000000000005 /* IBKRFlexSyncSession.swift in Sources */,
 				A9701000000000000000000C /* ZurichISPCredentialStore.swift in Sources */,
+				B100A0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */,
 				A9701000000000000000000B /* ZurichISPClient.swift in Sources */,
+				B100A0000000000000000003 /* IBKRFlexClient.swift in Sources */,
 				A9701000000000000000000A /* ZurichISPHoldingsPersistence.swift in Sources */,
+				B100A0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
 				A97010000000000000000009 /* ZurichISP.swift in Sources */,
+				B100A0000000000000000001 /* IBKRFlex.swift in Sources */,
 				A96010000000000000000001 /* Investment.swift in Sources */,
 				91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */,
 				91AA00022026091400000001 /* LFAppearancePreferences.swift in Sources */,
@@ -1545,6 +1595,7 @@
 				A94000000000000000000005 /* AlDarCurrentReferenceProvider.swift in Sources */,
 				A95000000000000000000002 /* AlDarReferenceSession.swift in Sources */,
 				7A790003307A000000000001 /* QatarAirwaysSalaryPDFParser.swift in Sources */,
+				A10030000000000000000002 /* FundingPlan.swift in Sources */,
 				7A790005307A000000000001 /* SalaryPersistence.swift in Sources */,
 				7A790007307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
 				760000033076000000000001 /* Card.swift in Sources */,
@@ -1574,6 +1625,7 @@
 				650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */,
 				650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */,
 				650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */,
+				28877C70306BB00800619089 /* SalaryHistoryView.swift in Sources */,
 				DBB00002305E000000000001 /* DeveloperDatabaseProfileViewModel.swift in Sources */,
 				DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */,
 				DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */,
@@ -1588,6 +1640,7 @@
 				2D5EA0DB579C85C284D09CBF /* CategoryRulesView.swift in Sources */,
 				D57000143057000000000001 /* CategoryManagementView.swift in Sources */,
 				3A4400043004000000000001 /* MoneyFormatting.swift in Sources */,
+				E10000022026100200000001 /* CardInstrumentLineage.swift in Sources */,
 				3A4400023004000000000001 /* Money.swift in Sources */,
 				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
 				28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */,
@@ -1613,6 +1666,7 @@
 				286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */,
 				286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */,
 				286D68FD2FFFF6C20078AAC5 /* LFInfoRow.swift in Sources */,
+				C10002012610020000000001 /* LFSettingsLayout.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
 				286D68FF2FFFF6E60078AAC5 /* LFEmptyState.swift in Sources */,
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
@@ -1660,6 +1714,7 @@
 				B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */,
 				B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
+				A10000300000000000000002 /* PeriodOverviewComponents.swift in Sources */,
 				281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */,
 				2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
@@ -1735,11 +1790,14 @@
 				A96020000000000000000001 /* Investment.swift in Sources */,
 				A9702000000000000000000B /* ZurichISPClient.swift in Sources */,
 				A9702000000000000000000A /* ZurichISPHoldingsPersistence.swift in Sources */,
+				B100C0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
 				A97020000000000000000009 /* ZurichISP.swift in Sources */,
+				B100C0000000000000000001 /* IBKRFlex.swift in Sources */,
 				A97020000000000000000003 /* InvestmentPriceClient.swift in Sources */,
 				A97020000000000000000002 /* InvestmentPriceRegistry.swift in Sources */,
 				A97020000000000000000001 /* InvestmentValuation.swift in Sources */,
 				A99029000000000000000001 /* ImportInstantFormatting.swift in Sources */,
+				A10030000000000000000003 /* FundingPlan.swift in Sources */,
 				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
 				A94000000000000000000003 /* AlDarReference.swift in Sources */,
 				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
@@ -1758,6 +1816,7 @@
 				B600000B3050000000000001 /* Transaction.swift in Sources */,
 				B600000C3050000000000001 /* Money.swift in Sources */,
 				B600000D3050000000000001 /* MoneyFormatting.swift in Sources */,
+				E10000032026100200000001 /* CardInstrumentLineage.swift in Sources */,
 				B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */,
 				B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */,
 				A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */,
@@ -1795,12 +1854,16 @@
 				AE482F873215DA13FD63A799 /* InvestmentPersistence.swift in Sources */,
 				84EDF445D2A446AF19D50962 /* Investment.swift in Sources */,
 				8FC9DDAD71E385AC53F0917A /* ZurichISPClient.swift in Sources */,
+				B100B0000000000000000003 /* IBKRFlexClient.swift in Sources */,
 				802C96D0047D95C210A422D2 /* ZurichISPHoldingsPersistence.swift in Sources */,
+				B100B0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
 				C18123BC232C5503C92DEDAE /* ZurichISP.swift in Sources */,
+				B100B0000000000000000001 /* IBKRFlex.swift in Sources */,
 				70CA715C2D0EC175E932857A /* InvestmentPriceClient.swift in Sources */,
 				2FC4C271C80CD7B8796E1819 /* InvestmentPriceRegistry.swift in Sources */,
 				C87843612F1D345394B680DF /* InvestmentValuation.swift in Sources */,
 				A99029000000000000000002 /* ImportInstantFormatting.swift in Sources */,
+				A10030000000000000000004 /* FundingPlan.swift in Sources */,
 				D9053F071F85489B50D6EA62 /* SalaryPersistence.swift in Sources */,
 				2E6CDBB92B42F1C33413D425 /* AlDarReference.swift in Sources */,
 				6748758D24910F4CDD24EA32 /* SQLiteSalaryRepository.swift in Sources */,
@@ -1818,6 +1881,7 @@
 				9413C4C926B7E3AFC9AD0366 /* Transaction.swift in Sources */,
 				491D2A98839D870A4EA69A2C /* Money.swift in Sources */,
 				40B79D3CABA1AEE6DD794B05 /* MoneyFormatting.swift in Sources */,
+				E10000042026100200000001 /* CardInstrumentLineage.swift in Sources */,
 				C693F5F1208ED72BB43BA771 /* InMemoryRepositoryProvider.swift in Sources */,
 				C7805345A5EB8FAFCB973C70 /* ZeroActivityStatementEvidence.swift in Sources */,
 				EC01804654BC7CDA49C5A893 /* Services/BackgroundUpdateExecutor.swift in Sources */,
@@ -1825,6 +1889,7 @@
 				9CDBE9163BDA3CEA474A89E8 /* GmailCollector.swift in Sources */,
 				F10DBB2391AE48044308C378 /* GmailCredentialStore.swift in Sources */,
 				3D91A86483E58266DFD146DC /* ZurichISPCredentialStore.swift in Sources */,
+				B100B0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */,
 				E1C5986DEB2D40C6BC356EE4 /* AlDarCurrentReferenceProvider.swift in Sources */,
 				C90000023099000000000001 /* BackgroundWorker/BackgroundWorker.swift in Sources */,
 			);

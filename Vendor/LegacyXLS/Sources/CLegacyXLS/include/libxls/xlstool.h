@@ -37,6 +37,9 @@
 
 void verbose(char* str);
 
+/* Copy source text without losing allocation failure in a NULL cell value. */
+char *xls_strdup(const char *s, xlsWorkBook *pWB);
+
 char *codepage_decode(const char *s, size_t len, xlsWorkBook *pWB);
 char *unicode_decode(const char *s, size_t len, xlsWorkBook *pWB);
 char *transcode_utf16_to_utf8(const char *s, size_t len);

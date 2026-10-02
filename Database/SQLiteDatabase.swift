@@ -646,10 +646,16 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
             throw SQLiteDatabaseError.prepareFailed(operation: .query)
         }
-        if sqlite3_step(stmt) == SQLITE_ROW {
+        let result = sqlite3_step(stmt)
+        switch result {
+        case SQLITE_ROW:
             return Int(sqlite3_column_int64(stmt, 0))
+        case SQLITE_DONE:
+            // Preserve the scalar helper's successful empty-result behavior.
+            return 0
+        default:
+            throw executionError(resultCode: result, operation: .query)
         }
-        return 0
     }
 
     public func queryInt(_ sql: String) throws -> Int {

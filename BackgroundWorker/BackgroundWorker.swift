@@ -193,6 +193,10 @@ private final class BackgroundWorkerRuntime {
                 try store.updateExisting(grant)
             } catch { await log.notice("Gmail helper authorization was not completed.") }
         }
+        if configuration.ibkrFlexHoldingsEnabled {
+            do { _ = try IBKRFlexCredentialStore(interaction: .foreground).load() }
+            catch { await log.notice("IBKR helper authorization was not completed.") }
+        }
         if configuration.zurichISPHoldingsEnabled {
             do { _ = try ZurichISPCredentialStore(interaction: .foreground).load() }
             catch { await log.notice("ISP helper authorization was not completed.") }

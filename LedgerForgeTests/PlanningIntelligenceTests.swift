@@ -5,6 +5,83 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct PlanningIntelligenceTests {
+
+    @Test func retainedRecurringIdentitySurvivesDueDayChangesWithinAndAcrossSalaryWindows() throws {
+        let month = try SelectedStatementMonth(canonical: "2026-10")
+        let retained = try StatementDate(canonical: "2026-10-20")
+        let movedWithinWindow = try StatementDate(canonical: "2026-10-22")
+        let movedAcrossWindow = try StatementDate(canonical: "2026-10-27")
+        let identities: Set<String> = ["commitment:" + retained.canonical]
+        for generated in [movedWithinWindow, movedAcrossWindow] {
+            #expect(PlanningIntelligence.occurrenceDates(definitionID: "commitment", month: month,
+                generatedDate: generated, retaining: identities) == [retained])
+        }
+        let nextMonth = try SelectedStatementMonth(canonical: "2026-11")
+        let nextDate = try StatementDate(canonical: "2026-11-27")
+        #expect(PlanningIntelligence.occurrenceDates(definitionID: "commitment", month: nextMonth,
+            generatedDate: nextDate, retaining: identities) == [nextDate])
+    }
+
+    @Test func retainedRecurringIdentityKeepsShortMonthDateAndAllExistingOwnership() throws {
+        let month = try SelectedStatementMonth(canonical: "2027-02")
+        let savedDate = try StatementDate(canonical: "2027-02-28")
+        let revisedDate = try StatementDate(canonical: "2027-02-20")
+        let ids: Set<String> = ["commitment:" + savedDate.canonical, "other:" + revisedDate.canonical, "invalid"]
+        #expect(PlanningIntelligence.occurrenceDates(definitionID: "commitment", month: month,
+            generatedDate: revisedDate, retaining: ids) == [savedDate])
+        #expect(PlanningIntelligence.occurrenceDates(definitionID: "unowned", month: month,
+            generatedDate: revisedDate, retaining: ids) == [revisedDate])
+        let anotherSavedDate = try StatementDate(canonical: "2027-02-21")
+        #expect(PlanningIntelligence.occurrenceDates(definitionID: "commitment", month: month,
+            generatedDate: revisedDate, retaining: ids.union(["commitment:" + anotherSavedDate.canonical])) == [anotherSavedDate, savedDate])
+    }
+
+    @Test func recurringExclusionPrecedenceKeepsOtherMonthsAndHonorsExplicitReadd() throws {
+        let september = try SelectedStatementMonth(canonical: "2026-09")
+        let october = try SelectedStatementMonth(canonical: "2026-10")
+        let november = try SelectedStatementMonth(canonical: "2026-11")
+        let original: Set<String> = ["commitment:2026-10-20"]
+        let resolved = PlanningIntelligence.resolvedOccurrenceIDs(currentMonth: october, currentIDs: [],
+            savedByMonth: [september: original, october: ["stale-current"], november: ["stale-draft"]],
+            draftByMonth: [november: []])
+        #expect(resolved == original)
+        #expect(PlanningIntelligence.resolvedOccurrenceIDs(currentMonth: september, currentIDs: [],
+            savedByMonth: [september: original], draftByMonth: [:]).isEmpty)
+    }
+
+    @Test func retainedRecurringOwnershipIncludesIncompleteOtherMonthDrafts() throws {
+        let september = try SelectedStatementMonth(canonical: "2026-09")
+        let october = try SelectedStatementMonth(canonical: "2026-10")
+        let original = try StatementDate(canonical: "2026-10-20")
+        let moved = try StatementDate(canonical: "2026-10-27")
+        let id = "commitment:" + original.canonical
+        let retained = PlanningIntelligence.resolvedOccurrenceIDs(currentMonth: october, currentIDs: [],
+            savedByMonth: [october: ["stale-current"]], draftByMonth: [september: [id]])
+        #expect(retained == [id])
+        #expect(PlanningIntelligence.occurrenceDates(definitionID: "commitment", month: october,
+            generatedDate: moved, retaining: retained) == [original])
+        #expect(PlanningIntelligence.resolvedOccurrenceIDs(currentMonth: september, currentIDs: [],
+            savedByMonth: [september: [id]], draftByMonth: [september: [id]]).isEmpty)
+    }
+
+    @Test func recurringRemovalKeepsReviewIdentityWhileExcludingMonthlyCashAndAutomaticInclusion() throws {
+        let october = try SelectedStatementMonth(canonical: "2026-10")
+        let original = try StatementDate(canonical: "2026-10-20")
+        let moved = try StatementDate(canonical: "2026-10-27")
+        let id = "commitment:" + original.canonical, excluded: Set<String> = [id]
+        for generated in [original, moved] {
+            let review = PlanningIntelligence.occurrenceSelections(definitionID: "commitment", month: october,
+                generatedDate: generated, retaining: [], excluding: excluded)
+            #expect(review == [.init(id: id, date: original, isExcludedFromPlan: true)])
+        }
+        let reapplied = PlanningIntelligence.occurrenceSelections(definitionID: "commitment", month: october,
+            generatedDate: moved, retaining: [id], excluding: [])
+        #expect(reapplied == [.init(id: id, date: original, isExcludedFromPlan: false)])
+        let november = try SelectedStatementMonth(canonical: "2026-11")
+        let next = try StatementDate(canonical: "2026-11-27")
+        #expect(PlanningIntelligence.occurrenceSelections(definitionID: "commitment", month: november,
+            generatedDate: next, retaining: [], excluding: excluded) == [.init(id: "commitment:" + next.canonical, date: next, isExcludedFromPlan: false)])
+    }
     private struct OwnerCategoryNomination: Decodable {
         let categoryID: String, categoryName: String
         let rule: CategoryRule
@@ -104,6 +181,13 @@ struct PlanningIntelligenceTests {
             #expect(throws: FinancialIntelligenceError.invalidRecord) { try sqlite.fundingPlanRepo.savePlan(corrupt) }
             #expect(try sqlite.fundingPlanRepo.plans(workspaceId: workspace).first { $0.planMonthISO == month.canonical } == saved)
         }
+        // The scratchpad preserves an incomplete owner entry through the same
+        // populated backup, without changing the last valid plan or source facts.
+        #expect(!model.updateMoney(.fee, text: "25."))
+        model.flushPendingEntries()
+        let retainedScratchpads = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace)
+        let retainedMonthly = try #require(retainedScratchpads.first { $0.month == month.canonical })
+        #expect(try MonthlyPlanScratchpad.decode(retainedMonthly).rawText["fee"] == "25.")
         DatabaseProvider.shared = provider
         let backup = BackupRestoreCoordinator(testingAt: target); backup.installTestProvider(sqlite)
         let destination = root.appendingPathComponent("backups"); try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
@@ -115,9 +199,12 @@ struct PlanningIntelligenceTests {
         defer { restored.database.close() }
         #expect(try restored.fundingPlanRepo.plans(workspaceId: workspace).first { $0.planMonthISO == month.canonical } == saved)
         #expect(try restored.transactionRepo.trustedTransactions(workspaceId: workspace) == beforeFacts)
+        #expect(try restored.fundingPlanRepo.scratchpads(workspaceId: workspace) == retainedScratchpads)
+        hydrator.publish(try hydrator.stageHydration())
         let refreshed = SalaryWorkspaceViewModel(month: month, workspaceID: workspace, provider: { provider }, now: { FinancialCalendar.instant(today)! })
         #expect(refreshed.payslipProposals.isEmpty)
         #expect(refreshed.calculation.expectedNet == statement.evidence.printedNet)
+        #expect(refreshed.moneyText(.fee) == "25.")
 
         // Exercise receipt precedence with an actual earlier payslip and its
         // genuine bank credit. Only the owner's planning acknowledgment changes.
@@ -317,11 +404,14 @@ struct PlanningIntelligenceTests {
         #expect(!selected.isEmpty)
         #expect(model.calculation.selectedINRLiquidity == (try Money.aggregate(selected)),
                 "Saved reserve targets must not reduce the Monthly plan's selected bank balances")
-        #expect(try upgraded.fundingPlanRepo.plans(workspaceId: workspace) == plans, "Draft checks do not save")
+        model.flushPendingEntries()
+        let retainedPlans = try upgraded.fundingPlanRepo.plans(workspaceId: workspace)
+        let retainedMonthly = try #require(retainedPlans.first { $0.planMonthISO == monthly.month.canonical })
+        #expect(try retainedMonthly.balances.first { $0.accountId == bank.repositoryAccountId }?.amountDecimal == bank.currentBalanceMoney.canonicalDecimalString())
         try upgraded.database.checkpointAndClose()
         let reopened = try SQLiteRepositoryProvider(path: upgradedURL.path, migrations: allMigrations, access: .existing)
         defer { reopened.database.close() }
-        #expect(try reopened.fundingPlanRepo.plans(workspaceId: workspace) == plans)
+        #expect(try reopened.fundingPlanRepo.plans(workspaceId: workspace) == retainedPlans)
         #expect(try BackupFiles.verifyPackage(source) == manifest)
     }
 
@@ -435,9 +525,28 @@ struct PlanningIntelligenceTests {
         while model.isWorking && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
         #expect(model.projection != nil)
         #expect(!model.isWorking)
+        let beforeNavigation = try #require(model.projection)
+        let worksheetBefore = FundingPlanCalculator.calculate(plan)
         model.cancel()
         model.refresh(plan: plan, scenario: .init())
         #expect(!model.isWorking, "A completed unchanged plan returns from the navigation cache")
+        let afterNavigation = try #require(model.projection)
+        #expect(FundingPlanCalculator.calculate(plan) == worksheetBefore)
+        #expect(afterNavigation.start == beforeNavigation.start && afterNavigation.end == beforeNavigation.end)
+        #expect(afterNavigation.actualSpending == beforeNavigation.actualSpending)
+        #expect(afterNavigation.actualTransactionIDs == beforeNavigation.actualTransactionIDs)
+        #expect(afterNavigation.plannedCommitments == beforeNavigation.plannedCommitments)
+        #expect(afterNavigation.runways.map(\.id) == beforeNavigation.runways.map(\.id))
+        for (before, after) in zip(beforeNavigation.runways, afterNavigation.runways) {
+            #expect(after.anchor.amount == before.anchor.amount && after.anchor.date == before.anchor.date)
+            #expect(after.points.map(\.balance) == before.points.map(\.balance))
+            #expect(after.points.map(\.date) == before.points.map(\.date))
+            #expect(after.points.map(\.transactionIDs) == before.points.map(\.transactionIDs))
+            #expect(after.events.map(\.change) == before.events.map(\.change))
+            #expect(after.reserveFloor == before.reserveFloor)
+            #expect(afterNavigation.investmentCapacity(accountID: after.id, assistance: plan.assistance).0 == beforeNavigation.investmentCapacity(accountID: before.id, assistance: plan.assistance).0)
+            #expect(afterNavigation.investmentCapacity(accountID: after.id, assistance: plan.assistance).1 == beforeNavigation.investmentCapacity(accountID: before.id, assistance: plan.assistance).1)
+        }
         var changed = PlanningScenario(); changed.extraCost = 1
         model.refresh(plan: plan, scenario: changed)
         #expect(model.isWorking)
@@ -703,6 +812,76 @@ struct PlanningIntelligenceTests {
             results.append(state)
         }
         #expect(results[0] == results[1])
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func automaticRecurringInclusionPreservesOverridesSuppressionAndNextMonthInventory() async throws {
+        let root = try folder(); defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("recurring.sqlite")
+        let sqlite = try SQLiteRepositoryProvider(path: path.path)
+        defer { sqlite.database.close() }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite)
+        let imported = try await confirmedImportPlan(generationToken: provider.generationToken)
+        guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(imported) else {
+            Issue.record("Authentic import failed"); return
+        }
+        let workspace = imported.workspace.id
+        let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+        let account = try #require(try provider.accountRepo.accounts(workspaceId: workspace).first { $0.accountType == "bank" })
+        #expect(account.nativeCurrency == "INR")
+        let definition = RecurringDefinition(id: "owner-recurring-s100", workspaceID: workspace, accountID: account.id,
+            title: "Owner monthly estimate", revisions: [.init(effectiveFrom: "2026-09-01", dueDay: 1,
+            amount: .init(currency: "INR", decimal: "1.00"))], endsOn: nil, predicates: [])
+        try provider.intelligenceRepo.applyPlanning(.recurring(definition, replacing: nil))
+        let hydrator = RepositoryStoreHydrator(databaseProvider: provider, workspaceId: workspace, participatesInLifecycleGate: false)
+        hydrator.publish(try hydrator.stageHydration())
+        let month = try SelectedStatementMonth(canonical: "2026-09")
+        let instant = try #require(FinancialCalendar.instant(StatementDate(canonical: "2026-09-29")))
+        func open(_ current: DatabaseProvider = provider) -> SalaryWorkspaceViewModel {
+            let vm = SalaryWorkspaceViewModel(month: month, workspaceID: workspace, provider: { current },
+                now: { instant }, refresh: { active in
+                    let read = RepositoryStoreHydrator(databaseProvider: active, workspaceId: workspace, participatesInLifecycleGate: false)
+                    read.publish(try read.stageHydration())
+                })
+            vm.plannerOpened(); return vm
+        }
+        let model = open()
+        for _ in 0..<200 where model.plan.indiaCommitments.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        let row = try #require(model.plan.indiaCommitments.first)
+        #expect(model.plan.indiaCommitments.count == 1)
+        #expect(row.dueDate?.canonical == "2026-10-01")
+        #expect(row.fundingAccountID == account.id)
+        model.editCommitment(region: "india", id: row.id, field: "amount", text: "2.5")
+        model.editCommitment(region: "india", id: row.id, field: "label", text: "This month only")
+        model.editCommitment(region: "india", id: row.id, field: "included", text: "false")
+        model.editCommitment(region: "india", id: row.id, field: "account", text: "")
+        #expect(model.plan.indiaCommitments.first?.fundingAccountID == account.id)
+        model.setBillDate(region: "india", id: row.id, date: nil)
+        #expect(model.plan.indiaCommitments.first?.dueDate == row.dueDate)
+        model.setCommitmentDetails(region: "india", id: row.id, recurs: true)
+        model.flushPendingEntries()
+        hydrator.publish(try hydrator.stageHydration())
+        let reopened = open()
+        for _ in 0..<30 { await Task.yield() }
+        #expect(reopened.plan.indiaCommitments.map(\.id) == [row.id])
+        #expect(reopened.plan.indiaCommitments.first?.label == "This month only")
+        #expect(reopened.plan.indiaCommitments.first?.included == false)
+        #expect(reopened.rawText["amount.\(row.id)"] == "2.5")
+        reopened.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        for _ in 0..<200 where reopened.plan.indiaCommitments.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(reopened.plan.indiaCommitments.count == 1)
+        #expect(reopened.plan.indiaCommitments.first?.dueDate?.canonical == "2026-11-01")
+        #expect(reopened.plan.indiaCommitments.first?.money.amount == 1)
+        reopened.switchMonth(to: month)
+        reopened.removeCommitment(region: "india", id: row.id)
+        reopened.flushPendingEntries()
+        hydrator.publish(try hydrator.stageHydration())
+        let afterRemoval = open()
+        for _ in 0..<30 { await Task.yield() }
+        #expect(afterRemoval.plan.indiaCommitments.isEmpty)
+        let retained = try #require(provider.fundingPlanRepo.scratchpads(workspaceId: workspace).first { $0.month == month.canonical })
+        #expect(try MonthlyPlanScratchpad.decode(retained).excludedRecurringOccurrenceIDs.count == 1)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspace) == facts)
     }
 
     @Test(.globalRuntimeStateIsolation)

@@ -262,16 +262,26 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var positionState: DashboardContentState = .loading
     @Published private(set) var fundingState: DashboardContentState = .loading
     @Published private(set) var fundingCalculation: FundingPlanCalculation?
+    @Published private(set) var fundingMessage: String?
+    @Published private(set) var fundingRateDetail: String?
     @Published private(set) var netWorthReport: NetWorthReport = .withdrawn(.loading)
 
     var fundingMonthTitle: String {
-        Self.currentMonth(at: now()).map(SalaryWorkspaceViewModel.monthTitle) ?? "Month unavailable"
+        selectedFundingMonth.map(SalaryWorkspaceViewModel.monthTitle) ?? "Month unavailable"
+    }
+
+    var fundingPlanTitle: String {
+        guard let month = selectedFundingMonth else { return "Monthly plan" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.monthSymbols[month.month - 1] + " plan"
     }
 
     private let accountStore: AccountStore
     private let transactionStore: TransactionStore
     private let cardStore: CardStore
     private let fundingPlanStore: FundingPlanStore
+    private weak var fundingWorkspace: SalaryWorkspaceViewModel?
     private let intelligenceStore: FinancialIntelligenceStore
     private let investmentStore: InvestmentStore
     private let membershipStore: NetWorthMembershipStore
@@ -282,6 +292,7 @@ final class DashboardViewModel: ObservableObject {
     private let availability: ApplicationAvailability
     private let now: () -> Date
     private let workspaceID: String
+    private var selectedFundingMonth: SelectedStatementMonth?
     private var cancellables = Set<AnyCancellable>()
     private var pendingRefreshID: UUID?
 
@@ -299,12 +310,15 @@ final class DashboardViewModel: ObservableObject {
         gmail: GmailIntakeSession = .shared,
         availability: ApplicationAvailability = .shared,
         workspaceID: String = "default-workspace",
+        fundingMonth: SelectedStatementMonth? = nil,
+        fundingWorkspace: SalaryWorkspaceViewModel? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.cardStore = cardStore
         self.fundingPlanStore = fundingPlanStore
+        self.fundingWorkspace = fundingWorkspace
         self.intelligenceStore = intelligenceStore
         self.investmentStore = investmentStore
         self.membershipStore = membershipStore
@@ -314,6 +328,7 @@ final class DashboardViewModel: ObservableObject {
         self.gmail = gmail
         self.availability = availability
         self.workspaceID = workspaceID
+        self.selectedFundingMonth = fundingMonth ?? Self.currentMonth(at: now())
         self.now = now
         // Every notification reads the complete already-installed canonical stores,
         // instead of combining captured values from different publication moments.
@@ -333,6 +348,7 @@ final class DashboardViewModel: ObservableObject {
 
         reportingRates?.objectWillChange.sink { [weak self] _ in self?.requestPresentationRefresh() }.store(in: &cancellables)
         reportingPrices?.objectWillChange.sink { [weak self] _ in self?.requestPresentationRefresh() }.store(in: &cancellables)
+        fundingWorkspace?.objectWillChange.sink { [weak self] _ in self?.requestPresentationRefresh() }.store(in: &cancellables)
 
         // These stores publish on the main actor after installing their backing
         // values. One queued refresh reads that whole snapshot. Availability
@@ -358,6 +374,12 @@ final class DashboardViewModel: ObservableObject {
 
     func markHydrationStarted() {
         invalidatePresentation(for: .loading)
+    }
+
+    func selectFundingMonth(_ month: SelectedStatementMonth) {
+        guard selectedFundingMonth != month else { return }
+        selectedFundingMonth = month
+        refreshPresentation()
     }
 
     func markHydrationCompleted(_ result: RepositoryStoreHydrationResult) {
@@ -391,6 +413,8 @@ final class DashboardViewModel: ObservableObject {
             : .failed("Dashboard load failed")
         positions = []
         fundingCalculation = nil
+        fundingMessage = nil
+        fundingRateDetail = nil
         netWorthReport = .withdrawn(loading ? .loading : .unavailable)
         positionState = loading ? .loading : .unavailable
         fundingState = loading ? .loading : .unavailable
@@ -435,19 +459,79 @@ final class DashboardViewModel: ObservableObject {
                 now: now(), generation: availability.generation)
         }
 
-        let currentMonth = Self.currentMonth(at: now())
         let fundingIsCurrent = isCurrent && fundingPlanStore.generation == availability.generation
-        let plan = fundingIsCurrent
-            ? currentMonth.flatMap { fundingPlanStore.plan(for: $0, workspaceID: workspaceID) }
+        let canonicalPlan = fundingIsCurrent
+            ? selectedFundingMonth.flatMap { fundingPlanStore.plan(for: $0, workspaceID: workspaceID) }
             : nil
+        var plan = canonicalPlan
+        var retained: MonthlyPlanScratchpad?
+        fundingMessage = nil
+        fundingRateDetail = nil
+        if fundingIsCurrent, let month = selectedFundingMonth, let generation = availability.generation {
+            let presentation = fundingWorkspace?.retainedPlanPresentation(for: month, workspaceID: workspaceID,
+                generation: generation, canonical: canonicalPlan)
+            if let presentation {
+                switch presentation {
+                case .canonical: break
+                case .retained(let entries): retained = entries
+                case .unavailable(let message): fundingMessage = message
+                }
+            } else {
+                retained = fundingPlanStore.scratchpads.first { $0.plan.workspaceID == workspaceID && $0.plan.month == month }
+            }
+        }
+        if let retained {
+            if retained.canonical == canonicalPlan {
+                plan = retained.plan
+            } else {
+                fundingMessage = "The retained entries belong to an earlier plan. Open Budget Planning to review them."
+            }
+        }
         let intelligence = intelligenceStore
-        let excluded = intelligence.generation == availability.generation ? intelligence.snapshot?.preferences?.excludedPlanningAccountIDs ?? [] : []
-        fundingCalculation = plan.map { FundingPlanCalculator.calculate($0, excludingAccounts: excluded,
-            salaryReceipt: PayslipReceiptState.resolve(plan: $0, transactions: transactionStore.transactions, excludedAccounts: excluded)) }
+        let excluded = (intelligence.generation == availability.generation ? intelligence.snapshot?.preferences?.excludedPlanningAccountIDs ?? [] : [])
+            .union(AccountPresentationScope.historyOnlyIDs(in: accounts))
+        let historyOnlyIDs = AccountPresentationScope.historyOnlyIDs(in: accounts)
+        if fundingMessage == nil, let retained, Self.hasIncompleteEntries(retained, excludedAccountIDs: excluded, historyOnlyIDs: historyOnlyIDs) {
+            fundingMessage = "Latest entries are retained. Complete the marked fields in Budget Planning to see the updated amounts."
+        }
+        fundingCalculation = fundingMessage == nil ? plan.map { FundingPlanCalculator.calculate($0, excludingAccounts: excluded,
+            historyOnlyAccountIDs: AccountPresentationScope.historyOnlyIDs(in: accounts),
+            salaryReceipt: PayslipReceiptState.resolve(plan: $0, transactions: transactionStore.transactions, excludedAccounts: excluded)) } : nil
+        fundingRateDetail = plan.map(Self.rateDetail)
         fundingState = .resolve(availability: state, isEmpty: plan == nil)
-        if (isCurrent && !fundingIsCurrent) || fundingCalculation?.incompleteReasons.contains(.invalidCurrency) == true {
+        if (isCurrent && !fundingIsCurrent) || fundingMessage != nil || fundingCalculation?.incompleteReasons.contains(.invalidCurrency) == true {
             fundingState = .unavailable
         }
+    }
+
+    private static func hasIncompleteEntries(_ entries: MonthlyPlanScratchpad, excludedAccountIDs: Set<String>, historyOnlyIDs: Set<String>) -> Bool {
+        let plan = entries.plan
+        let hiddenBills = Set((plan.qatarCommitments + plan.indiaCommitments).filter {
+            !$0.isInAccountScope(excluding: historyOnlyIDs, fundingOverrides: plan.assistance?.billFundingAccounts)
+        }.map(\.id))
+        return entries.fieldErrors.keys.contains { key in
+            if key.hasPrefix("balance.") { return !excludedAccountIDs.contains(String(key.dropFirst("balance.".count))) }
+            for prefix in ["amount.", "label."] where key.hasPrefix(prefix) {
+                return !hiddenBills.contains(String(key.dropFirst(prefix.count)))
+            }
+            return true
+        }
+    }
+
+    private static func rateDetail(_ plan: FundingPlan) -> String {
+        if plan.calculationVersion == .budgetV1, plan.referenceMode == .alDar {
+            guard let quote = plan.effectiveAlDarReference, quote.submittedQAR.amount == 1 else {
+                return "This plan has no effective Al Dar rate."
+            }
+            return "Plan rate · 1 QAR = \(quote.returnedINR.rawToken) INR\nAl Dar reference fetched \(AppDateDisplay.isoTimestamp(quote.fetchedAtISO))."
+        }
+        if let rate = plan.planningFX {
+            return "Plan rate · 1 QAR = \(NSDecimalNumber(decimal: rate.inrPerQAR).stringValue) INR\nManual reference dated \(rate.observationDate.presentation)."
+        }
+        if let quote = plan.alDarReference?.quote {
+            return "Plan rate · 1 QAR ≈ \(quote.displayRate) INR\nAl Dar reference fetched \(AppDateDisplay.isoTimestamp(quote.fetchedAtISO))."
+        }
+        return "This plan has no effective exchange rate."
     }
 
     static func currentMonth(at date: Date) -> SelectedStatementMonth? {

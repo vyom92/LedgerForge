@@ -399,3 +399,22 @@ nonisolated struct Transaction: Identifiable, Sendable {
         )
     }
 }
+
+
+extension StatementDate: Codable {
+    nonisolated init(from decoder: Decoder) throws {
+        try self.init(canonical: decoder.singleValueContainer().decode(String.self))
+    }
+    nonisolated func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer(); try value.encode(canonical)
+    }
+}
+
+extension SelectedStatementMonth: Codable {
+    nonisolated init(from decoder: Decoder) throws {
+        try self.init(canonical: decoder.singleValueContainer().decode(String.self))
+    }
+    nonisolated func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer(); try value.encode(canonical)
+    }
+}

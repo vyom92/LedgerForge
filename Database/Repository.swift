@@ -244,7 +244,9 @@ public protocol AccountRepository {
     @discardableResult
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool
     @discardableResult
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool
+    @discardableResult
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool
     func account(id: String) throws -> AccountDTO?
     func accounts(workspaceId: String) throws -> [AccountDTO]
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String
@@ -259,6 +261,7 @@ public protocol CardRepository {
 
 public extension AccountRepository {
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { [] }
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
 }
 
 public protocol ImportSessionRepository {
@@ -641,7 +644,8 @@ private struct GenerationCheckedAccountRepository: AccountRepository {
     let validity: ProviderGenerationValidity
     func upsertAccount(_ account: AccountDTO) throws -> String { return try validity.withValidOperation { try base.upsertAccount(account) } }
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { return try validity.withValidOperation { try base.updateAccountDisplayName(accountId: accountId, workspaceId: workspaceId, displayName: displayName) } }
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.markCreditCardHistoryOnly(accountId: accountId, workspaceId: workspaceId, markedAtISO: markedAtISO) } }
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.markAccountHistoryOnly(accountId: accountId, workspaceId: workspaceId, markedAtISO: markedAtISO) } }
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool { try validity.withValidOperation { try base.markAccountCurrent(accountId: accountId, workspaceId: workspaceId) } }
     func account(id: String) throws -> AccountDTO? { return try validity.withValidOperation { try base.account(id: id) } }
     func accounts(workspaceId: String) throws -> [AccountDTO] { return try validity.withValidOperation { try base.accounts(workspaceId: workspaceId) } }
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { return try validity.withValidOperation { try base.attachIdentifier(identifier) } }
@@ -767,6 +771,18 @@ private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
         return try validity.withValidOperation { try base.savePlan(plan) }
     }
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
+        try validity.withValidOperation { try base.scratchpads(workspaceId: workspaceId) }
+    }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
+        try validity.withValidOperation { try base.saveScratchpad(value) }
+    }
+    func removeScratchpad(workspaceId: String, month: String) throws {
+        try validity.withValidOperation { try base.removeScratchpad(workspaceId: workspaceId, month: month) }
+    }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
+        try validity.withValidOperation { try base.savePlan(plan, retaining: scratchpad) }
+    }
 }
 
 private struct GenerationCheckedInvestmentRepository: InvestmentRepository {
@@ -785,6 +801,10 @@ private struct GenerationCheckedInvestmentRepository: InvestmentRepository {
     }
     func saveZurichHoldings(_ plan: ZurichISPHoldingsPlan) -> ZurichISPHoldingsResult {
         do { return try validity.withValidOperation { base.saveZurichHoldings(plan) } }
+        catch { return .staleProviderGeneration }
+    }
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult {
+        do { return try validity.withValidOperation { base.saveIBKRFlexHoldings(plan) } }
         catch { return .staleProviderGeneration }
     }
 }
@@ -837,7 +857,7 @@ struct EmptyCategoryRepo: CategoryRepository {
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
         throw RepositoryError.persistenceUnavailable
     }
     func upsertAccount(_ account: AccountDTO) throws -> String {

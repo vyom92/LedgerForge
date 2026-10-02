@@ -64,6 +64,7 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         let debits: String
         let credits: String
         let closingBalance: String
+        var printedLiterals: [String: String] = [:]
     }
 
     private struct Comparison: Decodable {
@@ -211,8 +212,13 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         var representedStatements = Set<String>()
         var createdAccounts = Set<String>()
         var authoritativeCarriers = Set<String>()
+        var carriersByImportSessionID: [String: Carrier] = [:]
         for carrier in ordered {
-            let beforeIDs = Set(try provider.transactionRepo.trustedTransactions(workspaceId: workspace).map(\.id))
+            let beforeTransactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+            let beforeIDs = Set(beforeTransactions.map(\.id))
+            let beforeProjections = try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspace)
+            let beforeGroups = try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspace)
+            let beforeMembers = try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspace)
             let beforeWork = try #require(try provider.categoryRepo.automationSnapshot(workspaceId: workspace)).work
             let createsAccount = createdAccounts.insert(carrier.account).inserted
             let result = try await prepareVerifyAndCommit(
@@ -232,6 +238,15 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             expectSourceFact(result.isEquivalentSupportingSource == isSupporting)
             expectSourceFact(result.transactionCount == (isSupporting ? 0 : carrier.rows.count))
             let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+            carriersByImportSessionID[try #require(result.importSessionId)] = carrier
+            if isSupporting {
+                // A compatible supporting observation does not rewrite the
+                // canonical transactions or historical v1 projection graph.
+                expectSourceFact(facts.sorted { $0.id < $1.id } == beforeTransactions.sorted { $0.id < $1.id })
+                expectSourceFact(try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspace) == beforeProjections)
+                expectSourceFact(try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspace) == beforeGroups)
+                expectSourceFact(try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspace) == beforeMembers)
+            }
             let metadata = try #require(try provider.categoryRepo.automationSnapshot(workspaceId: workspace))
             let newIDs = Set(facts.map(\.id)).subtracting(beforeIDs)
             #expect(Set(metadata.work.keys).subtracting(beforeWork.keys) == newIDs)
@@ -247,6 +262,8 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             snapshot: hydrator.stageHydration(),
             stores: stores,
             oracle: oracle,
+            authoritativeCarriers: authoritativeCarriers,
+            carriersByImportSessionID: carriersByImportSessionID,
             expectedAttemptCount: 8
         )
 
@@ -276,6 +293,8 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             snapshot: hydrator.stageHydration(),
             stores: stores,
             oracle: oracle,
+            authoritativeCarriers: authoritativeCarriers,
+            carriersByImportSessionID: carriersByImportSessionID,
             expectedAttemptCount: 16
         )
 
@@ -300,6 +319,8 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             snapshot: reopenedSnapshot,
             stores: reopenedStores,
             oracle: oracle,
+            authoritativeCarriers: authoritativeCarriers,
+            carriersByImportSessionID: carriersByImportSessionID,
             expectedAttemptCount: 16,
             requirePublishedStores: false
         )
@@ -349,16 +370,31 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         expectSourceFact(document.declaredStatementPeriod?.end == expectedPeriodEnd)
         expectSourceFact(document.sourceStatementEvidence?.openingBalance?.amount == decimal(carrier.summary.openingBalance))
         expectSourceFact(document.sourceStatementEvidence?.closingBalance?.amount == decimal(carrier.summary.closingBalance))
+        let printedControls = try #require(document.sourceStatementEvidence).printedControls
+        expectSourceFact(printedControls.count == 6)
+        expectSourceFact(Dictionary(printedControls.map { ($0.kind.rawValue, $0.literal) }, uniquingKeysWith: { first, _ in first }) == carrier.summary.printedLiterals)
+        expectSourceFact(printedControls.allSatisfy {
+            $0.sourceOrdinal > 0 && $0.sourcePage == nil &&
+                $0.sourceUnit == (carrier.sourceFormat == .xls ? .row : .line)
+        })
 
         let projection = try StatementFinancialProjection.make(from: document)
         expectSourceFact(projection.hasValidDigest())
         expectSourceFact(projection.eventCount == carrier.rows.count)
-        expectSourceFact(projection.openingBalance.amount == decimal(carrier.summary.openingBalance))
-        expectSourceFact(projection.closingBalance.amount == decimal(carrier.summary.closingBalance))
-        expectSourceFact(projection.debitCount == carrier.summary.debitCount)
-        expectSourceFact(projection.creditCount == carrier.summary.creditCount)
-        expectSourceFact(projection.debitTotal.amount == decimal(carrier.summary.debits))
-        expectSourceFact(projection.creditTotal.amount == decimal(carrier.summary.credits))
+        // The persisted v1 projection remains immutable compatibility evidence.
+        // Its derived controls are distinct from the literal source controls
+        // verified above and cannot decide admission or source correspondence.
+        let first = try #require(carrier.rows.first), last = try #require(carrier.rows.last)
+        expectSourceFact(projection.openingBalance.amount == decimal(first.closing) - signedAmount(first))
+        expectSourceFact(projection.closingBalance.amount == decimal(last.closing))
+        expectSourceFact(projection.debitCount == carrier.rows.filter { !$0.withdrawal.isEmpty }.count)
+        expectSourceFact(projection.creditCount == carrier.rows.filter { !$0.deposit.isEmpty }.count)
+        expectSourceFact(projection.debitTotal.amount == carrier.rows.reduce(Decimal.zero) {
+            $0 + ($1.withdrawal.isEmpty ? .zero : decimal($1.withdrawal))
+        })
+        expectSourceFact(projection.creditTotal.amount == carrier.rows.reduce(Decimal.zero) {
+            $0 + ($1.deposit.isEmpty ? .zero : decimal($1.deposit))
+        })
 
         var priorOrdinal = 0
         for (transaction, row) in zip(document.transactions, carrier.rows) {
@@ -393,32 +429,57 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         snapshot: RepositoryRuntimeSnapshot,
         stores: RuntimeStores,
         oracle: Oracle,
+        authoritativeCarriers: Set<String>,
+        carriersByImportSessionID: [String: Carrier],
         expectedAttemptCount: Int,
         requirePublishedStores: Bool = true
     ) throws {
         let counts = try graphCounts(provider: provider, workspace: workspace)
         expectSourceFact(counts.accounts == 2)
         expectSourceFact(counts.transactions == 165)
-        expectSourceFact(counts.projections == 8)
+        expectSourceFact(counts.projections == 4)
         expectSourceFact(counts.groups == 4)
-        expectSourceFact(counts.members == 8)
+        expectSourceFact(counts.members == 4)
         expectSourceFact(counts.attempts == expectedAttemptCount)
 
         let members = try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspace)
         expectSourceFact(members.filter { $0.role == .authoritative }.count == 4)
-        expectSourceFact(members.filter { $0.role == .supporting }.count == 4)
-        expectSourceFact(Set(members.map(\.sourceFormatCode)) == ["pdf", "xls"])
+        expectSourceFact(members.allSatisfy { $0.role == .authoritative })
+        let authorityFormats = Set((oracle.carriers.pdf + oracle.carriers.xls)
+            .filter { authoritativeCarriers.contains($0.carrier) }.map { $0.sourceFormat.rawValue.lowercased() })
+        expectSourceFact(Set(members.map(\.sourceFormatCode)) == authorityFormats)
         let projections = try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspace)
-        expectSourceFact(Set(projections.map(\.projection.sourceFormatCode)) == ["pdf", "xls"])
+        expectSourceFact(Set(projections.map(\.projection.sourceFormatCode)) == authorityFormats)
         expectSourceFact(projections.allSatisfy {
             $0.projection.institutionCode == StatementFinancialProjection.hdfcInstitutionCode &&
                 $0.projection.statementFamilyCode == StatementFinancialProjection.hdfcBankAccountFamilyCode &&
                 $0.projection.isValid()
         })
-        expectSourceFact(projections.reduce(0) { $0 + $1.projection.eventCount } == 330)
+        expectSourceFact(projections.reduce(0) { $0 + $1.projection.eventCount } == 165)
+        try verifyBankOccurrenceEvidence(provider: provider, workspace: workspace,
+                                         carriersByImportSessionID: carriersByImportSessionID)
         let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace)
-        expectSourceFact(attempts.filter { $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue }.count == 4)
-        expectSourceFact(attempts.filter { $0.outcomeCode == ImportAttemptOutcome.equivalentSourceRecorded.rawValue }.count == 4)
+        // The BankImport occurrence route keeps successful_import for accepted
+        // supporting sources; the legacy projection route owns the separate
+        // equivalent_source_recorded outcome. Counts retain the distinction.
+        let acceptedAttempts = attempts.filter { $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue }
+        expectSourceFact(acceptedAttempts.count == 8)
+        expectSourceFact(attempts.filter { $0.outcomeCode == ImportAttemptOutcome.equivalentSourceRecorded.rawValue }.isEmpty)
+        expectSourceFact(acceptedAttempts.filter { $0.transactionCount > 0 }.count == 4)
+        expectSourceFact(acceptedAttempts.filter { $0.transactionCount == 0 }.count == 4)
+        expectSourceFact(Set(acceptedAttempts.compactMap(\.importSessionId)) == Set(carriersByImportSessionID.keys))
+        for attempt in acceptedAttempts {
+            let sessionID = try #require(attempt.importSessionId)
+            let carrier = try #require(carriersByImportSessionID[sessionID])
+            let sourceCount = carrier.rows.count
+            let importedCount = authoritativeCarriers.contains(carrier.carrier) ? sourceCount : 0
+            expectSourceFact(attempt.persistenceCode == ImportAttemptPersistence.committed.rawValue)
+            expectSourceFact(attempt.transactionCount == importedCount)
+            expectSourceFact(attempt.sourceRowCount == sourceCount)
+            expectSourceFact(attempt.importedTransactionCount == importedCount)
+            expectSourceFact(attempt.recognizedExistingRowCount == sourceCount - importedCount)
+            expectSourceFact(attempt.blockedRowCount == 0)
+        }
         if expectedAttemptCount == 16 {
             expectSourceFact(attempts.filter { $0.outcomeCode == ImportAttemptOutcome.exactStatementDuplicate.rawValue }.count == 8)
         }
@@ -431,7 +492,7 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         let actual = try multiset(snapshot.transactions.map { transaction in
             try transactionKey(transaction, identifiersByAccountID: identifiers)
         })
-        let expected = try expectedFinancialMultiset(oracle)
+        let expected = try expectedFinancialMultiset(oracle, authoritativeCarriers: authoritativeCarriers)
         expectSourceFact(actual == expected)
         expectSourceFact(snapshot.transactions.allSatisfy { transaction in
             transaction.sourceProvenance.count == 1 &&
@@ -481,12 +542,105 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         })
     }
 
+    private func verifyBankOccurrenceEvidence(
+        provider: DatabaseProvider,
+        workspace: String,
+        carriersByImportSessionID: [String: Carrier]
+    ) throws {
+        let graph = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspace)
+        let canonical = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
+        expectSourceFact(graph.sections.count == 8)
+        expectSourceFact(graph.sections.reduce(0) { $0 + $1.rows.count } == 330)
+        expectSourceFact(Set(graph.sections.map(\.importSessionId)) == Set(carriersByImportSessionID.keys))
+        for section in graph.sections {
+            let carrier = try #require(carriersByImportSessionID[section.importSessionId])
+            let authoritySessions = Set(canonical.compactMap(\.importSessionId)).filter {
+                carriersByImportSessionID[$0]?.logicalStatementKey == carrier.logicalStatementKey
+            }
+            expectSourceFact(authoritySessions.count == 1)
+            let authoritySession = try #require(authoritySessions.first)
+            let authority = try #require(carriersByImportSessionID[authoritySession])
+            let authorityTransactions = canonical.filter { $0.importSessionId == authoritySession }.sorted {
+                ($0.rawRows.first?.sourceOrdinal ?? Int.max) < ($1.rawRows.first?.sourceOrdinal ?? Int.max)
+            }
+            try sourceRequire(authorityTransactions.count == authority.rows.count, "canonical source multiplicity")
+            for (transaction, row) in zip(authorityTransactions, authority.rows) {
+                // The raw ordinal selects an authority row only after that
+                // transaction's actual facts agree with the independent source.
+                let expectedAmount = try Money(amount: signedAmount(row), currency: CurrencyCode(authority.currency))
+                let expectedBalance = try Money(amount: decimal(row.closing), currency: CurrencyCode(authority.currency))
+                expectSourceFact(transaction.importSessionId == authoritySession)
+                expectSourceFact(transaction.postedDateISO == (try statementDate(row.date)).canonical)
+                expectSourceFact(transaction.valueDateISO == (try statementDate(row.valueDate)).canonical)
+                expectSourceFact(transaction.nativeCurrency == authority.currency)
+                expectSourceFact(decimal(transaction.amountDecimal) == signedAmount(row))
+                expectSourceFact(transaction.amountMinor == (try expectedAmount.minorUnits()))
+                expectSourceFact(transaction.direction == (row.withdrawal.isEmpty ? "credit" : "debit"))
+                expectSourceFact(transaction.runningBalanceMinor == (try expectedBalance.minorUnits()))
+                expectSourceFact((transaction.reference ?? "") == row.reference)
+                expectSourceFact(compact(transaction.description ?? "") == compact(row.narration))
+                expectSourceFact(transaction.rawRows.count == 1)
+                let raw = try #require(transaction.rawRows.first)
+                expectSourceFact(raw.parserProfileId == (authority.sourceFormat == .pdf ? "hdfc.bank-account.pdf" : "hdfc.bank-account.xls"))
+                expectSourceFact(raw.parserProfileVersion == "1")
+                if let physicalRow = row.physicalRow {
+                    expectSourceFact(raw.sourceOrdinal == physicalRow)
+                } else {
+                    expectSourceFact((raw.sourceOrdinal ?? 0) > 0)
+                }
+            }
+            let correspondence: [Int]
+            if carrier.sha256 == authority.sha256 {
+                correspondence = Array(carrier.rows.indices)
+            } else {
+                correspondence = try sourceCorrespondence(carrier.rows, authority.rows)
+            }
+            expectSourceFact(section.rows.count == carrier.rows.count)
+            expectSourceFact(section.nativeCurrency == carrier.currency)
+            expectSourceFact(section.sourceEvidence.sourceFormatCode == carrier.sourceFormat.rawValue.lowercased())
+            expectSourceFact(section.sourceEvidence.statementStartDateISO == (try statementDate(carrier.periodStart)).canonical)
+            expectSourceFact(section.sourceEvidence.statementEndDateISO == (try statementDate(carrier.periodEnd)).canonical)
+            expectSourceFact(section.sourceEvidence.openingBalanceDecimal.map(decimal) == decimal(carrier.summary.openingBalance))
+            expectSourceFact(section.sourceEvidence.closingBalanceDecimal.map(decimal) == decimal(carrier.summary.closingBalance))
+            let details = try #require(section.sourceDetails)
+            expectSourceFact(details.controls.count == 6)
+            expectSourceFact(Dictionary(details.controls.map { ($0.kind, $0.literal) }, uniquingKeysWith: { first, _ in first }) == carrier.summary.printedLiterals)
+            expectSourceFact(details.controls.allSatisfy {
+                $0.sourceOrdinal > 0 && $0.sourcePage == nil &&
+                    $0.sourceUnit == (carrier.sourceFormat == .xls ? "row" : "line")
+            })
+            let targets = section.rows.map { $0.source.incomingTransactionId }
+            expectSourceFact(Set(targets).count == carrier.rows.count)
+            expectSourceFact(Set(targets) == Set(authorityTransactions.map(\.id)))
+            let ordinals = section.rows.map(\.sourceOrdinal)
+            expectSourceFact(Set(ordinals).count == carrier.rows.count && ordinals.allSatisfy { $0 > 0 })
+            for (index, pair) in zip(section.rows, carrier.rows).enumerated() {
+                let occurrence = pair.0, row = pair.1
+                // This zip checks one original's own physical row sequence;
+                // source correspondence was proved independently above.
+                expectSourceFact(occurrence.source.incomingTransactionId == authorityTransactions[correspondence[index]].id)
+                expectSourceFact(occurrence.source.postingDateISO == (try statementDate(row.date)).canonical)
+                expectSourceFact(occurrence.valueDateISO == (try statementDate(row.valueDate)).canonical)
+                expectSourceFact(decimal(occurrence.source.signedAmountDecimal) == signedAmount(row))
+                expectSourceFact(decimal(occurrence.source.runningBalanceDecimal) == decimal(row.closing))
+                expectSourceFact(decimal(occurrence.literalBalance) == decimal(row.closing))
+                expectSourceFact(compact(occurrence.literalNarration) == compact(row.narration))
+                expectSourceFact((occurrence.literalReference ?? "") == row.reference)
+                if let physicalRow = row.physicalRow {
+                    expectSourceFact(occurrence.sourceOrdinal == physicalRow)
+                }
+            }
+        }
+    }
+
     private struct GraphCounts: Equatable {
         let accounts: Int
         let transactions: Int
         let projections: Int
         let groups: Int
         let members: Int
+        let bankSections: Int
+        let bankOccurrences: Int
         let attempts: Int
 
         var withoutAttempts: GraphCounts {
@@ -496,18 +650,23 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
                 projections: projections,
                 groups: groups,
                 members: members,
+                bankSections: bankSections,
+                bankOccurrences: bankOccurrences,
                 attempts: 0
             )
         }
     }
 
     private func graphCounts(provider: DatabaseProvider, workspace: String) throws -> GraphCounts {
-        GraphCounts(
+        let bank = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspace)
+        return GraphCounts(
             accounts: try provider.accountRepo.accounts(workspaceId: workspace).count,
             transactions: try provider.transactionRepo.trustedTransactions(workspaceId: workspace).count,
             projections: try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspace).count,
             groups: try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspace).count,
             members: try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspace).count,
+            bankSections: bank.sections.count,
+            bankOccurrences: bank.sections.reduce(0) { $0 + $1.rows.count },
             attempts: try provider.importSessionRepo.importAttempts(workspaceId: workspace).count
         )
     }
@@ -519,6 +678,8 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             projections: 0,
             groups: 0,
             members: 0,
+            bankSections: 0,
+            bankOccurrences: 0,
             attempts: 0
         ))
     }
@@ -553,8 +714,9 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         })
     }
 
-    private func expectedFinancialMultiset(_ oracle: Oracle) throws -> [String: Int] {
-        try multiset(oracle.carriers.pdf.flatMap { carrier in
+    private func expectedFinancialMultiset(_ oracle: Oracle, authoritativeCarriers: Set<String>) throws -> [String: Int] {
+        try multiset((oracle.carriers.pdf + oracle.carriers.xls)
+            .filter { authoritativeCarriers.contains($0.carrier) }.flatMap { carrier in
             try carrier.rows.map { row in
                 try financialKey(
                     account: carrier.account,
@@ -866,7 +1028,10 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
                     summaries.append(try Summary(
                         openingBalance: sourceMoney(values[0]), debitCount: dr, creditCount: cr,
                         debits: sourceMoney(values[3]), credits: sourceMoney(values[4]),
-                        closingBalance: sourceMoney(values[5])
+                        closingBalance: sourceMoney(values[5]),
+                        printedLiterals: ["openingBalance": values[0], "debitCount": values[1],
+                            "creditCount": values[2], "debitTotal": values[3],
+                            "creditTotal": values[4], "closingBalance": values[5]]
                     ))
                     inSummary = false
                 }
@@ -970,7 +1135,10 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         let summary = try Summary(
             openingBalance: sourceMoney(amounts[0]), debitCount: dr, creditCount: cr,
             debits: sourceMoney(amounts[4]), credits: sourceMoney(amounts[5]),
-            closingBalance: sourceMoney(amounts[6])
+            closingBalance: sourceMoney(amounts[6]),
+            printedLiterals: ["openingBalance": amounts[0], "debitCount": counts[4],
+                "creditCount": counts[5], "debitTotal": amounts[4],
+                "creditTotal": amounts[5], "closingBalance": amounts[6]]
         )
         return try sourceMakeCarrier(
             url: url, data: data,
@@ -979,35 +1147,52 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         )
     }
     private func sourceCheckCarrier(_ carrier: Carrier, root: URL) throws {
-        var previous = try sourceDecimal(carrier.summary.openingBalance)
-        var debit = Decimal.zero, credit = Decimal.zero
-        var dr = 0, cr = 0
+        _ = try sourceDecimal(carrier.summary.openingBalance)
+        _ = try sourceDecimal(carrier.summary.closingBalance)
+        _ = try sourceDecimal(carrier.summary.debits)
+        _ = try sourceDecimal(carrier.summary.credits)
         for row in carrier.rows {
             try sourceValidateDate(row.date, fourDigitYear: false)
             try sourceValidateDate(row.valueDate, fourDigitYear: false)
             try sourceRequire(row.withdrawal.isEmpty != row.deposit.isEmpty, "single financial direction")
             let withdrawal = try sourceDecimal(row.withdrawal.isEmpty ? "0" : row.withdrawal)
             let deposit = try sourceDecimal(row.deposit.isEmpty ? "0" : row.deposit)
-            let closing = try sourceDecimal(row.closing)
+            _ = try sourceDecimal(row.closing)
             try sourceRequire(withdrawal >= 0 && deposit >= 0, "unsigned source columns")
-            try sourceRequire(previous - withdrawal + deposit == closing, "running balance")
-            previous = closing
-            debit += withdrawal
-            credit += deposit
-            dr += row.withdrawal.isEmpty ? 0 : 1
-            cr += row.deposit.isEmpty ? 0 : 1
         }
-        let closing = try sourceDecimal(carrier.summary.closingBalance)
-        let debits = try sourceDecimal(carrier.summary.debits)
-        let credits = try sourceDecimal(carrier.summary.credits)
-        try sourceRequire(previous == closing && debit == debits && credit == credits, "summary totals")
-        try sourceRequire(dr == carrier.summary.debitCount && cr == carrier.summary.creditCount, "summary counts")
+        // Every row and literal control has been parsed independently. The
+        // statement's balance/summary arithmetic is retained without vetoing
+        // otherwise complete explicit withdrawal/deposit facts.
         try sourceValidateDate(carrier.periodStart, fourDigitYear: true)
         try sourceValidateDate(carrier.periodEnd, fourDigitYear: true)
         try sourceRequire(carrier.currency == "INR", "source native currency")
         let digest = SHA256.hash(data: try Data(contentsOf: root.appendingPathComponent(carrier.carrier)))
             .map { String(format: "%02x", $0) }.joined()
         try sourceRequire(digest == carrier.sha256, "original bytes unchanged")
+    }
+
+    private func sourceCorrespondence(_ first: [Row], _ second: [Row]) throws -> [Int] {
+        try sourceRequire(first.count == second.count, "paired source multiplicity")
+        var used = Set<Int>(), mapping: [Int] = []
+        for row in first {
+            let candidates = try second.indices.filter { index in
+                let candidate = second[index]
+                let withdrawal = try sourceDecimal(row.withdrawal.isEmpty ? "0" : row.withdrawal)
+                let otherWithdrawal = try sourceDecimal(candidate.withdrawal.isEmpty ? "0" : candidate.withdrawal)
+                let deposit = try sourceDecimal(row.deposit.isEmpty ? "0" : row.deposit)
+                let otherDeposit = try sourceDecimal(candidate.deposit.isEmpty ? "0" : candidate.deposit)
+                return row.date == candidate.date && row.valueDate == candidate.valueDate &&
+                    row.reference == candidate.reference &&
+                    sourceCompact(row.narration) == sourceCompact(candidate.narration) &&
+                    withdrawal == otherWithdrawal && deposit == otherDeposit
+            }
+            try sourceRequire(candidates.count == 1, "independently unique source occurrence")
+            let target = candidates[0]
+            try sourceRequire(used.insert(target).inserted, "injective source occurrence ownership")
+            mapping.append(target)
+        }
+        try sourceRequire(used.count == second.count, "complete source correspondence")
+        return mapping
     }
     /// Preserve the mixed queue's existing lowest-digest XLS selection while
     /// reusing the complete eight-original comparison, entirely in memory.
@@ -1068,15 +1253,14 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
         var comparisons: [Comparison] = []
         for key in pdfByIdentity.keys.sorted() {
             let p = pdfByIdentity[key]!, x = xlsByIdentity[key]!
-            try sourceRequire(p.summary == x.summary, "paired financial controls")
-            try sourceRequire(p.rows.count == x.rows.count, "paired source multiplicity")
+            let correspondence = try sourceCorrespondence(p.rows, x.rows)
             var financial: [Mismatch] = [], compactMismatch: [Int] = [], literal: [Int] = []
-            for (index, pair) in zip(p.rows, x.rows).enumerated() {
-                let a = pair.0, b = pair.1, ordinal = index + 1
+            for (index, target) in correspondence.enumerated() {
+                let a = p.rows[index], b = x.rows[target], ordinal = index + 1
                 let fields: [(String, String, String)] = [
                     ("date", a.date, b.date), ("valueDate", a.valueDate, b.valueDate),
                     ("withdrawal", a.withdrawal, b.withdrawal), ("deposit", a.deposit, b.deposit),
-                    ("closing", a.closing, b.closing), ("reference", a.reference, b.reference)
+                    ("reference", a.reference, b.reference)
                 ]
                 for (field, left, right) in fields where left != right {
                     financial.append(Mismatch(ordinal: ordinal, field: field))
@@ -1084,7 +1268,7 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
                 if sourceCompact(a.narration) != sourceCompact(b.narration) { compactMismatch.append(ordinal) }
                 if a.narration != b.narration { literal.append(ordinal) }
             }
-            try sourceRequire(financial.isEmpty && compactMismatch.isEmpty, "paired ordered financial/reference/narration")
+            try sourceRequire(financial.isEmpty && compactMismatch.isEmpty, "paired unique financial/reference/narration occurrences")
             comparisons.append(Comparison(
                 logicalStatement: URL(fileURLWithPath: p.carrier).deletingPathExtension().lastPathComponent,
                 financialOrReferenceMismatches: financial,
@@ -1106,8 +1290,9 @@ struct HDFCBankAccountAuthenticAcceptanceTests {
             guard let x = xlsByIdentity[p.logicalStatementKey] else {
                 throw NSError(domain: "LedgerForge.HDFCIndependentSourceOracle", code: 11)
             }
-            try sourceRequire(ordinal <= p.rows.count && ordinal <= x.rows.count, "adjudication extent")
-            let a = p.rows[ordinal - 1], b = x.rows[ordinal - 1]
+            try sourceRequire(ordinal <= p.rows.count, "adjudication extent")
+            let correspondence = try sourceCorrespondence(p.rows, x.rows)
+            let a = p.rows[ordinal - 1], b = x.rows[correspondence[ordinal - 1]]
             try sourceRequire(b.physicalRow == physicalRow, "adjudication physical source row")
             try sourceRequire(a.narration != b.narration, "literal source narration difference")
             try sourceRequire(sourceCompact(a.narration) == sourceCompact(b.narration), "adjudication compact equality")

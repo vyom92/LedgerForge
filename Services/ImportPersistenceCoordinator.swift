@@ -224,6 +224,16 @@ enum ImportCardInstrumentChoice: Equatable {
             return relatedID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         }
     }
+
+    /// Separate printed sections need separate destinations. New-card choices
+    /// each create their own instrument; only reused durable IDs can collide.
+    static func hasDistinctExistingDestinations(_ choices: [String: Self]) -> Bool {
+        let existing = choices.values.compactMap { choice -> String? in
+            if case .reuseExistingInstrument(let id) = choice { return id }
+            return nil
+        }
+        return Set(existing).count == existing.count
+    }
 }
 
 /// A document-owned bank section can either reuse one eligible bank account or
@@ -1096,10 +1106,11 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             plan = try mapper.bankImportPlan(financialDocument: financialDocument, importSession: importSession,
                 validation: validation, fingerprintSet: fingerprintSet, providerGeneration: providerGeneration,
                 review: review, accountChoice: accountChoice)
-        } else if let account = try standaloneBankOccurrenceAccount(financialDocument, validation: validation,
+        } else if let route = try standaloneBankOccurrenceAccount(financialDocument, validation: validation,
                     accountChoice: accountChoice, provider: provider) {
             plan = try mapper.standaloneBankImportPlan(financialDocument: financialDocument, importSession: importSession,
-                validation: validation, fingerprintSet: fingerprintSet, providerGeneration: providerGeneration, account: account)
+                validation: validation, fingerprintSet: fingerprintSet, providerGeneration: providerGeneration,
+                account: route.account, statementCorrespondence: route.statementCorrespondence)
         } else {
             throw ImportPersistenceCoordinationError.explicitChoiceRequired
         }
@@ -1130,6 +1141,12 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 importSessionId: previous.importSessionId, transactionCount: 0,
                 previousImport: Self.previousImport(from: previous), importAttemptId: attemptID)
         case .held(let hold):
+            if hold.reason == "statement_format_already_recorded" {
+                let attemptID = rejectedAttempt(provider: provider, result: .equivalentFormatAlreadyRecorded,
+                    count: 0, accountId: plan.sections.first?.source.accountId)
+                throw ImportPersistenceCommitFailure(originalError: ImportPersistenceCoordinationError.equivalentFormatAlreadyRecorded,
+                    importAttemptId: attemptID)
+            }
             let attemptID = recordAttempt(provider: provider, outcome: .bankSourceOverlapHeld,
                 coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .integrityReviewRequired,
                 persistence: .rejectedRecorded, transactionCount: 0)
@@ -1306,7 +1323,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
 
         if contract == .axis {
-            guard evidence.accountSourceIdentityObservations.isEmpty,
+            guard evidence.accountSourceIdentityObservations.count <= 1,
+                  evidence.accountSourceIdentityObservations.allSatisfy({
+                      $0.kind == .axisPrimaryMaskedCardNumber && $0.subject == .liabilityAccount
+                  }),
                   evidence.instrumentSections.isEmpty,
                   evidence.transactionAnnotations.allSatisfy({
                       $0.financialScope == .accountLevel && $0.documentScopedSectionID == nil
@@ -1316,7 +1336,22 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             let proposedAccountID = "account-\(importSession.id.uuidString.lowercased())"
             let selectedAccountID: String
             let confirmedAccountChoice: ConfirmedImportAccountChoiceDTO
-            switch accountChoice {
+            var associationAuthority = "user_confirmed"
+            let review = try reviewValidatedImport(financialDocument: financialDocument, validation: validation)
+            let resolvedChoice: ImportAccountChoice?
+            if case .matchedExisting(let accountID) = review {
+                guard accountChoice == nil || accountChoice == .useExistingAccount(accountId: accountID) else {
+                    throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+                }
+                resolvedChoice = .useExistingAccount(accountId: accountID)
+                associationAuthority = "prior_user_confirmed_mapping"
+            } else {
+                guard review != .conflict else {
+                    throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+                }
+                resolvedChoice = accountChoice
+            }
+            switch resolvedChoice {
             case .createNewAccount:
                 selectedAccountID = proposedAccountID
                 confirmedAccountChoice = .createProposedAccount
@@ -1345,7 +1380,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 accountChoice: confirmedAccountChoice,
                 selectedAccountId: selectedAccountID,
                 proposedAccountDisplayName: accountChoice?.proposedAccountDisplayName,
-                cardAssociationAuthority: "user_confirmed",
+                cardAssociationAuthority: associationAuthority,
                 cardSectionChoices: [:],
                 cardSectionAuthorities: [:],
                 cardSectionRelationships: [:]
@@ -1396,19 +1431,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             mappingsByAccount[accountID] = [:]
             for section in evidence.instrumentSections {
                 let incoming = section.sourceIdentityObservations[0]
-                let instruments = Set(snapshot.sectionObservations.compactMap { observation -> String? in
-                    guard observation.associationAuthority == "user_confirmed",
-                          observation.observationKind == incoming.kind.rawValue,
-                          observation.sourceValue == incoming.value,
-                          let durableSection = snapshot.sections.first(where: {
-                              $0.id == observation.cardStatementSectionId
-                          }),
-                          snapshot.instruments.contains(where: {
-                              $0.id == durableSection.instrumentId && $0.liabilityAccountId == accountID
-                          }) else { return nil }
-                    return durableSection.instrumentId
-                }).sorted()
-                mappingsByAccount[accountID, default: [:]][section.documentScopedSectionID] = instruments
+                let instrument = snapshot.resolvedConfirmedInstrument(accountID: accountID,
+                    kind: incoming.kind.rawValue, value: incoming.value)
+                mappingsByAccount[accountID, default: [:]][section.documentScopedSectionID] = instrument.map { [$0] } ?? []
             }
         }
 
@@ -1448,6 +1473,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             guard Set(choices.keys) == Set(evidence.instrumentSections.map(\.documentScopedSectionID)),
                   choices.values.allSatisfy(\.isComplete) else {
                 throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
+            guard ImportCardInstrumentChoice.hasDistinctExistingDestinations(choices) else {
+                throw ImportPersistenceCoordinationError.explicitChoiceRequired
             }
             selectedAccountID = accountID
             confirmedAccountChoice = .useExistingAccount(accountId: accountID)
@@ -1636,7 +1664,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                       financialDocument.metadata.documentType == .creditCard,
                       [.pdf, .xlsx].contains(financialDocument.metadata.fileFormat),
                       evidence.nativeCurrency.code == "INR",
-                      evidence.accountSourceIdentityObservations.isEmpty,
+                      evidence.accountSourceIdentityObservations.count <= 1,
+                      evidence.accountSourceIdentityObservations.allSatisfy({
+                          $0.kind == .axisPrimaryMaskedCardNumber && $0.subject == .liabilityAccount
+                      }),
                       evidence.instrumentSections.isEmpty else {
                     return .conflict
                 }
@@ -1647,8 +1678,15 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                             $0.institutionId == Institution.axis.rawValue
                     }
                     .map(\.id).sorted()
-                // Institution/family similarity never auto-selects an Axis
-                // liability account; the user must review this choice.
+                if let incoming = evidence.accountSourceIdentityObservations.first {
+                    let mapped = Set(snapshot.sourceObservations.filter {
+                        eligible.contains($0.subjectId) && $0.subjectKind == "liability_account" &&
+                        $0.observationKind == incoming.kind.rawValue && $0.sourceValue == incoming.value &&
+                        $0.associationAuthority == "user_confirmed"
+                    }.map(\.subjectId))
+                    guard mapped.count <= 1 else { return .conflict }
+                    if let accountID = mapped.first { return .matchedExisting(accountId: accountID) }
+                }
                 return .liabilityAccountChoiceRequired(eligibleLiabilityAccountIds: eligible)
             }
             guard let accountObservation = evidence.accountSourceIdentityObservations.first,
@@ -1674,19 +1712,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             let exactlyMappedAccounts = accountIDs.filter { accountID in
                 let resolvedInstruments = evidence.instrumentSections.compactMap { incomingSection -> String? in
                     let incoming = incomingSection.sourceIdentityObservations[0]
-                    let mapped = Set(snapshot.sectionObservations.compactMap { observation -> String? in
-                        guard observation.associationAuthority == "user_confirmed",
-                              observation.observationKind == incoming.kind.rawValue,
-                              observation.sourceValue == incoming.value,
-                              let section = snapshot.sections.first(where: {
-                                  $0.id == observation.cardStatementSectionId
-                              }),
-                              snapshot.instruments.contains(where: {
-                                  $0.id == section.instrumentId && $0.liabilityAccountId == accountID
-                              }) else { return nil }
-                        return section.instrumentId
-                    })
-                    return mapped.count == 1 ? mapped.first : nil
+                    return snapshot.resolvedConfirmedInstrument(accountID: accountID,
+                        kind: incoming.kind.rawValue, value: incoming.value)
                 }
                 return resolvedInstruments.count == evidence.instrumentSections.count &&
                     Set(resolvedInstruments).count == evidence.instrumentSections.count
@@ -1898,12 +1925,19 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         return zip(mask, normalized).allSatisfy { printed, full in printed == "X" || printed == full }
     }
 
-    /// Select the occurrence path from durable same-account relationship
-    /// evidence, never from a loose date/amount resemblance. A held occurrence
-    /// decision cannot fall back to ordinary transaction creation.
+    private struct StandaloneBankOccurrenceRoute {
+        let account: AccountDTO
+        let statementCorrespondence: BankStatementCorrespondenceRequirementDTO?
+        var formatAlreadyRecorded = false
+    }
+
+    /// Select the existing occurrence path from durable relationship evidence
+    /// or a complete legacy statement group. The latter requires an exact
+    /// whole-statement bijection inside each provider's commit boundary.
+    /// A held occurrence decision cannot fall back to transaction creation.
     private func standaloneBankOccurrenceAccount(_ document: FinancialDocument,
             validation: ImportValidationResult, accountChoice: ImportAccountChoice?,
-            provider: DatabaseProvider) throws -> AccountDTO? {
+            provider: DatabaseProvider) throws -> StandaloneBankOccurrenceRoute? {
         guard BankImportDecision.standaloneProfiles.contains(document.parserProfileID ?? ""),
               document.parserProfileVersion == BankImportDecision.supportedVersion(for: document.parserProfileID ?? "") else { return nil }
         let review = try reviewValidatedImport(financialDocument: document, validation: validation)
@@ -1916,11 +1950,38 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         default: return nil
         }
         let sections = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: mapper.workspaceId).sections
-        guard sections.contains(where: { $0.accountId == accountID && BankImportDecision.relationshipProfiles.contains($0.parserProfileId) }) else { return nil }
         guard let account = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId).first(where: { $0.id == accountID }) else {
             throw ImportPersistenceCoordinationError.selectedAccountUnavailable
         }
-        return account
+        if sections.contains(where: { $0.accountId == accountID && BankImportDecision.relationshipProfiles.contains($0.parserProfileId) }) {
+            return .init(account: account, statementCorrespondence: nil)
+        }
+        guard !document.transactions.isEmpty, let period = document.declaredStatementPeriod,
+              let currency = document.bookedCurrency?.code else { return nil }
+        let axis = document.parserProfileID?.hasPrefix("axis.") == true
+        let groups = try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: mapper.workspaceId).filter {
+            $0.accountID == accountID && $0.institutionCode == (axis ? "axis" : "hdfc") &&
+                $0.statementFamilyCode == (axis ? "axis.bank-account" : "hdfc.bank-account") &&
+                $0.statementStartDateISO == period.start.canonical && $0.statementEndDateISO == period.end.canonical &&
+                $0.nativeCurrency == currency
+        }
+        guard groups.count <= 1 else { throw ImportPersistenceCoordinationError.repositoryIntegrityConflict }
+        guard let group = groups.first else { return nil }
+        let format = document.parserProfileID?.split(separator: ".").last.map(String.init) ?? ""
+        // Keep the legacy already-recorded-format outcome. Exact-byte replay
+        // remains separately owned by the original fingerprint path.
+        let members = try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: mapper.workspaceId)
+        guard !members.contains(where: { $0.groupID == group.id && $0.sourceFormatCode == format }) else { return nil }
+        let formatAlreadyRecorded = sections.contains {
+            $0.accountId == accountID && $0.nativeCurrency == currency &&
+                BankImportDecision.standaloneProfiles.contains($0.parserProfileId) &&
+                $0.sourceEvidence.statementStartDateISO == period.start.canonical &&
+                $0.sourceEvidence.statementEndDateISO == period.end.canonical &&
+                $0.sourceEvidence.sourceFormatCode == format
+        }
+        return .init(account: account, statementCorrespondence: .init(
+            groupID: group.id, authoritativeProjectionID: group.authoritativeProjectionID),
+            formatAlreadyRecorded: formatAlreadyRecorded)
     }
 
     func persistValidatedImport(
@@ -2160,8 +2221,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
         }
-        if try standaloneBankOccurrenceAccount(financialDocument, validation: validation, accountChoice: accountChoice, provider: provider) != nil {
-            return .notApplicable
+        if let route = try standaloneBankOccurrenceAccount(financialDocument, validation: validation, accountChoice: accountChoice, provider: provider) {
+            return route.formatAlreadyRecorded ? .formatAlreadyRecorded : .notApplicable
         }
         let plan = try makeConfirmedPlan(
             provider: provider,

@@ -10,11 +10,13 @@ nonisolated struct IntelligenceAccountContext: Equatable, Sendable, Identifiable
     let routeType: String?
     let verifiedIdentifiers: Set<String>
     var selectionDetail: String? = nil
+    var isHistoryOnly = false
 
-    var selectionTitle: String {
-        let suffix = verifiedIdentifiers.sorted { ($0.count, $0) < ($1.count, $1) }.first.map { " · …" + $0.suffix(4) } ?? ""
-        return title + suffix + " · " + currency + (suffix.isEmpty ? selectionDetail.map { " · " + $0 } ?? "" : "")
+    var selectionContext: String {
+        let suffix = verifiedIdentifiers.sorted { ($0.count, $0) < ($1.count, $1) }.first.map { "…" + $0.suffix(4) }
+        return [suffix, currency, suffix == nil ? selectionDetail : nil, isHistoryOnly ? "History only" : nil].compactMap { $0 }.joined(separator: " · ")
     }
+    var selectionTitle: String { title + " · " + selectionContext }
 }
 
 nonisolated struct FinancialCoveragePeriod: Equatable, Sendable {
@@ -27,6 +29,11 @@ nonisolated struct FinancialSourceContext: Equatable, Sendable {
     var accounts: [IntelligenceAccountContext] = []
     var periods: [FinancialCoveragePeriod] = []
     static let empty = Self()
+
+    func accountScope(selectedAccountIDs: Set<String> = []) -> AccountPresentationScope {
+        .init(selectedAccountIDs: selectedAccountIDs,
+              historyOnlyAccountIDs: Set(accounts.filter(\.isHistoryOnly).map(\.id)))
+    }
 
     func hasCompleteCoverage(accountID: String, start: StatementDate, end: StatementDate) -> Bool {
         let periods = periods.filter { $0.accountID == accountID }.sorted { $0.start < $1.start }
@@ -242,8 +249,9 @@ nonisolated enum SpendingIntelligence {
             let expenses = report.rows.filter { $0.treatment == .expense }
             let purchases = expenses.filter { !$0.source.isCharge }
             let charges = expenses.filter { $0.source.isCharge }
-            let coverage = sources.accounts.filter { $0.currency == currency && (accountIDs.isEmpty || accountIDs.contains($0.id)) }.map { account in
-                SpendingComparisonPeriod.Coverage(id: account.id, title: account.selectionTitle,
+            let scope = sources.accountScope(selectedAccountIDs: accountIDs)
+            let coverage = sources.accounts.filter { $0.currency == currency && scope.includes($0.id) }.map { account in
+                SpendingComparisonPeriod.Coverage(id: account.id, title: account.title,
                     recordedThrough: sources.periods.filter { $0.accountID == account.id && $0.start <= upper }.map(\.end).max(),
                     complete: sources.hasCompleteCoverage(accountID: account.id, start: lower, end: upper))
             }
@@ -456,7 +464,8 @@ nonisolated enum SpendingIntelligence {
         defer { GmailQualificationTiming.end(.spendingProjection, started: timing, count: rows.count) }
 #endif
         try Task.checkCancellation()
-        let selectedAccounts = sources.accounts.filter { $0.currency == currency && (accountIDs.isEmpty || accountIDs.contains($0.id)) }
+        let scope = sources.accountScope(selectedAccountIDs: accountIDs)
+        let selectedAccounts = sources.accounts.filter { $0.currency == currency && scope.includes($0.id) }
         let selectedIDs = Set(selectedAccounts.map(\.id))
         let accountRows = rows.filter { $0.currency == currency && selectedIDs.contains($0.accountID) }
         let selected = accountRows.filter {
@@ -492,8 +501,15 @@ nonisolated enum SpendingIntelligence {
                 amount: values.reduce(0) { $0 + $1.spending }, transactionIDs: Set(values.map(\.id)))
         }.sorted { ($0.amount, $0.id) > ($1.amount, $1.id) }
         let selectedTransactionIDs = Set(selected.map(\.id))
+        // Keep the complete relationship for interpretation, but do not expose
+        // a partial pair when one of its accounts is outside the history scope.
+        let excludedHistory = Set(sources.accounts.filter(\.isHistoryOnly).map(\.id)).subtracting(accountIDs)
+        let hiddenHistoryRows = Set(rows.filter { excludedHistory.contains($0.accountID) }.map(\.id))
         return .init(rows: review, periods: periods, categories: categories,
-            suggestions: try (allSuggestions ?? suggestions(rows: rows, metadata: metadata, sources: sources)).filter { !$0.transactionIDs.allSatisfy { !selectedTransactionIDs.contains($0) } },
+            suggestions: try (allSuggestions ?? suggestions(rows: rows, metadata: metadata, sources: sources)).filter {
+                !$0.transactionIDs.allSatisfy { !selectedTransactionIDs.contains($0) }
+                    && $0.transactionIDs.allSatisfy { !hiddenHistoryRows.contains($0) }
+            },
             selectedCurrency: currency, income: review.reduce(0) { $0 + $1.income }, spending: review.reduce(0) { $0 + $1.spending },
             unresolvedCount: review.filter { $0.treatment == .unresolved }.count, missingDateCount: accountRows.filter { $0.date == nil }.count)
     }

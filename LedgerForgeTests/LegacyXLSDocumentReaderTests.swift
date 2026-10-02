@@ -1,3 +1,4 @@
+import CLegacyXLS
 import Dispatch
 import Foundation
 import Synchronization
@@ -6,6 +7,13 @@ import Testing
 
 @MainActor
 struct LegacyXLSDocumentReaderTests {
+    @Test func readerMapsTextProductionFailuresToTypedDocumentErrors() {
+        #expect(LegacyXLSDocumentReader.importError(for: LF_XLS_ERROR_TEXT_CONVERSION)
+            == .invalidDocument(message: "XLS text could not be decoded."))
+        #expect(LegacyXLSDocumentReader.importError(for: LF_XLS_ERROR_ALLOCATION)
+            == .invalidDocument(message: "XLS workbook exceeds supported resource limits."))
+    }
+
     @Test func readerSupportsExactlyXLS() {
         #expect(LegacyXLSDocumentReader().supportedFileExtensions == ["xls"])
     }

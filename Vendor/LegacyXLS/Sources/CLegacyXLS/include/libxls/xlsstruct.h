@@ -38,6 +38,18 @@
 
 #include "../libxls/ole.h"
 
+typedef enum {
+    LIBXLS_OK,
+    LIBXLS_ERROR_OPEN,
+    LIBXLS_ERROR_SEEK,
+    LIBXLS_ERROR_READ,
+    LIBXLS_ERROR_PARSE,
+    LIBXLS_ERROR_MALLOC,
+    LIBXLS_ERROR_UNSUPPORTED_ENCRYPTION,
+    LIBXLS_ERROR_NULL_ARGUMENT,
+    LIBXLS_ERROR_TEXT_CONVERSION
+} xls_error_t;
+
 #define XLS_RECORD_EOF          0x000A
 #define XLS_RECORD_DEFINEDNAME  0x0018
 #define XLS_RECORD_NOTE         0x001C
@@ -505,6 +517,10 @@ typedef struct xlsWorkBook
     void        *converter;
     void        *utf16_converter;
     void        *utf8_locale;
+
+    /* First text-production failure. NULL alone is not an error: physical
+       blanks have no string, while successfully decoded empty text owns "". */
+    xls_error_t string_error;
 }
 xlsWorkBook;
 

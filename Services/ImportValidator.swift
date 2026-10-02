@@ -39,22 +39,9 @@ nonisolated final class ImportValidator {
                 evidence: cardEvidence
             )
         }
-        let usesRowAssociatedBalancesWithoutSourceOrderRecurrence =
-            financialDocument.metadata.institution == .cbq
-                && financialDocument.metadata.documentType == .bankAccount
-                && !financialDocument.transactions.isEmpty
-                && financialDocument.transactions.allSatisfy { transaction in
-                    !transaction.sourceProvenance.isEmpty
-                        && transaction.sourceProvenance.allSatisfy {
-                            [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID]
-                                .contains($0.parserProfileID)
-                                && $0.parserProfileVersion == "1"
-                        }
-                }
         return validate(
             transactions: financialDocument.transactions,
             statementCurrency: financialDocument.bookedCurrency,
-            reconcileSourceOrderBalances: !usesRowAssociatedBalancesWithoutSourceOrderRecurrence,
             zeroActivityEvidence: financialDocument.zeroActivityEvidence,
             financialDocument: financialDocument
         )
@@ -347,7 +334,10 @@ nonisolated final class ImportValidator {
         }
         let structuralIdentityIsInvalid: Bool
         if contract == .axis {
-            structuralIdentityIsInvalid = !evidence.accountSourceIdentityObservations.isEmpty ||
+            structuralIdentityIsInvalid = evidence.accountSourceIdentityObservations.count > 1 ||
+                evidence.accountSourceIdentityObservations.contains {
+                    $0.kind != .axisPrimaryMaskedCardNumber || $0.subject != .liabilityAccount
+                } ||
                 !evidence.instrumentSections.isEmpty ||
                 evidence.transactionAnnotations.contains {
                     $0.financialScope != .accountLevel || $0.documentScopedSectionID != nil
@@ -363,6 +353,7 @@ nonisolated final class ImportValidator {
                 (evidence.instrumentSections.isEmpty && !permitsAccountOnlyZero) ||
                 evidence.instrumentSections.contains(where: { section in
                     section.reconciliationRuleIdentifier != sectionRule ||
+                        section.signedNetTotal.currency != currency ||
                         section.sourceIdentityObservations.count != 1 ||
                         section.sourceIdentityObservations.first?.kind.rawValue != instrumentKind ||
                         section.sourceIdentityObservations.first?.subject != .instrument
@@ -378,43 +369,48 @@ nonisolated final class ImportValidator {
         let decreaseTotal = try? moneySum(decreaseValues, currency: currency)
         let instrumentTotal = try? moneySum(instrumentValues, currency: currency)
         let allRowsTotal = try? moneySum(allValues, currency: currency)
-        validateSummary(
-            contract: contract,
-            evidence: evidence,
-            previous: previous,
-            newBalance: newBalance,
-            increaseTotal: increaseTotal,
-            decreaseTotal: decreaseTotal,
-            instrumentTotal: instrumentTotal,
-            allRowsTotal: allRowsTotal,
-            membershipValues: membershipValues,
-            currency: currency,
-            issues: &issues
-        )
-        if contract != .axis {
-            for section in evidence.instrumentSections {
-                let sectionValues = sectionValues[section.documentScopedSectionID] ?? []
-                let sectionReconciles: Bool
-                if sectionValues.isEmpty {
-                    // An empty card may still contain source-proven structural
-                    // sections.  Empty section activity is valid only when
-                    // the section's printed signed total is exactly zero and
-                    // the independent zero-control admission succeeded.  The
-                    // summary, identity and profile checks above still run.
-                    sectionReconciles = zeroValidation?.passed == true &&
-                        (try? section.signedNetTotal.minorUnits()) == 0
-                } else {
-                    sectionReconciles = (try? moneySum(sectionValues, currency: currency)) == section.signedNetTotal
+        // Source totals and section balances cannot veto nonempty, fully
+        // accounted occurrences. Empty statements still require every
+        // existing summary, section and independent zero-activity check.
+        if transactions.isEmpty {
+            validateSummary(
+                contract: contract,
+                evidence: evidence,
+                previous: previous,
+                newBalance: newBalance,
+                increaseTotal: increaseTotal,
+                decreaseTotal: decreaseTotal,
+                instrumentTotal: instrumentTotal,
+                allRowsTotal: allRowsTotal,
+                membershipValues: membershipValues,
+                currency: currency,
+                issues: &issues
+            )
+            if contract != .axis {
+                for section in evidence.instrumentSections {
+                    let sectionValues = sectionValues[section.documentScopedSectionID] ?? []
+                    let sectionReconciles: Bool
+                    if sectionValues.isEmpty {
+                        // An empty card may still contain source-proven structural
+                        // sections.  Empty section activity is valid only when
+                        // the section's printed signed total is exactly zero and
+                        // the independent zero-control admission succeeded.  The
+                        // summary, identity and profile checks above still run.
+                        sectionReconciles = zeroValidation?.passed == true &&
+                            (try? section.signedNetTotal.minorUnits()) == 0
+                    } else {
+                        sectionReconciles = (try? moneySum(sectionValues, currency: currency)) == section.signedNetTotal
+                    }
+                    guard sectionReconciles else {
+                        issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
+                        continue
+                    }
                 }
-                guard sectionReconciles else {
-                    issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
-                    continue
+                let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
+                let expectedSectionCoverage = contract.isAmex ? instrumentTotal : allRowsTotal
+                if sectionsTotal != expectedSectionCoverage {
+                    issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
                 }
-            }
-            let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
-            let expectedSectionCoverage = contract.isAmex ? instrumentTotal : allRowsTotal
-            if sectionsTotal != expectedSectionCoverage {
-                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
             }
         }
 
@@ -518,15 +514,13 @@ nonisolated final class ImportValidator {
         let currencies = Set(transactions.map(\.money.currency))
         return validate(
             transactions: transactions,
-            statementCurrency: currencies.count == 1 ? currencies.first : nil,
-            reconcileSourceOrderBalances: true
+            statementCurrency: currencies.count == 1 ? currencies.first : nil
         )
     }
 
     private static func validate(
         transactions: [Transaction],
         statementCurrency: CurrencyCode?,
-        reconcileSourceOrderBalances: Bool,
         zeroActivityEvidence: ZeroActivityStatementEvidence? = nil,
         financialDocument: FinancialDocument? = nil
     ) -> ImportValidationResult {
@@ -609,63 +603,14 @@ nonisolated final class ImportValidator {
             ? zeroActivityEvidence?.creditTotal
             : (try? moneySum(transactions.compactMap(\.creditMoney), currency: statementCurrency))
 
-        let firstTransaction = transactions.first
-        let openingBalanceMoney: Money? = transactions.isEmpty
+        // Opening/closing controls are source-owned observations. Row order
+        // cannot supply missing statement controls or veto known occurrences.
+        let openingBalanceMoney = transactions.isEmpty
             ? zeroActivityEvidence?.openingBalance
-            : (reconcileSourceOrderBalances ? {
-            guard let first = firstTransaction,
-                  let firstBalance = first.runningBalanceMoney else {
-                return nil
-            }
-            var opening = firstBalance
-            if let debit = first.debitMoney { opening = (try? opening + debit) ?? opening }
-            if let credit = first.creditMoney { opening = (try? opening - credit) ?? opening }
-            return opening
-        }() : nil)
-
-        let closingBalanceMoney: Money? = transactions.isEmpty
+            : financialDocument?.sourceStatementEvidence?.openingBalance
+        let closingBalanceMoney = transactions.isEmpty
             ? zeroActivityEvidence?.closingBalance
-            : (reconcileSourceOrderBalances ? transactions.last?.runningBalanceMoney : nil)
-
-        if reconcileSourceOrderBalances, transactions.count > 1 {
-            for index in 1..<transactions.count {
-                let previous = transactions[index - 1]
-                let current = transactions[index]
-
-                guard let previousBalance = previous.runningBalanceMoney,
-                      let currentBalance = current.runningBalanceMoney else {
-                    continue
-                }
-
-                var expectedBalance = previousBalance
-                if let debit = current.debitMoney { expectedBalance = (try? expectedBalance - debit) ?? expectedBalance }
-                if let credit = current.creditMoney { expectedBalance = (try? expectedBalance + credit) ?? expectedBalance }
-
-                if expectedBalance != currentBalance {
-                    issues.append(
-                        ValidationIssue(
-                            severity: .error,
-                            rowNumber: current.sourceProvenance.first?.sourceOrdinal ?? index + 1,
-                            message: "Balance reconciliation failed on \(current.description). Expected \(expectedBalance.amount), found \(currentBalance.amount)."
-                        )
-                    )
-                }
-            }
-        }
-
-        if let openingBalanceMoney, let closingBalanceMoney,
-           let debitTotalMoney, let creditTotalMoney,
-           let expectedClosingBalance = try? (try openingBalanceMoney + creditTotalMoney) - debitTotalMoney {
-            if expectedClosingBalance != closingBalanceMoney {
-                issues.append(
-                    ValidationIssue(
-                        severity: .error,
-                        rowNumber: nil,
-                        message: "Statement totals do not reconcile. Expected closing balance \(expectedClosingBalance.amount), found \(closingBalanceMoney.amount)."
-                    )
-                )
-            }
-        }
+            : financialDocument?.sourceStatementEvidence?.closingBalance
 
         return ImportValidationResult(
             rowsRead: transactions.count,

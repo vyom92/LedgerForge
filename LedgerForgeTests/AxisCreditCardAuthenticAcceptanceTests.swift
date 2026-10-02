@@ -38,10 +38,15 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             throw AuthenticAcceptanceError.oracleMismatch
         }
         let expected = OracleRecord(sourceSHA256: sha256Hex(bytes), format: .traditionalPDF,
-            cycle: cycle, rowCount: rows.count, rows: rows, controls: controls)
+            cycle: cycle, rowCount: rows.count, rows: rows,
+            controls: controls.filter { $0.key != "primary_masked_card_number" })
         return { prepared in
             try require(prepared.sourceSnapshot.sourceByteFingerprint.digest == expected.sourceSHA256, error: .oracleMismatch)
             try assertProduction(prepared.financialDocument, matches: expected)
+            let observations = prepared.financialDocument.cardStatementEvidence?.accountSourceIdentityObservations ?? []
+            try require(observations.count == 1 && observations.first?.kind == .axisPrimaryMaskedCardNumber &&
+                        observations.first?.subject == .liabilityAccount &&
+                        observations.first?.value == controls["primary_masked_card_number"], error: .oracleMismatch)
         }
     }
     private static let rootKey = "LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY"
@@ -169,6 +174,7 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     private enum AuthenticAcceptanceError: Error {
         case sourceDirectoryUnreadable
         case sourceUnreadable
+        case sourceStageUnavailable(stage: String, sourceSHA256: String)
         case oracleUnavailable
         case oracleMismatch
         case gmailControlRole(String, count: Int)
@@ -264,7 +270,11 @@ struct AxisCreditCardAuthenticAcceptanceTests {
     }
 
     private static func authenticCorpus(root: URL) async throws -> LogicalCorpus {
-        let oracle = try await loadInMemorySourceOracle(root: root)
+        let oracle: SourceOracle
+        do { oracle = try await loadInMemorySourceOracle(root: root) }
+        catch AuthenticAcceptanceError.sourceUnreadable {
+            throw AuthenticAcceptanceError.sourceStageUnavailable(stage: "independent-oracle", sourceSHA256: "unavailable")
+        }
         try validateOracleContract(oracle)
 
         let recordDigests = oracle.records.map(\.sourceSHA256)
@@ -327,7 +337,17 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             let prepared: PreparedImport
             do { prepared = try await engine.prepareImport(from: url) }
             catch let error as AuthenticAcceptanceError { throw error }
-            catch { throw AuthenticAcceptanceError.sourceUnreadable }
+            catch let error as AxisCreditCardPDFNormalizationError {
+                throw AuthenticAcceptanceError.sourceStageUnavailable(
+                    stage: "axis-pdf-normalization-\(error)", sourceSHA256: digest
+                )
+            }
+            catch {
+                throw AuthenticAcceptanceError.sourceStageUnavailable(
+                    stage: "production-preparation-\(String(reflecting: type(of: error)))",
+                    sourceSHA256: digest
+                )
+            }
             defer { engine.cancelPreparedImport(prepared) }
 
             let format: SourceFormat
@@ -448,6 +468,27 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             field: "row-count"
         )
         let evidence = try #require(document.cardStatementEvidence)
+        let observations = evidence.accountSourceIdentityObservations
+        switch oracle.format {
+        case .appPDF:
+            // The registered app originals print a four-digit prefix mask.
+            // That source shape cannot authorize the six-digit reusable identity.
+            try requireRow(observations.isEmpty, row: 0, field: "app-nonbinding-source-mask")
+        case .traditionalPDF:
+            try requireRow(
+                observations.count == 1 &&
+                    observations.first?.kind == .axisPrimaryMaskedCardNumber &&
+                    observations.first?.subject == .liabilityAccount &&
+                    observations.first?.value.range(
+                        of: #"^[0-9]{6}X{6}[0-9]{4}$"#,
+                        options: .regularExpression
+                    ) != nil,
+                row: 0,
+                field: "traditional-reusable-source-mask"
+            )
+        case .xlsx:
+            break
+        }
         try assertControls(
             controls(
                 statementDate: evidence.statementDate,
@@ -698,6 +739,11 @@ struct AxisCreditCardAuthenticAcceptanceTests {
             let prepared = try await runtime.engine.prepareImport(from: source.url)
             try require(prepared.validation.passed, error: .campaignInvariant)
             try assertProduction(prepared.financialDocument, matches: source.oracle)
+            if source.oracle.format == .appPDF {
+                guard case .liabilityAccountChoiceRequired = try runtime.engine.reviewPreparedImport(prepared) else {
+                    throw AuthenticAcceptanceError.campaignInvariant
+                }
+            }
 
             let isSupporting = seenCycles.contains(source.cycle)
             let choice: ImportAccountChoice = accountID.map {
@@ -1499,6 +1545,10 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         guard headerY > cardY, cardY > balanceHeaderY, balanceHeaderY > bodyY else {
             throw AuthenticAcceptanceError.oracleMismatch
         }
+        let cardRegion = lines.keys.sorted(by: >).filter { $0 <= cardY && $0 > balanceHeaderY }
+            .map(text).joined(separator: " ")
+        let primaryMask = try sourceCapture(#"([0-9]{6}[*Xx]{6}[0-9]{4})"#, cardRegion)[0]
+            .uppercased().replacingOccurrences(of: "*", with: "X")
         let controlRows = lines.keys.filter { $0 < headerY && $0 > cardY }
         let datesY = try unique("dates", controlRows.filter {
             text($0).range(of: #"\d{2}/\d{2}/\d{4}\s*-\s*\d{2}/\d{2}/\d{4}"#,
@@ -1519,7 +1569,8 @@ struct AxisCreditCardAuthenticAcceptanceTests {
                                        sourceColumn(dates, 0, 650))
         let opening = try sourceCapture(#"^([0-9]+(?:,[0-9]{3})*\.[0-9]{2}\s*(?:Dr|Cr)?)"#,
                                         sourceColumn(balances, 0, 650))[0]
-        return try ["statement_period_start": sourceDate(period[0]), "statement_period_end": sourceDate(period[1]),
+        return try ["primary_masked_card_number": primaryMask,
+            "statement_period_start": sourceDate(period[0]), "statement_period_end": sourceDate(period[1]),
             "opening_balance": sourceMoney(opening),
             "total_payment_due": sourceMoney(sourceColumn(payment, 0, 140)),
             "payment_due_date": sourceDate(period[2]),

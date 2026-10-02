@@ -54,6 +54,23 @@ enum TransactionProvenanceAvailability: Equatable {
     }
 }
 
+/// Filename presentation retains each hydrated owner. A preferred source never
+/// supplies the document label for the original import's time or validation.
+nonisolated struct TransactionSourceDocumentsPresentation: Equatable {
+    let originalImportDocumentName: String
+    let preferredSourceDocumentName: String?
+
+    init(originalImportDocumentName: String?, preferredSourceDocumentName: String?) {
+        self.originalImportDocumentName = Self.nonempty(originalImportDocumentName) ?? "Unavailable"
+        self.preferredSourceDocumentName = Self.nonempty(preferredSourceDocumentName)
+    }
+
+    private static func nonempty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+}
+
 struct TransactionDetailPresentation: Equatable {
     let description: String
     let signedAmount: String
@@ -64,6 +81,7 @@ struct TransactionDetailPresentation: Equatable {
     let accountDisplayName: String
     let institution: String
     let sourceDocumentName: String
+    let preferredSourceDocumentName: String?
     let importedAt: Date?
     let importedAtText: String
     let validation: TransactionValidationPresentation?
@@ -126,6 +144,8 @@ nonisolated struct TransactionPresentationFilterSpec: Equatable, Sendable {
     var canonicalTransactionIDs: Set<String>?
     var searchText: String = ""
     var accountIDs: Set<String> = []
+    /// An explicit empty multi-selection differs from the usual current-account scope.
+    var excludesAllAccounts = false
     var currencies: Set<CurrencyCode> = []
     var categories: Set<TransactionPresentationCategoryChoice> = []
     var domains: Set<TransactionPresentationDomain> = []
@@ -268,7 +288,7 @@ nonisolated enum TransactionPresentationEngine {
             type = account.type
             displayName = account.preferredDisplayName
             institutionDisplayName = account.institutionDisplayName
-            identityDisplay = account.identitySummaries.map(\.redactedValue).sorted().joined(separator: ", ")
+            identityDisplay = account.sourceAccountNumberLabel ?? account.identitySummaries.map(\.redactedValue).sorted().joined(separator: ", ")
         }
     }
 
@@ -413,6 +433,9 @@ nonisolated enum TransactionPresentationEngine {
         let normalizedInstitutions = Set(filter.institutionDisplayNames.map(TransactionPresentationText.normalized))
         var exclusions = TransactionPresentationExclusionCounts()
         var matching = [TransactionPresentationRow]()
+        let accountScope = AccountPresentationScope(selectedAccountIDs: filter.accountIDs,
+            historyOnlyAccountIDs: AccountPresentationScope.historyOnlyIDs(in: accounts),
+            excludesAllAccounts: filter.excludesAllAccounts)
 
         for row in allRows {
             guard filter.canonicalTransactionIDs.map({ $0.contains(row.transaction.repositoryTransactionId ?? "") }) ?? true else { continue }
@@ -429,7 +452,7 @@ nonisolated enum TransactionPresentationEngine {
                     exclusions.search += 1; continue
                 }
             }
-            guard filter.accountIDs.isEmpty || row.accountID.map(filter.accountIDs.contains) == true else {
+            guard accountScope.includes(row.accountID) else {
                 exclusions.account += 1; continue
             }
             guard filter.currencies.isEmpty || filter.currencies.contains(row.transaction.money.currency) else {
@@ -581,7 +604,7 @@ nonisolated enum TransactionPresentationEngine {
         return !selectedInstitutions.contains(where: { $0.isEmpty || !institutions.contains($0) })
     }
 
-    private static func totals(for rows: [TransactionPresentationRow]) -> TransactionPresentationTotals {
+    static func totals(for rows: [TransactionPresentationRow]) -> TransactionPresentationTotals {
         var buckets = [TransactionPresentationTotalKey: [Money]]()
         var withheldUnknownDomainCount = 0
         var withheldUnknownEffectCount = 0
@@ -701,6 +724,46 @@ final class TransactionListViewModel: ObservableObject {
         }
     }
     @Published private(set) var selectedPresentationRowID: String?
+
+    var presentationAccounts: [Account] { accounts }
+
+    /// Calendar and activation refreshes advance relative presets only. Custom
+    /// bounds and the independent Period overview retain their selected dates.
+    func refreshRelativePeriod(
+        isOverview: Bool,
+        now: Date = Date(),
+        timeZone: TimeZone = .current
+    ) {
+        let period = presentationControls.period
+        guard !isOverview, period != .all, period != .custom else { return }
+        if presentationControls.dateInputError != nil { presentationControls.dateInputError = nil }
+        // Only today's user-facing calendar is converted to components.
+        // Imported StatementDate values remain civil dates throughout evaluation.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let today = calendar.dateComponents([.year, .month, .day], from: now)
+        guard let year = today.year, let month = today.month, let day = today.day else {
+            presentationControls.dateInputError = "The current calendar date is unavailable."
+            return
+        }
+        do {
+            let range = try period.range(relativeTo: StatementDate(year: year, month: month, day: day))
+            if presentationFilter.statementDateRange != range { presentationFilter.statementDateRange = range }
+        } catch { presentationControls.dateInputError = "The calendar range is unavailable." }
+    }
+
+    /// Exploration has its own query and selection while observing the same
+    /// hydrated records. Returning never rewrites the originating screen.
+    func makePeriodOverview(filter: TransactionPresentationFilterSpec? = nil) -> TransactionListViewModel {
+        let model = TransactionListViewModel(transactionStore: transactionStore,
+            importSessionStore: importSessionStore, accountStore: accountStore, categoryStore: categoryStore)
+        model.synchronizePresentation(generation: synchronizedGeneration,
+            availabilityState: presentationAvailability == .available ? .current : .unavailable)
+        model.presentationFilter = filter ?? presentationFilter
+        model.presentationSort = presentationSort
+        model.selectPresentationRow(id: selectedPresentationRowID)
+        return model
+    }
 
     init(
         transactionStore: TransactionStore = .shared,
@@ -880,7 +943,7 @@ final class TransactionListViewModel: ObservableObject {
         let unavailable = "Unavailable"
         let hasAccountRelationship = transaction.repositoryAccountId != nil
         let accountName = hasAccountRelationship
-            ? nonempty(transaction.account) ?? unavailable
+            ? accounts.first(where: { $0.repositoryAccountId == transaction.repositoryAccountId })?.preferredDisplayName ?? nonempty(transaction.account) ?? unavailable
             : unavailable
         let institution = hasAccountRelationship
             ? nonempty(transaction.sourceBank) ?? unavailable
@@ -891,9 +954,11 @@ final class TransactionListViewModel: ObservableObject {
             guard matches.count == 1 else { return nil }
             return matches[0]
         }
-        let sourceDocumentName = nonempty(transaction.repositoryPreferredSourceDocumentName)
-            ?? nonempty(transaction.repositorySourceDocumentName)
-            ?? unavailable
+        let sourceDocuments = TransactionSourceDocumentsPresentation(
+            originalImportDocumentName: transaction.repositorySourceDocumentName,
+            preferredSourceDocumentName: transaction.repositoryPreferredSourceDocumentName
+        )
+        let sourceDocumentName = sourceDocuments.originalImportDocumentName
 
         let importedAt = matchingSession.flatMap { session in
             strictISO8601Date(session.completedAtISO ?? session.startedAtISO)
@@ -943,12 +1008,13 @@ final class TransactionListViewModel: ObservableObject {
             "\(statementDateRole) \(statementDate).",
             "Account \(accountName).",
             "Institution \(institution).",
-            "Source document \(sourceDocumentName).",
-            "Imported \(importedAtText).",
+            "Original import document \(sourceDocumentName).",
+            "Originally imported \(importedAtText).",
             validation?.detail ?? "Validation unavailable for this imported transaction.",
+            sourceDocuments.preferredSourceDocumentName.map { "Preferred source document \($0)." },
             "Balance after \(runningBalance).",
             "Import provenance \(availability.title)."
-        ].joined(separator: " ")
+        ].compactMap { $0 }.joined(separator: " ")
 
         return TransactionDetailPresentation(
             description: transaction.description,
@@ -960,6 +1026,7 @@ final class TransactionListViewModel: ObservableObject {
             accountDisplayName: accountName,
             institution: institution,
             sourceDocumentName: sourceDocumentName,
+            preferredSourceDocumentName: sourceDocuments.preferredSourceDocumentName,
             importedAt: importedAt,
             importedAtText: importedAtText,
             validation: validation,

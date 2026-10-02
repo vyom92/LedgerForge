@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 private struct TransactionCategoryMutationIntent {
     let categoryID: String?
@@ -26,6 +27,11 @@ private struct TransactionTableComparator: SortComparator {
             lhs, rhs, sort: .init(key: key, direction: order == .forward ? .ascending : .descending)
         )
     }
+}
+
+private struct TransactionTableLayoutID: Hashable {
+    let compact: Bool
+    let showsInlineInspector: Bool
 }
 
 /// Paints existing AppKit rows without replacing SwiftUI's Table or its input,
@@ -206,6 +212,8 @@ struct TransactionListView: View {
     private let generation: ProviderGenerationToken?
     private let availabilityState: ApplicationDataState
     private let returnToPlanning: (() -> Void)?
+    private let overviewBack: (() -> Void)?
+    private let overviewBackTitle: String
 #if DEBUG
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
@@ -218,9 +226,18 @@ struct TransactionListView: View {
     @State private var spendingPresented = false
     @State private var spendingLoaded = false
     @State private var returnToSpendingFilter: (filter: TransactionPresentationFilterSpec, controls: TransactionPresentationControls)?
-    @State private var detailsVisible = true
+    @State private var detailsVisible = false
     @State private var narrowDetailsVisible = false
+    @State private var tableIsNarrow = false
     @State private var moreFiltersVisible = false
+    private struct OverviewSession: Identifiable {
+        let id = UUID()
+        let model: TransactionListViewModel
+        let backTitle: String
+    }
+    @State private var overviewSession: OverviewSession?
+    @State private var overviewTopHeight: CGFloat = 520
+    private var isOverview: Bool { overviewBack != nil }
     private var period: TransactionPeriodChoice {
         get { viewModel.presentationControls.period }
         nonmutating set {
@@ -287,7 +304,9 @@ struct TransactionListView: View {
         categoryStore: CategoryStore? = nil,
         categoryCoordinator: CategoryManaging? = nil,
         acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil,
-        returnToPlanning: (() -> Void)? = nil
+        returnToPlanning: (() -> Void)? = nil,
+        overviewBack: (() -> Void)? = nil,
+        overviewBackTitle: String = "Transactions"
     ) {
         let resolvedStore = categoryStore ?? .shared
         self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
@@ -298,6 +317,8 @@ struct TransactionListView: View {
         self.generation = generation
         self.availabilityState = availabilityState
         self.returnToPlanning = returnToPlanning
+        self.overviewBack = overviewBack
+        self.overviewBackTitle = overviewBackTitle
     }
 #else
     @MainActor
@@ -308,7 +329,9 @@ struct TransactionListView: View {
         availabilityState: ApplicationDataState = .loading,
         categoryStore: CategoryStore? = nil,
         categoryCoordinator: CategoryManaging? = nil,
-        returnToPlanning: (() -> Void)? = nil
+        returnToPlanning: (() -> Void)? = nil,
+        overviewBack: (() -> Void)? = nil,
+        overviewBackTitle: String = "Transactions"
     ) {
         let resolvedStore = categoryStore ?? .shared
         self._viewModel = StateObject(wrappedValue: viewModel ?? TransactionListViewModel())
@@ -318,15 +341,23 @@ struct TransactionListView: View {
         self.generation = generation
         self.availabilityState = availabilityState
         self.returnToPlanning = returnToPlanning
+        self.overviewBack = overviewBack
+        self.overviewBackTitle = overviewBackTitle
     }
 #endif
 
     private var result: TransactionPresentationResult { viewModel.transactionPresentationResult }
     private var selectedTransaction: Transaction? { viewModel.selectedPresentationRow?.transaction }
-    private var inputError: String? { dateInputError ?? amountInputError }
+    private var inputError: String? { isOverview ? nil : dateInputError ?? amountInputError }
     private var hasUsableResults: Bool { inputError == nil && result.state == .ready }
     private var selection: Binding<String?> {
-        Binding(get: { viewModel.selectedPresentationRowID }, set: { viewModel.selectPresentationRow(id: $0) })
+        Binding(get: { viewModel.selectedPresentationRowID }, set: { id in
+            viewModel.selectPresentationRow(id: id)
+            // Selection can arrive through accessibility or after the native
+            // table is recreated for the inspector. Keep keyboard ownership
+            // with that table so its ordinary Up/Down handling remains active.
+            if id != nil { tableFocused = true }
+        })
     }
     private var tableSort: Binding<[TransactionTableComparator]> {
         Binding(
@@ -345,6 +376,7 @@ struct TransactionListView: View {
                     Button("Back to spending & movements", systemImage: "arrow.left") {
                         viewModel.presentationFilter = previous.filter
                         viewModel.presentationControls = previous.controls
+                        viewModel.refreshRelativePeriod(isOverview: isOverview)
                         returnToSpendingFilter = nil; spendingPresented = true
                     }.lfSecondaryAction()
                         .accessibilityLabel("Back to spending & movements")
@@ -355,43 +387,85 @@ struct TransactionListView: View {
                         .accessibilityIdentifier("transactions.backToPlanning")
                 }
                 transactionBody
-            }.opacity(spendingPresented ? 0 : 1).allowsHitTesting(!spendingPresented).accessibilityHidden(spendingPresented)
+            }.opacity(spendingPresented || overviewSession != nil ? 0 : 1)
+                .allowsHitTesting(!spendingPresented && overviewSession == nil)
+                .accessibilityHidden(spendingPresented || overviewSession != nil)
             if spendingLoaded {
                 SpendingAndMovementView(model: viewModel.spendingAnalysis, generation: generation, availability: availabilityState,
-                    isActive: spendingPresented,
+                    isActive: spendingPresented && overviewSession == nil,
                     onBack: { spendingPresented = false }, onTransactions: { ids in
                         returnToSpendingFilter = (viewModel.presentationFilter, viewModel.presentationControls)
                         clearFilters()
                         viewModel.presentationFilter.canonicalTransactionIDs = ids
+                        viewModel.presentationFilter.accountIDs = Set(viewModel.spendingAnalysis.sourceRows
+                            .filter { ids.contains($0.id) }.map(\.accountID))
                         spendingPresented = false
                     }, onCategories: {
                         rulePresentation = RulePresentation(transactions: viewModel.spendingAnalysis.projection?.rows.map(\.source.transaction) ?? [])
+                    }, onPeriodOverview: { filter in
+                        overviewSession = OverviewSession(model: viewModel.makePeriodOverview(filter: filter),
+                            backTitle: "Spending & movements")
                     })
-                    .opacity(spendingPresented ? 1 : 0).allowsHitTesting(spendingPresented).accessibilityHidden(!spendingPresented)
+                    .opacity(spendingPresented && overviewSession == nil ? 1 : 0)
+                    .allowsHitTesting(spendingPresented && overviewSession == nil)
+                    .accessibilityHidden(!spendingPresented || overviewSession != nil)
             }
+            if let session = overviewSession { overviewView(session).id(session.id) }
         }
+    }
+
+    private func overviewView(_ session: OverviewSession) -> AnyView {
+        AnyView(TransactionListView(viewModel: session.model, generation: generation,
+            availabilityState: availabilityState, categoryStore: categoryStore, categoryCoordinator: categoryCoordinator,
+            overviewBack: { overviewSession = nil }, overviewBackTitle: session.backTitle))
     }
 
     private var transactionBody: some View {
         GeometryReader { geometry in
-            let narrow = geometry.size.width < 1120
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 12) {
+            let narrow = geometry.size.width < 1300
+            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                if isOverview {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                            overviewHeader
+                            PeriodOverviewControls(model: viewModel, retainedCriteria: overviewCriteria)
+                            matchingSummary
+                            PeriodOverviewActivityChart(rows: hasUsableResults ? result.rows : [],
+                                range: viewModel.presentationFilter.statementDateRange)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { overviewTopHeight = $0 }
+                    }
+                    .frame(height: min(overviewTopHeight,
+                        max(180, geometry.size.height - theme.spacing.pagePadding * 2 - 340)))
+                } else {
+                    transactionHeader
                     searchAndPeriod(narrow: narrow)
                     primaryFilters
                     if period == .custom { customDateControls }
                     matchingSummary
-                    transactionTable
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                if !narrow && detailsVisible {
-                    inspector
-                        .frame(width: 320)
+                if isOverview {
+                    HStack {
+                        Text("Transactions").font(theme.typography.sectionTitle)
+                        Spacer()
+                        detailsButton(narrow: narrow)
+                    }
                 }
+                HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                    transactionTable(availableWidth: geometry.size.width - theme.spacing.pagePadding * 2 -
+                        (!narrow && detailsVisible ? 350 + theme.spacing.sectionGap : 0),
+                        inlineDetails: !narrow && detailsVisible)
+                    if !narrow && detailsVisible {
+                        inspector.frame(width: 350)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: isOverview ? 260 : 0, maxHeight: .infinity, alignment: .top)
             }
             .padding(theme.spacing.pagePadding)
             .onChange(of: narrow, initial: true) { _, constrained in
-                if constrained { detailsVisible = false }
+                tableIsNarrow = constrained
+                if !constrained { narrowDetailsVisible = false }
             }
             .sheet(item: $rulePresentation) { selection in
                 CategoryRulesView(transactions: selection.transactions, proposal: selection.proposal)
@@ -399,13 +473,19 @@ struct TransactionListView: View {
             .sheet(isPresented: $narrowDetailsVisible) {
                 inspector
                     .padding(16)
-                    .frame(width: 400, height: 580)
+                    .frame(width: 430, height: 650)
                     .background(panelColor)
             }
         }
         .foregroundStyle(theme.palette.primaryText)
         .font(theme.typography.tableBody)
         .onAppear(perform: synchronizePresentation)
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
+            viewModel.refreshRelativePeriod(isOverview: isOverview)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).receive(on: RunLoop.main)) { _ in
+            viewModel.refreshRelativePeriod(isOverview: isOverview)
+        }
         .onChange(of: generation) { _, _ in synchronizePresentation() }
         .onChange(of: availabilityState) { _, _ in synchronizePresentation() }
         .onChange(of: period) { _, _ in updatePeriod() }
@@ -437,12 +517,109 @@ struct TransactionListView: View {
 
     private func synchronizePresentation() {
         viewModel.synchronizePresentation(generation: generation, availabilityState: availabilityState)
-        updatePeriod()
-        updateAmount()
+        if !isOverview {
+            updatePeriod()
+            updateAmount()
+        }
     }
 
     private func searchAndPeriod(narrow: Bool) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { searchField; periodAndDetails(narrow: narrow) }
+            VStack(alignment: .leading, spacing: 10) { searchField; periodAndDetails(narrow: narrow) }
+        }
+        .controlSize(.large)
+    }
+
+    private var transactionHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.sectionGap) {
+                transactionHeading; Spacer(minLength: 16); transactionActions
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) { transactionHeading; transactionActions }
+        }
+    }
+
+    private var transactionHeading: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Transactions").font(theme.typography.pageTitle)
+            Text("Recorded transactions · original currencies").font(theme.typography.secondary).foregroundStyle(secondary)
+        }
+    }
+
+    private var overviewHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                overviewHeading
+                Spacer()
+                Button("Back to \(overviewBackTitle)", systemImage: "chevron.left") { overviewBack?() }.lfSecondaryAction()
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                overviewHeading
+                Button("Back to \(overviewBackTitle)", systemImage: "chevron.left") { overviewBack?() }.lfSecondaryAction()
+            }
+        }
+    }
+
+    private var overviewHeading: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Period overview").font(theme.typography.pageTitle)
+            Text("Transactions in the selected period and accounts").font(theme.typography.secondary).foregroundStyle(secondary)
+        }
+    }
+
+    private var overviewCriteria: String {
+        let filter = viewModel.presentationFilter
+        var criteria: [String] = []
+        if !filter.searchText.isEmpty { criteria.append("Search: \(filter.searchText)") }
+        if !filter.currencies.isEmpty { criteria.append("Currency: " + filter.currencies.map(\.code).sorted().joined(separator: ", ")) }
+        if !filter.categories.isEmpty {
+            let names = filter.categories.map { choice in
+                switch choice {
+                case .uncategorized: "Uncategorized"
+                case .categoryID(let id): categoryStore.snapshot.categories.first(where: { $0.id == id })?.name ?? "Unavailable category"
+                }
+            }
+            criteria.append("Category: " + names.sorted().joined(separator: ", "))
+        }
+        if !filter.domains.isEmpty {
+            criteria.append(filter.domains.map { $0 == .bank ? "Bank movements" : $0 == .card ? "Card liability" : "Unknown family" }.sorted().joined(separator: ", "))
+        }
+        if !filter.effects.isEmpty {
+            criteria.append("Effect: " + filter.effects.map { effect in
+                switch effect {
+                case .credit: "Bank inflow"
+                case .debit: "Bank outflow"
+                case .increasesAmountOwed: "Increase owed"
+                case .decreasesAmountOwed: "Decrease owed"
+                case .unknown: "Unknown"
+                }
+            }.sorted().joined(separator: ", "))
+        }
+        if !filter.institutionDisplayNames.isEmpty { criteria.append("Institution: " + filter.institutionDisplayNames.sorted().joined(separator: ", ")) }
+        if let amounts = filter.amountRange {
+            criteria.append("Amount: \(amounts.lowerBound.map { NSDecimalNumber(decimal: $0).stringValue } ?? "Any") – \(amounts.upperBound.map { NSDecimalNumber(decimal: $0).stringValue } ?? "Any")")
+        }
+        if let ids = filter.canonicalTransactionIDs { criteria.append("Selected records: \(ids.count)") }
+        return criteria.joined(separator: " · ")
+    }
+
+    private var transactionActions: some View {
         HStack(spacing: 12) {
+            Button("Period overview") {
+                overviewSession = OverviewSession(model: viewModel.makePeriodOverview(), backTitle: "Transactions")
+            }.lfSecondaryAction().accessibilityIdentifier("transactions.periodOverview")
+                .disabled(inputError != nil)
+                .help(inputError ?? "Explore the current selection without changing these filters.")
+            Button("Spending & movements") { spendingLoaded = true; spendingPresented = true }
+                .lfSecondaryAction().accessibilityIdentifier("transactions.spending")
+            Button("Category rules") {
+                rulePresentation = RulePresentation(transactions: result.rows.map(\.transaction))
+            }.lfSecondaryAction().accessibilityIdentifier("transactions.categoryRules")
+        }.fixedSize()
+    }
+
+    private var searchField: some View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(secondary)
                 TextField("Search transactions", text: $viewModel.presentationFilter.searchText)
@@ -463,77 +640,76 @@ struct TransactionListView: View {
             .padding(10)
             .background(panelColor, in: RoundedRectangle(cornerRadius: theme.radius.control))
             .overlay(RoundedRectangle(cornerRadius: theme.radius.control).stroke(searchFocused ? focusColor : controlBorder, lineWidth: searchFocused ? 2 : 1))
+            .frame(minWidth: 230)
+    }
 
+    private func periodAndDetails(narrow: Bool) -> some View {
+        HStack(spacing: 12) {
             Picker("Period", selection: $viewModel.presentationControls.period) {
                 ForEach(TransactionPeriodChoice.allCases, id: \.self) { choice in
                     Text(choice.rawValue).tag(choice)
                 }
             }
-            .labelsHidden()
-            .frame(width: 150)
+            .tint(theme.palette.primaryText)
+            .frame(width: 225)
             .help("Filter by the date printed on each transaction.")
 
-            Button {
-                if narrow { narrowDetailsVisible = true }
-                else { detailsVisible.toggle() }
-            } label: {
-                Label(!narrow && detailsVisible ? "Hide details" : "Show details", systemImage: "sidebar.right")
-            }
-            .lfSecondaryAction()
-            .accessibilityLabel(!narrow && detailsVisible ? "Hide details" : "Show details")
-            .help("Open or close details without changing the selected transaction.")
+            detailsButton(narrow: narrow)
         }
-        .controlSize(.large)
+        .fixedSize()
+    }
+
+    private func detailsButton(narrow: Bool) -> some View {
+        Button {
+            if narrow { detailsVisible = true; narrowDetailsVisible = true }
+            else { detailsVisible.toggle() }
+        } label: {
+            Label(!narrow && detailsVisible ? "Hide details" : "Show details", systemImage: "sidebar.right")
+        }
+        .lfSecondaryAction()
+        .accessibilityLabel(!narrow && detailsVisible ? "Hide details" : "Show details")
+        .help("Open or close details without changing the selected transaction.")
     }
 
     private var primaryFilters: some View {
         VStack(alignment: .leading, spacing: 10) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) {
-                    accountMenu
-                    currencyMenu
-                    categoryMenu
-                    familyMenu
-                    effectMenu
-                    moreFiltersButton
-                    Spacer(minLength: 0)
+                    accountMenu; currencyMenu; categoryMenu; familyMenu; effectMenu; moreFiltersButton
+                    Spacer(minLength: 12)
+                    clearFiltersButton
                 }
                 HStack(spacing: 8) {
-                    accountMenu
-                    currencyMenu
-                    categoryMenu
-                    moreFiltersButton
+                    accountMenu; currencyMenu; categoryMenu; moreFiltersButton
                     Spacer(minLength: 0)
+                    clearFiltersButton
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) { accountMenu; currencyMenu; categoryMenu }
+                    HStack(spacing: 8) { familyMenu; effectMenu; moreFiltersButton; clearFiltersButton }
                 }
             }
-            HStack(spacing: 12) {
-                if let ids = viewModel.presentationFilter.canonicalTransactionIDs {
-                    Text("Chart detail · \(ids.count) transactions").font(theme.typography.caption)
-                    Button("Show all transactions") { viewModel.presentationFilter.canonicalTransactionIDs = nil }.buttonStyle(.borderless)
-                        .accessibilityLabel("Show all transactions")
-                        .accessibilityIdentifier("transactions.clearChartDetail")
+            if activeCriteriaCount > 0 || viewModel.presentationFilter.canonicalTransactionIDs != nil {
+                HStack(spacing: 12) {
+                    if let ids = viewModel.presentationFilter.canonicalTransactionIDs {
+                        Text("Chart detail · \(ids.count) transactions").font(theme.typography.secondary)
+                        Button("Show all transactions") { viewModel.presentationFilter.canonicalTransactionIDs = nil }.buttonStyle(.borderless)
+                            .accessibilityIdentifier("transactions.clearChartDetail")
+                    }
+                    if activeCriteriaCount > 0 {
+                        Text("\(activeCriteriaCount) active criteria · all matching transactions")
+                            .font(theme.typography.secondary).foregroundStyle(secondary)
+                    }
                 }
-                if activeCriteriaCount > 0 {
-                    Text("\(activeCriteriaCount) active criteria · all matching transactions")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(secondary)
-                }
-                Spacer(minLength: 0)
-                Button("Spending & movements", systemImage: "chart.bar.xaxis") { spendingLoaded = true; spendingPresented = true }.lfSecondaryAction()
-                    .accessibilityLabel("Spending & movements").accessibilityIdentifier("transactions.spending")
-                    .help("Spending & movements")
-                Button("Category rules") {
-                    rulePresentation = RulePresentation(transactions: viewModel.transactionPresentationResult.rows.map(\.transaction))
-                }.lfSecondaryAction().accessibilityLabel("Category rules")
-                    .accessibilityIdentifier("transactions.categoryRules").help("Category rules")
-                Button("Clear filters", action: clearFilters)
-                    .lfSecondaryAction()
-                    .disabled(activeCriteriaCount == 0)
             }
         }
     }
 
-    private var accountOptions: [(id: String, name: String)] {
+    private var clearFiltersButton: some View {
+        Button("Clear filters", action: clearFilters).lfSecondaryAction().disabled(activeCriteriaCount == 0)
+    }
+
+    private var accountOptions: [(id: String, name: String, context: String)] {
         var accounts = [String: TransactionPresentationRow]()
         for row in viewModel.allPresentationRows {
             if let id = row.accountID { accounts[id] = row }
@@ -543,11 +719,11 @@ struct TransactionListView: View {
         }.mapValues(\.count)
         return accounts.map { id, row in
             let hasCollision = nameCounts[TransactionPresentationText.normalized(row.accountDisplayName), default: 0] > 1
-            let label = hasCollision
-                ? [row.accountDisplayName, row.institutionDisplayName, row.transaction.money.currency.code, row.accountIdentityDisplay]
+            let context = hasCollision
+                ? [row.institutionDisplayName, row.transaction.money.currency.code, row.accountIdentityDisplay]
                     .filter { !$0.isEmpty }.joined(separator: " · ")
-                : row.accountDisplayName
-            return (id: id, name: label)
+                : row.transaction.money.currency.code
+            return (id: id, name: row.accountDisplayName, context: context)
         }.sorted {
             let left = TransactionPresentationText.normalized($0.name)
             let right = TransactionPresentationText.normalized($1.name)
@@ -566,15 +742,22 @@ struct TransactionListView: View {
     }
 
     private var accountMenu: some View {
-        Menu {
-            Button("All accounts") { viewModel.presentationFilter.accountIDs = [] }
-            Divider()
-            ForEach(accountOptions, id: \.id) { option in
-                Toggle(option.name, isOn: membership(\.accountIDs, option.id))
+        LFAccountMenu(title: viewModel.presentationFilter.excludesAllAccounts ? "Account: None" : viewModel.presentationFilter.accountIDs.isEmpty ? "Account: Current" : "Account: \(viewModel.presentationFilter.accountIDs.count)",
+            allTitle: "Current accounts", options: accountOptions.map { option in
+                .init(id: option.id, title: option.name, detail: option.context,
+                      selected: viewModel.presentationFilter.accountIDs.contains(option.id))
+            }) { id in
+                if let id {
+                    viewModel.presentationFilter.excludesAllAccounts = false
+                    let value = membership(\.accountIDs, id)
+                    value.wrappedValue.toggle()
+                } else {
+                    viewModel.presentationFilter.accountIDs = []
+                    viewModel.presentationFilter.excludesAllAccounts = false
+                }
             }
-        } label: { filterLabel("Account", count: viewModel.presentationFilter.accountIDs.count) }
-        .lfMenuAction()
-        .help("Choose one or more accounts. Accounts keep their durable identity.")
+        .fixedSize()
+        .help("Choose one or more accounts.")
     }
     private var currencyMenu: some View {
         Menu {
@@ -644,16 +827,16 @@ struct TransactionListView: View {
                     institutionMenu
                     Divider()
                     Text("Amount range").font(theme.typography.formHeading)
-                    Text("Choose one native currency. Bounds include the entered amounts.")
+                    Text("Choose one currency. Minimum and maximum are included.")
                         .font(theme.typography.caption).foregroundStyle(secondary)
                     currencyMenu
                     HStack {
                         TextField("Minimum", text: $viewModel.presentationControls.minimumAmount)
                             .lfTextField()
-                            .accessibilityLabel("Minimum native amount")
+                            .accessibilityLabel("Minimum amount")
                         TextField("Maximum", text: $viewModel.presentationControls.maximumAmount)
                             .lfTextField()
-                            .accessibilityLabel("Maximum native amount")
+                            .accessibilityLabel("Maximum amount")
                     }
                     Text("Use a decimal point; leave a bound empty for no limit.")
                         .font(theme.typography.caption).foregroundStyle(secondary)
@@ -739,18 +922,7 @@ struct TransactionListView: View {
             }
             return
         }
-        // Only today's user-facing calendar is converted to components.
-        // Imported StatementDate values remain civil dates throughout evaluation.
-        let calendar = Calendar(identifier: .gregorian)
-        let today = calendar.dateComponents([.year, .month, .day], from: Date())
-        guard let year = today.year, let month = today.month, let day = today.day else {
-            dateInputError = "The current calendar date is unavailable."; return
-        }
-        do {
-            viewModel.presentationFilter.statementDateRange = try period.range(
-                relativeTo: StatementDate(year: year, month: month, day: day)
-            )
-        } catch { dateInputError = "The calendar range is unavailable." }
+        viewModel.refreshRelativePeriod(isOverview: isOverview)
     }
 
     private func updateAmount() {
@@ -786,28 +958,17 @@ struct TransactionListView: View {
     private var matchingSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
             if hasUsableResults {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 10) {
-                        ForEach(totalKeys, id: \.self) { key in
-                            if let money = result.totals.partitions[key] {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(totalTitle(key))
-                                        .font(theme.typography.caption).foregroundStyle(secondary)
-                                    Text(MoneyFormatting.display(money))
-                                        .font(theme.typography.tableSummary)
-                                        .foregroundStyle(theme.financialEffectColor(key.effect))
-                                        .fixedSize(horizontal: true, vertical: false)
-                                }
-                                .padding(12)
-                                .background(theme.palette.raisedSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
-                            }
-                        }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 560), alignment: .topLeading)], spacing: 14) {
+                    ForEach(Array(Set(totalKeys.map(\.currency))).sorted { $0.code < $1.code }, id: \.self) { currency in
+                        currencyTotals(currency)
                     }
                 }
+                Text("All matching records · bank movements and card liability remain separate")
+                    .font(theme.typography.secondary).foregroundStyle(secondary)
                 if result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount > 0 {
-                    Label("\(result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount) matching transactions have unestablished effects; their totals are withheld.",
+                    Label("The effect of \(result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount) transactions is unknown, so they are excluded from these totals.",
                           systemImage: "info.circle")
-                        .font(theme.typography.caption).foregroundStyle(secondary)
+                        .font(theme.typography.secondary).foregroundStyle(secondary)
                 }
             }
             if viewModel.presentationFilter.statementDateRange != nil && result.exclusions.period > 0 && inputError == nil {
@@ -825,16 +986,61 @@ struct TransactionListView: View {
         }
     }
 
-    private func totalTitle(_ key: TransactionPresentationTotalKey) -> String {
-        let effect: String
-        switch (key.domain, key.effect) {
-        case (.bank, .credit): effect = "Bank · Inflow"
-        case (.bank, .debit): effect = "Bank · Outflow"
-        case (.card, .increasesAmountOwed): effect = "Card · Increase owed"
-        case (.card, .decreasesAmountOwed): effect = "Card · Decrease owed"
-        default: effect = "Total unavailable"
+    private func currencyTotals(_ currency: CurrencyCode) -> some View {
+        LFPanel(contentSpacing: 10) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    Text(currency.code).font(theme.typography.rowTitle).frame(width: 50, alignment: .leading)
+                    totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                    totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
+                }.fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(currency.code).font(theme.typography.rowTitle)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 16) {
+                            totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                            totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
+                        }.fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 14) {
+                            totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                            totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
+                        }
+                    }
+                }
+            }
         }
-        return "\(key.currency.code) · \(effect)"
+    }
+
+    @ViewBuilder private func totalDomain(_ currency: CurrencyCode, domain: TransactionPresentationDomain,
+                                          title: String, effects: [TransactionPresentationEffect]) -> some View {
+        let keys = effects.map { TransactionPresentationTotalKey(currency: currency, domain: domain, effect: $0) }
+        if keys.contains(where: { result.totals.partitions[$0] != nil }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(theme.typography.secondary).foregroundStyle(secondary)
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(keys, id: \.self) { key in
+                        if let money = result.totals.partitions[key] {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(totalTitle(key)).font(theme.typography.secondary).foregroundStyle(secondary)
+                                Text(MoneyFormatting.display(money)).font(theme.typography.tableSummary).monospacedDigit()
+                                    .foregroundStyle(money.amount == 0 ? theme.palette.primaryText : theme.financialEffectColor(key.effect))
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func totalTitle(_ key: TransactionPresentationTotalKey) -> String {
+        switch (key.domain, key.effect) {
+        case (.bank, .credit): "Inflow"
+        case (.bank, .debit): "Outflow"
+        case (.card, .increasesAmountOwed): "Increase owed"
+        case (.card, .decreasesAmountOwed): "Decrease owed"
+        default: "Total unavailable"
+        }
     }
 
     /// Match the system display font with tabular digits, including sign and currency.
@@ -848,8 +1054,18 @@ struct TransactionListView: View {
         }
     }
 
-    private var transactionTable: some View {
-        VStack(spacing: 10) {
+    private func transactionTable(availableWidth: CGFloat, inlineDetails: Bool) -> some View {
+        let compact = availableWidth < 1000
+        let dateWidth: CGFloat = compact ? 100 : 112
+        let accountWidth: CGFloat = compact ? 140 : 185
+        let categoryWidth: CGFloat = compact ? 120 : 160
+        let moneyWidth = amountColumnWidth
+        // AppKit retains ideal widths when a Table narrows unless each column
+        // has a real upper bound. Reserve the complete Money width first.
+        // Native Table adds cell insets around all five column widths, plus
+        // the inset style and scroll gutter. Keep that chrome in the budget.
+        let descriptionWidth = max(170, availableWidth - dateWidth - accountWidth - categoryWidth - moneyWidth - 112)
+        return VStack(spacing: 10) {
             Table(hasUsableResults ? result.rows : [], selection: selection, sortOrder: tableSort) {
                 TableColumn(sortHeader(.statementDate), sortUsing: TransactionTableComparator(key: .statementDate, order: .reverse)) { row in
                     HStack(spacing: 5) {
@@ -871,14 +1087,16 @@ struct TransactionListView: View {
                         .accessibilityHidden(true)
                     }
                 }
-                .width(min: 96, ideal: 112)
+                .width(min: 96, ideal: dateWidth, max: dateWidth)
                 TableColumn(sortHeader(.description), sortUsing: TransactionTableComparator(key: .description)) { row in
                     Text(row.transaction.description)
                         .lineLimit(2)
                         .help(row.transaction.description)
                         .padding(.vertical, 6)
                 }
-                .width(min: 220, ideal: 280)
+                // Re-expand after a narrow window or inspector closes. An ideal
+                // width alone leaves AppKit's previous narrow column in place.
+                .width(min: descriptionWidth, ideal: descriptionWidth, max: descriptionWidth)
                 TableColumn(sortHeader(.account), sortUsing: TransactionTableComparator(key: .account)) { row in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(row.accountDisplayName).lineLimit(1)
@@ -887,29 +1105,43 @@ struct TransactionListView: View {
                     }
                     .help("\(row.accountDisplayName) · \(row.institutionDisplayName)")
                 }
-                .width(min: 136, ideal: 160)
+                .width(min: 120, ideal: accountWidth, max: accountWidth)
                 TableColumn(sortHeader(.category), sortUsing: TransactionTableComparator(key: .category)) { row in
                     Text(row.currentCategoryDisplayName)
                         .font(theme.typography.caption)
                         .lineLimit(1)
-                        .padding(.horizontal, 7).padding(.vertical, 4)
-                        .background(theme.interaction.dataBadge, in: Capsule())
                         .help(row.currentCategoryDisplayName)
                 }
-                .width(min: 120, ideal: 144)
+                .width(min: 105, ideal: categoryWidth, max: categoryWidth)
                 TableColumn(sortHeader(.nativeAmount), sortUsing: TransactionTableComparator(key: .nativeAmount)) { row in
                     Text(MoneyFormatting.display(row.transaction.money))
                         .font(theme.typography.tableMoney)
-                        .foregroundStyle(theme.financialEffectColor(row.effect))
+                        .foregroundStyle(row.transaction.money.amount == 0 ? theme.palette.primaryText : theme.financialEffectColor(row.effect))
                         .fixedSize(horizontal: true, vertical: false)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .width(min: amountColumnWidth, ideal: amountColumnWidth)
+                .width(moneyWidth)
             }
+            // SwiftUI updates the headers but can retain old AppKit cell frames
+            // when the inspector changes the viewport. Recreate only at these
+            // discrete layout boundaries; selection, sorting and filters live
+            // in the surrounding model and survive the change.
+            .id(TransactionTableLayoutID(compact: compact, showsInlineInspector: inlineDetails))
             .tableStyle(.inset(alternatesRowBackgrounds: false))
             .tint(theme.palette.dataSelection)
             .scrollContentBackground(.hidden)
             .background(panelColor)
+            .contextMenu(forSelectionType: String.self) { ids in
+                Button("Show details") {
+                    if let id = ids.first { viewModel.selectPresentationRow(id: id) }
+                    detailsVisible = true
+                    if tableIsNarrow { narrowDetailsVisible = true }
+                }.disabled(ids.isEmpty)
+            } primaryAction: { ids in
+                if let id = ids.first { viewModel.selectPresentationRow(id: id) }
+                detailsVisible = true
+                if tableIsNarrow { narrowDetailsVisible = true }
+            }
             .focused($tableFocused)
             .focusEffectDisabled()
             .overlay {
@@ -963,7 +1195,6 @@ struct TransactionListView: View {
             VStack(spacing: 12) {
                 ProgressView()
                 Text("Loading transactions…")
-                Text("Waiting for current canonical data.").foregroundStyle(secondary)
             }
         } else {
             switch result.state {
@@ -978,14 +1209,14 @@ struct TransactionListView: View {
                             : "Change the search or filters to see more transactions.",
                         systemImage: "tray"
                     )
-                    if !viewModel.allPresentationRows.isEmpty {
+                    if !viewModel.allPresentationRows.isEmpty && !isOverview {
                         Button("Clear filters", action: clearFilters).lfSecondaryAction()
                     }
                 }
             case .unavailable:
-                LFEmptyState(title: "Transactions unavailable", message: "Current canonical data could not be established. Check the application status before continuing.", systemImage: "exclamationmark.triangle")
+                LFEmptyState(title: "Transactions unavailable", message: "Transactions could not be loaded. Check the app status and try again.", systemImage: "exclamationmark.triangle")
             case .invalidAmountCurrencySelection:
-                LFEmptyState(title: "Choose one currency", message: "An amount range requires exactly one selected native currency.", systemImage: "exclamationmark.triangle")
+                LFEmptyState(title: "Choose one currency", message: "Select one currency to use an amount range.", systemImage: "exclamationmark.triangle")
             case .invalidStatementDateRange:
                 LFEmptyState(title: "Check source dates", message: "The start date must be on or before the end date.", systemImage: "exclamationmark.triangle")
             default:
@@ -995,144 +1226,118 @@ struct TransactionListView: View {
     }
 
     private var inspector: some View {
-        VStack(spacing: 12) {
+        LFPanel(variant: .inspector, contentSpacing: 12) {
             HStack {
-                Text("Transaction details").font(theme.typography.formHeading)
+                Text("Transaction details").font(theme.typography.sectionTitle)
                 Spacer()
                 Button {
-                    detailsVisible = false
-                    narrowDetailsVisible = false
+                    detailsVisible = false; narrowDetailsVisible = false
                 } label: { Image(systemName: "xmark") }
-                .lfSecondaryAction()
-                .help("Close transaction details")
-                .accessibilityLabel("Close transaction details")
+                .buttonStyle(.borderless).accessibilityLabel("Close transaction details")
             }
-            transactionDetailPanel
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-    private var transactionDetailPanel: some View {
-        LFPanel(variant: .inspector) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if let selected = selectedTransaction {
-                        let presentation = viewModel.detailPresentation(for: selected)
-                        HStack(spacing: 12) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                                .foregroundStyle(theme.palette.primaryText)
-                                .frame(width: 46, height: 46)
-                                .background(theme.interaction.dataIcon)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(presentation.description)
-                                    .font(theme.typography.formHeading)
-                                    .lineLimit(2)
-                                Text(presentation.signedAmount)
-                                    .font(theme.typography.body.weight(.semibold))
-                                    .fixedSize(horizontal: true, vertical: false)
-                                    .foregroundStyle(theme.palette.primaryText)
-                                    .monospacedDigit()
-                            }
-                            Spacer()
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(presentation.accessibilityText)
+                transactionDetailPanel
+            }
+        }.frame(maxHeight: .infinity, alignment: .top)
+    }
 
-                        detailSection("Transaction") {
-                            LFInfoRow(title: "Direction", value: presentation.direction, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: presentation.statementDateRole, value: presentation.statementDate, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Description", value: presentation.description, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Native currency", value: presentation.nativeCurrency, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Balance After", value: presentation.runningBalance, titleWidth: 100, verticalPadding: 0)
+    private var transactionDetailPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let selected = selectedTransaction {
+                let presentation = viewModel.detailPresentation(for: selected)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(presentation.description).font(theme.typography.rowTitle).lineLimit(2)
+                        .help(presentation.description)
+                    Text(presentation.signedAmount).font(theme.typography.headlineMoney).monospacedDigit()
+                        .foregroundStyle(selected.money.amount == 0 ? theme.palette.primaryText : theme.financialEffectColor(viewModel.selectedPresentationRow?.effect ?? .unknown))
+                    LFAccountLabel(title: presentation.accountDisplayName, detail: presentation.direction)
+                }
+                Divider()
+                detailFact(presentation.statementDateRole, presentation.statementDate)
+                if let date = selected.valueDate { detailFact("Value date", date.presentation) }
+                detailFact("Balance after", presentation.runningBalance)
+                VStack(alignment: .leading, spacing: 8) {
+                    if isOverview { detailFact("Category", categoryName(for: selected)) }
+                    else { categoryPicker(for: selected, titleWidth: 70) }
+                    if let id = selected.repositoryTransactionId {
+                        if let intent = categoryStore.snapshot.automation?.intents[id] {
+                            Text(intent.kind == .automatic ? "Assigned by a saved rule" : intent.kind == .deliberatelyCleared ? "You cleared this category" : "Your category choice")
+                                .font(theme.typography.secondary).foregroundStyle(secondary)
                         }
-
-                        detailSection("Account and category") {
-                            LFInfoRow(title: "Account", value: presentation.accountDisplayName, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Institution", value: presentation.institution, titleWidth: 100, verticalPadding: 0)
-                            categoryPicker(for: selected, titleWidth: 100)
-                            if let id = selected.repositoryTransactionId {
-                                if let intent = categoryStore.snapshot.automation?.intents[id] {
-                                    Text(intent.kind == .automatic ? "Assigned by a saved rule" : intent.kind == .deliberatelyCleared ? "You cleared this category" : "Your category choice")
-                                        .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
-                                }
-                                if let work = categoryStore.snapshot.automation?.work[id] {
-                                    Text(work.explanation).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
-                                }
-                                Button("Make a future rule…") {
-                                    rulePresentation = RulePresentation(transactions: viewModel.transactionPresentationResult.rows.map(\.transaction), proposal: selected)
-                                }.lfSecondaryAction()
-                            }
+                        if let work = categoryStore.snapshot.automation?.work[id] {
+                            Text(work.explanation).font(theme.typography.secondary).foregroundStyle(secondary)
                         }
-
-                        detailSection("Import provenance") {
-                            LFInfoRow(title: "Availability", value: presentation.provenanceAvailability.title, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Source document", value: presentation.sourceDocumentName, titleWidth: 100, verticalPadding: 0)
-                            LFInfoRow(title: "Imported", value: presentation.importedAtText, titleWidth: 100, verticalPadding: 0)
+                        if !isOverview {
+                            Button("Make a future rule…") {
+                                rulePresentation = RulePresentation(transactions: result.rows.map(\.transaction), proposal: selected)
+                            }.lfSecondaryAction()
                         }
-
-                        detailSection("Validation") {
-                            if let validation = presentation.validation {
-                                LFStatusBadge(
-                                    title: validation.title,
-                                    color: validation.isPassed ? LFTheme.success : LFTheme.warning
-                                )
-                                Text(validation.detail)
-                                    .font(theme.typography.formCaption)
-                                    .foregroundStyle(theme.palette.secondaryText)
-                            } else {
-                                LFInfoRow(title: "Outcome", value: "Unavailable", titleWidth: 100, verticalPadding: 0)
-                                Text("Validation is unavailable for this imported transaction.")
-                                    .font(theme.typography.formCaption)
-                                    .foregroundStyle(theme.palette.secondaryText)
-                            }
-                        }
-
-                        if let categoryMessage {
-                            Text(categoryMessage)
-                                .font(theme.typography.formCaption)
-                                .foregroundStyle(LFTheme.warning)
-                        }
-
-                        if categoryReconciliationRequired {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
-                                    .font(theme.typography.formCaption)
-                                    .foregroundStyle(LFTheme.warning)
-                                Button("Retry refresh", action: retryCanonicalHydration)
-                                    .lfSecondaryAction()
-                            }
-                        }
-                    } else {
-                        VStack(spacing: 12) {
-                            Image(systemName: "cursorarrow.click")
-                                .font(theme.typography.emptyStateIcon)
-                                .foregroundStyle(theme.palette.accentHover)
-                            Text("Select a transaction")
-                                .font(theme.typography.formHeading)
-                            Text("Details appear here without leaving the transaction table.")
-                                .font(theme.typography.formCaption)
-                                .foregroundStyle(theme.palette.secondaryText)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 260)
                     }
                 }
+                Divider()
+                Text("Source description").font(theme.typography.secondary).foregroundStyle(secondary)
+                Text(presentation.description).font(theme.typography.body).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let reference = selected.reference { detailFact("Reference", reference) }
+                Divider()
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) {
+                        detailFact("Exact amount", exactMoney(selected.money))
+                        if let balance = selected.runningBalanceMoney { detailFact("Exact balance", exactMoney(balance)) }
+                        detailFact("Native currency", presentation.nativeCurrency)
+                        ForEach(Array(selected.sourceProvenance.enumerated()), id: \.offset) { _, source in
+                            if let date = source.sourceTransactionDate { detailFact("Source transaction date", date.presentation) }
+                            detailFact("Source parser", source.parserProfileID + " · " + source.parserProfileVersion)
+                            detailFact("Source row", String(source.sourceOrdinal))
+                            if let page = source.sourcePage { detailFact("Source page", String(page)) }
+                        }
+                        detailFact("Institution", presentation.institution)
+                        Divider()
+                        Text("Original import").font(theme.typography.body.weight(.semibold))
+                        detailFact("Source document", presentation.sourceDocumentName)
+                        detailFact("Imported", presentation.importedAtText)
+                        if let validation = presentation.validation {
+                            Text(validation.title).font(theme.typography.body.weight(.semibold))
+                                .foregroundStyle(validation.isPassed ? LFTheme.success : LFTheme.warning)
+                            Text(validation.detail).font(theme.typography.secondary).foregroundStyle(secondary)
+                        } else {
+                            Text("Validation is unavailable for this imported transaction.").font(theme.typography.secondary).foregroundStyle(secondary)
+                        }
+                        if presentation.preferredSourceDocumentName != nil || selected.repositoryPreferredSourceTransactionDate != nil {
+                            Divider()
+                            Text("Preferred source evidence").font(theme.typography.body.weight(.semibold))
+                            if let name = presentation.preferredSourceDocumentName { detailFact("Source document", name) }
+                            if let date = selected.repositoryPreferredSourceTransactionDate { detailFact("Source transaction date", date.presentation) }
+                        }
+                    }.padding(.top, 10)
+                } label: {
+                    Text("Import provenance & validation").font(theme.typography.body).textSelection(.disabled)
+                }
+                Text(presentation.provenanceAvailability.title + " · " + (presentation.validation?.title ?? "Validation unavailable"))
+                    .font(theme.typography.secondary).foregroundStyle(secondary)
+                if let categoryMessage { Text(categoryMessage).font(theme.typography.secondary).foregroundStyle(LFTheme.warning) }
+                if categoryReconciliationRequired {
+                    Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the app's data is reloaded.")
+                        .font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                    Button("Retry refresh", action: retryCanonicalHydration).lfSecondaryAction()
+                }
+            } else {
+                Text("Select a transaction").font(theme.typography.rowTitle)
+                Text("Select a row to inspect its original description, category and source details.")
+                    .font(theme.typography.body).foregroundStyle(secondary)
             }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func detailFact(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(theme.typography.secondary).foregroundStyle(secondary)
+            Text(value).font(theme.typography.body).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func detailSection<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(theme.typography.formHeading)
-            content()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .lfSurface(.subtle)
+    private func exactMoney(_ money: Money) -> String {
+        money.currency.code + " " + ((try? money.canonicalDecimalString()) ?? NSDecimalNumber(decimal: money.amount).stringValue)
     }
 
     private func categoryPicker(for transaction: Transaction, titleWidth: CGFloat = 86) -> some View {
@@ -1158,6 +1363,7 @@ struct TransactionListView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .tint(theme.palette.primaryText)
             .disabled(transaction.repositoryTransactionId == nil)
             .frame(maxWidth: .infinity, alignment: .leading)
         }

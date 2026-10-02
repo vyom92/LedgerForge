@@ -360,7 +360,12 @@ final class BackupRestoreCoordinator: ObservableObject {
                 catch { try? db.closeChecked(); throw error }
             }
             let current = try currentProvider()
-            ledgerLifecyclePermit = try LedgerAccessCoordinator.shared(path: layout.current.path).beginLifecycle()
+            // Only this verified, explicitly confirmed restore may supersede a
+            // failed receipt-owned replacement. An unavailable provider can
+            // still retain a closed connection, so its presence is not authority.
+            let recoveryReceipt = try layout.readReceipt()
+            let recovering = !DatabaseProvider.shared.persistenceState.isUsable && recoveryReceipt != nil
+            ledgerLifecyclePermit = try LedgerAccessCoordinator.shared(path: layout.current.path).beginLifecycle(recovering: recovering)
             current?.database.lifecyclePermit = ledgerLifecyclePermit
             if let targetChangeCounter, let current {
                 guard try current.database.totalChangeCounter() == targetChangeCounter else { throw BackupError.candidateChanged }

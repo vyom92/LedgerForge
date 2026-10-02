@@ -44,6 +44,47 @@ struct ImportOutcomePresentationTests {
         #expect(!presentation.allowsViewingTransactions)
     }
 
+    @Test func reconciledSupportingSourceRetainsEvidenceStatusAndNavigationExclusion() {
+        var pending = ImportOutcomePresentation(result: ImportEngineResult(
+            fileName: "supporting.pdf", transactionCount: 0, validationPassed: true,
+            persisted: true, errorMessage: "The saved import needs a refresh.",
+            hydrationOutcome: .committedReconciliationRequired,
+            isEquivalentSupportingSource: true, recoveryRoute: .retryCanonicalReconciliation))
+        pending.recoveryContextID = UUID()
+        #expect(pending.requiresReconciliation)
+
+        let recovered = pending.markingReconciled()
+
+        #expect(recovered.recoveryRoute == .none)
+        #expect(recovered.recoveryContextID == nil)
+        #expect(recovered.persistenceStatus == "Equivalent Source Recorded")
+        #expect(recovered.fileSubtitle == "Equivalent source evidence recorded — 0 additional transactions")
+        #expect(recovered.isEquivalentSupportingSource)
+        #expect(!recovered.allowsViewingTransactions)
+        #expect(recovered.message == nil)
+        #expect(recovered.tone == .success)
+    }
+
+    @Test func reconciledOrdinaryPartialSalaryAndInvestmentOutcomesKeepTheirExistingRoutes() {
+        let variants = [
+            (partial: false, salary: false, investment: false),
+            (partial: true, salary: false, investment: false),
+            (partial: false, salary: true, investment: false),
+            (partial: false, salary: false, investment: true)
+        ]
+        for variant in variants {
+            let pending = ImportOutcomePresentation(result: ImportEngineResult(
+                fileName: "outcome", transactionCount: 0, validationPassed: true,
+                persisted: true, errorMessage: "The saved import needs a refresh.",
+                hydrationOutcome: .committedReconciliationRequired,
+                isPartialImport: variant.partial, isSalaryImport: variant.salary,
+                isInvestmentImport: variant.investment, recoveryRoute: .retryCanonicalReconciliation))
+            let recovered = pending.markingReconciled()
+            #expect(recovered.persistenceStatus == (variant.partial ? "Partial Import Succeeded" : "Persistence Succeeded"))
+            #expect(recovered.allowsViewingTransactions == (!variant.salary && !variant.investment))
+        }
+    }
+
     @Test func salaryImportRoutesToSalaryHistoryWithoutClaimingTransactions() {
         let presentation = ImportOutcomePresentation(result: ImportEngineResult(
             fileName: "salary.pdf", transactionCount: 0, validationPassed: true,
@@ -183,7 +224,7 @@ struct ImportOutcomePresentationTests {
 
         let presentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: attempt)
 
-        #expect(presentation.title == "Latest durable import")
+        #expect(presentation.title == "Last import attempt")
         #expect(presentation.status == "Import completed")
         #expect(presentation.subtitle == "Persisted 3 transaction(s)")
     }

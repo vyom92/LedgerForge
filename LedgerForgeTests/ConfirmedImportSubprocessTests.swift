@@ -129,6 +129,53 @@ struct SQLiteSubprocessMechanicsTests {
     }
 }
 
+/// Reuses the signed test subprocess protocol to put the production namespace
+/// acquisition itself under contention before a real repository call begins.
+/// The body stays synchronous; no source work or unrelated await holds the gate.
+@MainActor
+func withHeldNamespaceLock<T>(databasePath: String, _ body: () throws -> T) throws -> T {
+    let testBundle = try #require(Bundle.allBundles.first { $0.bundleURL.lastPathComponent == "LedgerForgeTests.xctest" })
+    let executable = try #require(testBundle.resourceURL?.appendingPathComponent("LedgerForgeSubprocessProbe"))
+    let child = try ProbeChild(executable: executable, databasePath: databasePath, scenario: "authority-hold", variant: "mechanics")
+    try child.start()
+    var drained = false
+    defer { if !drained { child.stopAndDrain() } }
+    guard child.ready.wait(timeout: .now() + 5) == .success else {
+        throw NSError(domain: "NamespaceContentionTests", code: 1, userInfo: [NSLocalizedDescriptionKey: "Namespace lock holder did not report readiness within the bounded wait."])
+    }
+    let result = try body()
+    try #require(child.process.isRunning, "The independent process must retain the namespace lock throughout the repository call.")
+    try child.sendGo()
+    guard child.waitForExit(timeout: 5) else {
+        throw NSError(domain: "NamespaceContentionTests", code: 2, userInfo: [NSLocalizedDescriptionKey: "Namespace lock holder did not finish within the bounded release wait."])
+    }
+    child.finishDraining()
+    drained = true
+    try #require(child.result?.result == "released", Comment(rawValue: child.diagnostic))
+    try #require(child.result?.slot == child.slot && child.result?.pid == child.recordedPID)
+    return result
+}
+
+/// In-memory state only. Counts cover every actual table, while the connection
+/// change counter also detects same-count writes. Nothing is exported to disk.
+struct SQLiteNamespaceContentionSnapshot: Equatable {
+    let tableCounts: [String: Int]
+    let changeCounter: Int64
+    let activation: LedgerActivationStamp
+
+    init(database: SQLiteDatabase) throws {
+        let tables = try database.query(sql: "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;") {
+            $0.string(at: 0) ?? ""
+        }
+        tableCounts = try Dictionary(uniqueKeysWithValues: tables.map { table in
+            let quoted = table.replacingOccurrences(of: "\"", with: "\"\"")
+            return (table, try database.queryInt("SELECT COUNT(*) FROM \"\(quoted)\";"))
+        })
+        changeCounter = try database.totalChangeCounter()
+        activation = try database.validatedActivationStamp()
+    }
+}
+
 private struct ProbePayload: Decodable, Sendable {
     let slot: String
     let pid: Int32

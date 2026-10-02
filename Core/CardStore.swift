@@ -35,3 +35,21 @@ final class CardStore: ObservableObject {
         _snapshot.publishInstalledValue()
     }
 }
+
+extension CardStoreSnapshot {
+    func continuingCardGroups(accountID: String) -> [CardInstrumentLineage.Group] {
+        CardInstrumentLineage.groups(instrumentIDs: Set(instruments.filter { $0.liabilityAccountID == accountID }.map(\.id)),
+            links: relationships.filter { $0.liabilityAccountID == accountID }.map {
+                .init(predecessor: $0.predecessorInstrumentID, successor: $0.successorInstrumentID,
+                      kind: $0.kind.rawValue, authority: $0.authority)
+            })
+    }
+
+    func instrumentForSelection(group: CardInstrumentLineage.Group, observation: CardSourceIdentityObservation?) -> String? {
+        let memberIDs = Set(group.members)
+        let matches = Set(statements.flatMap(\.sections).filter { section in
+            memberIDs.contains(section.instrumentID) && observation.map { section.sourceObservations.contains($0) } == true
+        }.map(\.instrumentID))
+        return matches.isEmpty ? group.terminal : CardInstrumentLineage.resolve(exactMatches: matches, groups: [group])
+    }
+}

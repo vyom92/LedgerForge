@@ -161,6 +161,7 @@ final class InMemoryRepositoryState {
     var netWorthExclusions: [String: Set<NetWorthMemberID>] = [:]
     var salaryStatements: [String: SalaryStatementDTO] = [:]
     var fundingPlans: [String: FundingPlanDTO] = [:]
+    var monthlyScratchpads: [String: MonthlyPlanScratchpadDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
 }
@@ -215,14 +216,14 @@ private final class InMemoryInvestmentRepo: InvestmentRepository {
         let ids = Set(containers.map(\.id))
         let holdings = state.investmentHoldings.values.filter { ids.contains($0.containerID) }.sorted { $0.id < $1.id }
         for container in containers {
-            if container.zioSource != nil { continue }
+            if container.zioSource != nil || container.ibkrSource != nil { continue }
             guard let documentID = container.documentID, let sessionID = container.importSessionID,
                   let document = state.documents[documentID], let session = state.importSessions[sessionID],
                   document.workspaceId == workspaceID, document.importSessionId == session.id,
                   session.workspaceId == workspaceID, session.validationStatus == "passed" else { throw InvestmentError.invalidPersistedState }
         }
         for holding in holdings {
-            if holding.zioObservationID != nil { continue }
+            if holding.zioObservationID != nil || holding.ibkrObservationID != nil { continue }
             guard let documentID = holding.documentID, let sessionID = holding.importSessionID, let normalizedID = holding.normalizedDocumentID,
                   let document = state.documents[documentID], let session = state.importSessions[sessionID],
                   let normalized = state.normalizedDocuments[normalizedID],
@@ -317,6 +318,23 @@ private final class InMemoryInvestmentRepo: InvestmentRepository {
         } catch let error as InvestmentError { return .rejected(error) }
         catch { return .unavailable }
     }
+    func saveIBKRFlexHoldings(_ plan: IBKRFlexHoldingsPlan) -> IBKRFlexHoldingsResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            let updated = try plan.applying(to: snapshot(workspaceID: plan.workspace.id), now: Date())
+            guard !state.investmentFailureBeforePublish else { return .unavailable }
+            var containers = state.investmentContainers, holdings = state.investmentHoldings
+            let ids = Set(updated.containers.filter { $0.institution == "Interactive Brokers" && $0.identity == plan.source.accountID }.map(\.id))
+            for container in updated.containers where ids.contains(container.id) { containers[container.id] = container }
+            holdings = holdings.filter { !ids.contains($0.value.containerID) }
+            for holding in updated.holdings where ids.contains(holding.containerID) { holdings[holding.id] = holding }
+            state.workspaces[plan.workspace.id] = state.workspaces[plan.workspace.id] ?? plan.workspace
+            state.investmentContainers = containers; state.investmentHoldings = holdings
+            return .saved
+        } catch let error as InvestmentError { return .rejected(error) }
+        catch { return .unavailable }
+    }
 }
 
 private final class InMemorySalaryRepo: SalaryRepository {
@@ -400,12 +418,47 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     private let state: InMemoryRepositoryState
     init(state: InMemoryRepositoryState) { self.state = state }
 
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.monthlyScratchpads.values.filter { $0.workspaceID == workspaceId }.sorted { $0.month < $1.month }
+    }
+
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
+        let scratch = try MonthlyPlanScratchpad.decode(value)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard state.workspaces[value.workspaceID] != nil || value.workspaceID == "default-workspace" else {
+            throw RepositoryError.relationshipViolation("Monthly scratchpad workspace is invalid.")
+        }
+        if state.workspaces[value.workspaceID] == nil {
+            state.workspaces[value.workspaceID] = WorkspaceDTO(id: value.workspaceID, name: "Default Workspace", createdAtISO: scratch.plan.updatedAtISO)
+        }
+        state.monthlyScratchpads[value.workspaceID + ":" + value.month] = value
+    }
+
+    func removeScratchpad(workspaceId: String, month: String) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        state.monthlyScratchpads[workspaceId + ":" + month] = nil
+    }
+
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
+        let scratch = try MonthlyPlanScratchpad.decode(scratchpad)
+        guard scratch.canonical == scratch.plan, try scratch.plan.persistenceDTO() == plan,
+              scratchpad.workspaceID == plan.workspaceId, scratchpad.month == plan.planMonthISO else {
+            throw RepositoryError.relationshipViolation("Monthly scratchpad does not match its plan.")
+        }
+        return try persistPlan(plan, scratchpad: scratchpad)
+    }
+
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         return state.fundingPlans.values.filter { $0.workspaceId == workspaceId }.sorted { $0.planMonthISO < $1.planMonthISO }
     }
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
+        try persistPlan(plan, scratchpad: nil)
+    }
+
+    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         try SalaryPersistenceDTOValidator.validateRowLineage(plan: plan, existing: Array(state.fundingPlans.values))
@@ -431,6 +484,7 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
         }
         for id in plan.assistance?.appliedSalaryIDs ?? [] { state.salaryAssistance[id]?.draftState = .consumed }
         state.fundingPlans[plan.id] = plan
+        if let scratchpad { state.monthlyScratchpads[plan.workspaceId + ":" + plan.planMonthISO] = scratchpad }
         return plan
     }
 }
@@ -657,18 +711,19 @@ private final class InMemoryAccountRepo: AccountRepository {
         guard state.workspaces[account.workspaceId] != nil else {
             throw RepositoryError.relationshipViolation("Workspace \(account.workspaceId) does not exist for account \(account.id).")
         }
-        // Import/upsert must never reactivate an owner-classified history-only card.
+        // Only the explicit metadata command can change a saved account name.
+        // Import/upsert must also retain the owner's history-only decision.
         state.accounts[account.id] = AccountDTO(
-            id: account.id, workspaceId: account.workspaceId, name: account.name,
+            id: account.id, workspaceId: account.workspaceId, name: state.accounts[account.id]?.name ?? account.name,
             institutionId: account.institutionId, accountType: account.accountType,
             nativeCurrency: account.nativeCurrency, description: account.description,
             createdAtISO: account.createdAtISO,
-            closedAtISO: state.accounts[account.id]?.closedAtISO ?? account.closedAtISO
+            closedAtISO: state.accounts[account.id].map { $0.closedAtISO } ?? account.closedAtISO
         )
         return account.id
     }
 
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard ISO8601DateFormatter().date(from: markedAtISO) != nil else {
             throw RepositoryError.relationshipViolation("History-only classification requires its recorded time.")
@@ -676,8 +731,8 @@ private final class InMemoryAccountRepo: AccountRepository {
         guard let existing = state.accounts[accountId] else {
             throw RepositoryError.recordNotFound("Account does not exist.")
         }
-        guard existing.workspaceId == workspaceId, existing.accountType == "credit_card" else {
-            throw RepositoryError.relationshipViolation("History-only classification requires a credit card in this workspace.")
+        guard existing.workspaceId == workspaceId else {
+            throw RepositoryError.relationshipViolation("History-only classification requires an account in this workspace.")
         }
         guard existing.closedAtISO == nil else { return false }
         state.accounts[accountId] = AccountDTO(
@@ -686,6 +741,17 @@ private final class InMemoryAccountRepo: AccountRepository {
             nativeCurrency: existing.nativeCurrency, description: existing.description,
             createdAtISO: existing.createdAtISO, closedAtISO: markedAtISO
         )
+        return true
+    }
+
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let existing = state.accounts[accountId] else { throw RepositoryError.recordNotFound("Account does not exist.") }
+        guard existing.workspaceId == workspaceId else { throw RepositoryError.relationshipViolation("Account status requires an account in this workspace.") }
+        guard existing.closedAtISO != nil else { return false }
+        state.accounts[accountId] = AccountDTO(id: existing.id, workspaceId: existing.workspaceId, name: existing.name,
+            institutionId: existing.institutionId, accountType: existing.accountType, nativeCurrency: existing.nativeCurrency,
+            description: existing.description, createdAtISO: existing.createdAtISO, closedAtISO: nil)
         return true
     }
 
@@ -1246,7 +1312,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     private func bankResolution(_ plan: BankImportPlanDTO) throws -> BankImportDecision.Resolution {
         try BankImportDecision.resolve(plan, accounts: Array(state.accounts.values), identifiers: Array(state.accountIdentifiers.values),
             existingSections: Array(state.bankSectionPlans.values), transactions: Array(state.transactions.values),
-            existingZeroControls: Array(state.statementZeroActivityControls.values))
+            existingZeroControls: Array(state.statementZeroActivityControls.values),
+            existingStatementGroups: Array(state.statementEquivalenceGroups.values),
+            existingStatementProjections: Array(state.statementFinancialProjections.values),
+            existingStatementMembers: Array(state.statementEquivalenceMembers.values))
     }
 
     func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
@@ -2042,10 +2111,13 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   section.importSessionId == history.importSession.id,
                   section.normalizedDocumentId == history.normalizedDocument?.id,
                   section.sectionOrdinal == 1,
+                  !isSupportingSource,
                   section.rows.count == transactions.values.filter({ $0.documentId == history.document.id }).count,
-                  section.identityPatterns.count == 2 else { return .repositoryIntegrityConflict }
-            for identity in section.identityPatterns {
-                cbqSourceIdentityRecords["\(history.document.id)|\(identity.kind)"] = CBQSourceIdentityRecordDTO(accountId: account.id, kind: identity.kind, pattern: identity.pattern)
+                  section.identityPatterns.count == (BankImportDecision.standaloneProfiles.contains(section.parserProfileId) ? 1 : 2) else { return .repositoryIntegrityConflict }
+            if section.parserProfileId.hasPrefix("cbq.") {
+                for identity in section.identityPatterns {
+                    cbqSourceIdentityRecords["\(history.document.id)|\(identity.kind)"] = CBQSourceIdentityRecordDTO(accountId: account.id, kind: identity.kind, pattern: identity.pattern)
+                }
             }
             bankSectionPlans[section.id] = section
         }
@@ -2161,6 +2233,12 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let preexistingSourceObservations = sourceObservations
         let preexistingSectionObservations = sectionObservations
         let preexistingSections = sections
+        let preexistingInstrumentIDs = Set(instruments.values.filter { $0.workspaceId == plan.workspace.id && $0.liabilityAccountId == account.id }.map(\.id))
+        let confirmedCardGroups = CardInstrumentLineage.groups(instrumentIDs: preexistingInstrumentIDs,
+            links: relationships.values.filter { $0.workspaceId == plan.workspace.id && $0.liabilityAccountId == account.id }.map {
+                .init(predecessor: $0.predecessorInstrumentId, successor: $0.successorInstrumentId,
+                    kind: $0.relationshipKind, authority: $0.authority)
+            })
         let allowedAuthorities = Set(["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"])
         let allowedRelationships = Set(["additional_concurrent", "replacement", "renewal", "upgrade", "unspecified"])
         var selectedInstrumentIDs = Set<String>()
@@ -2241,13 +2319,18 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                     return .repositoryIntegrityConflict
                 }
                 if observation.associationAuthority == "prior_user_confirmed_mapping" {
-                    guard preexistingSectionObservations.values.contains(where: {
-                        $0.workspaceId == observation.workspaceId &&
-                        $0.observationKind == observation.observationKind &&
-                        $0.sourceValue == observation.sourceValue &&
-                        $0.associationAuthority == "user_confirmed" &&
-                        preexistingSections[$0.cardStatementSectionId]?.instrumentId == selectedInstrumentID
-                    }) else { return .staleIdentityDecision }
+                    let matches = Set(preexistingSectionObservations.values.compactMap { existing -> String? in
+                        guard existing.workspaceId == observation.workspaceId,
+                              existing.observationKind == observation.observationKind,
+                              existing.sourceValue == observation.sourceValue,
+                              existing.associationAuthority == "user_confirmed",
+                              let id = preexistingSections[existing.cardStatementSectionId]?.instrumentId,
+                              preexistingInstrumentIDs.contains(id) else { return nil }
+                        return id
+                    })
+                    guard CardInstrumentLineage.resolve(exactMatches: matches, groups: confirmedCardGroups) == selectedInstrumentID else {
+                        return .staleIdentityDecision
+                    }
                 }
                 sectionObservations[observation.id] = observation
             }
@@ -2270,7 +2353,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         }
 
         guard (contract == .axis
-                ? card.sourceObservations.isEmpty
+                ? card.sourceObservations.count <= 1 && card.sourceObservations.allSatisfy({ $0.subjectKind == "liability_account" })
                 : (card.sectionDecisions.count == 1
                     ? (1...2).contains(card.sourceObservations.count)
                     : card.sourceObservations.count == 1)),
@@ -2294,6 +2377,12 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   !observation.sourceValue.isEmpty,
                   sourceObservations[observation.id] == nil else {
                 return .repositoryIntegrityConflict
+            }
+            if contract == .axis {
+                guard observation.sourceValue.range(of: #"^[0-9]{6}X{6}[0-9]{4}$"#, options: .regularExpression) != nil,
+                      observation.associationAuthority != "parser_strong_evidence" else {
+                    return .repositoryIntegrityConflict
+                }
             }
             if observation.associationAuthority == "prior_user_confirmed_mapping" {
                 guard preexistingSourceObservations.values.contains(where: {
@@ -2369,31 +2458,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else {
             return .repositoryIntegrityConflict
         }
-        var increaseTotal: Int64 = 0
-        var decreaseTotal: Int64 = 0
-        var instrumentNet: Int64 = 0
-        var allRowsNet: Int64 = 0
-        var membershipTotals: [CardTransactionSummaryMembership: Int64] = [:]
-        var sectionTotals = Dictionary(uniqueKeysWithValues: card.sectionDecisions.map {
-            ($0.section.documentScopedSectionId, Int64(0))
-        })
         for evidence in card.transactionEvidence {
             guard evidence.cardStatementId == card.statement.id,
                   let transaction = incomingByID[evidence.transactionId],
-                  transaction.direction == evidence.liabilityEffectCode else { return .repositoryIntegrityConflict }
-            switch evidence.liabilityEffectCode {
-            case CardLiabilityEffect.increasesAmountOwed.rawValue:
-                increaseTotal += transaction.amountMinor
-                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
-            case CardLiabilityEffect.decreasesAmountOwed.rawValue:
-                decreaseTotal += -transaction.amountMinor
-                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
-            default:
+                  transaction.direction == evidence.liabilityEffectCode,
+                  CardLiabilityEffect(rawValue: evidence.liabilityEffectCode) != nil else {
                 return .repositoryIntegrityConflict
             }
-            allRowsNet += transaction.amountMinor
             let membership = evidence.summaryMembershipCode.flatMap(CardTransactionSummaryMembership.init(rawValue:))
-            if let membership { membershipTotals[membership, default: 0] += transaction.amountMinor }
             if evidence.rowScopeCode == "account_level" {
                 guard evidence.instrumentId == nil,
                       (contract != .axis || evidence.documentScopedSectionId == nil),
@@ -2411,7 +2483,6 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             }
             if let sectionID = evidence.documentScopedSectionId {
                 guard selectedBySectionID[sectionID] != nil else { return .repositoryIntegrityConflict }
-                sectionTotals[sectionID, default: 0] += transaction.amountMinor
             } else if !contract.isAmex && contract != .axis {
                 return .repositoryIntegrityConflict
             }
@@ -2425,47 +2496,37 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 transactionEvidence[evidence.id] = evidence
             }
         }
-        let sectionNet = card.sectionDecisions.reduce(Int64(0), { $0 + $1.section.signedTotalMinor })
-        let summaryValid: Bool
-        switch contract {
-        case .amex, .amexUSDZero:
-            summaryValid = previous != nil && balance != nil &&
-                byCode["new_debits"]?.moneyMinor == increaseTotal &&
-                byCode["new_credits"]?.moneyMinor == decreaseTotal &&
-                byCode["instrument_net_total"]?.moneyMinor == instrumentNet &&
-                previous! - decreaseTotal + increaseTotal == balance! && sectionNet == instrumentNet
-        case .cbqV1:
-            let billed = byCode["amount_billed"]?.moneyMinor
-            let payment = byCode["payment_received"]?.moneyMinor
-            let equationValid = billed.flatMap { amount in
-                payment.flatMap { paid in
-                    previous.flatMap { opening in balance.map { opening + amount - paid == $0 } }
-                }
-            } ?? false
-            summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
-                payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
-                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
-                equationValid && sectionNet == allRowsNet
-        case .cbqV2:
-            let payment = byCode["total_payment"]?.moneyMinor
-            let credit = byCode["credit_reversal"]?.moneyMinor
-            let purchases = byCode["purchases"]?.moneyMinor
-            let installment = byCode["billed_installment"]?.moneyMinor
-            let fees = byCode["fees_charges"]?.moneyMinor
-            summaryValid = payment == -membershipTotals[.cbqV2TotalPayment, default: 0] &&
-                credit == -membershipTotals[.cbqV2CreditReversal, default: 0] &&
-                purchases == membershipTotals[.cbqV2Purchases, default: 0] &&
-                installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
-                fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
-                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
-                payment.flatMap { paid in credit.flatMap { credited in purchases.flatMap { bought in installment.flatMap { billed in fees.flatMap { fee in previous.flatMap { opening in balance.map { opening - paid - credited + bought + billed + fee == $0 } } } } } } } == true &&
-                sectionNet == allRowsNet
-        case .axis:
-            summaryValid = true
-        }
-        guard summaryValid,
-              card.sectionDecisions.allSatisfy({ sectionTotals[$0.section.documentScopedSectionId] == $0.section.signedTotalMinor }) else {
-            return .repositoryIntegrityConflict
+        // Row counts and section ownership are independent of printed totals.
+        // Only an empty source still needs the zero-activity equations.
+        if incomingTransactions.isEmpty {
+            let summaryValid: Bool
+            switch contract {
+            case .amex, .amexUSDZero:
+                summaryValid = previous != nil && balance != nil &&
+                    byCode["new_debits"]?.moneyMinor == 0 &&
+                    byCode["new_credits"]?.moneyMinor == 0 &&
+                    byCode["instrument_net_total"]?.moneyMinor == 0 &&
+                    previous == balance
+            case .cbqV1:
+                summaryValid = byCode["amount_billed"]?.moneyMinor == 0 &&
+                    byCode["payment_received"]?.moneyMinor == 0 &&
+                    byCode["source_section_net_total"]?.moneyMinor == 0 &&
+                    previous == balance
+            case .cbqV2:
+                summaryValid = byCode["total_payment"]?.moneyMinor == 0 &&
+                    byCode["credit_reversal"]?.moneyMinor == 0 &&
+                    byCode["purchases"]?.moneyMinor == 0 &&
+                    byCode["billed_installment"]?.moneyMinor == 0 &&
+                    byCode["fees_charges"]?.moneyMinor == 0 &&
+                    byCode["source_section_net_total"]?.moneyMinor == 0 &&
+                    previous == balance
+            case .axis:
+                summaryValid = true
+            }
+            guard summaryValid,
+                  card.sectionDecisions.allSatisfy({ $0.section.signedTotalMinor == 0 }) else {
+                return .repositoryIntegrityConflict
+            }
         }
         statements[card.statement.id] = card.statement
         card.summaryComponents.forEach { summaryComponents[$0.id] = $0 }
@@ -2518,8 +2579,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             guard case .equivalent = equivalenceReview,
                   let group = matchingCardSemanticGroup(projection, workspaceID: plan.workspace.id, accountID: account.id, groups: groups),
                   group.projectionAlgorithm == projection.algorithmIdentifier,
-                  group.projectionDigest == projection.digest,
                   let authoritative = projections[group.authoritativeProjectionId],
+                  authoritative.digest == group.projectionDigest,
+                  (projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.amexAlgorithm ||
+                   group.projectionDigest == projection.digest),
                   authoritative.events.count == projection.events.count else {
                 return .repositoryIntegrityConflict
             }
@@ -2548,13 +2611,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 }
                 canonicalIDsByOrdinal = resolved
             } else {
-                let authoritativeByOrdinal = Dictionary(uniqueKeysWithValues: authoritative.events.map { ($0.sourceOrdinal, $0) })
-                guard projection.events.allSatisfy({ incoming in
-                    guard let existing = authoritativeByOrdinal[incoming.sourceOrdinal],
-                          existing.canonicalTransactionId != nil else { return false }
-                    return cardSemanticEventMatches(existing, incoming)
-                }) else { return .repositoryIntegrityConflict }
-                canonicalIDsByOrdinal = authoritativeByOrdinal.mapValues { $0.canonicalTransactionId }
+                guard let correspondence = amexCorrespondence(plan, projection: projection,
+                    authoritative: authoritative) else { return .repositoryIntegrityConflict }
+                canonicalIDsByOrdinal = correspondence.mapValues { Optional($0) }
             }
         } else {
             guard case .firstAcceptedSource = equivalenceReview else { return .repositoryIntegrityConflict }
@@ -2666,6 +2725,21 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
         return nil
+    }
+
+    private func amexCorrespondence(
+        _ plan: ConfirmedImportPlanDTO, projection: CardStatementSemanticProjectionDTO,
+        authoritative: CardStatementSemanticProjectionRecordDTO
+    ) -> [Int: String]? {
+        guard let card = plan.cardImportPlan,
+              authoritative.workspaceId == plan.workspace.id,
+              authoritative.liabilityAccountId == card.liabilityAccountId else { return nil }
+        return AmexStatementCorrespondence.resolve(
+            incoming: projection, incomingSections: card.sectionDecisions.map(\.section),
+            incomingTransactions: plan.transactionTemplates.map(\.transaction),
+            authoritative: authoritative,
+            authoritativeSections: state.cardSections.values.filter { $0.cardStatementId == authoritative.cardStatementId },
+            canonicalTransactions: Array(state.transactions.values))
     }
 
     private func matchingCardSemanticGroup(
@@ -2814,7 +2888,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     }
 
     private func isCBQObservationPlan(_ plan: ConfirmedImportPlanDTO) -> Bool {
-        plan.bankStatementSectionPlan != nil ||
+        plan.bankStatementSectionPlan?.parserProfileId.hasPrefix("cbq.") == true ||
             (expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil)
     }
 
@@ -2894,10 +2968,13 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 groups: state.cardSemanticGroups
             ) {
                 guard group.projectionAlgorithm == projection.algorithmIdentifier,
-                      group.projectionDigest == projection.digest,
-                      let authoritative = state.cardSemanticProjections[group.authoritativeProjectionId] else {
-                    return .conflict
-                }
+                      let authoritative = state.cardSemanticProjections[group.authoritativeProjectionId],
+                      authoritative.digest == group.projectionDigest else { return .conflict }
+                if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.amexAlgorithm {
+                    guard amexCorrespondence(plan, projection: projection, authoritative: authoritative) != nil else {
+                        return .conflict
+                    }
+                } else if group.projectionDigest != projection.digest { return .conflict }
                 if let incomingMonth = projection.selectedStatementMonthISO,
                    let authoritativeMonth = authoritative.selectedStatementMonthISO,
                    incomingMonth != authoritativeMonth {

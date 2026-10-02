@@ -79,7 +79,7 @@ nonisolated enum CardStatementProfileContract: Equatable, Sendable {
         switch self {
         case .amex, .amexUSDZero: return "amex_membership_number"
         case .cbqV1, .cbqV2: return "cbq_card_account_reference"
-        case .axis: return nil
+        case .axis: return "axis_primary_masked_card_number"
         }
     }
     var instrumentObservationKindCode: String? {
@@ -368,7 +368,7 @@ public struct AccountDTO: nonisolated Equatable, Sendable {
     public let nativeCurrency: String
     public let description: String?
     public let createdAtISO: String
-    /// When the owner marked this credit card closed and settled/history-only.
+    /// When the owner marked this account history-only.
     /// This is administrative metadata, not an issuer closure or settlement date.
     public let closedAtISO: String?
 

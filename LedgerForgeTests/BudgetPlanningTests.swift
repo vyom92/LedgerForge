@@ -177,7 +177,7 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertFalse(next.plan.deductions.first?.recurs ?? true)
     }
 
-    func testTemporaryBillReductionCanBeChosenAfterEditingAndSwitchingMonths() throws {
+    func testTemporaryBillReductionKeepsItsBasisWithoutOverwritingAnAlreadyRetainedMonth() throws {
         let (vm, active, store) = try editor()
         let id = try bill(vm, region: "qatar", amount: "120")
         vm.save()
@@ -188,7 +188,10 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.plan.qatarCommitments.first?.temporaryCarryBasis, try money("120"))
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let reopenedNext = try editor(month: "2026-10", active: active, store: store).0
-        XCTAssertEqual(reopenedNext.plan.qatarCommitments.first?.money, try money("120"))
+        // October was already opened and retained with zero before the owner
+        // marked September's reduction temporary. Do not rewrite that month.
+        XCTAssertEqual(reopenedNext.plan.qatarCommitments.first?.money, try money("0"))
+        XCTAssertEqual(vm.plan.qatarCommitments.first?.temporaryCarryBasis, try money("120"))
     }
 
     func testRemovingTemporaryExceptionRestoresBasisAndInvalidSaveCannotReuseOldAmount() throws {
@@ -232,7 +235,48 @@ final class BudgetPlanningTests: XCTestCase {
         vm.switchMonth(to: last); XCTAssertEqual(vm.month, last); XCTAssertTrue(vm.canEdit)
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2100-01"))
         XCTAssertEqual(vm.month, last)
-        XCTAssertTrue(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").isEmpty)
+        let retainedPlans = try active.fundingPlanRepo.plans(workspaceId: "default-workspace")
+        XCTAssertEqual(retainedPlans.count, 1)
+        XCTAssertEqual(retainedPlans.first?.planMonthISO, future.canonical)
+        XCTAssertEqual(retainedPlans.first?.expectedFixedDecimal, "250.00")
+    }
+
+    func testScratchpadProviderParityAndSQLiteReopenKeepExactIncompleteEntries() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-s100-scratch-\(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("scratch.sqlite").path
+        let sqlite = try SQLiteRepositoryProvider(path: path)
+        defer { sqlite.database.close() }
+        for provider in [DatabaseProvider(inMemory: true), .verifiedSQLite(sqlite)] {
+            let (vm, _, _) = try editor(active: provider)
+            _ = vm.updateMoney(.fixed, text: "5000.5")
+            vm.flushPendingEntries()
+            _ = vm.updateMoney(.fixed, text: "5000.")
+            let billID = try bill(vm, region: "india", amount: "12.5")
+            vm.editCommitment(region: "india", id: billID, field: "amount", text: "12.")
+            vm.flushPendingEntries()
+            let rows = try provider.fundingPlanRepo.scratchpads(workspaceId: "default-workspace")
+            XCTAssertEqual(rows.count, 1)
+            let state = try MonthlyPlanScratchpad.decode(XCTUnwrap(rows.first))
+            XCTAssertEqual(state.rawText["fixed"], "5000.")
+            XCTAssertEqual(state.rawText["amount.\(billID)"], "12.")
+            XCTAssertEqual(state.untouchedZeroFields.contains("variable"), true)
+            XCTAssertEqual(try provider.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal, "5000.50")
+            let plans = FundingPlanStore()
+            plans.installWithoutObservation([try XCTUnwrap(state.canonical)], generation: provider.generationToken, scratchpads: [state])
+            let restored = try editor(active: provider, store: plans).0
+            XCTAssertEqual(restored.rawText, vm.rawText)
+            XCTAssertEqual(restored.fieldErrors, vm.fieldErrors)
+            XCTAssertTrue(try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace").isEmpty)
+        }
+        try sqlite.database.checkpointAndClose()
+        let reopened = try SQLiteRepositoryProvider(path: path)
+        defer { reopened.database.close() }
+        let state = try MonthlyPlanScratchpad.decode(XCTUnwrap(reopened.fundingPlanRepo.scratchpads(workspaceId: "default-workspace").first))
+        XCTAssertEqual(state.rawText["fixed"], "5000.")
+        XCTAssertEqual(state.fieldErrors.count, 2)
+        XCTAssertEqual(try reopened.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal, "5000.50")
     }
 
     func testSwitchingWithSharedFXSeedsSavedRowsBeforeMakingTheNewDraftDirty() throws {
@@ -348,7 +392,10 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.currentPlanningMonth.canonical, "2026-10")
         XCTAssertEqual(vm.nextPlanningMonth.canonical, "2026-11")
         XCTAssertEqual(vm.plan, draft); XCTAssertEqual(vm.month.canonical, "2026-09")
-        XCTAssertEqual(vm.rawText["fixed"], "100."); XCTAssertTrue(vm.hasUnsavedDrafts)
+        vm.flushPendingEntries()
+        XCTAssertEqual(vm.rawText["fixed"], "100."); XCTAssertFalse(vm.hasUnsavedDrafts)
+        XCTAssertNotNil(vm.fieldErrors["fixed"])
+        XCTAssertEqual(try active.fundingPlanRepo.scratchpads(workspaceId: "default-workspace").count, 1)
     }
 
     func testPlannerSaveReopenParityAndLegacyVersionRemainDistinct() throws {

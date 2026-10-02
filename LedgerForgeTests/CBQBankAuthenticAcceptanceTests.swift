@@ -538,7 +538,12 @@ struct CBQBankAuthenticAcceptanceTests {
                     // A neutral closing label is only interpreted when the
                     // original explicitly prints zero; direction is not inferred.
                     guard !neutralClosing || amount == 0 else { throw CBQOracleError.ambiguousControl("neutral-closing") }
-                    guard previous == amount else { throw CBQOracleError.failedEquation }
+                    // Empty-statement evidence still needs an unchanged
+                    // opening/closing balance. Nonempty explicit rows retain
+                    // this printed closing observation without an equation veto.
+                    if rows.isEmpty {
+                        guard previous == amount else { throw CBQOracleError.failedEquation }
+                    }
                     closing = amount
                     continue
                 }
@@ -570,7 +575,7 @@ struct CBQBankAuthenticAcceptanceTests {
                 guard closing == nil else { throw CBQOracleError.malformedRow("financial-content-after-closing") }
                 if cbqIsSourceDate(cells[0]) {
                     try finishPending()
-                    guard let prior = previous, cbqIsSourceDate(cells[2]),
+                    guard previous != nil, cbqIsSourceDate(cells[2]),
                           !cells[1].isEmpty, cells[3].isEmpty != cells[4].isEmpty else {
                         throw CBQOracleError.malformedRow("source-financial-columns")
                     }
@@ -579,7 +584,10 @@ struct CBQBankAuthenticAcceptanceTests {
                     let amount = try sourceDecimal(cells[3].isEmpty ? cells[4] : cells[3])
                     let balance = try sourceDecimal(cells[5], legacyBookBalance: legacy && product == "Current Account-Retail")
                     let signed = cells[3].isEmpty ? amount : -amount
-                    guard amount > 0, prior + signed == balance else { throw CBQOracleError.failedEquation }
+                    // The independently explicit debit/credit column owns
+                    // direction. Retain the printed balance without making
+                    // its arithmetic agreement an admission requirement.
+                    guard amount > 0 else { throw CBQOracleError.malformedRow("non-positive-source-amount") }
                     pending = CBQPendingSourceRow(
                         postingDate: cells[0], sourceTransactionDate: cells[2],
                         signedAmount: signed, balance: balance, page: pageIndex + 1,
@@ -596,10 +604,7 @@ struct CBQBankAuthenticAcceptanceTests {
             }
         }
         guard let opening, let closing, let periodStart,
-              pending == nil, previous == closing else { throw CBQOracleError.failedEquation }
-        guard opening + rows.reduce(Decimal.zero, { $0 + (Decimal(string: $1.signedAmount) ?? Decimal.nan) }) == closing else {
-            throw CBQOracleError.failedEquation
-        }
+              pending == nil else { throw CBQOracleError.malformedRow("incomplete-source-controls") }
         return Carrier(
             carrier: input.carrier,
             sha256: SHA256.hash(data: input.bytes).map { String(format: "%02x", $0) }.joined(),

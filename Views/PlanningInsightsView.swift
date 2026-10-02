@@ -163,6 +163,10 @@ struct PlanningInsightsView: View {
     @ObservedObject var model: PlanningAnalysisModel
     let onTransactions: (Set<String>) -> Void
     let onMonthlyPlan: () -> Void
+    var availableWidth: CGFloat = 1000
+    private var columnLayout: AnyLayout {
+        availableWidth >= 820 ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
+    }
     private var section: String { selection.section }
     private var accountID: String { get { selection.accountID } nonmutating set { selection.accountID = newValue } }
     private var currency: String { selection.currency }
@@ -177,7 +181,10 @@ struct PlanningInsightsView: View {
 #endif
     private var metadata: FinancialIntelligenceSnapshot? { store.snapshot }
     private var accounts: [IntelligenceAccountContext] {
-        store.sources.accounts.filter { $0.domain == "bank" && !planner.excludedPlanningAccountIDs.contains($0.id) }
+        store.sources.accounts.filter { $0.domain == "bank" }
+    }
+    private var availableAccountIDs: Set<String> {
+        Set(planner.availablePlanningAccounts.compactMap(\.repositoryAccountId)).subtracting(planner.excludedPlanningAccountIDs)
     }
     private var assistance: PlanAssistance { planner.plan.assistance ?? .init(workspaceID: planner.plan.workspaceID, month: planner.month.canonical) }
     private var usable: Bool { planner.canEdit && store.generation == planner.generation && metadata != nil }
@@ -203,32 +210,35 @@ struct PlanningInsightsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Picker("Planning insight", selection: $selection.section) {
-                    ForEach(["Cash runway", "Commitments", "Reserves"], id: \.self) { Text($0) }
-                }.pickerStyle(.segmented).frame(maxWidth: 560)
-                Spacer()
-                Button("Salary assistance") { editor = .preferences }.lfSecondaryAction()
-                Button("Account funding") { editor = .funding }.lfSecondaryAction()
-                Button("Plan assumptions") { editor = .budget }.lfSecondaryAction()
-            }
             if let message { Text(message).foregroundStyle(LFTheme.warning).textSelection(.enabled) }
             if !usable {
                 Text("Planning context is unavailable or this draft belongs to an older ledger. Reload the plan before editing.").foregroundStyle(LFTheme.warning)
-            } else {
-                if let issue = SpendingIntelligence.salarySetupIssue(preferences: metadata?.preferences, categories: CategoryStore.shared.snapshot, sources: store.sources) {
-                    HStack {
-                        Text(issue).font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
-                        Spacer()
-                        Button("Set up salary assistance") { editor = .preferences }.lfSecondaryAction()
+            } else if let value = model.projection {
+                if section == "Cash runway" { runway(value) }
+                else if section == "Commitments" { LFPanel { commitments(value) } }
+                else { LFPanel { reserves(value) } }
+                LFPanel(contentSpacing: 12) {
+                    ViewThatFits(in: .horizontal) {
+                        insightNavigation
+                        VStack(alignment: .leading, spacing: 10) {
+                            insightSections
+                            insightTools
+                        }
+                    }
+                    DisclosureGroup("Planning setup and changes") {
+                        if let issue = SpendingIntelligence.salarySetupIssue(preferences: metadata?.preferences, categories: CategoryStore.shared.snapshot, sources: store.sources) {
+                            Text(issue).font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                            Button("Set up salary assistance") { editor = .preferences }.lfSecondaryAction()
+                        }
+                        if metadata?.preferences?.lastReviewedChangeKey != changeKey { changes }
+                        else { Text("Recorded planning changes reviewed.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText) }
                     }
                 }
-                if metadata?.preferences?.lastReviewedChangeKey != changeKey { changes }
-                if let value = model.projection {
-                    if section == "Cash runway" { runway(value) }
-                    else if section == "Commitments" { commitments(value) }
-                    else { reserves(value) }
-                } else { ProgressView("Preparing account context…") }
+            } else if model.isWorking {
+                ProgressView("Preparing account context…")
+            } else {
+                Text("Planning analysis is unavailable. Review account funding and reload the plan.").foregroundStyle(LFTheme.warning)
+                Button("Review account funding") { editor = .funding }.lfSecondaryAction()
             }
             if model.isWorking { ProgressView().controlSize(.small).accessibilityLabel("Updating planning analysis") }
         }
@@ -237,6 +247,9 @@ struct PlanningInsightsView: View {
         .onAppear { refresh() }
         .onDisappear { model.cancel() }
         .onChange(of: planner.plan) { _, _ in refresh() }
+        .onChange(of: planner.selectedHistoryAccountIDs) { _, _ in refresh() }
+        .onChange(of: planner.retainedRecurringOccurrenceIDs) { _, _ in refresh() }
+        .onChange(of: planner.recurringOccurrenceExclusions) { _, _ in refresh() }
         .onChange(of: store.revision) { _, _ in refresh() }
         .onChange(of: scenario) { _, _ in refresh() }
         .onChange(of: model.isWorking) { _, working in
@@ -245,7 +258,7 @@ struct PlanningInsightsView: View {
             }
         }
         .sheet(item: $editor) { request in
-            PlanningEditorView(request: request, metadata: metadata, accounts: accounts, rows: model.rows, plan: planner.plan,
+            PlanningEditorView(request: request, metadata: metadata, accounts: accounts, availableAccountIDs: availableAccountIDs, excludedHistoryAccountIDs: planner.excludedHistoryAccountIDs, rows: model.rows, plan: planner.plan,
                 onMetadata: { edit in try FinancialIntelligenceCoordinator().applyPlanning(edit, generation: planner.generation) },
                 onAssistance: { planner.updateAssistance($0); editor = nil },
                 onSalary: { value in
@@ -265,6 +278,24 @@ struct PlanningInsightsView: View {
                 Button("Cancel", role: .cancel) { pending = nil; challenge = nil }
             } message: { Text(DevelopmentProfileAcknowledgementPresentation.message) }
 #endif
+    }
+
+    private var insightNavigation: some View {
+        HStack(spacing: 16) { insightSections; Spacer(minLength: 8); insightTools }
+    }
+    private var insightSections: some View {
+        Picker("Planning insight", selection: $selection.section) {
+            Text("Balance forecast").tag("Cash runway")
+            Text("Commitments").tag("Commitments")
+            Text("Reserves").tag("Reserves")
+        }.pickerStyle(.segmented).frame(maxWidth: 480)
+    }
+    private var insightTools: some View {
+        HStack(spacing: 12) {
+            Button("Salary assistance") { editor = .preferences }.buttonStyle(.link)
+            Button("Account funding") { editor = .funding }.buttonStyle(.link)
+            Button("Plan assumptions") { editor = .budget }.buttonStyle(.link)
+        }
     }
 
     private var changes: some View {
@@ -316,63 +347,106 @@ struct PlanningInsightsView: View {
 
     private func runway(_ projection: PlanningProjection) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Picker("Account", selection: $selection.accountID) {
-                    Text("Choose an account").tag("")
-                    ForEach(projection.runways) { value in Text(accounts.first { $0.id == value.id }?.selectionTitle ?? value.anchor.title).tag(value.id) }
-                }.tint(theme.palette.primaryText).frame(maxWidth: 440)
-                Spacer()
-                Text("\(projection.start.presentation)–\(projection.end.presentation) · 90 days").foregroundStyle(theme.palette.secondaryText)
-            }
             if let value = selectedRunway {
-                HStack(alignment: .top, spacing: 28) {
-                    figure("Dated balance", value.anchor.amount, currency: value.anchor.currency, detail: value.anchor.date?.presentation ?? "No source date")
-                    figure("Lowest projected balance", value.lowestBalance, currency: value.anchor.currency, detail: value.firstShortfall.map { "Shortfall on " + $0.date.presentation } ?? "Conditional on the recorded inputs")
-                    figure("Protected balance", value.reserveFloor, currency: value.anchor.currency, detail: "After bills; overlapping cash floors count once")
+                let capacity = projection.investmentCapacity(accountID: value.id, assistance: assistance)
+                LFPanel(contentSpacing: 10) {
+                    columnLayout {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Additional investment capacity").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            Text(capacity.0.map { amount($0, value.anchor.currency) } ?? "Unavailable")
+                                .font(theme.typography.headlineMoney).monospacedDigit()
+                                .foregroundStyle(capacity.0 == nil || (capacity.0 ?? 0) < 0 ? LFTheme.warning : theme.palette.primaryText)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(capacity.1.first ?? "Based on the included cash flows and protected balances.")
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Review funding and actuals") { editor = .funding }.lfSecondaryAction()
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-                if !value.points.isEmpty {
-                    RunwayBalanceChart(runway: value).id(value.id)
-                    if !value.events.contains(where: { $0.change != 0 }) {
-                        Text("No changing cash flows are included for this account in this forecast. The line carries forward its balance dated " + (value.anchor.date?.presentation ?? "unknown") + "; a flat line does not establish future affordability.")
+                LFPanel(title: "Balance forecast", contentSpacing: 14) {
+                    columnLayout {
+                        VStack(alignment: .leading, spacing: 7) {
+                            LFAccountPicker(label: "Selected account", placeholder: "Choose account", selection: $selection.accountID,
+                                options: projection.runways.map { item in
+                                    .init(id: item.id, title: accounts.first { $0.id == item.id }?.title ?? item.anchor.title,
+                                        detail: accounts.first { $0.id == item.id }?.selectionContext ?? item.anchor.currency)
+                                }, allowsEmptySelection: false)
+                                .accessibilityLabel("Forecast account")
+                            Text("Currency: \(value.anchor.currency)").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        figure("Starting balance", value.anchor.amount, currency: value.anchor.currency,
+                               detail: value.anchor.date.map { "Balance date: " + $0.presentation } ?? "Balance date unavailable")
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Forecast period").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            Text("\(projection.start.presentation)–\(projection.end.presentation)")
+                            Text("90 days").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Divider()
+                    if value.anchor.amount == nil || value.anchor.date == nil {
+                        Text("A dated starting balance is unavailable.").foregroundStyle(LFTheme.warning)
+                    } else if value.events.contains(where: { $0.change != 0 }) {
+                        columnLayout {
+                            figure("Lowest projected balance", value.lowestBalance, currency: value.anchor.currency,
+                                   detail: value.firstShortfall.map { "Shortfall on " + $0.date.presentation } ?? "Based on included payments")
+                            figure("Protected balance", value.reserveFloor, currency: value.anchor.currency,
+                                   detail: "After bills")
+                        }
+                        RunwayBalanceChart(runway: value).id(value.id)
+                    } else {
+                        Text("Starting balance carried forward").font(theme.typography.body.weight(.semibold))
+                        Text("No future payments are included.")
                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }
+                    DisclosureGroup("Balances and payments") {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("The protected balance counts overlapping cash floors once.")
+                                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                                .padding(.bottom, theme.spacing.small)
+                            ForEach(value.points) { point in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                        Text(point.date.presentation)
+                                        Spacer()
+                                        Text(amount(point.balance, value.anchor.currency)).monospacedDigit()
+                                    }
+                                    Text(point.title).fixedSize(horizontal: false, vertical: true)
+                                    if point.transactionIDs.isEmpty {
+                                        Text(point.isForecast ? "Forecast" : "Source balance").foregroundStyle(theme.palette.secondaryText)
+                                    } else { Button("Transactions") { onTransactions(point.transactionIDs) }.lfSecondaryAction() }
+                                }.padding(.vertical, 8)
+                                Divider()
+                            }
+                        }
+                    }.font(theme.typography.secondary)
+                    fundingNeeds(projection, target: value)
                 }
-                DisclosureGroup("Assumptions and incomplete evidence (\(value.limitations.count + projection.cardNeeds.count))", isExpanded: $showAssumptions) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("Dashed path: forecast. Solid points: recorded balance or movements. No undated salary estimate is added to this path.")
-                        ForEach(value.limitations + projection.cardNeeds, id: \.self) { Text($0) }
-                    }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText).padding(.top, 6)
-                }
-                if !value.limitations.isEmpty { Text("Conditional forecast · review incomplete evidence above before allocating money.").font(theme.typography.secondary).foregroundStyle(LFTheme.warning) }
-                let capacity = projection.investmentCapacity(accountID: value.id, assistance: assistance)
-                HStack {
-                    Text("Additional investment capacity: " + (capacity.0.map { amount($0, value.anchor.currency) } ?? "Unavailable"))
-                        .font(theme.typography.body.weight(.semibold))
-                    Spacer()
-                    Button("Review funding and actuals") { editor = .funding }.lfSecondaryAction()
-                }
-                if !capacity.1.isEmpty {
-                    DisclosureGroup("What remains to establish capacity") {
-                        ForEach(capacity.1, id: \.self) { Text($0).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText) }
+                LFPanel(contentSpacing: 14) { planActual(projection, currency: value.anchor.currency) }
+                LFPanel(contentSpacing: 12) {
+                    DisclosureGroup("Assumptions and missing information (\(value.limitations.count + projection.cardNeeds.count))", isExpanded: $showAssumptions) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Dashed path: forecast. Solid points: recorded balance or movements. No undated salary estimate is added to this path.")
+                            ForEach(value.limitations + projection.cardNeeds, id: \.self) { Text($0) }
+                        }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText).padding(.top, 6)
                     }
-                }
-                fundingNeeds(projection, target: value)
-                DisclosureGroup("Exact balance path and payments") {
-                    VStack(spacing: 0) {
-                        ForEach(value.points) { point in
-                            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                                Text(point.date.presentation).frame(width: 112, alignment: .leading)
-                                Text(point.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                                Text(amount(point.balance, value.anchor.currency)).monospacedDigit()
-                                if point.transactionIDs.isEmpty { Text(point.isForecast ? "Forecast" : "Source balance").foregroundStyle(theme.palette.secondaryText).frame(width: 100) }
-                                else { Button("Transactions") { onTransactions(point.transactionIDs) }.lfSecondaryAction() }
-                            }.padding(.vertical, 9)
-                            Divider()
+                    if !capacity.1.isEmpty {
+                        DisclosureGroup("What needs review") {
+                            ForEach(capacity.1, id: \.self) { Text($0).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText) }
+                            HStack(spacing: 16) {
+                                Button("Open Commitments") { selection.section = "Commitments" }.buttonStyle(.link)
+                                Button("Open Reserves") { selection.section = "Reserves" }.buttonStyle(.link)
+                                Button("Salary assistance") { editor = .preferences }.buttonStyle(.link)
+                            }
                         }
                     }
+                    scenarioControls(account: value)
                 }
-                scenarioControls(account: value)
-                planActual(projection, currency: value.anchor.currency)
+            } else {
+                LFPanel(title: "Balance forecast") {
+                    Text("No eligible account balance is available for this forecast.").foregroundStyle(theme.palette.secondaryText)
+                    Button("Review funding and actuals") { editor = .funding }.lfSecondaryAction()
+                }
             }
         }
     }
@@ -383,13 +457,11 @@ struct PlanningInsightsView: View {
                 Text("Upcoming commitments").font(theme.typography.sectionTitle)
                 Spacer()
                 Button("Add recurring commitment") { editor = .recurring(nil, nil) }.lfSecondaryAction()
-                Button("Review salary-plan prefills") { editor = .prefills(projection.recurring.filter { planner.plan.includesRecurring($0.date) && !planner.excludedPlanningAccountIDs.contains($0.definition.accountID) }) }.lfPrimaryAction()
+                Button("Review monthly amounts") { editor = .prefills(projection.recurring.filter { planner.plan.includesRecurring($0.date) && !planner.excludedPlanningAccountIDs.contains($0.definition.accountID) }) }.lfPrimaryAction()
             }
             if projection.recurring.isEmpty { Text("Add a confirmed recurring commitment, or review a repeated-payment candidate below.").foregroundStyle(theme.palette.secondaryText) }
             let schedules = Dictionary(grouping: projection.recurring, by: { $0.definition.id })
             let firstPayments = schedules.values.compactMap { $0.min { $0.date < $1.date } }.sorted { ($0.date, $0.id) < ($1.date, $1.id) }
-            Text("Each commitment is shown once. Expand its schedule to review the later payments in the 90-day forecast.")
-                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             ForEach(firstPayments) { payment in
                 HStack(alignment: .top, spacing: 18) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -426,7 +498,7 @@ struct PlanningInsightsView: View {
             let dismissedCandidates = projection.candidates.filter { $0.decision == .dismissed }
             DisclosureGroup("Repeated payments to review (\(pendingCandidates.count))") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Repeated narration, native amount and monthly dates nominate a review. They do not establish a new obligation.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    Text("Similar descriptions, amounts and monthly dates suggest a recurring payment. Review it before adding a commitment.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     ForEach(pendingCandidates.prefix(25)) { value in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
@@ -456,6 +528,7 @@ struct PlanningInsightsView: View {
     }
 
     private func paymentStatus(_ payment: RecurringPaymentProjection) -> String {
+        if payment.isExcludedFromPlan { return payment.status }
         if payment.paid == 0, !payment.isWaived, let today = FinancialCalendar.statement(Date()), payment.date > today {
             return "Upcoming payment"
         }
@@ -509,7 +582,7 @@ struct PlanningInsightsView: View {
                 }.textFieldStyle(.roundedBorder)
                 HStack {
                     Button("Compare scenario") {
-                        guard let income = decimal(selection.scenarioIncome), let cost = decimal(selection.scenarioCost), let contribution = decimal(selection.scenarioContribution), income >= 0, cost >= 0, contribution >= 0 else { message = "Enter nonnegative native amounts with up to two decimals."; return }
+                        guard let income = decimal(selection.scenarioIncome), let cost = decimal(selection.scenarioCost), let contribution = decimal(selection.scenarioContribution), income >= 0, cost >= 0, contribution >= 0 else { message = "Enter amounts of zero or more with up to two decimals."; return }
                         scenario.accountID = account.id; scenario.extraIncome = income; scenario.extraCost = cost; scenario.contributionChange = contribution
                     }.lfSecondaryAction()
                     Button("Reset scenario") { scenario = .init(); selection.scenarioIncome = ""; selection.scenarioCost = ""; selection.scenarioContribution = "" }.lfSecondaryAction()
@@ -520,34 +593,53 @@ struct PlanningInsightsView: View {
     }
 
     private func planActual(_ projection: PlanningProjection, currency: String) -> some View {
-        let payments = projection.recurring.filter { planner.plan.includesRecurring($0.date) && $0.currency == currency }
+        let payments = projection.recurring.filter { planner.plan.includesRecurring($0.date) && $0.currency == currency && !$0.isExcludedFromPlan }
         let actual = payments.reduce(Decimal.zero) { $0 + $1.paid }, remaining = payments.reduce(Decimal.zero) { $0 + $1.remaining }
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Plan and recorded activity · \(currency)").font(theme.typography.sectionTitle)
-            Text(planner.plan.recurringStart.presentation + "–" + planner.plan.recurringEnd.presentation).foregroundStyle(theme.palette.secondaryText)
-            if payments.isEmpty {
-                Text(metadata?.recurring.isEmpty == false ? "No configured recurring payments fall in this currency and salary cycle. Review Commitments for their dates and application status." : "No recurring commitments are configured in this ledger. Add or confirm one in Commitments; zero matched payments is not evidence that bills are settled.")
-                    .foregroundStyle(theme.palette.secondaryText)
-            } else if actual == 0 {
-                Text("No payments are matched to these commitments. " + (payments.contains { !$0.hasCoverage } ? "Source coverage is incomplete for at least one payment period. " : "The payment periods have source coverage. ") + "Review payment suggestions and financial treatment in Commitments.")
-                    .foregroundStyle(theme.palette.secondaryText)
+        let activityIDs = projection.actualTransactionIDs[currency, default: []]
+        let observedRows = model.rows.filter { row in row.currency == currency && row.date.map { planner.plan.includesRecurring($0) } == true }
+        let observedAccounts = Set(observedRows.map(\.accountID))
+        let covered = !observedAccounts.isEmpty && observedAccounts.allSatisfy {
+            store.sources.hasCompleteCoverage(accountID: $0, start: planner.plan.recurringStart, end: planner.plan.recurringEnd)
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Plan & recorded activity · \(currency)").font(theme.typography.sectionTitle)
+            Text("Recorded-activity period: " + planner.plan.recurringStart.presentation + "–" + planner.plan.recurringEnd.presentation)
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            columnLayout {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("Recurring commitments").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    if payments.isEmpty {
+                        let configured = metadata?.recurring.contains { $0.revisions.contains { $0.amount.currency == currency } } == true
+                        Text(configured ? "No recurring payments included in this period" : "Not configured").font(theme.typography.sectionTitle)
+                        Text("Matched and remaining amounts are unavailable.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        Button("Open Commitments") { selection.section = "Commitments" }.buttonStyle(.link)
+                    } else {
+                        Text(actual == 0 ? "No matched payments" : "Matched: " + amount(actual, currency)).font(theme.typography.body.weight(.semibold))
+                        Text("Remaining: " + amount(remaining, currency)).monospacedDigit()
+                        Text(payments.contains { !$0.hasCoverage } ? "Statements do not cover the full payment periods." : "Statements cover the payment periods.")
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        Chart {
+                            BarMark(x: .value("Value", numeric(actual)), y: .value("Measure", "Matched payments")).foregroundStyle(theme.palette.accent)
+                            BarMark(x: .value("Value", numeric(remaining)), y: .value("Measure", "Remaining")).foregroundStyle(theme.palette.secondaryText)
+                        }.frame(height: 85).accessibilityLabel("Matched and remaining recurring cash commitments")
+                    }
+                    Button("Matched transactions") { onTransactions(Set(payments.flatMap(\.actualIDs))) }
+                        .lfSecondaryAction().disabled(payments.allSatisfy { $0.actualIDs.isEmpty })
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("Recorded consumption").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    Text(observedRows.isEmpty ? "No recorded activity" : amount(projection.actualSpending[currency, default: 0], currency))
+                        .font(theme.typography.sectionTitle).monospacedDigit()
+                    Text(observedRows.isEmpty ? "No transactions recorded in this currency and period; spending is unknown." : "\(observedRows.count) recorded transactions · \(covered ? "statements cover these accounts for this period" : "statements do not cover the full period")")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    Button("Spending transactions") { onTransactions(activityIDs) }.lfSecondaryAction().disabled(activityIDs.isEmpty)
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
-            Chart {
-                BarMark(x: .value("Value", numeric(actual)), y: .value("Measure", "Matched commitment payments")).foregroundStyle(Color.cyan)
-                BarMark(x: .value("Value", numeric(remaining)), y: .value("Measure", "Remaining commitments")).foregroundStyle(theme.palette.secondaryText.opacity(0.5))
-            }.frame(height: 115).accessibilityLabel("Matched and remaining recurring cash commitments")
-            HStack {
-                Text("Matched: " + amount(actual, currency) + " · Remaining: " + amount(remaining, currency))
-                Spacer()
-                Button("Matched transactions") { onTransactions(Set(payments.flatMap(\.actualIDs))) }.lfSecondaryAction().disabled(payments.allSatisfy { $0.actualIDs.isEmpty })
-            }
-            HStack {
-                Text("Recorded consumption: " + amount(projection.actualSpending[currency, default: 0], currency))
-                Spacer()
-                Button("Spending transactions") { onTransactions(projection.actualTransactionIDs[currency, default: []]) }.lfSecondaryAction()
-            }
-            Text("Consumption includes recognized purchases and refunds. Loan and EMI entries are excluded; card payments remain cash commitments. \(projection.unmatchedSpendingCount) transactions in this month still need interpretation.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-            if let allowance = assistance.allowance, allowance.currency == currency {
+            DisclosureGroup("Consumption scope and allowance") {
+            Text("Consumption includes recognized purchases and refunds. Loan and EMI entries are excluded; card payments remain cash commitments. \(projection.unmatchedSpendingCount) transactions in this period still need interpretation.")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            if let allowance = assistance.allowance, allowance.currency == currency,
+                       assistance.allowanceAccountID.map(planner.excludedHistoryAccountIDs.contains) != true {
                 let committedIDs = Set(payments.flatMap(\.actualIDs))
                 let spendingIDs = projection.actualTransactionIDs[currency, default: []].subtracting(committedIDs)
                 let discretionary = model.rows.filter { spendingIDs.contains($0.id) && $0.accountID == assistance.allowanceAccountID }.reduce(Decimal.zero) { total, row in
@@ -561,6 +653,7 @@ struct PlanningInsightsView: View {
                 }.frame(height: 100).accessibilityLabel("Discretionary spending and signed remaining allowance")
                 Button("Discretionary transactions") { onTransactions(Set(model.rows.filter { spendingIDs.contains($0.id) && $0.accountID == assistance.allowanceAccountID }.map(\.id))) }.lfSecondaryAction()
             } else { Button("Choose discretionary allowance") { editor = .budget }.lfSecondaryAction() }
+            }
         }
     }
     private func fundingNeeds(_ projection: PlanningProjection, target: AccountRunway) -> some View {
@@ -589,7 +682,11 @@ struct PlanningInsightsView: View {
             Text(detail).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
-    private func refresh() { model.refresh(plan: planner.plan, scenario: scenario) }
+    private func refresh() {
+        model.refresh(plan: planner.plan, scenario: scenario, selectedHistoryAccountIDs: planner.selectedHistoryAccountIDs,
+            retainedRecurringOccurrenceIDs: planner.retainedRecurringOccurrenceIDs,
+            excludedRecurringOccurrenceIDs: planner.recurringOccurrenceExclusions)
+    }
     private func setCandidateDecision(_ key: String, _ decision: RecurringCandidateDecision?) {
         let previous = metadata?.preferences
         var value = previous ?? .init(workspaceID: planner.plan.workspaceID)

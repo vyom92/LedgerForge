@@ -6,6 +6,72 @@ import Testing
 @MainActor
 struct AccountsViewModelTests {
 
+    @Test func recentActivityKeyIsTotalAndRetainsSameDocumentSourceOrder() throws {
+        // Nonfinancial sort keys exercise the former a > c > b > a cycle.
+        // No transaction, statement or financial DTO is constructed.
+        let today = try StatementDate(year: 2026, month: 10, day: 2)
+        let prior = try StatementDate(year: 2026, month: 10, day: 1)
+        let a = AccountRecentActivityOrderKey(statementDate: today, documentID: "document-a", sourceOrdinal: 2, transactionID: "a")
+        let c = AccountRecentActivityOrderKey(statementDate: today, documentID: "document-a", sourceOrdinal: 1, transactionID: "c")
+        let b = AccountRecentActivityOrderKey(statementDate: today, documentID: "document-b", sourceOrdinal: 1, transactionID: "b")
+        let previousDay = AccountRecentActivityOrderKey(statementDate: prior, documentID: "document-z", sourceOrdinal: 99, transactionID: "prior")
+        let undated = AccountRecentActivityOrderKey(statementDate: nil, documentID: "document-z", sourceOrdinal: 99, transactionID: "undated")
+        let keys = [a, b, c, previousDay, undated]
+
+        #expect(keys.sorted(by: >).map(\.transactionID) == ["b", "a", "c", "prior", "undated"])
+        for permutation in [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]] {
+            #expect(permutation.sorted(by: >).map(\.transactionID) == ["b", "a", "c"])
+        }
+        for left in keys {
+            #expect(!(left > left))
+            for right in keys {
+                #expect((left > right) == (right < left))
+                #expect((left == right) || (left > right) || (right > left))
+                if left > right { #expect(!(right > left)) }
+                for last in keys where left > right && right > last {
+                    #expect(left > last)
+                }
+            }
+        }
+        let tie = AccountRecentActivityOrderKey(statementDate: today, documentID: "document-a", sourceOrdinal: 2, transactionID: "z")
+        #expect(tie > a)
+        let missingOrdinal = AccountRecentActivityOrderKey(statementDate: today, documentID: "document-a", sourceOrdinal: 0, transactionID: "z")
+        #expect(c > missingOrdinal)
+    }
+
+#if DEBUG
+    @Test func canonicalStorePublicationRefreshesAccountsOnceAndExplicitRefreshConsumesPendingWork() async {
+        // Empty installed snapshots test publication ownership without financial fixtures.
+        let stores = PresentationStores()
+        let viewModel = makeViewModel(coordinator: RecordingMetadataCoordinator(), stores: stores)
+        #expect(viewModel.presentationRefreshCount == 1)
+
+        stores.accounts.notifyAccountsOfInstalledValue()
+        stores.transactions.notifyTransactionsOfInstalledValues()
+        stores.importSessions.notifyImportSessionsOfInstalledValue()
+        stores.cards.notifySnapshotOfInstalledValue()
+        #expect(viewModel.presentationRefreshCount == 1)
+        await drainMainQueue()
+        #expect(viewModel.presentationRefreshCount == 2)
+
+        stores.importSessions.notifyImportSessionsOfInstalledValue()
+        await drainMainQueue()
+        #expect(viewModel.presentationRefreshCount == 3)
+
+        stores.cards.notifySnapshotOfInstalledValue()
+        viewModel.selectCurrentAccounts()
+        #expect(viewModel.presentationRefreshCount == 4)
+        await drainMainQueue()
+        #expect(viewModel.presentationRefreshCount == 4)
+    }
+
+    private func drainMainQueue() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+#endif
+
     @Test func accountNumberPresentationShowsOnlyKnownLastFourDigits() {
         #expect(AccountDisplayText.maskedNumber("123456789012") == "xxx9012")
         #expect(AccountDisplayText.maskedNumber("XXXX XXXX 1234") == "xxx1234")
@@ -159,7 +225,12 @@ private final class RecordingMetadataCoordinator: AccountMetadataCoordinating {
         return true
     }
 
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
+    func markAccountHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
+        callCount += 1
+        return true
+    }
+
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool {
         callCount += 1
         return true
     }
@@ -170,6 +241,7 @@ private struct PresentationStores {
     let accounts = AccountStore()
     let transactions = TransactionStore()
     let importSessions = ImportSessionStore()
+    let cards = CardStore()
 }
 
 @MainActor
@@ -183,7 +255,7 @@ private func makeViewModel(
         transactionStore: stores.transactions,
         importSessionStore: stores.importSessions,
         metadataCoordinator: coordinator,
-        cardStore: CardStore(),
+        cardStore: stores.cards,
         acknowledgementGate: acknowledgementGate ?? .shared
     )
 }

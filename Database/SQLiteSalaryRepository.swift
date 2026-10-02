@@ -51,6 +51,8 @@ final class SQLiteSalaryRepository: SalaryRepository {
             }
         }
 
+        } catch LedgerAccessError.contention {
+            return .retryableContention
         } catch { return .repositoryIntegrityConflict }
     }
 
@@ -168,8 +170,41 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     private let db: SQLiteDatabase
     private let supportsAssistance: Bool
     private let supportsBalanceDates: Bool
-    init(db: SQLiteDatabase, supportsAssistance: Bool = true, supportsBalanceDates: Bool = true) {
+    private let supportsScratchpads: Bool
+    init(db: SQLiteDatabase, supportsAssistance: Bool = true, supportsBalanceDates: Bool = true, supportsScratchpads: Bool = true) {
         self.db = db; self.supportsAssistance = supportsAssistance; self.supportsBalanceDates = supportsBalanceDates
+        self.supportsScratchpads = supportsScratchpads
+    }
+
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
+        guard supportsScratchpads else { return [] }
+        return try db.query(sql: "SELECT workspace_id,plan_month,state_json FROM monthly_plan_scratchpads WHERE workspace_id=? ORDER BY plan_month;", params: [workspaceId]) {
+            .init(workspaceID: $0.string(at: 0) ?? "", month: $0.string(at: 1) ?? "", stateJSON: $0.string(at: 2) ?? "")
+        }
+    }
+
+    private func writeScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
+        guard supportsScratchpads else { throw RepositoryError.persistenceUnavailable }
+        let state = try MonthlyPlanScratchpad.decode(value)
+        if value.workspaceID == "default-workspace" {
+            try db.executePrepared(sql: "INSERT INTO workspaces (id,name,created_at) VALUES (?,?,?) ON CONFLICT(id) DO NOTHING;",
+                params: [value.workspaceID, "Default Workspace", state.plan.updatedAtISO])
+        }
+        try db.executePrepared(sql: "INSERT INTO monthly_plan_scratchpads (workspace_id,plan_month,state_json) VALUES (?,?,?) ON CONFLICT(workspace_id,plan_month) DO UPDATE SET state_json=excluded.state_json;",
+            params: [value.workspaceID, value.month, value.stateJSON])
+    }
+
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
+        try db.withExclusiveAccess {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do { try writeScratchpad(value); try db.execute(sql: "COMMIT;") }
+            catch { try? db.execute(sql: "ROLLBACK;"); throw error }
+        }
+    }
+
+    func removeScratchpad(workspaceId: String, month: String) throws {
+        guard supportsScratchpads else { throw RepositoryError.persistenceUnavailable }
+        try db.executePrepared(sql: "DELETE FROM monthly_plan_scratchpads WHERE workspace_id=? AND plan_month=?;", params: [workspaceId, month])
     }
 
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
@@ -218,6 +253,19 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
+        try persistPlan(plan, scratchpad: nil)
+    }
+
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
+        let state = try MonthlyPlanScratchpad.decode(scratchpad)
+        guard state.canonical == state.plan, try state.plan.persistenceDTO() == plan,
+              scratchpad.workspaceID == plan.workspaceId, scratchpad.month == plan.planMonthISO else {
+            throw RepositoryError.relationshipViolation("Monthly scratchpad does not match its plan.")
+        }
+        return try persistPlan(plan, scratchpad: scratchpad)
+    }
+
+    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?) throws -> FundingPlanDTO {
         return try db.withExclusiveAccess {
             try SalaryPersistenceDTOValidator.validate(plan: plan)
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
@@ -295,6 +343,7 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
                 if supportsAssistance {
                     try SQLiteFinancialIntelligenceRepository(db: db, supportsBalanceDates: supportsBalanceDates).savePlanAssistance(plan)
                 } else if plan.assistance != nil { throw FinancialIntelligenceError.unavailable }
+                if let scratchpad { try writeScratchpad(scratchpad) }
                 try db.execute(sql: "COMMIT;")
                 return plan
             } catch {

@@ -12,14 +12,14 @@ final class AlDarReferenceTests: XCTestCase {
     private func quote(_ amount: Money, raw: String = "3.0000") throws -> AlDarReferenceQuote {
         try AlDarReferenceQuote(submittedQAR: amount, returnedINR: AlDarReturnedINRDecimal(rawToken: raw), fetchedAtISO: "2026-09-15T08:00:00Z")
     }
-    private func editor(month: String = "2026-09", runtime: DatabaseProvider? = nil, store: FundingPlanStore? = nil) throws -> (SalaryWorkspaceViewModel, DatabaseProvider, FundingPlanStore) {
+    private func editor(month: String = "2026-09", runtime: DatabaseProvider? = nil, store: FundingPlanStore? = nil, intelligence: FinancialIntelligenceStore? = nil) throws -> (SalaryWorkspaceViewModel, DatabaseProvider, FundingPlanStore) {
         let memory = InMemoryRepositoryProvider()
         let active = runtime ?? DatabaseProvider(workspaceRepo: memory.workspaceRepo, transactionRepo: memory.transactionRepo,
             accountRepo: memory.accountRepo, importSessionRepo: memory.importSessionRepo, fundingPlanRepo: memory.fundingPlanRepo)
         let plans = store ?? FundingPlanStore()
         if store == nil { plans.installWithoutObservation([], generation: active.generationToken) }
         let vm = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(canonical: month), provider: { active },
-            accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: plans, locale: Locale(identifier: "en_US_POSIX"),
+            accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: plans, intelligenceStore: intelligence, locale: Locale(identifier: "en_US_POSIX"),
             refresh: { current in
                 _ = try RepositoryStoreHydrator(accountRepo: current.accountRepo, importSessionRepo: current.importSessionRepo,
                     transactionRepo: current.transactionRepo, fundingPlanRepo: current.fundingPlanRepo,
@@ -138,6 +138,46 @@ final class AlDarReferenceTests: XCTestCase {
         XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.effectiveReference?.rawINR, "3.0000")
     }
 
+    func testObservedReferenceDoesNotRetainOrPublishUntilAnEntryChanges() async throws {
+        let intelligence = FinancialIntelligenceStore()
+        let (vm, active, store) = try editor(intelligence: intelligence)
+        intelligence.installWithoutObservation(nil, generation: active.generationToken)
+        _ = try seed(vm); try publish(vm)
+        XCTAssertTrue(vm.updateMoney(.fee, text: "25")); vm.save()
+        let saved = try active.fundingPlanRepo.plans(workspaceId: "default-workspace")
+        let retained = try active.fundingPlanRepo.scratchpads(workspaceId: "default-workspace")
+        let savedCalculation = FundingPlanCalculator.calculate(try XCTUnwrap(store.plan(for: vm.month)))
+
+        // Refresh immediately after Save, before the prior retention task runs.
+        vm.receiveSharedReference(try AlDarUnitReference(currency: .inr, rawToken: "3.0000", fetchedAtISO: "2026-09-16T08:00:00Z"))
+        vm.plannerOpened(); intelligence.notifyInstalledValue(); store.notifyInstalledValue()
+        vm.flushPendingEntries()
+        try await Task.sleep(for: .milliseconds(900))
+        XCTAssertFalse(vm.isDirty)
+        XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace"), saved)
+        XCTAssertEqual(try active.fundingPlanRepo.scratchpads(workspaceId: "default-workspace"), retained)
+
+        // A genuinely different live rate changes the draft calculation only.
+        try publish(vm, raw: "6.0000")
+        XCTAssertNotEqual(vm.calculation.requiredQARPrincipal, savedCalculation.requiredQARPrincipal)
+        XCTAssertTrue(vm.updateMoney(.fee, text: vm.moneyText(.fee)))
+        vm.flushPendingEntries()
+        try await Task.sleep(for: .milliseconds(900))
+        XCTAssertFalse(vm.isDirty)
+        XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace"), saved)
+        XCTAssertEqual(try active.fundingPlanRepo.scratchpads(workspaceId: "default-workspace"), retained)
+        XCTAssertEqual(FundingPlanCalculator.calculate(try XCTUnwrap(store.plan(for: vm.month))), savedCalculation)
+
+        // An actual entry still publishes automatically with the exact live rate.
+        XCTAssertTrue(vm.updateMoney(.fixed, text: "100"))
+        try await Task.sleep(for: .milliseconds(900))
+        let updated = try XCTUnwrap(active.fundingPlanRepo.plans(workspaceId: "default-workspace").first)
+        XCTAssertEqual(updated.expectedFixedDecimal, "100.00")
+        XCTAssertEqual(updated.effectiveReference?.rawINR, "6.0000")
+        XCTAssertEqual(vm.moneyText(.fixed), "100")
+        XCTAssertFalse(vm.isDirty)
+    }
+
     func testRolloverDoesNotInheritAppliedExternalEvidence() throws {
         let (vm, active, store) = try editor(); _ = try seed(vm); try publish(vm); vm.save()
         let next = try editor(month: "2026-10", runtime: active, store: store).0
@@ -219,10 +259,13 @@ final class AlDarReferenceTests: XCTestCase {
         XCTAssertEqual(vm.plan, before); XCTAssertFalse(vm.canSave)
     }
 
-    func testAllMonthDraftsParticipateInUnsavedWorkGuard() throws {
-        let (vm, _, _) = try editor(); _ = vm.updateMoney(.fixed, text: "100.")
-        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+    func testSwitchingMonthsRetainsIncompleteEntriesBeforeClearingTheUnsavedWorkGuard() throws {
+        let (vm, active, _) = try editor(); _ = vm.updateMoney(.fixed, text: "100.")
         XCTAssertTrue(vm.hasUnsavedDrafts)
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        XCTAssertFalse(vm.hasUnsavedDrafts)
+        let scratch = try XCTUnwrap(active.fundingPlanRepo.scratchpads(workspaceId: "default-workspace").first)
+        XCTAssertEqual(try MonthlyPlanScratchpad.decode(scratch).rawText["fixed"], "100.")
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-09"))
         XCTAssertEqual(vm.rawText["fixed"], "100."); XCTAssertFalse(vm.canSave)
     }

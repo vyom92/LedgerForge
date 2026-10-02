@@ -43,17 +43,6 @@ extern "C" {
 #include "libxls/xlsstruct.h"
 #include "libxls/xlstool.h"
 
-typedef enum {
-    LIBXLS_OK,
-    LIBXLS_ERROR_OPEN,
-    LIBXLS_ERROR_SEEK,
-    LIBXLS_ERROR_READ,
-    LIBXLS_ERROR_PARSE,
-    LIBXLS_ERROR_MALLOC,
-    LIBXLS_ERROR_UNSUPPORTED_ENCRYPTION,
-    LIBXLS_ERROR_NULL_ARGUMENT
-} xls_error_t;
-
 const char* xls_getVersion(void);
 const char* xls_getError(xls_error_t code);
 

@@ -89,13 +89,13 @@ enum AccountDetailPresentationState: Equatable {
         case .validationFailed:
             return "Enter a non-empty display name before saving."
         case .saveFailed:
-            return "The display name could not be saved. Runtime data was not changed."
+            return "The name could not be saved. Your saved name is unchanged."
         case .savedButRefreshFailed:
-            return "The display name was saved, but the account detail could not refresh. Retry or relaunch to load persisted data."
+            return "The name was saved but could not be displayed yet. Retry or reopen the app."
         case .historyOnlySaveFailed:
-            return "The card could not be kept as history only. Retry the account change."
+            return "The account status could not be changed. Try again."
         case .historyOnlySavedButRefreshFailed:
-            return "The card was kept as history only, but the account detail could not refresh. Retry or relaunch to load persisted data."
+            return "The account status was saved but could not be refreshed. Retry or reopen the app."
 #if DEBUG
         case .acknowledgementRequired:
             return "Acknowledge the active development database profile before saving the account change."
@@ -112,9 +112,24 @@ private struct PendingAccountDisplayNameMutation {
     let displayName: String
 }
 
-private struct PendingCreditCardHistoryOnlyMutation {
+private struct PendingAccountHistoryOnlyMutation {
     let accountID: String
     let workspaceID: String
+    let historyOnly: Bool
+}
+
+/// Recent activity uses one total presentation key. Document identity breaks
+/// equal-date ties across sources; it does not imply cross-document chronology.
+nonisolated struct AccountRecentActivityOrderKey: Comparable {
+    let statementDate: StatementDate?
+    let documentID: String
+    let sourceOrdinal: Int
+    let transactionID: String
+
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        (lhs.statementDate?.canonical ?? "", lhs.documentID, lhs.sourceOrdinal, lhs.transactionID)
+            < (rhs.statementDate?.canonical ?? "", rhs.documentID, rhs.sourceOrdinal, rhs.transactionID)
+    }
 }
 
 @MainActor
@@ -127,6 +142,10 @@ final class AccountsViewModel: ObservableObject {
     @Published private(set) var transactionCount = 0
     @Published private(set) var importHistory: [AccountImportHistoryPresentation] = []
     @Published private(set) var nativeBalanceSummaries: [DashboardCurrencyPosition] = []
+    private var explicitlySelectedHistoryAccountID: String?
+    var visibleAccounts: [AccountsAccountPresentation] {
+        accounts.filter { !$0.isHistoryOnly || $0.id == explicitlySelectedHistoryAccountID }
+    }
     @Published private(set) var selectedImportSession: AccountImportHistoryPresentation?
     @Published var displayNameDraft = ""
     @Published private(set) var editState: AccountDisplayNameEditState = .idle
@@ -143,9 +162,13 @@ final class AccountsViewModel: ObservableObject {
 #if DEBUG
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
     private var pendingDisplayNameMutation: PendingAccountDisplayNameMutation?
-    private var pendingHistoryOnlyMutation: PendingCreditCardHistoryOnlyMutation?
+    private var pendingHistoryOnlyMutation: PendingAccountHistoryOnlyMutation?
 #endif
     private var cancellables = Set<AnyCancellable>()
+    private var pendingPresentationRefreshID: UUID?
+#if DEBUG
+    private(set) var presentationRefreshCount = 0
+#endif
 
     convenience init() {
         self.init(
@@ -173,20 +196,7 @@ final class AccountsViewModel: ObservableObject {
         self.cardStore = cardStore
         self.acknowledgementGate = acknowledgementGate ?? .shared
 
-        accountStore.$accounts
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        transactionStore.$transactions
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        importSessionStore.$importSessions
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        cardStore.$snapshot.receive(on: RunLoop.main).sink { [weak self] _ in self?.refreshPresentation() }.store(in: &cancellables)
-
+        observeCanonicalStores()
         refreshPresentation()
     }
 #else
@@ -203,23 +213,33 @@ final class AccountsViewModel: ObservableObject {
         self.metadataCoordinator = metadataCoordinator
         self.cardStore = cardStore
 
-        accountStore.$accounts
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        transactionStore.$transactions
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        importSessionStore.$importSessions
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshPresentation() }
-            .store(in: &cancellables)
-        cardStore.$snapshot.receive(on: RunLoop.main).sink { [weak self] _ in self?.refreshPresentation() }.store(in: &cancellables)
-
+        observeCanonicalStores()
         refreshPresentation()
     }
 #endif
+
+    private func observeCanonicalStores() {
+        // Hydration installs the complete snapshot before publishing its stores.
+        // Consume that synchronous publication batch once on the next main turn.
+        Publishers.MergeMany([
+            accountStore.$accounts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            transactionStore.$transactions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            importSessionStore.$importSessions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            cardStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher()
+        ])
+        .sink { [weak self] in self?.requestPresentationRefresh() }
+        .store(in: &cancellables)
+    }
+
+    private func requestPresentationRefresh() {
+        guard pendingPresentationRefreshID == nil else { return }
+        let requestID = UUID()
+        pendingPresentationRefreshID = requestID
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.pendingPresentationRefreshID == requestID else { return }
+            self.refreshPresentation()
+        }
+    }
 
     var isEditingDisplayName: Bool {
         editState == .editing
@@ -231,15 +251,24 @@ final class AccountsViewModel: ObservableObject {
             return
         }
         guard accounts.contains(where: { $0.id == repositoryAccountID }) else { return }
+        explicitlySelectedHistoryAccountID = accounts.first { $0.id == repositoryAccountID }?.isHistoryOnly == true ? repositoryAccountID : nil
         selectedRepositoryAccountID = repositoryAccountID
         selectedImportSession = nil
         presentationState = .ready
         refreshPresentation()
     }
 
+    func selectCurrentAccounts() {
+        guard editState == .idle else { presentationState = .selectionBlockedWhileEditing; return }
+        explicitlySelectedHistoryAccountID = nil
+        selectedRepositoryAccountID = accounts.first { !$0.isHistoryOnly }?.id
+        selectedImportSession = nil
+        refreshPresentation()
+    }
+
     func beginDisplayNameEdit() {
-        guard let selectedAccount else { return }
-        displayNameDraft = selectedAccount.displayName
+        guard let selectedRuntimeAccount else { return }
+        displayNameDraft = selectedRuntimeAccount.name
         editState = .editing
         presentationState = .ready
     }
@@ -249,7 +278,7 @@ final class AccountsViewModel: ObservableObject {
         discardPendingAcknowledgement()
 #endif
         editState = .idle
-        displayNameDraft = selectedAccount?.displayName ?? ""
+        displayNameDraft = selectedRuntimeAccount?.name ?? ""
         presentationState = .ready
     }
 
@@ -328,16 +357,24 @@ final class AccountsViewModel: ObservableObject {
     }
 #endif
 
-    /// Called only after the owner confirms that the selected card is closed
-    /// and settled. Historical imports remain eligible for this same account.
-    func markCreditCardHistoryOnly(accountID: String) {
+    /// Called after the owner confirms history-only treatment for this account.
+    /// Historical imports remain eligible for this same account.
+    func markAccountHistoryOnly(accountID: String) {
+        setHistoryOnly(true, accountID: accountID)
+    }
+
+    func markAccountCurrent(accountID: String) {
+        setHistoryOnly(false, accountID: accountID)
+    }
+
+    private func setHistoryOnly(_ historyOnly: Bool, accountID: String) {
         guard editState == .idle, selectedRepositoryAccountID == accountID,
-              let account = selectedRuntimeAccount, account.type == .creditCard,
-              !account.isHistoryOnly, let workspaceID = account.workspaceId else { return }
-        let mutation = PendingCreditCardHistoryOnlyMutation(accountID: accountID, workspaceID: workspaceID)
+              let account = selectedRuntimeAccount,
+              account.isHistoryOnly != historyOnly, let workspaceID = account.workspaceId else { return }
+        let mutation = PendingAccountHistoryOnlyMutation(accountID: accountID, workspaceID: workspaceID, historyOnly: historyOnly)
 #if DEBUG
         discardPendingAcknowledgement()
-        switch acknowledgementGate.authorization(for: .creditCardHistoryOnlyMutation) {
+        switch acknowledgementGate.authorization(for: .accountHistoryOnlyMutation) {
         case .allowed:
             performHistoryOnlyMutation(mutation)
         case .acknowledgementRequired(let challenge):
@@ -352,11 +389,11 @@ final class AccountsViewModel: ObservableObject {
 #endif
     }
 
-    private func performHistoryOnlyMutation(_ mutation: PendingCreditCardHistoryOnlyMutation) {
+    private func performHistoryOnlyMutation(_ mutation: PendingAccountHistoryOnlyMutation) {
         do {
-            _ = try metadataCoordinator.markCreditCardHistoryOnly(
+            _ = mutation.historyOnly ? try metadataCoordinator.markAccountHistoryOnly(
                 accountId: mutation.accountID, workspaceId: mutation.workspaceID
-            )
+            ) : try metadataCoordinator.markAccountCurrent(accountId: mutation.accountID, workspaceId: mutation.workspaceID)
             presentationState = .ready
             refreshPresentation()
         } catch {
@@ -435,6 +472,11 @@ final class AccountsViewModel: ObservableObject {
     }
 
     private func refreshPresentation() {
+        // An explicit selection/metadata refresh also consumes queued publication.
+        pendingPresentationRefreshID = nil
+#if DEBUG
+        presentationRefreshCount += 1
+#endif
         let runtimeAccounts = accountStore.accounts
             .compactMap { account -> (Account, String)? in
                 guard let repositoryAccountID = account.repositoryAccountId else { return nil }
@@ -482,7 +524,7 @@ final class AccountsViewModel: ObservableObject {
                     default: return false
                     }
                 }.first
-            let instrumentCount = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == repositoryAccountID }.count
+            let instrumentCount = cardStore.snapshot.continuingCardGroups(accountID: repositoryAccountID).count
             let latestStatementPeriod = latestCardStatement.flatMap { statement -> String? in
                 if let period = statement.period {
                     return "\(period.start.presentation) – \(period.end.presentation)"
@@ -504,7 +546,10 @@ final class AccountsViewModel: ObservableObject {
                 accountType: account.type,
                 accountTypeLabel: Self.accountTypeLabel(account.type),
                 currencyCode: account.currencyCode,
-                currentBalance: account.isHistoryOnly ? latestCardStatement?.newBalance?.amount : positions[repositoryAccountID]?.amount?.amount,
+                currentBalance: account.isHistoryOnly
+                    ? (account.type == .creditCard ? latestCardStatement?.newBalance?.amount
+                       : (account.currentBalanceAsOfISO == nil ? nil : account.currentBalance))
+                    : positions[repositoryAccountID]?.amount?.amount,
                 identitySummaries: account.identitySummaries,
                 currentBalanceLabel: account.isHistoryOnly ? "Historical Statement Balance"
                     : account.type == .creditCard ? "Current Liability" : "Current Balance",
@@ -516,13 +561,13 @@ final class AccountsViewModel: ObservableObject {
         }
 
         if let selectedRepositoryAccountID,
-           accounts.contains(where: { $0.id == selectedRepositoryAccountID }) {
+           accounts.contains(where: { $0.id == selectedRepositoryAccountID && (!$0.isHistoryOnly || $0.id == explicitlySelectedHistoryAccountID) }) {
             self.selectedRepositoryAccountID = selectedRepositoryAccountID
         } else if editState == .editing {
             // A refresh must not silently retarget an active display-name draft.
             self.selectedRepositoryAccountID = selectedRepositoryAccountID
         } else {
-            self.selectedRepositoryAccountID = accounts.first?.id
+            self.selectedRepositoryAccountID = accounts.first { !$0.isHistoryOnly }?.id
         }
 
         selectedAccount = accounts.first { $0.id == selectedRepositoryAccountID }
@@ -604,26 +649,17 @@ final class AccountsViewModel: ObservableObject {
     }
 
     private static func isNewer(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
-        switch (lhs.statementDate, rhs.statementDate) {
-        case let (left?, right?) where left != right:
-            return left > right
-        case (.some, nil):
-            return true
-        case (nil, .some):
-            return false
-        default:
-            return Self.displayOrder(lhs, rhs)
-        }
+        recentActivityOrderKey(for: lhs) > recentActivityOrderKey(for: rhs)
     }
 
-    private static func displayOrder(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
-        if lhs.documentScopedSourceOrder?.documentID == rhs.documentScopedSourceOrder?.documentID,
-           let left = lhs.documentScopedSourceOrder?.ordinal,
-           let right = rhs.documentScopedSourceOrder?.ordinal,
-           left != right {
-            return left > right
-        }
-        return (lhs.repositoryTransactionId ?? lhs.id.uuidString) > (rhs.repositoryTransactionId ?? rhs.id.uuidString)
+    private static func recentActivityOrderKey(for transaction: Transaction) -> AccountRecentActivityOrderKey {
+        let sourceOrder = transaction.documentScopedSourceOrder
+        return AccountRecentActivityOrderKey(
+            statementDate: transaction.statementDate,
+            documentID: sourceOrder?.documentID ?? transaction.repositoryDocumentId ?? "",
+            sourceOrdinal: sourceOrder?.ordinal ?? 0,
+            transactionID: transaction.repositoryTransactionId ?? transaction.id.uuidString
+        )
     }
 
     private static func accountTypeLabel(_ type: AccountType) -> String {

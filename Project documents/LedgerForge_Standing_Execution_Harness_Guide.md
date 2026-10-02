@@ -39,6 +39,13 @@ Implement a coherent boundary, compile/type-check, run focused falsification, in
 
 [Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Financial proof outranks time/token efficiency. No generated statement or production-derived sole oracle; preserve exact native semantics, fail closed on financial ambiguity and prove zero accepted losing-path residue, provider parity and canonical hydration/reopen where relevant. The [owner's current source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older on-disk copy/oracle-artifact permissions; historical evidence is not current permission. If an intake foundation is accepted locally before its full sprint, record that boundary and any effective source-authority transition separately from publication, full-sprint readiness and adoption.
 
+<a id="protected-adopted-ledger"></a>
+## Protected adopted ledger
+
+After personal adoption, the normal ledger is protected user data, not a disposable development database. Earlier recreation or disposable-data permissions do not apply to it; see the [owner's adoption decision](SCOPE_DECISIONS.md#personal-v1-adoption-and-protected-ledger-20261003). <!-- user-specified -->
+
+Before development work that may alter live data, persistence or schema, create and verify a current native backup outside Git. Preserve the existing ledger and exact original sources, and exercise development/test operations in an isolated namespace where possible. For an authorized live migration or persistence change, retain the backup, prove record/identity/manual-choice/source-link preservation and verify canonical hydration and normal relaunch. Never reset, delete, reseed, replace or downgrade the adopted ledger as a development shortcut; any intentional removal or replacement requires a fresh explicit owner decision naming that effect. A backup is a recovery safeguard, not permission to discard current data. <!-- user-specified -->
+
 <a id="parser--authentic-corpus-acceptance-policy"></a>
 ## Parser / Authentic-Corpus Acceptance Policy
 
@@ -73,7 +80,7 @@ Start with the smallest check that can falsify the changed boundary. Compile aff
 
 One complete TestPlan per stable implementation state is authoritative when a recorded trigger applies: material cross-cutting final acceptance; migrations/provider transactions; canonical hydration/shared orchestration; shared duplicate/credential/reader routing effects; global test infrastructure/concurrency; a named unexplained cross-area failure; or explicitly required cycle close. A second full pass needs a material change or named diagnostic hypothesis. Do not rerun suites to compensate for missing financial or runtime evidence.
 
-Persistence/startup changes preserve the independent accepted migration identity lock, explicit task-owned schema experiment namespace and genuine adopted-data upgrade acceptance. Use the existing durable-startup gate for actual SQLite/provider publication, clean quit and same-database relaunch; memory Run is insufficient. One-time disposable database recreation is not future reset authority. Keep product build identity and dirty/unavailable provenance truthful.
+Persistence/startup changes preserve the independent accepted migration identity lock, explicit task-owned schema experiment namespace and genuine adopted-data upgrade acceptance. Use the existing durable-startup gate for actual SQLite/provider publication, clean quit and same-database relaunch; memory Run is insufficient. Apply the [protected-ledger procedure](#protected-adopted-ledger); historical recreation permissions do not authorize resetting adopted data. Keep product build identity and dirty/unavailable provenance truthful.
 
 Runtime checks are required where automation cannot establish launch, navigation, import review/confirmation, provider replacement/relaunch, process contention or actual native interaction. Label passed/pending/unavailable/explicitly accepted deferral separately. No guessed native pass or blanket formal accessibility campaign.
 

@@ -212,6 +212,7 @@ struct PreparedImport: Identifiable {
     private(set) var investmentPlan: InvestmentImportPlan?
     private(set) var investmentReview: InvestmentUpdateReview?
     private(set) var investmentReviewError: String?
+    private(set) var investmentReviewFailure: InvestmentError?
 
 
     init(
@@ -259,6 +260,7 @@ struct PreparedImport: Identifiable {
         self.investmentPlan = investmentPlan
         self.investmentReview = nil
         self.investmentReviewError = nil
+        self.investmentReviewFailure = nil
         if investmentPlan != nil { updateInvestmentChoices(investmentPlan!.choices) }
 
     }
@@ -272,10 +274,22 @@ struct PreparedImport: Identifiable {
         do {
             investmentReview = try InvestmentUpdatePlanner.review(plan, current: plan.baseline)
             investmentReviewError = nil
+            investmentReviewFailure = nil
         } catch {
             investmentReview = nil
-            investmentReviewError = (error as? InvestmentError)?.localizedDescription ?? InvestmentError.invalidEvidence.localizedDescription
+            investmentReviewFailure = (error as? InvestmentError) ?? .invalidEvidence
+            investmentReviewError = investmentReviewFailure?.localizedDescription
         }
+    }
+
+    /// A non-actionable preparation outcome, never an accepted import. Restrict
+    /// this to one source scope: an early olderSnapshot error in a multi-scope
+    /// document does not establish the disposition of its remaining scopes.
+    var retainsNewerHoldingsWithoutImport: Bool {
+        validation.passed && advisoryPreviousImport == nil
+            && investmentPlan?.evidence.scopes.count == 1
+            && (investmentReviewFailure == .olderSnapshot || investmentReviewFailure == .directSourceRetained)
+            && financialDocument.transactions.isEmpty
     }
 
     var investmentConfirmationBlocked: Bool {
@@ -743,6 +757,71 @@ final class ImportEngine {
         await commitPreparedImport(preparedImport, accountChoice: nil)
     }
 
+    /// Explicit Continue on a validation failure records only its bounded
+    /// rejected attempt. It cannot enter accepted financial persistence.
+    func acknowledgeValidationFailure(_ preparedImport: PreparedImport) -> ImportEngineResult {
+        let unrecordedResult = ImportEngineResult(
+            fileName: preparedImport.fileName,
+            transactionCount: preparedImport.transactionCount,
+            validationPassed: preparedImport.validation.passed,
+            persisted: false,
+            errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
+            recoveryRoute: .reviewRequired(.validationFailed)
+        )
+        guard !preparedImport.validation.passed,
+              markPreparedImportCommitted(preparedImport.id) else { return unrecordedResult }
+
+        let ownership = livePreparedImports[preparedImport.id]
+        defer {
+            preparedImport.sourceSnapshot.invalidate()
+            livePreparedImports.removeValue(forKey: preparedImport.id)?.lifecycleLease.finish()
+        }
+        guard ownership?.sourceSnapshot.id == preparedImport.sourceSnapshot.id,
+              preparedImport.providerGeneration == providerGenerationProvider(),
+              persistenceStateProvider().isUsable,
+              !reconciliationGate.isBlocked,
+              (try? preparedImport.sourceSnapshot.recomputedSourceByteFingerprint())
+                == preparedImport.sourceSnapshot.sourceByteFingerprint else {
+            developerConsole.warning(.validation, "Validation rejection could not be recorded")
+            return unrecordedResult
+        }
+#if DEBUG
+        do {
+            try developmentProfileAcknowledgementGate.requireAuthorization(
+                for: .importConfirmation,
+                providerGeneration: preparedImport.providerGeneration
+            )
+        } catch {
+            developerConsole.warning(.validation, "Validation rejection could not be recorded")
+            return unrecordedResult
+        }
+#endif
+        // This method does not suspend: the retained preparation lease and
+        // generation remain owned throughout the bounded audit write.
+        return recordPreparedValidationFailure(preparedImport)
+    }
+
+    private func recordPreparedValidationFailure(_ preparedImport: PreparedImport) -> ImportEngineResult {
+        let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(
+            fileName: preparedImport.fileName,
+            transactionCount: preparedImport.transactionCount
+        )
+        if attemptID != nil {
+            do { try rejectedAttemptHydration() }
+            catch { developerConsole.warning(.database, "Import attempt refresh unavailable") }
+        }
+        developerConsole.error(.validation, "Validation failed")
+        return ImportEngineResult(
+            fileName: preparedImport.fileName,
+            transactionCount: preparedImport.transactionCount,
+            validationPassed: false,
+            persisted: false,
+            errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
+            importAttemptId: attemptID,
+            recoveryRoute: .reviewRequired(.validationFailed)
+        )
+    }
+
     /// A bounded look-ahead preparation may have finished before the preceding
     /// commit. Refresh only its repository-dependent authority when it reaches
     /// the single review/commit lane. Parsed content remains bound to the same
@@ -956,21 +1035,7 @@ final class ImportEngine {
             )
         }
         guard preparedImport.validation.passed else {
-            let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
-            developerConsole.error(.validation, "Validation failed")
-            return ImportEngineResult(
-                fileName: preparedImport.fileName,
-                transactionCount: preparedImport.transactionCount,
-                validationPassed: false,
-                persisted: false,
-                errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
-                accountId: nil,
-                importSessionId: nil,
-                redactedIdentifier: nil,
-                previousImport: nil,
-                importAttemptId: attemptID,
-                recoveryRoute: .reviewRequired(.validationFailed)
-            )
+            return recordPreparedValidationFailure(preparedImport)
         }
 
         var persistenceResult = ImportPersistenceResult.skipped

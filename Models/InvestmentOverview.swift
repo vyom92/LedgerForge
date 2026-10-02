@@ -6,13 +6,19 @@ nonisolated struct InvestmentConvertedAmount: Equatable, Sendable {
     let currency: String
     let coverage: Int
     let display: String
+    private let roundedDisplayMoney: Money?
+    var numberDisplay: String { roundedDisplayMoney.map { MoneyFormatting.number($0) } ?? "Out of range" }
+    var amountInWords: String? { roundedDisplayMoney.flatMap { MoneyFormatting.amountInWords($0) } }
 
     init(numerator: InvestmentArithmetic.Exact, denominator: InvestmentArithmetic.Exact, currency: String, coverage: Int) {
         self.numerator = numerator; self.denominator = denominator; self.currency = currency; self.coverage = coverage
         guard let token = try? InvestmentRatioFormatter.rounded(numerator: numerator, denominator: denominator,
                                                                places: MoneyFormatting.displayFractionDigits),
               let rounded = Decimal(string: token, locale: Locale(identifier: "en_US_POSIX")),
-              let money = try? Money(amount: rounded, currency: currency) else { self.display = "Out of range"; return }
+              let money = try? Money(amount: rounded, currency: currency) else {
+            self.display = "Out of range"; self.roundedDisplayMoney = nil; return
+        }
+        self.roundedDisplayMoney = money
         self.display = MoneyFormatting.display(money)
     }
 
@@ -52,6 +58,8 @@ nonisolated enum InvestmentPortfolioGroup: String, CaseIterable, Identifiable, S
     case isp = "ISP", ibkr = "IBKR", indianMF = "Indian MF", cbq = "CBQ Investments"
     var id: String { rawValue }
     static func group(for holding: InvestmentHolding, container: InvestmentContainer? = nil) -> Self? {
+        if let source = container?.ibkrSource, container?.id == holding.containerID,
+           holding.ibkrObservationID == source.observationID { return .ibkr }
         // Container ownership does not depend on a qualified price mapping.
         // This supplies no price and makes no claim that two instruments are aliases.
         guard let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding) else {
@@ -290,7 +298,10 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
                      "3UUSD": "iShares Emerging Markets Index USD", "B0280": "Qatar Airways ISP Conventional Blend"]
         return groups.keys.sorted().compactMap { key -> InvestmentFundSummary? in
             guard let rows = groups[key], let first = rows.first else { return nil }
-            let mapping = InvestmentPriceRegistry.confirmedMapping(for: first)
+            let directMapping = valuations[first.id]?.quote.flatMap {
+                $0.mapping.provider == "ibkr-flex" ? $0.mapping : nil
+            }
+            let mapping = directMapping ?? InvestmentPriceRegistry.confirmedMapping(for: first)
             let part = scope(rows, valuations: valuations, legs: legs, currencies: parent.lines.map(\.currency))
             let units = try? rows.map { $0.units.value }.reduce(Decimal.zero, InvestmentArithmetic.add)
             let identifier = mapping.map { mapping in
@@ -393,7 +404,8 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
             }
         }
         return .init(holdingCount: holdings.count, priceCount: priceCount, costCount: costCount, gainCount: gainCount,
-            lines: lines, quotes: quotes, fxDates: dependencies.compactMap { legs[$0]?.fetchedAt },
+            lines: lines, quotes: quotes,
+            fxDates: AlDarCurrency.allCases.filter { dependencies.contains($0) }.compactMap { legs[$0]?.fetchedAt },
             fxMissing: dependencies.contains { legs[$0] == nil })
     }
 }

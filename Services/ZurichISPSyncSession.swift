@@ -53,6 +53,8 @@ final class ZurichISPSyncSession: ObservableObject {
     private var pendingDueCheck = false
     private var backgroundScheduleActive = false
     var sharedHoldingsRefresh: ((Bool) -> Void)?
+    /// True means the installed foreground request owner handled cancellation.
+    var sharedHoldingsCancel: ((Bool) -> Bool)?
 
     func setBackgroundScheduleActive(_ active: Bool) {
         guard active != backgroundScheduleActive else { return }
@@ -272,9 +274,17 @@ final class ZurichISPSyncSession: ObservableObject {
     }
 
     func cancel(silent: Bool = false) {
-        epoch = UUID(); operation?.cancel(); operation = nil; isBusy = false; pendingDueCheck = false
-        Task { await client.cancel() }
-        message = silent ? nil : "Cancelled. Previous ISP holdings are retained."
+        pendingDueCheck = false
+        if operation == nil, sharedHoldingsCancel?(silent) == true { return }
+        let hadOperation = operation != nil
+        epoch = UUID(); operation?.cancel(); operation = nil; isBusy = false
+        if hadOperation {
+            Task { await client.cancel() }
+            message = silent ? nil : "Cancelled. Previous ISP holdings are retained."
+        } else if silent {
+            message = nil
+        }
+        // An idle Cancel cannot relabel a completed save as retained holdings.
     }
 
     func disconnect() {

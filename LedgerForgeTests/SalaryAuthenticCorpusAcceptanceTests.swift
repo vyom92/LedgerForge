@@ -157,6 +157,90 @@ struct SalaryAuthenticCorpusAcceptanceTests {
         }
     }
 
+    /// One already nominated retained Gmail original supplies the exact input
+    /// and the existing independent source-only expectation, entirely in RAM.
+    /// Called from the Gmail suite so local Salary FIFO configuration is not
+    /// required for this repository-boundary test.
+    func qualifyGmailNamespaceContention(
+        _ original: (source: GmailInboxSource, bytes: Data)
+    ) async throws {
+        let expected = try GmailSalarySourceOracle.statement(source: original.source, bytes: original.bytes)
+        let source = original.source
+        guard source.acquisition == .available, let sourceURL = source.importURL else {
+            throw AcceptanceError.mismatch(sourceToken: expected.sourceToken, field: "Gmail original receipt/locator")
+        }
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-SalaryNamespace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("contention.sqlite").path
+        let sqlite = try SQLiteRepositoryProvider(path: databasePath)
+        defer { sqlite.database.close() }
+        let observer = SalaryNamespaceOutcomeObserver(base: sqlite.salaryRepo)
+        let provider = DatabaseProvider(
+            workspaceRepo: sqlite.workspaceRepo, transactionRepo: sqlite.transactionRepo,
+            categoryRepo: sqlite.categoryRepo, accountRepo: sqlite.accountRepo,
+            cardRepo: sqlite.cardRepo, importSessionRepo: sqlite.importSessionRepo,
+            confirmedImportRepo: sqlite.confirmedImportRepo, salaryRepo: observer,
+            gmailInboxRepo: sqlite.gmailInboxRepo,
+            generationToken: sqlite.generationToken, persistenceState: .verifiedSQLite)
+        var inbox = try provider.gmailInboxRepo.load(account: source.account)
+        inbox.sources[source.id] = source
+        _ = try provider.gmailInboxRepo.save(
+            inbox, originals: [expected.sourceSha256: original.bytes], expectedRevision: inbox.revision)
+        try verifyGmailOriginal(source: source, bytes: original.bytes,
+            repository: provider.gmailInboxRepo, sourceToken: expected.sourceToken)
+
+        let coordinator = DefaultImportPersistenceCoordinator(databaseProvider: provider)
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(readerRegistry: DefaultReaderRegistry()),
+            sourceSnapshotAcquirer: { url in
+                try GmailImportSource.acquireSnapshot(from: url, repository: provider.gmailInboxRepo)
+            },
+            importPersistenceCoordinator: coordinator,
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
+        let prepared = try await engine.prepareImport(from: sourceURL)
+        defer { engine.cancelPreparedImport(prepared) }
+        try verifyPrepared(prepared, against: expected)
+        let before = try SQLiteNamespaceContentionSnapshot(database: sqlite.database)
+
+        try withHeldNamespaceLock(databasePath: databasePath) {
+            do {
+                _ = try coordinator.persistValidatedSalaryImport(
+                    financialDocument: prepared.financialDocument, importSession: prepared.importSession,
+                    validation: prepared.validation, fingerprintSet: prepared.fingerprintSet,
+                    providerGeneration: sqlite.generationToken)
+                Issue.record("Salary persistence unexpectedly succeeded while the namespace was held.")
+            } catch ImportPersistenceCoordinationError.retryableContention {
+                // The repository outcome reaches the ordinary coordinator's
+                // existing retry classification, not its unclassified branch.
+            } catch {
+                Issue.record("Salary namespace contention used an unexpected recovery classification.")
+            }
+        }
+        #expect(observer.result == .retryableContention)
+        let unchanged = try SQLiteNamespaceContentionSnapshot(database: sqlite.database) == before
+        #expect(unchanged, "Salary namespace contention changed durable tables, connection writes or activation.")
+        #expect(try sqlite.salaryRepo.snapshot(workspaceId: "default-workspace").statements.isEmpty)
+        let plan = try #require(observer.plan)
+        #expect(try sqlite.importSessionRepo.importSession(id: plan.history.importSession.id) == nil)
+        try verifyGmailOriginal(source: source, bytes: original.bytes,
+            repository: provider.gmailInboxRepo, sourceToken: expected.sourceToken)
+
+        guard case .committed = sqlite.salaryRepo.commitImportedSalary(plan) else {
+            Issue.record("The unchanged authentic salary plan did not commit after namespace contention ended.")
+            return
+        }
+        let storedStatements = try sqlite.salaryRepo.snapshot(workspaceId: plan.workspace.id).statements
+        try #require(storedStatements.count == 1)
+        let stored = try #require(storedStatements.first)
+        try verifyPersisted(stored, against: expected)
+        try verifyGmailOriginal(source: source, bytes: original.bytes,
+            repository: provider.gmailInboxRepo, sourceToken: expected.sourceToken)
+    }
+
     /// Gmail qualification has no file-backed source oracle.  It builds the two
     /// regular-payslip expectations from the exact original bytes in RAM using
     /// PDFKit's native text plus positioned word selections.  It deliberately
@@ -1508,4 +1592,25 @@ private final class SalaryAcceptanceRuntimeStores {
     let fundingPlans = FundingPlanStore()
     let sessions = ImportSessionStore()
     let attempts = ImportAttemptStore()
+}
+
+/// Test-only observation of the untouched production-mapped plan and the real
+/// repository result. It does not substitute a response or financial value.
+private final class SalaryNamespaceOutcomeObserver: SalaryRepository {
+    let base: any SalaryRepository
+    private(set) var plan: SalaryImportPlanDTO?
+    private(set) var result: SalaryImportRepositoryResult?
+
+    init(base: any SalaryRepository) { self.base = base }
+
+    func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
+        self.plan = plan
+        let result = base.commitImportedSalary(plan)
+        self.result = result
+        return result
+    }
+
+    func snapshot(workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
+        try base.snapshot(workspaceId: workspaceId)
+    }
 }

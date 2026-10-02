@@ -66,7 +66,7 @@ nonisolated final class LegacyXLSDocumentReader: ImportFramework.DocumentReader,
         return document
     }
 
-    fileprivate static func importError(for error: LF_XLS_ERROR) -> ImportError {
+    static func importError(for error: LF_XLS_ERROR) -> ImportError {
         switch error {
         case LF_XLS_ERROR_UNSUPPORTED_ENCRYPTION:
             return .unsupportedStatement(message: "Encrypted XLS workbooks are unsupported.")
@@ -87,6 +87,8 @@ nonisolated final class LegacyXLSDocumentReader: ImportFramework.DocumentReader,
              LF_XLS_ERROR_STRING_ALLOCATION_EXCEEDED,
              LF_XLS_ERROR_ALLOCATION:
             return .invalidDocument(message: "XLS workbook exceeds supported resource limits.")
+        case LF_XLS_ERROR_TEXT_CONVERSION:
+            return .invalidDocument(message: "XLS text could not be decoded.")
         case LF_XLS_ERROR_TRUNCATED:
             return .invalidDocument(message: "XLS workbook is truncated.")
         case LF_XLS_ERROR_INVALID_ARGUMENT,

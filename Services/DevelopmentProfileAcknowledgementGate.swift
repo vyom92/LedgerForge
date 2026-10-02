@@ -10,7 +10,7 @@ enum DevelopmentProtectedAction: nonisolated Equatable {
     case importPreparation
     case importConfirmation
     case accountDisplayNameMutation
-    case creditCardHistoryOnlyMutation
+    case accountHistoryOnlyMutation
     case netWorthMembershipMutation
     case financialIntelligenceMutation
     case categoryCreate

@@ -7,6 +7,23 @@ import Testing
 struct PlannerEditorTests {
     private let locale = Locale(identifier: "en_US_POSIX")
 
+    @Test func dashboardNumberAndWordsUseTheSameCurrencySpecificRounding() throws {
+        // Source-independent formatting mechanics; these are not statement facts.
+        for code in ["INR", "QAR", "USD"] {
+            let money = try Money(canonicalDecimal: "12345678.50", currency: code)
+            #expect(MoneyFormatting.number(money, locale: locale) == (code == "INR" ? "1,23,45,679" : "12,345,679"))
+            #expect(MoneyFormatting.amountInWords(money) == (code == "INR"
+                ? "One crore twenty-three lakh forty-five thousand six hundred seventy-nine"
+                : "Twelve million three hundred forty-five thousand six hundred seventy-nine"))
+            #expect(try money.canonicalDecimalString() == "12345678.50")
+            let small = try Money(canonicalDecimal: "-0.49", currency: code)
+            #expect(MoneyFormatting.number(small, locale: locale) == "0")
+            #expect(MoneyFormatting.amountInWords(small) == "Zero")
+        }
+        #expect(PlannerInputCodec.amountInWords("1234567.05", currency: "QAR", locale: locale)
+            == "One million two hundred thirty-four thousand five hundred sixty-seven point zero five")
+    }
+
     @Test func liveAmountWordsUseExactIndianGroupingAndHideUnfinishedInput() {
         let examples = ["7000": "Seven thousand", "250072": "Two lakh fifty thousand seventy-two",
                         "12000000": "One crore twenty lakh", "0": "Zero",
@@ -52,21 +69,86 @@ struct PlannerEditorTests {
         #expect(setup.vm.rawText["fx.rate"] == "22.75junk")
     }
 
-    @Test func focusedEquivalentDraftSavesAllRowsAndReloadsExactlyOnce() throws {
+    @Test func automaticPublicationRetainsExactInputAndReloadsExactlyOnce() throws {
         let setup = try editor()
         #expect(setup.vm.updateMoney(.fixed, text: "5000.55"))
         setup.vm.addCommitment(region: "india")
         let row = try #require(setup.vm.plan.indiaCommitments.first)
         setup.vm.updateCommitment(region: "india", id: row.id, label: "Manual plan", amountText: "5000.5", included: true, fundingAccountID: nil)
         setup.vm.setFX(rateText: "22.7501", dateText: "2026-09-09")
-        setup.vm.save()
+        setup.vm.flushPendingEntries()
         #expect(setup.spy.saves == 1)
         #expect(setup.vm.saveState == .saved)
         let persisted = try #require(setup.spy.plans(workspaceId: "default-workspace").first)
         #expect(persisted.expectedFixedDecimal == "5000.55")
         #expect(persisted.commitments.first?.amountDecimal == "5000.50")
+        #expect(setup.vm.rawText["amount.\(row.id)"] == "5000.5")
         #expect(persisted.fxINRPerQARDecimal == "22.7501")
         #expect(setup.vm.plan == setup.store.plans.first)
+    }
+
+    @Test func screenNavigationRetainsPartialInputWithoutPublishingInvalidMoney() throws {
+        let setup = try editor()
+        #expect(setup.vm.updateMoney(.fixed, text: "5000.55"))
+        setup.vm.flushPendingEntries()
+        let saved = try setup.spy.plans(workspaceId: "default-workspace")
+        let month = setup.vm.month
+        #expect(!setup.vm.updateMoney(.fixed, text: "5000."))
+        setup.vm.flushPendingEntries()
+        #expect(!setup.vm.hasUnsavedDrafts)
+        let plan = setup.vm.plan, rawText = setup.vm.rawText, errors = setup.vm.fieldErrors
+
+        for section in ["Plan insights", "Salary History", "This Month"] {
+            setup.vm.destinationSection = section
+            #expect(setup.vm.month == month)
+            #expect(setup.vm.plan == plan)
+            #expect(setup.vm.rawText == rawText)
+            #expect(setup.vm.fieldErrors == errors)
+            #expect(setup.vm.isDirty)
+            #expect(!setup.vm.canSave)
+            #expect(setup.spy.saves == 1)
+            #expect(try setup.spy.plans(workspaceId: "default-workspace") == saved)
+        }
+        #expect(setup.vm.updateMoney(.fixed, text: "5000.75"))
+        #expect(setup.spy.saves == 1)
+        setup.vm.flushPendingEntries()
+        #expect(setup.spy.saves == 2)
+        #expect(setup.vm.saveState == .saved)
+        #expect(try setup.spy.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal == "5000.75")
+    }
+
+    @Test func debouncePublishesValidInputButRetainsIncompleteTextWithoutAnEditHistory() async throws {
+        let setup = try editor()
+        #expect(setup.vm.updateMoney(.fixed, text: "5000.5"))
+        for _ in 0..<150 where setup.spy.saves == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(setup.spy.saves == 1)
+        #expect(setup.vm.moneyText(.fixed) == "5000.5")
+        #expect(!setup.vm.updateMoney(.fixed, text: "5000."))
+        setup.vm.flushPendingEntries()
+        #expect(setup.spy.saves == 1)
+        #expect(!setup.vm.hasUnsavedDrafts)
+        let retained = try #require(setup.spy.scratchpads(workspaceId: "default-workspace").first)
+        let state = try MonthlyPlanScratchpad.decode(retained)
+        #expect(state.rawText["fixed"] == "5000.")
+        #expect(state.fieldErrors["fixed"] != nil)
+        #expect(try setup.spy.scratchpads(workspaceId: "default-workspace").count == 1)
+        #expect(try setup.spy.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal == "5000.50")
+    }
+
+    @Test func failedRawRetentionKeepsTheAppOpenUntilTheEntriesAreRetained() throws {
+        let setup = try editor()
+        setup.spy.rejectRetention = true
+        #expect(!setup.vm.updateMoney(.fixed, text: "25."))
+        #expect(!SalaryWorkspaceViewModel.retainOpenWorkspacesBeforeTermination())
+        #expect(setup.vm.hasUnsavedDrafts)
+        #expect(setup.vm.saveState == .retentionFailed)
+        #expect(setup.vm.moneyText(.fixed) == "25.")
+        #expect(setup.spy.saves == 0)
+        setup.spy.rejectRetention = false
+        setup.vm.flushPendingEntries()
+        #expect(!setup.vm.hasUnsavedDrafts)
+        let retained = try #require(setup.spy.scratchpads(workspaceId: "default-workspace").first)
+        #expect(try MonthlyPlanScratchpad.decode(retained).rawText["fixed"] == "25.")
     }
 
     @Test func commitThenRefreshFailureNeverReplaysWrite() throws {
@@ -203,10 +285,13 @@ struct PlannerEditorTests {
         #expect(!setup.vm.isDirty)
         #expect(setup.vm.updateMoney(.fee, text: "0"))
         #expect(setup.vm.amountInputText("fee") == "0")
-        setup.vm.save()
-        #expect(setup.vm.saveState == .saved)
+        setup.vm.flushPendingEntries()
+        #expect(!setup.vm.hasUnsavedDrafts)
+        let retained = try #require(setup.spy.scratchpads(workspaceId: "default-workspace").first)
+        #expect(try MonthlyPlanScratchpad.decode(retained).untouchedZeroFields.contains("fixed") == false)
+        #expect(try MonthlyPlanScratchpad.decode(retained).untouchedZeroFields.contains("fee") == false)
         for field in SalaryWorkspaceViewModel.MoneyField.allCases {
-            #expect(setup.vm.amountInputText(field.rawValue) == "0")
+            #expect(setup.vm.amountInputText(field.rawValue) == ([.fixed, .fee].contains(field) ? "0" : ""))
         }
     }
 
@@ -253,7 +338,7 @@ struct PlannerEditorTests {
         #expect(next.amountInputText("balance.manual-bank") == "0")
     }
 
-    @Test func manualFXCalendarSelectionPreservesTheChosenDayAndSaveBoundary() throws {
+    @Test func manualFXCalendarSelectionPreservesTheChosenDayThroughAutomaticPublication() throws {
         #expect(SalaryWorkspaceViewModel.monthTitle(try SelectedStatementMonth(canonical: "2026-08")) == "Aug 26")
         for zone in ["Asia/Qatar", "America/Los_Angeles", "Pacific/Kiritimati"] {
             let timeZone = try #require(TimeZone(identifier: zone))
@@ -272,7 +357,7 @@ struct PlannerEditorTests {
             #expect(setup.vm.rawText["fx.date"] == "2026-09-01")
             #expect(setup.vm.plan.planningFX?.inrPerQAR == 25)
             #expect(setup.spy.saves == 0)
-            setup.vm.save()
+            setup.vm.flushPendingEntries()
             #expect(setup.vm.saveState == .saved)
             #expect(setup.vm.plan.planningFX?.observationDate.canonical == "2026-09-01")
         }
@@ -375,7 +460,7 @@ struct PlannerEditorTests {
         #expect(try reopened.fundingPlanRepo.plans(workspaceId: "default-workspace") == [candidate])
     }
 
-    @Test func negativeConfiguredFeeRejectsFocusedSaveWithAndWithoutTransfer() throws {
+    @Test func negativeConfiguredFeeIsRetainedWithoutCanonicalPublication() throws {
         for needsTransfer in [false, true] {
             let setup = try editor()
             if needsTransfer {
@@ -388,14 +473,17 @@ struct PlannerEditorTests {
             #expect(setup.vm.moneyText(.fee) == "-25")
             #expect(setup.vm.fieldErrors["fee"] == "Transfer fee must be zero or greater")
             #expect(!setup.vm.canSave)
-            setup.vm.save() // The shared Save/Command-S action with the field still focused.
+            setup.vm.flushPendingEntries()
             #expect(setup.spy.saves == 0)
+            #expect(!setup.vm.hasUnsavedDrafts)
             #expect(setup.vm.moneyText(.fee) == "-25")
             for fee in ["0", "25.5"] {
                 #expect(setup.vm.updateMoney(.fee, text: fee))
                 #expect(setup.vm.fieldErrors.isEmpty)
-                setup.vm.save()
-                #expect(setup.vm.saveState == .saved)
+                setup.vm.flushPendingEntries()
+                #expect(!setup.vm.hasUnsavedDrafts)
+                let retained = try #require(setup.spy.scratchpads(workspaceId: "default-workspace").first)
+                #expect(try MonthlyPlanScratchpad.decode(retained).rawText["fee"] == fee)
                 #expect(setup.vm.plan.configuredTransferFee.amount == Decimal(string: fee))
                 if !needsTransfer { #expect(setup.vm.calculation.effectiveTransferFee?.amount == 0) }
             }
@@ -497,11 +585,25 @@ struct PlannerEditorTests {
 
 private final class PlanWriteSpy: FundingPlanRepository {
     var saves = 0
+    var scratchpadSaves = 0
     var reject = false
+    var rejectRetention = false
     let base: FundingPlanRepository
     init(_ base: FundingPlanRepository) { self.base = base }
     func plans(workspaceId: String) throws -> [FundingPlanDTO] { try base.plans(workspaceId: workspaceId) }
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO { saves += 1; if reject { throw RepositoryError.relationshipViolation("injected failure") }; return try base.savePlan(plan) }
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] { try base.scratchpads(workspaceId: workspaceId) }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
+        scratchpadSaves += 1
+        if rejectRetention { throw RepositoryError.persistenceUnavailable }
+        try base.saveScratchpad(value)
+    }
+    func removeScratchpad(workspaceId: String, month: String) throws { try base.removeScratchpad(workspaceId: workspaceId, month: month) }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
+        saves += 1
+        if reject { throw RepositoryError.relationshipViolation("injected failure") }
+        return try base.savePlan(plan, retaining: scratchpad)
+    }
 }
 
 @MainActor

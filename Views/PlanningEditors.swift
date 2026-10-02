@@ -23,19 +23,17 @@ struct PayslipProposalEditor: View {
             if let cycle = plan.assistance?.salaryCycle ?? SalaryFundingCycle.expected(month: plan.month) {
                 Text("Expected payday \(cycle.recurringStart.presentation) · bills generated \(cycle.billRange) · recurring payments \(cycle.recurringRange).")
             }
-            Picker("Salary account", selection: $accountID) {
-                Text("Choose account").tag("")
-                ForEach(accounts.filter { $0.nativeCurrency.code == "QAR" }) { account in
-                    Text(account.selectionTitle).tag(account.repositoryAccountId ?? "")
-                }
-            }
+            LFAccountPicker(label: "Salary account", placeholder: "Choose account", selection: $accountID,
+                options: accounts.filter { $0.nativeCurrency.code == "QAR" }.map {
+                    .init(id: $0.repositoryAccountId ?? "", title: $0.preferredDisplayName, detail: $0.selectionContext)
+                })
             Text("This replaces the draft’s fixed income (\(MoneyFormatting.display(plan.expectedFixedEarnings))), variable income (\(MoneyFormatting.display(plan.expectedVariableEarnings))) and payroll deductions with this net salary. Bills, balances and transfer choices remain. You can enter additional income afterwards.")
             Toggle("I have reviewed this change to my draft", isOn: $reviewed)
             if let error { Text(error).foregroundStyle(LFTheme.warning) }
             Button("Apply to draft") {
                 if !onApply(accountID) { error = "The source or draft changed. Close this review and reopen the current proposal." }
             }.lfPrimaryAction().disabled(!reviewed || accountID.isEmpty)
-            Text("Use Save in the monthly plan to keep the change. Other monthly drafts stay available.")
+            Text("Changes are kept automatically for this month. Other monthly entries stay available.")
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }.font(theme.typography.body).padding(24).frame(width: 650)
     }
@@ -73,6 +71,8 @@ struct PlanningEditorView: View {
     let request: PlanningEditorRequest
     let metadata: FinancialIntelligenceSnapshot?
     let accounts: [IntelligenceAccountContext]
+    var availableAccountIDs: Set<String>? = nil
+    var excludedHistoryAccountIDs: Set<String> = []
     let rows: [SpendingSourceRow]
     let plan: FundingPlan
     let onMetadata: (PlanningMetadataEdit) throws -> Void
@@ -133,7 +133,7 @@ struct PlanningEditorView: View {
                     case .contribution(let value): contribution(value)
                     case .budget: budgetInputs
                     case .preferences: salaryPreferences
-                    case .funding: PlanningFundingEditor(plan: plan, metadata: metadata, accounts: accounts, rows: rows, onApply: onAssistance)
+                    case .funding: PlanningFundingEditor(plan: plan, metadata: metadata, accounts: accounts, availableAccountIDs: availableAccountIDs, excludedHistoryAccountIDs: excludedHistoryAccountIDs, rows: rows, onApply: onAssistance)
                     case .historicalSalary: historicalSalary
                     case .salary(let value): salaryProposal(value)
                     case .prefills(let values): prefills(values)
@@ -156,10 +156,10 @@ struct PlanningEditorView: View {
 #endif
     }
     private var accountPicker: some View {
-        Picker("Funding bank", selection: $accountID) {
-            Text("Choose account").tag("")
-            ForEach(accounts) { Text($0.selectionTitle).tag($0.id) }
-        }
+        LFAccountPicker(label: "Funding bank", placeholder: "Choose account", selection: $accountID,
+            options: accounts.filter { availableAccountIDs?.contains($0.id) != false || $0.id == accountID }.map {
+                .init(id: $0.id, title: $0.title, detail: $0.selectionContext + (availableAccountIDs?.contains($0.id) == false ? " · Saved account; unavailable for new funding" : ""))
+            })
     }
     private func field(_ label: String, _ binding: Binding<String>) -> some View {
         LabeledContent(label) { TextField(label, text: binding).textFieldStyle(.roundedBorder).frame(maxWidth: 420) }
@@ -299,7 +299,7 @@ struct PlanningEditorView: View {
                     onAssistance(result)
                 }
             }.lfPrimaryAction()
-            Text("Use Save in the monthly plan to keep this change.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Text("Changes in the monthly plan are kept automatically.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }
     }
     private var budgetInputs: some View {
@@ -346,7 +346,7 @@ struct PlanningEditorView: View {
     private var salaryPreferences: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle("Prepare a reviewable salary-funded plan after salary arrives", isOn: Binding(get: { preferences?.salaryAssistanceEnabled ?? true }, set: { preferences?.salaryAssistanceEnabled = $0 }))
-            Text("The plan is labelled by the salary-credit month. It covers bills issued since the previous payday and recurring payments before the next payday. Applying a proposal changes the draft; Save persists it.").foregroundStyle(theme.palette.secondaryText)
+            Text("The plan is labelled by the salary-credit month. It covers bills issued since the previous payday and recurring payments before the next payday. Applying a proposal updates the monthly scratchpad automatically.").foregroundStyle(theme.palette.secondaryText)
             Text("Choose the enabled bank-credit rules that identify regular salary. Bonus, ad-hoc, transfer and payslip records do not create another salary receipt.").foregroundStyle(theme.palette.secondaryText)
             let sources = FinancialIntelligenceStore.shared.sources
             let rules = SpendingIntelligence.eligibleSalaryRules(categories: CategoryStore.shared.snapshot, sources: sources)
@@ -357,10 +357,11 @@ struct PlanningEditorView: View {
                 Toggle(rule.name, isOn: Binding(get: { preferences?.salaryRuleIDs.contains(rule.id) ?? false }, set: { if $0 { preferences?.salaryRuleIDs.insert(rule.id) } else { preferences?.salaryRuleIDs.remove(rule.id) } }))
             }
             if rules.isEmpty { Text("Create an enabled, account-specific salary rule in Transactions → Category rules first.") }
-            Picker("CBQ cash account for Keep in CBQ", selection: Binding(get: { preferences?.retentionAccountID ?? "" }, set: { preferences?.retentionAccountID = $0.isEmpty ? nil : $0 })) {
-                Text("Choose the canonical bank account").tag("")
-                ForEach(accounts.filter { $0.currency == "QAR" }) { Text($0.selectionTitle).tag($0.id) }
-            }
+            LFAccountPicker(label: "CBQ cash account for Keep in CBQ", placeholder: "Choose bank account",
+                selection: Binding(get: { preferences?.retentionAccountID ?? "" }, set: { preferences?.retentionAccountID = $0.isEmpty ? nil : $0 }),
+                options: accounts.filter { $0.currency == "QAR" && (availableAccountIDs?.contains($0.id) != false || $0.id == preferences?.retentionAccountID) }.map {
+                    .init(id: $0.id, title: $0.title, detail: $0.selectionContext)
+                })
             Text("Monthly plan uses only its own Keep in CBQ amount. Plan insights compares that floor with the saved reserve target and protects the larger amount once. This account choice is independent of the salary switch.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             Button("Save assistance preferences") { execute { if let value = preferences { try onMetadata(.preferences(value, replacing: metadata?.preferences)); dismiss(); SalaryAssistanceSession.shared.retry() } } }.lfPrimaryAction()
         }
@@ -389,7 +390,8 @@ struct PlanningEditorView: View {
     private func salaryProposal(_ value: SalaryAssistance) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let row = rows.first(where: { $0.id == value.id }) {
-                Text(MoneyFormatting.display(row.transaction.money) + " · " + row.accountTitle).font(theme.typography.sectionTitle)
+                Text(MoneyFormatting.display(row.transaction.money)).font(theme.typography.sectionTitle)
+                Text(row.accountTitle).font(theme.typography.body)
                 Text(row.transaction.description).textSelection(.enabled)
             }
             Text("Received \(AppDateDisplay.civil(value.financialDate)) → \(AppDateDisplay.month(value.targetMonth)) plan")
@@ -405,7 +407,7 @@ struct PlanningEditorView: View {
                 Button("Apply proposal") { onSalary(value) }.lfPrimaryAction().disabled(!acknowledged)
                 Button("Dismiss proposal") { execute { var result = value; result.draftState = .dismissed; try onMetadata(.salary(result, replacing: value)); dismiss() } }.lfSecondaryAction()
             }
-            Text("Other unsaved monthly drafts are retained. The proposal is consumed only when this plan is explicitly saved.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Text("Other monthly entries are retained. The proposal is consumed when this valid plan is retained automatically.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }
     }
     private func proposedCycle(for value: SalaryAssistance) -> SalaryFundingCycle? {
@@ -429,7 +431,7 @@ struct PlanningEditorView: View {
             }
             Toggle("Apply these reviewed remaining amounts", isOn: $acknowledged)
             Button("Apply to editable plan") { onPrefills(values); dismiss() }.lfPrimaryAction().disabled(!acknowledged || values.isEmpty)
-            Text("Use Save to keep the monthly plan.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            Text("Monthly entries are kept automatically.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }
     }
     private func populate() {
@@ -439,7 +441,7 @@ struct PlanningEditorView: View {
         switch request {
         case .recurring(let value, let candidate):
             if let value { title = value.title; accountID = value.accountID; endsOn = value.endsOn ?? ""; predicates = value.predicates; enabled = value.isEnabled; note = value.note
-                if let revision = value.revisions.max(by: { $0.effectiveFrom < $1.effectiveFrom }) { amount = revision.amount.decimal; dueDay = String(revision.dueDay) }
+                if let revision = value.revisions.max(by: { $0.effectiveFrom < $1.effectiveFrom }) { amount = revision.amount.decimal; currency = revision.amount.currency; dueDay = String(revision.dueDay) }
             } else if let candidate { title = candidate.narration; accountID = candidate.accountID; amount = NSDecimalNumber(decimal: candidate.amount).stringValue; dueDay = String(candidate.dates.last!.day); predicates = [.init(field: .narration, match: .exact, text: candidate.narration)] }
         case .payment(let value):
             if let saved = metadata?.occurrences.first(where: { $0.id == value.id }) { amount = saved.amountOverride?.decimal ?? ""; selectedIDs = Set(saved.transactionIDs); waived = saved.isWaived; note = saved.note }
@@ -504,7 +506,7 @@ struct PlanningSalaryCycleEditor: View {
             }
             if let error { Text(error).foregroundStyle(LFTheme.warning) }
             HStack {
-                Text("Applies to the editable draft; use Save to keep it.").foregroundStyle(theme.palette.secondaryText)
+                Text("Applies to this month; changes are kept automatically.").foregroundStyle(theme.palette.secondaryText)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply dates") {

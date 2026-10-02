@@ -16,11 +16,18 @@ nonisolated protocol LegacyKeychainInteractionControlling: Sendable {
 }
 
 nonisolated struct SystemLegacyKeychainInteractionController: LegacyKeychainInteractionControlling {
+    // Existing file-based Keychain items still need the process-wide no-UI
+    // guard; a per-query LAContext does not replace that legacy guard. Keep these
+    // legacy calls inside deprecated witnesses, reached only through the
+    // coordinator's protocol, without suppressing other compiler warnings or
+    // changing credential identities/backends.
+    @available(macOS, deprecated: 10.10, message: "Legacy Keychain compatibility; use CredentialInteractionPolicy.perform(_:).")
     func userInteractionAllowed() -> (status: OSStatus, allowed: Bool) {
         var allowed = DarwinBoolean(false)
         return (SecKeychainGetUserInteractionAllowed(&allowed), allowed.boolValue)
     }
 
+    @available(macOS, deprecated: 10.10, message: "Legacy Keychain compatibility; use CredentialInteractionPolicy.perform(_:).")
     func setUserInteractionAllowed(_ allowed: Bool) -> OSStatus {
         SecKeychainSetUserInteractionAllowed(allowed)
     }

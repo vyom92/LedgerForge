@@ -7,6 +7,9 @@ struct DashboardInvestmentSnapshotCard: View {
     @Environment(\.lfTheme) private var theme
 
     let overview: InvestmentOverview
+    let report: NetWorthReport
+    @Binding var selectedRow: String?
+    @State private var showsBasis = false
     let openInvestments: () -> Void
 
     private var scope: InvestmentOverviewScope { overview.performance }
@@ -16,11 +19,11 @@ struct DashboardInvestmentSnapshotCard: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            LFPanel(title: "Investments", systemImage: "chart.line.uptrend.xyaxis", contentSpacing: theme.spacing.controlGap) {
+            LFPanel(title: "Investments", trailing: AnyView(openButton), contentSpacing: theme.spacing.controlGap) {
                 if scope.holdingCount == 0 {
                     emptyContent
                 } else {
-                    snapshotContent(now: context.date)
+                    snapshotContent(now: context.date).frame(maxHeight: .infinity, alignment: .top)
                 }
             }
         }
@@ -31,18 +34,59 @@ struct DashboardInvestmentSnapshotCard: View {
             Text("No investment holdings are imported.")
                 .font(theme.typography.secondary)
                 .foregroundStyle(theme.palette.secondaryText)
-            openButton
         }
     }
 
     private func snapshotContent(now: Date) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            currentValue
-            compactPerformance
-            coverageTruth
-            freshnessTruth(now: now)
-            openButton
+            snapshotMetrics
+            if report.members.contains(where: { $0.kind == .investment && !$0.isIncluded }) {
+                Text("Allocation covers investments included in net worth.")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+            DashboardReportRows(report: report, scope: .allocation, selectedRow: $selectedRow)
+            Divider()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    freshnessTruth(now: now)
+                    Spacer(minLength: theme.spacing.small)
+                    basisButton(now: now)
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    freshnessTruth(now: now)
+                    basisButton(now: now)
+                }
+            }
         }
+    }
+
+    private func basisButton(now: Date) -> some View {
+        Button("Details") { selectedRow = nil; showsBasis = true }
+            .buttonStyle(.link)
+            .font(theme.typography.secondary)
+            .accessibilityIdentifier("dashboard.investmentBasis")
+            .popover(isPresented: $showsBasis) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                        HStack {
+                            Text("Investment details").font(theme.typography.rowTitle)
+                            Spacer()
+                            Button("Close details", systemImage: "xmark") { showsBasis = false }
+                                .labelStyle(.iconOnly).buttonStyle(.borderless)
+                        }
+                        Text("Allocation follows your net-worth inclusion choices. Performance and quote coverage summarize all investment holdings.")
+                            .font(theme.typography.secondary)
+                        snapshotMetrics
+                        coverageTruth
+                        freshnessTruth(now: now)
+                        if !scope.fxDates.isEmpty {
+                            Text(fxAgeText(now: now)).font(theme.typography.secondary)
+                        }
+                        Text("Source ownership and valuation dates remain unchanged by an FX refresh. Open a portfolio row for individual holdings and source dates.")
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    }.padding(theme.spacing.panelPadding)
+                }.frame(width: 520, height: 380)
+            }
     }
 
     private var currentValue: some View {
@@ -80,19 +124,27 @@ struct DashboardInvestmentSnapshotCard: View {
         }
     }
 
-    private var compactPerformance: some View {
+    private var snapshotMetrics: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: theme.spacing.controlGap) {
-                performanceMetric("Invested / contributed", amount: usd?.cost?.covering(scope.costCount))
-                performanceMetric("Growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
-                returnMetric
+                currentValue.frame(maxWidth: .infinity, alignment: .leading)
+                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount))
+                growthMetric
             }
             VStack(alignment: .leading, spacing: theme.spacing.small) {
-                performanceMetric("Invested / contributed", amount: usd?.cost?.covering(scope.costCount))
-                performanceMetric("Growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
-                returnMetric
+                currentValue
+                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount))
+                growthMetric
             }
         }
+    }
+
+    private var growthMetric: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            performanceMetric("Gain / growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
+            returnMetric
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func performanceMetric(
@@ -106,7 +158,7 @@ struct DashboardInvestmentSnapshotCard: View {
                 .foregroundStyle(theme.palette.secondaryText)
             if let amount {
                 Text(amount.display)
-                    .font(theme.typography.tableMoney)
+                    .font(theme.typography.headlineMoney)
                     .monospacedDigit()
                     .foregroundStyle(profit ? profitColor(amount.numerator.sign) : theme.palette.primaryText)
                     .fixedSize(horizontal: true, vertical: false)
@@ -121,15 +173,13 @@ struct DashboardInvestmentSnapshotCard: View {
 
     private var returnMetric: some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text("Growth %")
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
             Text(scope.returnPercent ?? "Unavailable")
-                .font(scope.returnPercent == nil ? theme.typography.caption : theme.typography.tableMoney)
+                .font(scope.returnPercent == nil ? theme.typography.caption : theme.typography.rowTitle)
                 .monospacedDigit()
                 .foregroundStyle(scope.returnPercent == nil ? theme.palette.secondaryText
                                  : profitColor(scope.lines.first { $0.gain?.covering(scope.gainCount) != nil && $0.gainCost?.covering(scope.gainCount) != nil }?.gain?.numerator.sign ?? 0))
                 .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Growth percentage: " + (scope.returnPercent ?? "unavailable"))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -144,21 +194,18 @@ struct DashboardInvestmentSnapshotCard: View {
     private func freshnessTruth(now: Date) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
             if scope.priceCount == 0 {
-                Text("No source quotes available.")
+                Text("No prices available.")
                     .foregroundStyle(theme.palette.secondaryText)
             } else {
                 Label(
-                    "Source quotes · \(scope.priceCount)/\(scope.holdingCount) priced · \(quoteAgeText(now: now))",
+                    "\(scope.priceCount)/\(scope.holdingCount) prices available · \(quoteAgeText(now: now))",
                     systemImage: "clock"
                 )
                 .foregroundStyle(freshnessColor(scope.quotes.map { $0.freshnessAge(at: now) }.max() ?? 0))
             }
             if scope.fxMissing {
-                Label("FX conversion unavailable for some totals", systemImage: "exclamationmark.triangle")
+                Label("Currency conversion unavailable for some totals", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(theme.palette.secondaryText)
-            } else if !scope.fxDates.isEmpty {
-                Label("FX · \(fxAgeText(now: now))", systemImage: "arrow.left.arrow.right")
-                    .foregroundStyle(freshnessColor(scope.fxDates.map { Int(WeekdayFreshness.seconds(from: $0, to: now) / 86_400) }.max() ?? 0))
             }
         }
         .font(theme.typography.caption)
@@ -182,7 +229,7 @@ struct DashboardInvestmentSnapshotCard: View {
     }
 
     private func quoteAgeText(now: Date) -> String {
-        ageText(quoteAge(now: now), noun: "source quote")
+        ageText(quoteAge(now: now), noun: "oldest")
     }
 
     private func fxAgeText(now: Date) -> String {

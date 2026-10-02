@@ -103,14 +103,18 @@ struct LedgerForgeTests {
 
         let dashboardAccounts = try sourceSection(
             contentViewSource,
-            startingAt: "private func dashboardDomain(",
-            endingBefore: "private func dashboardAccountName("
+            startingAt: "private func dashboardAccountPanel(",
+            endingBefore: "private var salaryDashboardSummary:"
         )
         #expect(!dashboardAccounts.contains("Image(systemName: \"chevron.right\")"))
         #expect(!dashboardAccounts.contains("linkButton("))
         #expect(!dashboardAccounts.contains("performDashboardRoute("))
-        #expect(dashboardAccounts.contains("Bank balances"))
-        #expect(dashboardAccounts.contains("No card accounts"))
+        #expect(!dashboardAccounts.contains("Cash & cards"))
+        #expect(dashboardAccounts.contains("Recorded balances"))
+        #expect(dashboardAccounts.contains("Bank accounts"))
+        #expect(dashboardAccounts.contains("Credit cards"))
+        #expect(dashboardAccounts.contains("Amount owed"))
+        #expect(!dashboardAccounts.contains("Show zero balances"))
 
         let accountDetail = try sourceSection(
             contentViewSource,
@@ -367,9 +371,15 @@ private func sourceSection(
     startingAt startMarker: String,
     endingBefore endMarker: String
 ) throws -> String {
-    let start = try #require(source.range(of: startMarker))
+    let startRange = source.range(of: startMarker)
+    let hasStart = startRange != nil
+    try #require(hasStart, "The expected presentation section starts at \(startMarker)")
+    let start = startRange!
     let trailing = source[start.lowerBound...]
-    let end = try #require(trailing.range(of: endMarker))
+    let endRange = trailing.range(of: endMarker)
+    let hasEnd = endRange != nil
+    try #require(hasEnd, "The expected presentation section ends before \(endMarker)")
+    let end = endRange!
     return String(trailing[..<end.lowerBound])
 }
 

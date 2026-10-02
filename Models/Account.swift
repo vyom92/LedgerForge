@@ -37,6 +37,27 @@ enum AccountStatus: String, Codable {
     case closed
 }
 
+/// One presentation rule for the owner's default account scope. An explicit
+/// account selection can include history; an unknown account is never hidden
+/// merely because it has no current metadata. This does not affect import identity.
+nonisolated struct AccountPresentationScope: Equatable, Sendable {
+    let selectedAccountIDs: Set<String>
+    let historyOnlyAccountIDs: Set<String>
+    var excludesAllAccounts = false
+
+    func includes(_ accountID: String?) -> Bool {
+        guard !excludesAllAccounts else { return false }
+        if !selectedAccountIDs.isEmpty {
+            return accountID.map(selectedAccountIDs.contains) == true
+        }
+        return accountID.map { !historyOnlyAccountIDs.contains($0) } ?? true
+    }
+
+    static func historyOnlyIDs(in accounts: [Account]) -> Set<String> {
+        Set(accounts.filter(\.isHistoryOnly).compactMap(\.repositoryAccountId))
+    }
+}
+
 struct Account: Identifiable, Codable {
 
     let id: UUID
@@ -81,8 +102,8 @@ struct Account: Identifiable, Codable {
     var exchangeRateToBaseCurrency: Decimal?
 
     var status: AccountStatus
-    /// Owner-confirmed closed and settled; financial records remain historical.
-    var isHistoryOnly: Bool { type == .creditCard && status == .closed }
+    /// Owner-confirmed history-only account; original balances and records remain.
+    nonisolated var isHistoryOnly: Bool { status == .closed }
 
     var lastImport: Date?
     var identitySummaries: [AccountIdentitySummary]
@@ -96,18 +117,17 @@ struct Account: Identifiable, Codable {
     nonisolated var institutionDisplayName: String { AccountDisplayText.shortened(institution) }
 
     nonisolated var preferredDisplayName: String {
-        if let nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return AccountDisplayText.shortened(nickname) }
-        let identifierCharacters = CharacterSet(charactersIn: "0123456789Xx* -")
-        if !name.isEmpty, name.unicodeScalars.allSatisfy(identifierCharacters.contains) {
-            return AccountDisplayText.shortened(sourceProductName ?? institution + " account")
-        }
-        return AccountDisplayText.shortened(name)
+        if let nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nickname }
+        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
+        return AccountDisplayText.shortened(sourceProductName ?? institution + " account")
     }
 
-    nonisolated var selectionTitle: String {
-        let identity = sourceAccountLabel ?? identitySummaries.first?.redactedValue
-        return ([preferredDisplayName, identity, nativeCurrency.code].compactMap { $0 }).joined(separator: " · ")
+    nonisolated var selectionContext: String {
+        let identity = sourceAccountNumberLabel ?? identitySummaries.first?.redactedValue ?? sourceAccountLabel
+        return ([identity, nativeCurrency.code, isHistoryOnly ? "History only" : nil].compactMap { $0 }).joined(separator: " · ")
     }
+
+    nonisolated var selectionTitle: String { preferredDisplayName + " · " + selectionContext }
 
     init(
         id: UUID = UUID(),

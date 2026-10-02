@@ -1,6 +1,10 @@
 import SwiftUI
 import AppKit
 
+func investmentDisplayTitle(_ sourceName: String) -> String {
+    sourceName.replacingOccurrences(of: #"\s*\(non[-\s]+demat\)\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
+}
+
 struct InvestmentListView: View {
     @Environment(\.lfTheme) private var theme
     @Environment(\.appearsActive) private var appearsActive
@@ -9,7 +13,10 @@ struct InvestmentListView: View {
     let availabilityState: ApplicationDataState
     let importStatement: () -> Void
     @State private var selection: String?
-    @State private var showsDetails = false
+    @State private var showsCustomizedTable = false
+    @State private var fundSelections: [String: String] = [:]
+    @State private var sortOrder: [InvestmentHoldingSort] = []
+    @FocusState private var focusedHolding: String?
     @AppStorage("investments.table.columns") private var columnCustomization = TableColumnCustomization<InvestmentHolding>()
     @FocusState private var tableFocused: Bool
     @State private var widths: [String: CGFloat] = [:]
@@ -17,7 +24,7 @@ struct InvestmentListView: View {
     @State private var showsHoldingsTable = false
 
     private var rows: [InvestmentHolding] {
-        prices.rows
+        sortOrder.isEmpty ? prices.rows : prices.rows.sorted(using: sortOrder)
     }
     private var selected: InvestmentHolding? { store.snapshot.holdings.first { $0.id == selection } }
     private func portfolio(_ holding: InvestmentHolding) -> String {
@@ -25,11 +32,26 @@ struct InvestmentListView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            HStack {
-                Text("\(store.snapshot.holdings.count) current holdings")
-                    .font(theme.typography.formBody).foregroundStyle(theme.palette.secondaryText)
-                Spacer()
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                    Text("Investments").font(theme.typography.pageTitle)
+                    Text(selectedPortfolio.map { "\($0.group.rawValue) holdings · \($0.scope.holdingCount) positions" }
+                     ?? "\(store.snapshot.holdings.count) current holdings · \(showsHoldingsTable ? "All holdings" : "Portfolio overview")")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                }
+                Spacer(minLength: theme.spacing.small)
+                if showsHoldingsTable && selectedPortfolio == nil {
+                    Button(showsCustomizedTable ? "Compact rows" : "Table columns", systemImage: "tablecells") {
+                        showsCustomizedTable.toggle()
+                    }.lfSecondaryAction()
+                        .help("Open the table with your saved columns")
+                }
+                Button(showsHoldingsTable || selectedPortfolio != nil ? "Collapse holdings" : "Expand holdings",
+                       systemImage: showsHoldingsTable || selectedPortfolio != nil ? "chevron.up" : "list.bullet") {
+                    if selectedPortfolio != nil || showsHoldingsTable { selectedPortfolio = nil; showsHoldingsTable = false }
+                    else { showsHoldingsTable = true }
+                }.lfSecondaryAction()
             }
             if availabilityState == .loading {
                 ProgressView("Loading holdings…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -39,24 +61,33 @@ struct InvestmentListView: View {
             } else if store.snapshot.holdings.isEmpty {
                 LFEmptyState(title: "No current holdings",
                     message: "Import an investment statement to add its closing positions.", systemImage: "chart.pie")
-            } else {
-                ZStack(alignment: .bottom) {
-                    ScrollView {
-                        InvestmentOverviewView(overview: prices.overview) { portfolio in
-                            showsHoldingsTable = false
-                            selectedPortfolio = portfolio
+            } else if let selectedPortfolio {
+                InvestmentPortfolioDetailView(
+                    portfolio: prices.overview.portfolios.first { $0.id == selectedPortfolio.id } ?? selectedPortfolio,
+                    overview: prices.overview, holdings: store.snapshot.holdings,
+                    containers: store.snapshot.containers, portfolioNames: prices.portfolioNames,
+                    valuations: prices.valuations,
+                    selection: Binding(get: { fundSelections[selectedPortfolio.id] },
+                                       set: { fundSelections[selectedPortfolio.id] = $0 }))
+            } else if showsHoldingsTable {
+                if showsCustomizedTable {
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        HStack {
+                            Text("Drag column headings to reorder; use the heading menu to show columns.")
+                                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            Spacer()
+                            if selected != nil {
+                                Button("Show selected holding details") { showsCustomizedTable = false }.buttonStyle(.link)
+                            }
                         }
-                        .padding(.bottom, showsHoldingsTable || selectedPortfolio != nil ? 0 : holdingsBarHeight)
+                        table
                     }
-                    .disabled(showsHoldingsTable || selectedPortfolio != nil)
-                    .accessibilityHidden(showsHoldingsTable || selectedPortfolio != nil)
-
-                    if let selectedPortfolio {
-                        portfolioOverlay(prices.overview.portfolios.first { $0.id == selectedPortfolio.id } ?? selectedPortfolio)
-                    } else if showsHoldingsTable {
-                        holdingsOverlay
-                    } else {
-                        holdingsBar
+                } else { compactHoldings }
+            } else {
+                GeometryReader { viewport in
+                    ScrollView {
+                        InvestmentOverviewView(overview: prices.overview, availableWidth: viewport.size.width - theme.spacing.micro) { selectedPortfolio = $0 }
+                            .padding(.trailing, theme.spacing.micro)
                     }
                 }
             }
@@ -64,218 +95,154 @@ struct InvestmentListView: View {
         .padding(theme.spacing.pagePadding)
         .foregroundStyle(theme.palette.primaryText)
         .onChange(of: store.generation) { _, _ in
-            selection = nil; showsDetails = false; selectedPortfolio = nil; showsHoldingsTable = false
+            selection = nil; selectedPortfolio = nil; showsHoldingsTable = false; fundSelections = [:]
         }
-        .onChange(of: store.snapshot) { _, _ in if selected == nil { selection = nil; showsDetails = false } }
+        .onChange(of: store.snapshot) { _, _ in if selected == nil { selection = nil } }
         .onAppear { measurePresentation() }
         .onChange(of: prices.revision) { _, _ in
             measurePresentation()
+            sortOrder = sortOrder.map { comparator($0.field, order: $0.order) }
             if let selectedPortfolio { self.selectedPortfolio = prices.overview.portfolios.first { $0.id == selectedPortfolio.id } }
         }
         .onChange(of: measurementFont) { _, _ in measurePresentation() }
         .onExitCommand {
-            guard !showsDetails else { return }
-            if selectedPortfolio != nil {
-                selectedPortfolio = nil
-            } else if showsHoldingsTable {
-                showsHoldingsTable = false
-            }
+            if selectedPortfolio != nil { selectedPortfolio = nil }
+            else if showsCustomizedTable { showsCustomizedTable = false }
+            else if selection != nil { selection = nil }
+            else { showsHoldingsTable = false }
         }
-        .sheet(isPresented: $showsDetails) {
-            if let holding = selected {
-                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                            Text(holding.displayName).font(theme.typography.formHeading)
-                            Text([portfolio(holding), instrumentCodes(holding) ?? "Identifier unavailable"].joined(separator: " · "))
-                                .font(theme.typography.caption)
-                                .foregroundStyle(theme.palette.secondaryText)
-                        }
-                        Spacer()
-                        Button("Done") { showsDetails = false }.keyboardShortcut(.defaultAction)
-                    }
+    }
+
+    private var compactHoldings: some View {
+        GeometryReader { viewport in
+            let wide = viewport.size.width >= 1080
+            let showsDate = viewport.size.width >= 850
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                Text("Values in each investment’s currency")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                            Text("Position").font(theme.typography.rowTitle)
-                            detailLine("Units", holding.units.sourceText)
-                            detailLine("Currency", holding.currency)
-                            detailLine(holding.sourceDateLabel, InvestmentPriceDates.display(holding.holdingsDate))
-
-                            if let valuation = prices.valuations[holding.id] {
-                                Divider().overlay(theme.palette.divider)
-                                Text("Current valuation").font(theme.typography.rowTitle)
-                                if let quote = valuation.quote {
-                                    detailLine("NAV / price", quote.price.sourceText + " " + quote.mapping.currency)
-                                    detailLine("Price date", InvestmentPriceDates.display(quote.valuationDay))
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: theme.spacing.sectionGap) {
+                                sortHeading("Investment", field: .investment).frame(maxWidth: .infinity, alignment: .leading)
+                                if wide { sortHeading("Portfolio", field: .portfolio).frame(width: 175, alignment: .leading) }
+                                sortHeading("Units", field: .units).frame(width: compactUnitsWidth, alignment: .trailing)
+                                if showsDate { sortHeading("NAV / price date", field: .date).frame(width: 150, alignment: .leading) }
+                                sortHeading("Current value", field: .value).frame(width: compactValueWidth, alignment: .trailing)
+                            }.padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.controlGap)
+                            Divider()
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(rows) { holding in
+                                    compactHoldingRow(holding, wide: wide, showsDate: showsDate)
+                                        .id(holding.id)
+                                        .onKeyPress(.downArrow) { moveHolding(from: holding.id, by: 1, proxy: proxy); return .handled }
+                                        .onKeyPress(.upArrow) { moveHolding(from: holding.id, by: -1, proxy: proxy); return .handled }
+                                    if selection == holding.id {
+                                        InvestmentHoldingInlineDetails(holding: holding,
+                                            valuation: prices.valuations[holding.id],
+                                            container: store.snapshot.containers.first { $0.id == holding.containerID },
+                                            portfolioName: portfolio(holding))
+                                            .padding(theme.spacing.controlGap).lfSurface(.subtle)
+                                            .padding(.horizontal, theme.spacing.small)
+                                            .padding(.bottom, theme.spacing.controlGap)
+                                    }
+                                    Divider()
                                 }
-                                if let value = valuation.currentValue { detailLine("Current value", InvestmentArithmetic.displayedMoney(value, currency: holding.currency)) }
-                                if let basis = valuation.costBasis, let cost = valuation.supportedCost {
-                                    detailLine(basis.rawValue, InvestmentArithmetic.displayedMoney(cost, currency: holding.currency))
-                                }
-                                if let gain = valuation.gain { detailLine("Gain / loss", InvestmentArithmetic.displayedMoney(gain, currency: holding.currency)) }
-                                detailLine("Return", valuation.simpleReturn?.display ?? "—")
-                                if let issue = valuation.issue { detailLine("Status", issue) }
                             }
-
-                            DisclosureGroup("Source and exact details") {
-                                VStack(alignment: .leading, spacing: theme.spacing.small) {
-                                    detailLine("ISIN / Ticker", instrumentCodes(holding) ?? "Not in statement")
-                                    detailLine(holding.averageCostLabel ?? "Average cost", cost(holding.averageCost, holding))
-                                    detailLine("Source total cost", cost(holding.totalCost, holding))
-                                    if let valuation = prices.valuations[holding.id] {
-                                        if let value = valuation.currentValue { detailLine("Exact current value", InvestmentArithmetic.text(value) + " " + holding.currency) }
-                                        if let cost = valuation.supportedCost { detailLine("Exact supported cost", InvestmentArithmetic.text(cost) + " " + holding.currency) }
-                                        if let gain = valuation.gain { detailLine("Exact gain / loss", InvestmentArithmetic.text(gain) + " " + holding.currency) }
-                                    }
-                                    detailLine("Instrument", holding.instrumentIdentity)
-                                    detailLine("Source aliases", holding.sourceAliases.joined(separator: " · "))
-                                    detailLine("Source", holding.parserProfile)
-                                    if let importID = holding.importSessionID { detailLine("Import", importID) }
-                                    if let date = holding.issueDate { detailLine("Issued", date) }
-                                    if holding.zioObservationID == nil, let date = holding.valuationDate { detailLine("Statement valuation date", date) }
-                                    if let policy = store.snapshot.containers.first(where: { $0.id == holding.containerID })?.zioSource,
-                                       let fund = policy.funds.first(where: { $0.code == holding.zioFundCode }) {
-                                        detailLine("Source", "Zurich ZIO account")
-                                        detailLine("Portal valuation date", policy.valuationDateText)
-                                        detailLine("Holdings fetched", AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
-                                        detailLine("Source fund code", fund.code)
-                                        detailLine("Portal unit price (exact)", fund.price.sourceText + " " + fund.currency)
-                                        detailLine("Portal value (exact)", fund.value.sourceText + " " + fund.currency)
-                                        detailLine("Portal allocation (exact)", fund.allocation.sourceText + "%")
-                                        detailLine("Portal FX rate (exact)", fund.fxRate.sourceText)
-                                        if let vested = fund.vestedValue { detailLine("Portal vested value (exact)", vested.sourceText + " " + fund.currency) }
-                                        Text("The portal supplies a valuation date, but no separate units-as-of date. Current value above uses the public FE price.")
-                                            .foregroundStyle(theme.palette.secondaryText)
-                                    }
-                                    if let mapping = holding.priceMapping {
-                                        detailLine("Price provider", InvestmentPriceRegistry.providerNames[mapping.provider] ?? mapping.provider)
-                                        detailLine("Provider lookup", mapping.code)
-                                        detailLine("Public instrument", mapping.instrumentReference ?? "Unavailable")
-                                        detailLine("Mapping evidence", mapping.evidence ?? "Unavailable")
-                                    }
-                                    if let quote = prices.valuations[holding.id]?.quote {
-                                        detailLine("Price kind", quote.mapping.priceKind ?? "Unavailable")
-                                        detailLine("Date basis", quote.dateBasis.label)
-                                        if let text = quote.valuationText { detailLine("Provider date / time", text) }
-                                        detailLine("Fetched successfully", AppDateDisplay.timestamp(quote.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
-                                        detailLine("Source qualification", quote.qualification)
-                                    }
-                                }
-                                .padding(.top, theme.spacing.small)
-                            }
-                            .font(theme.typography.caption)
-                        }.textSelection(.enabled)
+                        }.padding(theme.spacing.small)
                     }
+                    .lfSurface()
+                    .onAppear { if let selection { proxy.scrollTo(selection, anchor: .center) } }
                 }
-                .padding(theme.spacing.panelPadding).frame(width: 560, height: 620)
-                .background(theme.palette.inspectorSurface)
             }
         }
     }
 
-    private var holdingsBarHeight: CGFloat {
-        theme.typography.compactControlMinimum + theme.spacing.panelPadding * 2
+    private var compactUnitsWidth: CGFloat {
+        max(100, investmentColumnWidth(rows.map { $0.units.sourceText }, role: .body))
+    }
+    private var compactValueWidth: CGFloat {
+        max(150, investmentColumnWidth(Array(prices.valueText.values), role: .body))
+    }
+    private func investmentColumnWidth(_ values: [String], role: LFFontRole) -> CGFloat {
+        let font = theme.typography.nativeFont(role, tabularDigits: true)
+        return ceil(values.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0) + 8
     }
 
-    private var holdingsBar: some View {
+    private func compactHoldingRow(_ holding: InvestmentHolding, wide: Bool, showsDate: Bool) -> some View {
         Button {
-            selectedPortfolio = nil
-            showsHoldingsTable = true
+            selection = selection == holding.id ? nil : holding.id
+            focusedHolding = holding.id
         } label: {
-            HStack(spacing: theme.spacing.controlGap) {
-                Label("Expand holdings", systemImage: "tablecells")
-                    .font(theme.typography.rowTitle)
-                Spacer()
-                Text("\(rows.count) current holdings")
-                    .font(theme.typography.secondary)
-                    .foregroundStyle(theme.palette.secondaryText)
-                Image(systemName: "chevron.up")
-                    .font(theme.typography.secondary)
-                    .foregroundStyle(theme.palette.secondaryText)
+            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.sectionGap) {
+                HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
+                    Image(systemName: selection == holding.id ? "chevron.down" : "chevron.right")
+                        .font(theme.typography.caption).frame(width: 14).foregroundStyle(theme.palette.secondaryText)
+                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                        Text(instrumentName(holding)).font(theme.typography.body.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(wide ? (instrumentCodes(holding) ?? holding.currency) : portfolio(holding))
+                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                if wide {
+                    Text(portfolio(holding)).font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText).frame(width: 175, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(holding.units.sourceText).font(theme.typography.body).monospacedDigit()
+                    .fixedSize().frame(width: compactUnitsWidth, alignment: .trailing)
+                if showsDate {
+                    Text(prices.valuations[holding.id]?.quote.map { InvestmentPriceDates.display($0.valuationDay) } ?? "Unavailable")
+                        .font(theme.typography.secondary).monospacedDigit()
+                        .foregroundStyle(prices.valuations[holding.id]?.quote.map { ageColor($0.freshnessAge(at: .now)) } ?? theme.palette.secondaryText)
+                        .frame(width: 150, alignment: .leading)
+                }
+                Text(prices.valueText[holding.id] ?? "Unavailable").font(theme.typography.body).monospacedDigit()
+                    .fixedSize().frame(width: compactValueWidth, alignment: .trailing)
             }
-            .padding(theme.spacing.panelPadding)
+            .padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.sectionGap)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .lfSurface(.subtle)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, theme.spacing.micro)
-        .padding(.bottom, theme.spacing.micro)
-        .accessibilityHint("Shows the detailed holdings table over the investment overview")
+            .background(selection == holding.id ? theme.palette.dataSelection : Color.clear,
+                        in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay(alignment: .leading) {
+                if selection == holding.id { RoundedRectangle(cornerRadius: 2).fill(theme.interaction.focusRing).frame(width: 3).padding(.vertical, 8) }
+            }
+            .contentShape(Rectangle())
+        }.buttonStyle(LFPlainActionStyle()).focusable().focused($focusedHolding, equals: holding.id)
+            .accessibilityLabel(instrumentName(holding) + ", " + portfolio(holding) + ", " + holding.units.sourceText + " units, " + (prices.valueText[holding.id] ?? "Value unavailable"))
+            .accessibilityValue(selection == holding.id ? "Expanded" : "Collapsed")
+            .accessibilityIdentifier("investments.holding." + holding.id)
     }
 
-    private func portfolioOverlay(_ portfolio: InvestmentPortfolioSummary) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap) {
-                VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                    Text("\(portfolio.group.rawValue) holdings").font(theme.typography.formHeading)
-                    Text("Fund-level current positions")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
+    private func moveHolding(from id: String, by step: Int, proxy: ScrollViewProxy) {
+        guard let index = rows.firstIndex(where: { $0.id == id }), rows.indices.contains(index + step) else { return }
+        let next = rows[index + step].id
+        selection = next; focusedHolding = next
+        proxy.scrollTo(next, anchor: .center)
+    }
+
+    private func sortHeading(_ title: String, field: InvestmentHoldingSort.Field) -> some View {
+        Button {
+            let order: SortOrder = sortOrder.first?.field == field && sortOrder.first?.order == .forward ? .reverse : .forward
+            sortOrder = [comparator(field, order: order)]
+        } label: {
+            HStack(spacing: theme.spacing.micro) {
+                Text(title)
+                if sortOrder.first?.field == field {
+                    Image(systemName: sortOrder.first?.order == .forward ? "chevron.up" : "chevron.down").font(theme.typography.caption)
                 }
-                Spacer()
-                Button("Collapse", systemImage: "chevron.down") { selectedPortfolio = nil }
-                    .lfSecondaryAction()
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityHint("Returns to the investment overview")
             }
-            Divider().overlay(theme.palette.divider)
-            InvestmentPortfolioDetailView(
-                portfolio: portfolio,
-                holdings: store.snapshot.holdings,
-                containers: store.snapshot.containers,
-                portfolioNames: prices.portfolioNames
-            )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(theme.spacing.panelPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .lfSurface(.inspector)
-        .padding(theme.spacing.micro)
-        .accessibilityElement(children: .contain)
+        }.buttonStyle(.plain).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            .accessibilityLabel("Sort by " + title)
     }
 
-    private var holdingsOverlay: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap) {
-                VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                    Text("Holdings").font(theme.typography.formHeading)
-                    Text("Detailed current positions")
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.secondaryText)
-                }
-                Spacer()
-                Button("Collapse", systemImage: "chevron.down") { showsHoldingsTable = false }
-                    .lfSecondaryAction()
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityHint("Returns to the investment overview")
-            }
-            Divider().overlay(theme.palette.divider)
-            table.frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(theme.spacing.panelPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .lfSurface(.inspector)
-        .padding(theme.spacing.micro)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func cost(_ number: InvestmentDecimal?, _ holding: InvestmentHolding) -> String {
-        guard let number else { return "Unavailable" }
-        return number.sourceText + (holding.costCurrency == holding.currency ? "" : " " + (holding.costCurrency ?? ""))
-    }
-
-    private func detailLine(_ title: String, _ value: String) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.small) {
-                Text(title).foregroundStyle(theme.palette.secondaryText)
-                Text(value).fixedSize(horizontal: true, vertical: false)
-            }
-            VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                Text(title).foregroundStyle(theme.palette.secondaryText)
-                Text(value).fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .font(theme.typography.secondary)
+    private func comparator(_ field: InvestmentHoldingSort.Field, order: SortOrder = .forward) -> InvestmentHoldingSort {
+        InvestmentHoldingSort(field: field, order: order, facts: Dictionary(uniqueKeysWithValues: prices.rows.map { holding in
+            (holding.id, .init(name: instrumentName(holding), portfolio: portfolio(holding), date: prices.valuations[holding.id]?.quote?.valuationDay,
+                               value: prices.valuations[holding.id]?.currentValue))
+        }))
     }
 
     private func totalCost(_ holding: InvestmentHolding) -> String {
@@ -283,7 +250,7 @@ struct InvestmentListView: View {
     }
 
     private func averageCost(_ holding: InvestmentHolding) -> String {
-        InvestmentArithmetic.displayedMoney(holding.averageCost?.value, currency: holding.costCurrency ?? holding.currency)
+        holding.averageCost.map { MoneyFormatting.unitPrice($0.sourceText, currency: holding.costCurrency ?? holding.currency) } ?? "Unavailable"
     }
 
     private func numericWidth(_ values: [String], heading: String) -> CGFloat {
@@ -310,8 +277,8 @@ struct InvestmentListView: View {
 
     private func instrumentName(_ holding: InvestmentHolding) -> String {
         guard let symbol = holding.sourceAliases.first(where: { $0.hasPrefix("symbol:") }).map({ String($0.dropFirst(7)) }),
-              holding.displayName.hasPrefix(symbol + " · ") else { return holding.displayName }
-        return String(holding.displayName.dropFirst(symbol.count + 3))
+              holding.displayName.hasPrefix(symbol + " · ") else { return investmentDisplayTitle(holding.displayName) }
+        return investmentDisplayTitle(String(holding.displayName.dropFirst(symbol.count + 3)))
     }
 
     private func instrumentCodes(_ holding: InvestmentHolding) -> String? {
@@ -330,8 +297,8 @@ struct InvestmentListView: View {
     }
 
     private func holdingsTable(at now: Date) -> some View {
-        Table(rows, selection: $selection, columnCustomization: $columnCustomization) {
-            TableColumn("Investment") { holding in
+        Table(rows, selection: $selection, sortOrder: $sortOrder, columnCustomization: $columnCustomization) {
+            TableColumn("Investment", sortUsing: comparator(.investment)) { holding in
                 Text(instrumentName(holding)).lineLimit(2).help(instrumentName(holding))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, minHeight: theme.typography.tableRowMinimum)
@@ -350,11 +317,11 @@ struct InvestmentListView: View {
                     .foregroundStyle(theme.palette.secondaryText).lineLimit(2).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity).help(instrumentCodes(holding) ?? "No ISIN or ticker supplied by this statement")
             }.width(min: 185, ideal: 205).alignment(.center).customizationID("identifiers")
-            TableColumn("Portfolio/Folio") { holding in
+            TableColumn("Portfolio/Folio", sortUsing: comparator(.portfolio)) { holding in
                 Text(portfolio(holding)).lineLimit(2).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity).help(portfolio(holding))
             }.width(min: 190, ideal: 240).alignment(.center).customizationID("portfolio")
-            TableColumn("Units") { holding in numeric(holding.units.sourceText) }
+            TableColumn("Units", sortUsing: comparator(.units)) { holding in numeric(holding.units.sourceText) }
                 .width(min: widths["units"] ?? 100)
                 .alignment(.center).customizationID("units")
             TableColumn("Currency") { Text($0.currency).frame(maxWidth: .infinity) }
@@ -366,7 +333,7 @@ struct InvestmentListView: View {
                 .width(min: widths["totalCost"] ?? 100)
                 .alignment(.center).customizationID("totalCost")
             valuationColumns
-            TableColumn("NAV / Price date") { holding in valuationDate(prices.valuations[holding.id]?.quote, at: now) }
+            TableColumn("NAV / Price date", sortUsing: comparator(.date)) { holding in valuationDate(prices.valuations[holding.id]?.quote, at: now) }
                 .width(min: 145, ideal: 155)
                 .alignment(.center).customizationID("valuationDate")
         }
@@ -381,11 +348,11 @@ struct InvestmentListView: View {
         .clipShape(RoundedRectangle(cornerRadius: theme.radius.panel))
     }
 
-    @TableColumnBuilder<InvestmentHolding, Never>
-    private var valuationColumns: some TableColumnContent<InvestmentHolding, Never> {
+    @TableColumnBuilder<InvestmentHolding, InvestmentHoldingSort>
+    private var valuationColumns: some TableColumnContent<InvestmentHolding, InvestmentHoldingSort> {
             TableColumn("NAV / Price") { holding in numeric(prices.valuations[holding.id]?.quote?.price.sourceText ?? "Unavailable") }
                 .width(min: widths["price"] ?? 115).alignment(.center).customizationID("price")
-            TableColumn("Current value") { holding in numeric(prices.valueText[holding.id] ?? "Unavailable") }
+            TableColumn("Current value", sortUsing: comparator(.value)) { holding in numeric(prices.valueText[holding.id] ?? "Unavailable") }
                 .width(min: widths["value"] ?? 130).alignment(.center).customizationID("currentValue")
             TableColumn("Unrealised gain/loss") { holding in numeric(prices.gainText[holding.id] ?? "Unavailable") }
                 .width(min: widths["gain"] ?? 145).alignment(.center).customizationID("unrealisedGain")
@@ -415,18 +382,155 @@ struct InvestmentListView: View {
         }
     }
 
-    /// Compare civil dates without inventing a market timestamp or altering source evidence.
-    private func civilDay(_ date: StatementDate) -> Int {
-        let year = date.year - 1
-        let preceding = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-        let leap = date.year % 4 == 0 && (date.year % 100 != 0 || date.year % 400 == 0)
-        return 365 * year + year / 4 - year / 100 + year / 400
-            + preceding[date.month - 1] + (leap && date.month > 2 ? 1 : 0) + date.day
-    }
-
     /// Al Dar's visual scale, applied to printed calendar dates: green today,
     /// yellow at one day, gradually red by four days. No rate behavior changes.
     private func ageColor(_ days: Int) -> Color {
         FreshnessTint.color(position: WeekdayFreshness.colorPosition(days: Double(days)))
+    }
+}
+
+
+/// View-local ordering; values are read from the accepted presentation snapshot.
+/// Sorting native amounts groups by currency before comparing values.
+nonisolated private struct InvestmentHoldingSort: SortComparator {
+    enum Field: Hashable, Sendable { case investment, portfolio, units, date, value }
+    struct Fact: Hashable, Sendable { let name: String; let portfolio: String; let date: String?; let value: Decimal? }
+    var field: Field
+    var order: SortOrder = .forward
+    var facts: [String: Fact] = [:]
+
+    func compare(_ lhs: InvestmentHolding, _ rhs: InvestmentHolding) -> ComparisonResult {
+        let result: ComparisonResult
+        switch field {
+        case .investment: result = (facts[lhs.id]?.name ?? lhs.displayName).localizedStandardCompare(facts[rhs.id]?.name ?? rhs.displayName)
+        case .portfolio: result = (facts[lhs.id]?.portfolio ?? "").localizedStandardCompare(facts[rhs.id]?.portfolio ?? "")
+        case .units: result = ordered(lhs.units.value, rhs.units.value)
+        case .date:
+            if facts[lhs.id]?.date == nil || facts[rhs.id]?.date == nil {
+                return missing(facts[lhs.id]?.date, facts[rhs.id]?.date)
+            }
+            result = ordered(facts[lhs.id]!.date!, facts[rhs.id]!.date!)
+        case .value:
+            if facts[lhs.id]?.value == nil || facts[rhs.id]?.value == nil {
+                return missing(facts[lhs.id]?.value, facts[rhs.id]?.value)
+            }
+            result = lhs.currency == rhs.currency ? ordered(facts[lhs.id]!.value!, facts[rhs.id]!.value!)
+                : lhs.currency.localizedStandardCompare(rhs.currency)
+        }
+        return order == .forward ? result : result == .orderedAscending ? .orderedDescending : result == .orderedDescending ? .orderedAscending : .orderedSame
+    }
+    private func ordered<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {
+        a < b ? .orderedAscending : a > b ? .orderedDescending : .orderedSame
+    }
+    private func missing<T>(_ a: T?, _ b: T?) -> ComparisonResult {
+        a == nil ? (b == nil ? .orderedSame : .orderedDescending) : .orderedAscending
+    }
+}
+
+struct InvestmentHoldingInlineDetails: View {
+    @Environment(\.lfTheme) private var theme
+    let holding: InvestmentHolding
+    let valuation: InvestmentValuation?
+    let container: InvestmentContainer?
+    let portfolioName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            Text("Price & statement details").font(theme.typography.rowTitle)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 205), alignment: .topLeading)], alignment: .leading, spacing: theme.spacing.controlGap) {
+                tile("Identifier", instrumentCodes(holding) ?? "Not in statement")
+                tile("Portfolio / Folio", portfolioName)
+                tile(holding.averageCostLabel ?? "Average cost", cost(holding.averageCost, holding))
+                tile("Source total cost", cost(holding.totalCost, holding))
+                tile("Units", holding.units.sourceText)
+                tile("NAV / price", valuation?.quote.map { MoneyFormatting.unitPrice($0.price.sourceText, currency: $0.mapping.currency) } ?? "Unavailable")
+                tile("NAV / price date", valuation?.quote.map { InvestmentPriceDates.display($0.valuationDay) } ?? "Unavailable")
+                tile(holding.sourceDateLabel, InvestmentPriceDates.display(holding.holdingsDate))
+                tile("Current value", InvestmentArithmetic.displayedMoney(valuation?.currentValue, currency: holding.currency))
+                if let basis = valuation?.costBasis {
+                    tile(basis.rawValue, InvestmentArithmetic.displayedMoney(valuation?.supportedCost, currency: holding.currency))
+                }
+                tile("Gain / loss", InvestmentArithmetic.displayedMoney(valuation?.gain, currency: holding.currency))
+                tile("Return", valuation?.simpleReturn?.display ?? "Unavailable")
+            }
+            if let issue = valuation?.issue {
+                Text(issue).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    detailLine("Source fund name", holding.displayName)
+                    detailLine("ISIN / Ticker", instrumentCodes(holding) ?? "Not in statement")
+                    detailLine(holding.averageCostLabel ?? "Average cost", cost(holding.averageCost, holding))
+                    detailLine("Source total cost", cost(holding.totalCost, holding))
+                    if let valuation = valuation {
+                        if let value = valuation.currentValue { detailLine("Exact current value", InvestmentArithmetic.text(value) + " " + holding.currency) }
+                        if let cost = valuation.supportedCost { detailLine("Exact supported cost", InvestmentArithmetic.text(cost) + " " + holding.currency) }
+                        if let gain = valuation.gain { detailLine("Exact gain / loss", InvestmentArithmetic.text(gain) + " " + holding.currency) }
+                    }
+                    detailLine("Instrument", holding.instrumentIdentity)
+                    detailLine("Source aliases", holding.sourceAliases.joined(separator: " · "))
+                    detailLine("Source", holding.parserProfile)
+                    if let importID = holding.importSessionID { detailLine("Import", importID) }
+                    if let date = holding.issueDate { detailLine("Issued", date) }
+                    if holding.zioObservationID == nil, let date = holding.valuationDate { detailLine("Statement valuation date", date) }
+                    if let policy = container?.zioSource,
+                       let fund = policy.funds.first(where: { $0.code == holding.zioFundCode }) {
+                        detailLine("Source", "Zurich ZIO account")
+                        detailLine("Portal valuation date", policy.valuationDateText)
+                        detailLine("Holdings fetched", AppDateDisplay.timestamp(policy.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
+                        detailLine("Source fund code", fund.code)
+                        detailLine("Portal unit price (exact)", fund.price.sourceText + " " + fund.currency)
+                        detailLine("Portal value (exact)", fund.value.sourceText + " " + fund.currency)
+                        detailLine("Portal allocation (exact)", fund.allocation.sourceText + "%")
+                        detailLine("Portal FX rate (exact)", fund.fxRate.sourceText)
+                        if let vested = fund.vestedValue { detailLine("Portal vested value (exact)", vested.sourceText + " " + fund.currency) }
+                        Text("The portal supplies a valuation date, but no separate units-as-of date. Current value above uses the public FE price.")
+                            .foregroundStyle(theme.palette.secondaryText)
+                    }
+                    if let mapping = valuation?.quote?.mapping ?? holding.priceMapping {
+                        detailLine("Price provider", InvestmentPriceRegistry.providerNames[mapping.provider] ?? mapping.provider)
+                        detailLine("Provider lookup", mapping.code)
+                        detailLine("Public instrument", mapping.instrumentReference ?? "Unavailable")
+                        detailLine("Mapping evidence", mapping.evidence ?? "Unavailable")
+                    }
+                    if let quote = valuation?.quote {
+                        detailLine("Price kind", quote.mapping.priceKind ?? "Unavailable")
+                        detailLine("Date basis", quote.dateBasis.label)
+                        if let text = quote.valuationText { detailLine("Provider date / time", text) }
+                        detailLine("Fetched successfully", AppDateDisplay.timestamp(quote.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
+                        detailLine("Source qualification", quote.qualification)
+                    }
+                }.padding(.top, theme.spacing.small)
+            } label: {
+                Text("Source and exact details").textSelection(.disabled)
+            }
+                .font(theme.typography.secondary)
+                .accessibilityIdentifier("investments.sourceDetails.\(holding.id)")
+        }.textSelection(.enabled)
+    }
+
+    private func tile(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(title).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            Text(value).font(theme.typography.body).fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+    private func detailLine(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            Text(title).foregroundStyle(theme.palette.secondaryText)
+            Text(value).fixedSize(horizontal: false, vertical: true)
+        }.font(theme.typography.secondary)
+    }
+    private func cost(_ number: InvestmentDecimal?, _ holding: InvestmentHolding) -> String {
+        guard let number else { return "Unavailable" }
+        return MoneyFormatting.unitPrice(number.sourceText, currency: holding.costCurrency ?? holding.currency)
+    }
+    private func instrumentCodes(_ holding: InvestmentHolding) -> String? {
+        if let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding), mapping.provider == "fe" { return mapping.code }
+        let aliases = [holding.instrumentIdentity] + holding.sourceAliases
+        let isin = aliases.first(where: { $0.hasPrefix("isin:") }).map { String($0.dropFirst(5)) }
+        let symbol = aliases.first(where: { $0.hasPrefix("symbol:") }).map { String($0.dropFirst(7)) }
+        let codes = [isin, symbol].compactMap { $0 }
+        return codes.isEmpty ? nil : codes.joined(separator: " · ")
     }
 }

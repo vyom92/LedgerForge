@@ -42,6 +42,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         let cancelledOrNotProcessedCount: Int
         let reconciliationRequiredCount: Int
         let isComplete: Bool
+        var noUpdateNeededCount: Int = 0
     }
 
     struct Dependencies {
@@ -61,6 +62,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             _ accountChoice: ImportAccountChoice?,
             _ reviewedPartialPlan: ReviewedPartialImportPlanDTO?
         ) async -> ImportOutcomePresentation
+        let acknowledgeValidationFailure: @MainActor (_ preparation: Preparation) -> ImportOutcomePresentation
         let cancelPreparation: @MainActor (_ preparation: Preparation) -> Void
         let cancelPasswordChallenge: @MainActor (_ operationID: UUID?) -> Void
         let failureSummary: @MainActor (_ error: Error) -> ImportFailureSummary
@@ -72,6 +74,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             _ preparation: Preparation,
             _ review: ImportCentreReviewState
         ) -> Bool
+        var retainsNewerHoldingsWithoutImport: @MainActor (Preparation) -> Bool = { _ in false }
+        var requiredCardSectionIDs: @MainActor (Preparation) -> [String]? = { _ in nil }
     }
 
     struct Item: Identifiable {
@@ -109,6 +113,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         fileprivate(set) var preparationFailure: ImportFailureSummary? = nil
         fileprivate(set) var retrySourceURL: URL?
         fileprivate(set) var recoveryContext: ConfirmedImportRecoveryContext?
+        fileprivate(set) var retainedNewerHoldings = false
     }
 
     @Published private(set) var items: [Item] = []
@@ -192,12 +197,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 $0.completionDisposition == .rejected || $0.phase == .validationFailed
             }.count,
             failedPreparationCount: items.filter { $0.phase == .failed }.count,
-            skippedCount: items.filter { $0.phase == .skipped }.count,
+            skippedCount: items.filter { $0.phase == .skipped && !$0.retainedNewerHoldings }.count,
             cancelledOrNotProcessedCount: items.filter { $0.phase == .cancelled }.count,
             reconciliationRequiredCount: items.filter {
                 $0.completionDisposition == .reconciliationRequired
             }.count,
-            isComplete: hasTerminalOutcomesForEntireBatch && activeItemID == nil
+            isComplete: hasTerminalOutcomesForEntireBatch && activeItemID == nil,
+            noUpdateNeededCount: items.filter { $0.phase == .skipped && $0.retainedNewerHoldings }.count
         )
     }
 
@@ -505,7 +511,21 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     @discardableResult
     func continueAfterCurrent() -> Bool {
         guard let item = currentItem, permitsContinue else { return false }
-        if let preparation = item.preparation {
+        if item.phase == .validationFailed, let preparation = item.preparation {
+            // Continue acknowledges this terminal rejection. Preparation, Cancel
+            // and Skip remain write-free for validation failures.
+            var outcome = dependencies.acknowledgeValidationFailure(preparation)
+            outcome.fileName = item.displayFileName
+            outcome.message = outcome.importAttemptID == nil
+                ? "The statement failed validation. The failure could not be added to Import History. No financial data was saved."
+                : "The statement failed validation. The failure was added to Import History. No financial data was saved."
+            mutateItem(item.id) {
+                $0.phase = .completed
+                $0.preparation = nil
+                $0.outcome = outcome
+                $0.completionDisposition = .rejected
+            }
+        } else if let preparation = item.preparation {
             dependencies.cancelPreparation(preparation)
             mutateItem(item.id) { $0.preparation = nil }
         }
@@ -596,7 +616,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             }
             item.cardSectionDraftChoices[sectionID] = choice
             if Set(item.cardSectionDraftChoices.keys) == Set(requiredSectionIDs),
-               item.cardSectionDraftChoices.values.allSatisfy(\.isComplete) {
+               item.cardSectionDraftChoices.values.allSatisfy(\.isComplete),
+               ImportCardInstrumentChoice.hasDistinctExistingDestinations(item.cardSectionDraftChoices) {
                 item.accountChoice = .useExistingCardLiabilityAccountSections(
                     accountId: accountID,
                     sectionChoices: item.cardSectionDraftChoices
@@ -646,6 +667,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
               let preparation = item.preparation,
               expectedPreparationID == nil || preparation.id == expectedPreparationID,
               !automaticallyConfirmed || isAutomaticCommitEligible(item, preparation: preparation) else { return }
+
+        // Keep the source and review draft open if separate printed sections
+        // were assigned to the same recorded card, including direct callers.
+        guard ImportCardInstrumentChoice.hasDistinctExistingDestinations(item.cardSectionDraftChoices) else { return }
+        if case .useExistingCardLiabilityAccountSections(_, let choices) = item.accountChoice,
+           !ImportCardInstrumentChoice.hasDistinctExistingDestinations(choices) { return }
+        guard cardChoiceIsReady(item) else { return }
 
         let itemID = item.id
         let preparationID = preparation.id
@@ -821,6 +849,20 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         do {
             let preparation = try dependencies.refreshQueuedPreparation(original)
             let review = try dependencies.review(preparation)
+            if review.validationPassed, dependencies.retainsNewerHoldingsWithoutImport(preparation) {
+                // Release the verified source snapshot without invoking commit.
+                // No receipt, financial row or current holding is written.
+                dependencies.cancelPreparation(preparation)
+                mutateItem(itemID) {
+                    $0.preparation = nil
+                    $0.preparationOperationID = nil
+                    $0.validationPassed = true
+                    $0.retainedNewerHoldings = true
+                    $0.phase = .skipped
+                }
+                advanceToNextPending(after: itemID)
+                return
+            }
             mutateItem(itemID) {
                 $0.preparation = preparation
                 $0.preparationOperationID = nil
@@ -881,6 +923,17 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         )
     }
 
+    private func cardChoiceIsReady(_ item: Item) -> Bool {
+        if item.cardSectionDraftAccountID != nil && item.accountChoice == nil { return false }
+        guard case .cardChoiceRequired = item.identityReview else { return true }
+        // Completeness comes from the retained preparation, never from the
+        // submitted dictionary. A genuine zero-section preparation returns [].
+        let sectionIDs = item.preparation.flatMap { dependencies.requiredCardSectionIDs($0) }
+        return ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: item.identityReview, choice: item.accountChoice, requiredCardSectionIDs: sectionIDs
+        )
+    }
+
     private func isAutomaticCommitEligible(
         _ item: Item,
         preparation: Preparation
@@ -892,6 +945,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
               activeItemID == item.id,
               item.phase == .awaitingConfirmation,
               item.preparation?.id == preparation.id else { return false }
+        guard ImportCardInstrumentChoice.hasDistinctExistingDestinations(item.cardSectionDraftChoices) else { return false }
+        if case .useExistingCardLiabilityAccountSections(_, let choices) = item.accountChoice,
+           !ImportCardInstrumentChoice.hasDistinctExistingDestinations(choices) { return false }
+        guard cardChoiceIsReady(item) else { return false }
         return dependencies.isAutomaticallyCommittable(
             preparation,
             automaticReviewState(for: item)
@@ -1100,6 +1157,20 @@ enum ProductionImportCentre {
 }
 
 extension ImportCentreCoordinator where Preparation == PreparedImport {
+    static func isRetryablePreparationFailure(_ error: Error) -> Bool {
+        if let snapshotError = error as? SourceContentSnapshotError {
+            return snapshotError == .acquisitionFailed
+        }
+        guard let importError = error as? ImportError else { return false }
+        switch importError {
+        case .readerFailure, .unknown, .passwordRequired, .incorrectPassword:
+            return true
+        case .unsupportedFile, .readerUnavailable, .invalidDocument,
+                .unsupportedStatement, .cancelled:
+            return false
+        }
+    }
+
     func updateInvestmentChoices(_ choices: InvestmentImportChoices) {
         guard let item = currentItem, item.phase == .awaitingConfirmation,
               var preparation = item.preparation, preparation.investmentPlan != nil else { return }
@@ -1162,22 +1233,15 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                         )
                     )
                 },
+                acknowledgeValidationFailure: {
+                    ImportOutcomePresentation(result: engine.acknowledgeValidationFailure($0))
+                },
                 cancelPreparation: { engine.cancelPreparedImport($0) },
                 cancelPasswordChallenge: { operationID in
                     StatementPasswordChallengeController.shared.cancel(challengeID: operationID)
                 },
                 failureSummary: { ImportFailureSummary.from($0) },
-                isRetryablePreparationFailure: { error in
-                    guard let importError = error as? ImportError else { return false }
-                    switch importError {
-                    case .readerFailure, .unknown:
-                        return true
-                    case .unsupportedFile, .passwordRequired, .incorrectPassword,
-                            .readerUnavailable, .invalidDocument, .unsupportedStatement,
-                            .cancelled:
-                        return false
-                    }
-                },
+                isRetryablePreparationFailure: { isRetryablePreparationFailure($0) },
                 isAutomaticallyCommittable: { preparation, review in
                     guard review.validationPassed else { return false }
                     let isSalaryOrInvestment = preparation.financialDocument.salaryStatementEvidence != nil
@@ -1211,7 +1275,9 @@ extension ImportCentreCoordinator where Preparation == PreparedImport {
                             .ownershipConflict, .repositoryIntegrityConflict:
                         return false
                     }
-                }
+                },
+                retainsNewerHoldingsWithoutImport: { $0.retainsNewerHoldingsWithoutImport },
+                requiredCardSectionIDs: { $0.financialDocument.cardStatementEvidence?.instrumentSections.map(\.documentScopedSectionID) }
             )
         )
     }

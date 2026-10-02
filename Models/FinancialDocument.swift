@@ -75,12 +75,38 @@ nonisolated struct CBQSourceIdentityObservation: Equatable, Sendable {
     }
 }
 
+/// A literal printed control and its actual source location. A worksheet row
+/// or extracted text line is never relabelled as page geometry.
+nonisolated struct SourceStatementControl: Equatable, Sendable {
+    let kind: BankSectionControlKind
+    let label: String
+    let literal: String
+    let sourceOrdinal: Int
+    let sourceUnit: FinancialRegionSourceUnit
+    let sourcePage: Int?
+
+    init(kind: BankSectionControlKind, label: String, literal: String,
+         sourceOrdinal: Int, sourceUnit: FinancialRegionSourceUnit, sourcePage: Int? = nil) {
+        self.kind = kind; self.label = label; self.literal = literal
+        self.sourceOrdinal = sourceOrdinal; self.sourceUnit = sourceUnit; self.sourcePage = sourcePage
+    }
+}
+
 nonisolated struct SourceStatementEvidence: Equatable, Sendable {
     let sourceFormatCode: String
     let statementBoundaryDate: StatementDate?
     let period: DeclaredStatementPeriod?
     let openingBalance: Money?
     let closingBalance: Money?
+    let printedControls: [SourceStatementControl]
+
+    init(sourceFormatCode: String, statementBoundaryDate: StatementDate?,
+         period: DeclaredStatementPeriod?, openingBalance: Money?, closingBalance: Money?,
+         printedControls: [SourceStatementControl] = []) {
+        self.sourceFormatCode = sourceFormatCode; self.statementBoundaryDate = statementBoundaryDate
+        self.period = period; self.openingBalance = openingBalance; self.closingBalance = closingBalance
+        self.printedControls = printedControls
+    }
 }
 
 nonisolated enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
@@ -88,6 +114,7 @@ nonisolated enum CardSourceIdentityObservationKind: String, CaseIterable, Equata
     case instrumentCardAccountNumber = "amex_card_account_number"
     case cbqLiabilityAccountReference = "cbq_card_account_reference"
     case cbqInstrumentMaskedCardNumber = "cbq_masked_card_number"
+    case axisPrimaryMaskedCardNumber = "axis_primary_masked_card_number"
 }
 
 nonisolated enum CardSourceIdentitySubject: String, CaseIterable, Equatable, Sendable, Codable {
@@ -120,6 +147,9 @@ nonisolated struct CardSourceIdentityObservation: Equatable, Sendable {
             expectedSubject = .instrument
             isValidValue = trimmed.range(of: #"^[0-9X]+$"#, options: .regularExpression) != nil &&
                 trimmed.contains("X") && trimmed.contains(where: \.isNumber)
+        case .axisPrimaryMaskedCardNumber:
+            expectedSubject = .liabilityAccount
+            isValidValue = trimmed.range(of: #"^[0-9]{6}X{6}[0-9]{4}$"#, options: .regularExpression) != nil
         }
         guard subject == expectedSubject, !trimmed.isEmpty, isValidValue else {
             throw CardStatementEvidenceError.malformedIdentityObservation

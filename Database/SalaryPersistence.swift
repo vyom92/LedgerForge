@@ -209,9 +209,30 @@ public struct FundingPlanDTO: nonisolated Equatable, Sendable {
     public var assistance: PlanAssistance? = nil
 }
 
+public struct MonthlyPlanScratchpadDTO: nonisolated Equatable, Sendable {
+    public let workspaceID: String
+    public let month: String
+    public let stateJSON: String
+}
+
 public protocol FundingPlanRepository {
     func plans(workspaceId: String) throws -> [FundingPlanDTO]
     @discardableResult func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO]
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws
+    func removeScratchpad(workspaceId: String, month: String) throws
+    @discardableResult func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO
+}
+
+public extension FundingPlanRepository {
+    // Historical read-only providers can hydrate existing plans. Mutations
+    // never silently discard editor state when V30 is unavailable.
+    func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] { [] }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws { throw RepositoryError.persistenceUnavailable }
+    func removeScratchpad(workspaceId: String, month: String) throws { throw RepositoryError.persistenceUnavailable }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
+        throw RepositoryError.persistenceUnavailable
+    }
 }
 
 nonisolated enum SalaryPersistenceDTOValidator {
@@ -566,6 +587,7 @@ public struct PlaceholderSalaryRepo: SalaryRepository {
 
 public struct PlaceholderFundingPlanRepo: FundingPlanRepository {
     public init() {}
+    public func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] { throw RepositoryError.persistenceUnavailable }
     public func plans(workspaceId: String) throws -> [FundingPlanDTO] { throw RepositoryError.persistenceUnavailable }
     public func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO { throw RepositoryError.persistenceUnavailable }
 }

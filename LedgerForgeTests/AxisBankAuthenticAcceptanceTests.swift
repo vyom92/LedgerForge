@@ -46,10 +46,12 @@ struct AxisBankAuthenticAcceptanceTests {
         let closingBalance: String
         let debitTotal: String
         let creditTotal: String
+        var printedLiterals: [String: String] = [:]
     }
 
     private struct Row: Decodable {
         let sourceOrder: Int
+        let correspondenceOrder: Int
         let sourceOrdinal: Int
         let sourcePage: Int?
         let date: String
@@ -62,12 +64,6 @@ struct AxisBankAuthenticAcceptanceTests {
         let upiReference: String?
         let upiReferenceSha256: String?
         let upiSubtype: String?
-    }
-
-    private struct PreparedCarrier {
-        let oracle: Carrier
-        let financialDocument: FinancialDocument
-        let semanticProjection: [String]
     }
 
     private struct Runtime {
@@ -109,7 +105,6 @@ struct AxisBankAuthenticAcceptanceTests {
         let provider = DatabaseProvider(inMemory: true)
         let workspaceID = "axis-bank-authentic-parse-\(UUID().uuidString.lowercased())"
         let engine = makeEngine(provider: provider, workspaceID: workspaceID)
-        var preparedCarriers: [PreparedCarrier] = []
 
         for carrier in oracle.carriers {
             let label = privacySafeLabel(carrier)
@@ -125,20 +120,14 @@ struct AxisBankAuthenticAcceptanceTests {
             expectSourceFact(prepared.financialDocument.metadata.fileFormat.rawValue.lowercased() == carrier.format, "\(label): format")
             expectSourceFact(prepared.validation.passed, "\(label): validation")
             try verify(prepared: prepared, against: carrier)
-            preparedCarriers.append(
-                PreparedCarrier(
-                    oracle: carrier,
-                    financialDocument: prepared.financialDocument,
-                    semanticProjection: semanticProjection(prepared.financialDocument)
-                )
-            )
         }
 
-        for group in Dictionary(grouping: preparedCarriers, by: { $0.oracle.logicalStatementId }).values {
+        // loadOracle establishes a unique source-row correspondence directly
+        // from the originals. Every parser is then checked against its own
+        // original's literal balances, narration and physical ordering above.
+        for group in Dictionary(grouping: oracle.carriers, by: \.logicalStatementId).values {
             expectSourceFact(group.count == 3)
-            expectSourceFact(Set(group.map { $0.oracle.format }) == Set(["csv", "pdf", "xls"]))
-            expectSourceFact(Set(group.map(\.semanticProjection)).count == 1,
-                    "\(group.first.map { privacySafeLabel($0.oracle) } ?? "statement"): cross-format financial projection")
+            expectSourceFact(Set(group.map(\.format)) == Set(["csv", "pdf", "xls"]))
         }
 
         expectSourceFact(try provider.accountRepo.accounts(workspaceId: workspaceID).isEmpty)
@@ -146,6 +135,7 @@ struct AxisBankAuthenticAcceptanceTests {
         expectSourceFact(try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspaceID).isEmpty)
         expectSourceFact(try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceID).isEmpty)
         expectSourceFact(try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID).isEmpty)
+        expectSourceFact(try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID).sections.isEmpty)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -158,18 +148,22 @@ struct AxisBankAuthenticAcceptanceTests {
         expectSourceFact(sources.count == 9)
 
         for inMemory in [true, false] {
-            try await runAuthenticPersistenceCampaign(
-                oracle: oracle,
-                sources: sources,
-                inMemory: inMemory
-            )
+            for reverseSourceOrder in [false, true] {
+                try await runAuthenticPersistenceCampaign(
+                    oracle: oracle,
+                    sources: sources,
+                    inMemory: inMemory,
+                    reverseSourceOrder: reverseSourceOrder
+                )
+            }
         }
     }
 
     private func runAuthenticPersistenceCampaign(
         oracle: Oracle,
         sources: [String: URL],
-        inMemory: Bool
+        inMemory: Bool,
+        reverseSourceOrder: Bool
     ) async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("LedgerForge-Axis-Bank-Authentic-\(UUID().uuidString)")
@@ -184,7 +178,9 @@ struct AxisBankAuthenticAcceptanceTests {
             ?? DatabaseProvider(inMemory: true)
         let workspaceID = "axis-bank-authentic-persistence-\(UUID().uuidString.lowercased())"
         let runtime = makeRuntime(provider: provider, workspaceID: workspaceID)
-        let ordered = try orderedCampaignCarriers(oracle.carriers)
+        let campaignOrder = try orderedCampaignCarriers(oracle.carriers)
+        // Only the order in which exact originals are imported changes.
+        let ordered = reverseSourceOrder ? Array(campaignOrder.reversed()) : campaignOrder
 
         let cancelledCarrier = try #require(ordered.first)
         let cancelledURL = try #require(sources[cancelledCarrier.sourceSha256])
@@ -207,16 +203,20 @@ struct AxisBankAuthenticAcceptanceTests {
             let sourceURL = try #require(sources[carrier.sourceSha256])
             let prepared = try await runtime.engine.prepareImport(from: sourceURL)
             try verify(prepared: prepared, against: carrier)
+            let transactionsBefore = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
+            let projectionsBefore = try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspaceID)
+            let groupsBefore = try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceID)
+            let membersBefore = try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID)
 
             let isAuthoritative = authoritativeImportSessionIDByLogicalStatement[carrier.logicalStatementId] == nil
             if isAuthoritative {
                 expectSourceFact(prepared.statementEquivalenceReview == .firstAcceptedSource,
                         "\(label): first source review")
-            } else if case .equivalent(let reviewedAuthority) = prepared.statementEquivalenceReview {
-                expectSourceFact(reviewedAuthority == authoritativeImportSessionIDByLogicalStatement[carrier.logicalStatementId],
-                        "\(label): supporting source authority")
             } else {
-                Issue.record("\(label): expected equivalent supporting-source review")
+                // Supporting standalone sources use BankImport occurrence review;
+                // the legacy whole-statement projection review is not applicable.
+                expectSourceFact(prepared.statementEquivalenceReview == .notApplicable,
+                        "\(label): supporting occurrence-route review")
             }
 
             let accountChoice: ImportAccountChoice
@@ -226,6 +226,7 @@ struct AxisBankAuthenticAcceptanceTests {
             case .choiceRequired:
                 accountChoice = .createNewAccount(displayName: "Imported review account")
             default:
+                Issue.record("\(label): account identity review did not provide a destination")
                 throw AxisBankAuthenticAcceptanceError.campaignInvariant
             }
 
@@ -240,9 +241,55 @@ struct AxisBankAuthenticAcceptanceTests {
             expectSourceFact(committed.transactionCount == (isAuthoritative ? carrier.rowCount : 0),
                     "\(label): canonical transaction delta")
             guard committed.persisted,
-                  let accountID = committed.accountId,
                   let importSessionID = committed.importSessionId else {
+                Issue.record("\(label): committed source session missing")
                 throw AxisBankAuthenticAcceptanceError.campaignInvariant
+            }
+            expectSourceFact(importSessionID == prepared.importSession.id.uuidString,
+                    "\(label): committed session belongs to the prepared source")
+            let accountID: String
+            if isAuthoritative {
+                accountID = try #require(committed.accountId,
+                        "First-source receipt must retain its account destination.")
+            } else {
+                // BankImport receipts retain destinations on their source sections.
+                expectSourceFact(committed.accountId == nil, "\(label): section-owned destination")
+                guard committed.bankSections.count == 1,
+                      let receipt = committed.bankSections.first else {
+                    Issue.record("\(label): supporting receipt must contain one source section")
+                    throw AxisBankAuthenticAcceptanceError.campaignInvariant
+                }
+                let sourceSections = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID)
+                    .sections.filter { $0.importSessionId == importSessionID }
+                guard sourceSections.count == 1, let section = sourceSections.first else {
+                    Issue.record("\(label): supporting receipt must bind one durable source section")
+                    throw AxisBankAuthenticAcceptanceError.campaignInvariant
+                }
+                let authoritySessionID = try #require(authoritativeImportSessionIDByLogicalStatement[carrier.logicalStatementId])
+                let authorityCarrier = try #require(carrierByImportSessionID[authoritySessionID])
+                let authorityAccountID = try #require(accountIDBySourceDigest[authorityCarrier.sourceSha256])
+                expectSourceFact(authorityCarrier.accountIdentifierSha256 == carrier.accountIdentifierSha256,
+                        "\(label): source-proven authority account identity")
+                expectSourceFact(receipt.sectionID == section.id, "\(label): receipt source-section binding")
+                expectSourceFact(receipt.accountID == section.accountId && receipt.accountID == authorityAccountID,
+                        "\(label): supporting source retains the authority account")
+                expectSourceFact(receipt.sourceRowCount == carrier.rowCount, "\(label): receipt source multiplicity")
+                expectSourceFact(receipt.importedTransactionCount == 0, "\(label): receipt creates no canonical transactions")
+                expectSourceFact(committed.sourceRowCount == carrier.rowCount, "\(label): complete source count")
+                expectSourceFact(committed.recognizedExistingRowCount == carrier.rowCount,
+                        "\(label): every supporting row is already represented")
+                accountID = receipt.accountID
+            }
+
+            if !isAuthoritative {
+                expectSourceFact(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID) == transactionsBefore,
+                        "\(label): supporting source preserves canonical transactions")
+                expectSourceFact(try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspaceID) == projectionsBefore,
+                        "\(label): supporting source preserves persisted v1 projections")
+                expectSourceFact(try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceID) == groupsBefore,
+                        "\(label): supporting source preserves persisted v1 groups")
+                expectSourceFact(try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID) == membersBefore,
+                        "\(label): supporting source preserves persisted v1 members")
             }
 
             if let established = accountIDByIdentifierDigest[carrier.accountIdentifierSha256] {
@@ -430,11 +477,24 @@ struct AxisBankAuthenticAcceptanceTests {
                     "\(label): first transaction source ordinal")
         }
 
-        let controls = try financialControls(document)
-        expectSourceFact(controls.opening == decimal(carrier.controls.openingBalance), "\(label): opening")
-        expectSourceFact(controls.closing == decimal(carrier.controls.closingBalance), "\(label): closing")
-        expectSourceFact(controls.debit == decimal(carrier.controls.debitTotal), "\(label): debit total")
-        expectSourceFact(controls.credit == decimal(carrier.controls.creditTotal), "\(label): credit total")
+        let evidence = try #require(document.sourceStatementEvidence)
+        expectSourceFact(evidence.sourceFormatCode == carrier.format)
+        expectSourceFact(evidence.period?.start.canonical == carrier.periodStart)
+        expectSourceFact(evidence.period?.end.canonical == carrier.periodEnd)
+        if carrier.format == "pdf" {
+            expectSourceFact(evidence.openingBalance?.amount == decimal(carrier.controls.openingBalance), "\(label): printed opening")
+            expectSourceFact(evidence.closingBalance?.amount == decimal(carrier.controls.closingBalance), "\(label): printed closing")
+            expectSourceFact(evidence.printedControls.count == 4, "\(label): all printed controls")
+            expectSourceFact(Dictionary(evidence.printedControls.map { ($0.kind.rawValue, $0.literal) }, uniquingKeysWith: { first, _ in first }) == carrier.controls.printedLiterals,
+                    "\(label): literal control text")
+            expectSourceFact(evidence.printedControls.allSatisfy {
+                $0.sourceUnit == .line && $0.sourceOrdinal > 0 && $0.sourcePage == nil
+            }, "\(label): truthful control locations")
+        } else {
+            expectSourceFact(evidence.openingBalance == nil && evidence.closingBalance == nil,
+                    "\(label): absent printed controls are not inferred from rows")
+            expectSourceFact(evidence.printedControls.isEmpty)
+        }
     }
 
     private func verifyPersistedCampaign(
@@ -451,14 +511,12 @@ struct AxisBankAuthenticAcceptanceTests {
 
         expectSourceFact(accounts.count == 2)
         expectSourceFact(transactions.count == oracle.corpus.canonicalEventCount)
-        expectSourceFact(projections.count == oracle.carriers.count)
+        expectSourceFact(projections.count == oracle.corpus.logicalStatementCount)
         expectSourceFact(groups.count == oracle.corpus.logicalStatementCount)
-        expectSourceFact(members.count == oracle.carriers.count)
+        expectSourceFact(members.count == oracle.corpus.logicalStatementCount)
         expectSourceFact(members.filter { $0.role == .authoritative }.count == oracle.corpus.logicalStatementCount)
-        expectSourceFact(members.filter { $0.role == .supporting }.count == 6)
-        expectSourceFact(Dictionary(grouping: members, by: \.sourceFormatCode).mapValues(\.count) == [
-            "csv": 3, "pdf": 3, "xls": 3
-        ])
+        expectSourceFact(members.allSatisfy { $0.role == .authoritative })
+        expectSourceFact(Set(projections.map(\.importSessionID)) == evidence.authoritativeImportSessionIDs)
 
         let accountIDs = Set(accounts.map(\.id))
         var identifierDigests = Set<String>()
@@ -482,6 +540,7 @@ struct AxisBankAuthenticAcceptanceTests {
             let carrier = try #require(evidence.carrierByImportSessionID[record.importSessionID])
             let label = privacySafeLabel(carrier)
             let projection = record.projection
+            let controls = try projectionControls(carrier)
             expectSourceFact(projection.isValid(), "\(label): durable projection validity")
             expectSourceFact(projection.algorithmIdentifier == StatementFinancialProjectionDTO.axisAlgorithm,
                     "\(label): distinct Axis projection algorithm")
@@ -499,14 +558,14 @@ struct AxisBankAuthenticAcceptanceTests {
             expectSourceFact(projection.statementEndDateISO == carrier.periodEnd, "\(label): period end")
             expectSourceFact(projection.nativeCurrency == "INR", "\(label): native currency")
             expectSourceFact(projection.eventCount == carrier.rowCount, "\(label): event multiplicity")
-            expectSourceFact(projection.openingBalanceMinor == (try minorUnits(carrier.controls.openingBalance)))
-            expectSourceFact(decimal(projection.openingBalanceDecimal) == decimal(carrier.controls.openingBalance))
-            expectSourceFact(projection.debitTotalMinor == (try minorUnits(carrier.controls.debitTotal)))
-            expectSourceFact(decimal(projection.debitTotalDecimal) == decimal(carrier.controls.debitTotal))
-            expectSourceFact(projection.creditTotalMinor == (try minorUnits(carrier.controls.creditTotal)))
-            expectSourceFact(decimal(projection.creditTotalDecimal) == decimal(carrier.controls.creditTotal))
-            expectSourceFact(projection.closingBalanceMinor == (try minorUnits(carrier.controls.closingBalance)))
-            expectSourceFact(decimal(projection.closingBalanceDecimal) == decimal(carrier.controls.closingBalance))
+            expectSourceFact(projection.openingBalanceMinor == (try minorUnits(controls.openingBalance)))
+            expectSourceFact(decimal(projection.openingBalanceDecimal) == decimal(controls.openingBalance))
+            expectSourceFact(projection.debitTotalMinor == (try minorUnits(controls.debitTotal)))
+            expectSourceFact(decimal(projection.debitTotalDecimal) == decimal(controls.debitTotal))
+            expectSourceFact(projection.creditTotalMinor == (try minorUnits(controls.creditTotal)))
+            expectSourceFact(decimal(projection.creditTotalDecimal) == decimal(controls.creditTotal))
+            expectSourceFact(projection.closingBalanceMinor == (try minorUnits(controls.closingBalance)))
+            expectSourceFact(decimal(projection.closingBalanceDecimal) == decimal(controls.closingBalance))
             for (event, row) in zip(projection.events, carrier.rows) {
                 expectSourceFact(event.ordinal == row.sourceOrder, "\(label): projection order")
                 expectSourceFact(event.statementDateISO == row.date, "\(label): projection date")
@@ -527,15 +586,13 @@ struct AxisBankAuthenticAcceptanceTests {
             let records = projections.filter { record in
                 evidence.carrierByImportSessionID[record.importSessionID]?.logicalStatementId == carrierGroup[0].logicalStatementId
             }
-            expectSourceFact(records.count == 3)
-            expectSourceFact(Set(records.map { $0.projection.digest }).count == 1,
-                    "\(privacySafeLabel(carrierGroup[0])): durable cross-format digest")
+            expectSourceFact(records.count == 1,
+                    "\(privacySafeLabel(carrierGroup[0])): original authority projection remains unchanged")
         }
 
         for group in groups {
             let groupMembers = members.filter { $0.groupID == group.id }
-            expectSourceFact(groupMembers.count == 3)
-            expectSourceFact(Set(groupMembers.map(\.sourceFormatCode)) == Set(["csv", "pdf", "xls"]))
+            expectSourceFact(groupMembers.count == 1)
             expectSourceFact(group.projectionAlgorithm == StatementFinancialProjectionDTO.axisAlgorithm)
             expectSourceFact(accountIDs.contains(group.accountID))
             let authorityMembers = groupMembers.filter { $0.role == .authoritative }
@@ -553,6 +610,7 @@ struct AxisBankAuthenticAcceptanceTests {
         }
 
         let transactionIDs = Set(transactions.map(\.id))
+        try verifyBankOccurrenceEvidence(provider, workspaceID: workspaceID, oracle: oracle, evidence: evidence)
         for importSessionID in evidence.authoritativeImportSessionIDs {
             let carrier = try #require(evidence.carrierByImportSessionID[importSessionID])
             let label = privacySafeLabel(carrier)
@@ -632,6 +690,80 @@ struct AxisBankAuthenticAcceptanceTests {
                 "authentic reused references remain distinct through subtype")
     }
 
+    private func verifyBankOccurrenceEvidence(
+        _ provider: DatabaseProvider,
+        workspaceID: String,
+        oracle: Oracle,
+        evidence: CampaignEvidence
+    ) throws {
+        let graph = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID)
+        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
+        expectSourceFact(graph.sections.count == oracle.carriers.count)
+        expectSourceFact(graph.sections.reduce(0) { $0 + $1.rows.count } == oracle.corpus.representationRowCount)
+        expectSourceFact(Set(graph.sections.map(\.importSessionId)) == Set(evidence.carrierByImportSessionID.keys))
+        for section in graph.sections {
+            let carrier = try #require(evidence.carrierByImportSessionID[section.importSessionId])
+            let label = privacySafeLabel(carrier)
+            let authoritySession = try #require(evidence.authoritativeImportSessionIDs.first {
+                evidence.carrierByImportSessionID[$0]?.logicalStatementId == carrier.logicalStatementId
+            })
+            let authority = try #require(evidence.carrierByImportSessionID[authoritySession])
+            let canonical = transactions.filter { $0.importSessionId == authoritySession }.sorted {
+                ($0.rawRows.first?.sourceOrdinal ?? Int.max) < ($1.rawRows.first?.sourceOrdinal ?? Int.max)
+            }
+            guard canonical.count == authority.rows.count else {
+                throw AxisBankAuthenticAcceptanceError.campaignInvariant
+            }
+            let targetByCorrespondence = Dictionary(uniqueKeysWithValues: zip(authority.rows, canonical).map {
+                ($0.0.correspondenceOrder, $0.1.id)
+            })
+            expectSourceFact(section.rows.count == carrier.rows.count, "\(label): source occurrence multiplicity")
+            expectSourceFact(section.accountId == evidence.accountIDBySourceDigest[carrier.sourceSha256])
+            expectSourceFact(section.nativeCurrency == "INR")
+            expectSourceFact(section.sourceEvidence.sourceFormatCode == carrier.format)
+            expectSourceFact(section.sourceEvidence.statementStartDateISO == carrier.periodStart)
+            expectSourceFact(section.sourceEvidence.statementEndDateISO == carrier.periodEnd)
+            if carrier.format == "pdf" {
+                expectSourceFact(section.sourceEvidence.openingBalanceDecimal.map(decimal) == decimal(carrier.controls.openingBalance))
+                expectSourceFact(section.sourceEvidence.closingBalanceDecimal.map(decimal) == decimal(carrier.controls.closingBalance))
+                let details = try #require(section.sourceDetails)
+                expectSourceFact(details.controls.count == 4)
+                expectSourceFact(Dictionary(details.controls.map { ($0.kind, $0.literal) }, uniquingKeysWith: { first, _ in first }) == carrier.controls.printedLiterals,
+                        "\(label): persisted literal controls")
+                expectSourceFact(details.controls.allSatisfy {
+                    $0.sourceUnit == "line" && $0.sourceOrdinal > 0 && $0.sourcePage == nil
+                })
+            } else {
+                expectSourceFact(section.sourceEvidence.openingBalanceDecimal == nil && section.sourceEvidence.closingBalanceDecimal == nil)
+                expectSourceFact(section.sourceDetails == nil)
+            }
+            let targets = section.rows.map { $0.source.incomingTransactionId }
+            expectSourceFact(Set(targets).count == carrier.rows.count)
+            expectSourceFact(Set(targets) == Set(targetByCorrespondence.values), "\(label): complete canonical occurrence bijection")
+            let ordinals = section.rows.map(\.sourceOrdinal)
+            expectSourceFact(ordinals.count == carrier.rowCount && zip(ordinals, ordinals.dropFirst()).allSatisfy(<))
+            for (occurrence, row) in zip(section.rows, carrier.rows) {
+                // Compare each representation in its own original order. The
+                // independently observed correspondence selects its target.
+                expectSourceFact(occurrence.source.incomingTransactionId == targetByCorrespondence[row.correspondenceOrder],
+                        "\(label): source-proven canonical target")
+                expectSourceFact(occurrence.source.postingDateISO == row.date)
+                expectSourceFact(occurrence.valueDateISO == nil)
+                expectSourceFact(occurrence.source.direction == row.direction)
+                expectSourceFact(decimal(occurrence.source.signedAmountDecimal) == decimal(row.signedAmount))
+                expectSourceFact(decimal(occurrence.source.runningBalanceDecimal) == decimal(row.balance))
+                expectSourceFact(try Self.directRequiredDecimal(occurrence.literalBalance) == decimal(row.balance))
+                expectSourceFact(sha256(Data(collapse(occurrence.literalNarration).utf8)) == row.descriptionSha256)
+                expectSourceFact(occurrence.literalReference.map { sha256(Data($0.utf8)) } == row.chequeReferenceSha256)
+                if carrier.format == "pdf" {
+                    expectSourceFact(occurrence.sourceOrdinal > 0)
+                } else {
+                    expectSourceFact(occurrence.sourceOrdinal == row.sourceOrdinal)
+                }
+            }
+        }
+    }
+
     private func verifyHydratedSnapshot(
         _ snapshot: RepositoryRuntimeSnapshot,
         oracle: Oracle,
@@ -693,18 +825,22 @@ struct AxisBankAuthenticAcceptanceTests {
         expectSourceFact(try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspaceID).isEmpty)
         expectSourceFact(try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceID).isEmpty)
         expectSourceFact(try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID).isEmpty)
+        expectSourceFact(try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID).sections.isEmpty)
     }
 
     private func financialRepositoryCounts(
         _ provider: DatabaseProvider,
         workspaceID: String
     ) throws -> [Int] {
-        [
+        let bank = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: workspaceID)
+        return [
             try provider.accountRepo.accounts(workspaceId: workspaceID).count,
             try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count,
             try provider.importSessionRepo.statementFinancialProjections(workspaceId: workspaceID).count,
             try provider.importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceID).count,
-            try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID).count
+            try provider.importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceID).count,
+            bank.sections.count,
+            bank.sections.reduce(0) { $0 + $1.rows.count }
         ]
     }
 
@@ -751,36 +887,19 @@ struct AxisBankAuthenticAcceptanceTests {
         ).minorUnits()
     }
 
-    private func financialControls(
-        _ document: FinancialDocument
-    ) throws -> (opening: Decimal, closing: Decimal, debit: Decimal, credit: Decimal) {
-        let first = try #require(document.transactions.first)
-        let last = try #require(document.transactions.last)
-        let firstBalance = try #require(first.runningBalanceMoney)
-        let opening = try firstBalance - first.money
-        let currency = try #require(document.bookedCurrency)
-        let zero = try Money(amount: 0, currency: currency)
-        let debit = try document.transactions.compactMap(\.debitMoney).reduce(zero, +)
-        let credit = try document.transactions.compactMap(\.creditMoney).reduce(zero, +)
-        return (
-            opening.amount,
-            try #require(last.runningBalanceMoney).amount,
-            debit.amount,
-            credit.amount
+    private func projectionControls(_ carrier: Carrier) throws -> Controls {
+        let first = try #require(carrier.rows.first)
+        let last = try #require(carrier.rows.last)
+        let debit = carrier.rows.reduce(Decimal.zero) { $0 + max(-decimal($1.signedAmount), .zero) }
+        let credit = carrier.rows.reduce(Decimal.zero) { $0 + max(decimal($1.signedAmount), .zero) }
+        // Persisted v1 projection fields remain the original row-derived
+        // definition. Literal printed controls are asserted separately.
+        return Controls(
+            openingBalance: Self.directCanonicalDecimal(decimal(first.balance) - decimal(first.signedAmount)),
+            closingBalance: last.balance,
+            debitTotal: Self.directCanonicalDecimal(debit),
+            creditTotal: Self.directCanonicalDecimal(credit)
         )
-    }
-
-    private func semanticProjection(_ document: FinancialDocument) -> [String] {
-        document.transactions.enumerated().map { index, transaction in
-            [
-                String(index + 1),
-                transaction.statementDate?.canonical ?? "",
-                direction(transaction),
-                (try? transaction.money.canonicalDecimalString()) ?? "",
-                (try? transaction.runningBalanceMoney?.canonicalDecimalString()) ?? "",
-                transaction.reference.map { sha256(Data($0.utf8)) } ?? ""
-            ].joined(separator: "|")
-        }
     }
 
     private func direction(_ transaction: Transaction) -> String {
@@ -941,9 +1060,9 @@ struct AxisBankAuthenticAcceptanceTests {
                 throw AxisBankAuthenticAcceptanceError.campaignInvariant
             }
 
-            let pdfRows = try directPDFRows(source, expected: csv.rows, controls: csv.controls)
+            let pdfRows = try directPDFRows(source, expected: csv.rows)
             let pages = pdfRows.pages
-            guard pages.count == csv.rows.count else {
+            guard pages.count == pdfRows.rows.count else {
                 throw AxisBankAuthenticAcceptanceError.campaignInvariant
             }
 
@@ -953,7 +1072,9 @@ struct AxisBankAuthenticAcceptanceTests {
                     pages: pages,
                     sourceOrdinals: [:],
                     headerSourceOrdinal: nil,
-                    descriptions: pdfRows.descriptions
+                    sourceRows: pdfRows.rows,
+                    sourceControls: pdfRows.controls,
+                    correspondenceOrdinals: pdfRows.correspondence
                 )
             )
         }
@@ -970,17 +1091,25 @@ struct AxisBankAuthenticAcceptanceTests {
                 grid: grid,
                 headerRow: xls.headerRow
             )
-            let ordinals = try directRepresentationOrdinals(
-                expected: csv.rows,
-                observed: observed
-            )
+            let rows = observed.enumerated().map { index, row in
+                DirectSourceRow(sourceOrder: index + 1, sourceOrdinal: row.physicalRow + 1,
+                    date: row.date, direction: row.direction, signedAmount: row.signedAmount,
+                    balance: row.balance, description: row.description, reference: row.reference,
+                    upi: directUPI(narration: row.description, direction: row.direction))
+            }
+            let correspondence = try directUniqueCorrespondence(expected: csv.rows, observed: rows) { left, right in
+                left.representationFingerprint == right.representationFingerprint
+            }
 
             carriers.append(
                 csv.carrier(
                     source: source,
                     pages: [:],
-                    sourceOrdinals: ordinals,
-                    headerSourceOrdinal: xls.headerRow + 1
+                    sourceOrdinals: [:],
+                    headerSourceOrdinal: xls.headerRow + 1,
+                    sourceRows: rows,
+                    sourceControls: try directRowControls(rows),
+                    correspondenceOrdinals: correspondence
                 )
             )
         }
@@ -1080,16 +1209,17 @@ struct AxisBankAuthenticAcceptanceTests {
             )!
         }
 
-        func oracleRow(sourcePage: Int?, sourceOrdinal: Int, sourceDescription: String? = nil) -> Row {
+        func oracleRow(sourcePage: Int?, sourceOrdinal: Int, correspondenceOrder: Int) -> Row {
             Row(
                 sourceOrder: sourceOrder,
+                correspondenceOrder: correspondenceOrder,
                 sourceOrdinal: sourceOrdinal,
                 sourcePage: sourcePage,
                 date: date,
                 direction: direction,
                 signedAmount: signedAmount,
                 balance: balance,
-                descriptionSha256: directSHA256(Data(directCollapse(sourceDescription ?? description).utf8)),
+                descriptionSha256: directSHA256(Data(directCollapse(description).utf8)),
                 chequeReferenceSha256: reference.map { directSHA256(Data($0.utf8)) },
                 upiOperation: upi?.operation,
                 upiReference: upi?.reference,
@@ -1103,7 +1233,6 @@ struct AxisBankAuthenticAcceptanceTests {
                 date,
                 direction,
                 signedAmount,
-                balance,
                 directCollapse(description),
                 reference ?? ""
             ].joined(separator: "|")
@@ -1122,13 +1251,15 @@ struct AxisBankAuthenticAcceptanceTests {
             pages: [Int: Int],
             sourceOrdinals: [Int: Int],
             headerSourceOrdinal: Int?,
-            descriptions: [Int: String] = [:]
+            sourceRows: [DirectSourceRow]? = nil,
+            sourceControls: Controls? = nil,
+            correspondenceOrdinals: [Int: Int] = [:]
         ) -> Carrier {
-            let outputRows = rows.map { row in
+            let outputRows = (sourceRows ?? rows).map { row in
                 row.oracleRow(
                     sourcePage: source.format == "pdf" ? pages[row.sourceOrder] : nil,
                     sourceOrdinal: sourceOrdinals[row.sourceOrder] ?? row.sourceOrdinal,
-                    sourceDescription: descriptions[row.sourceOrder]
+                    correspondenceOrder: correspondenceOrdinals[row.sourceOrder] ?? row.sourceOrder
                 )
             }
 
@@ -1143,7 +1274,7 @@ struct AxisBankAuthenticAcceptanceTests {
                 rowCount: outputRows.count,
                 pageCount: source.format == "pdf" ? pages.values.max() : nil,
                 headerSourceOrdinal: headerSourceOrdinal,
-                controls: controls,
+                controls: sourceControls ?? controls,
                 rows: outputRows
             )
         }
@@ -1212,16 +1343,6 @@ struct AxisBankAuthenticAcceptanceTests {
         let description: String
         let reference: String?
 
-        var representationFingerprint: String {
-            [
-                date,
-                direction,
-                signedAmount,
-                balance,
-                directCollapse(description),
-                reference ?? ""
-            ].joined(separator: "|")
-        }
     }
 
     private static func directAxisFiles(root: URL) throws -> [DirectAxisFile] {
@@ -1410,10 +1531,11 @@ struct AxisBankAuthenticAcceptanceTests {
         return directCollapse(expected).range(of: pattern, options: .regularExpression) != nil
     }
 
-    private static func directPDFRows(_ source: DirectAxisFile, expected: [DirectSourceRow], controls: Controls) throws -> (pages: [Int: Int], descriptions: [Int: String]) {
+    private static func directPDFRows(_ source: DirectAxisFile, expected: [DirectSourceRow]) throws -> (pages: [Int: Int], rows: [DirectSourceRow], controls: Controls, correspondence: [Int: Int]) {
         guard let document = PDFDocument(data: source.bytes) else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
-        var observed: [(Int, [String], [String])] = []
+        var observed: [(page: Int, ordinal: Int, cells: [String], narrationLines: [String])] = []
         var controlRows: [String: [String]] = [:]
+        var physicalLine = 0
         for pageIndex in 0..<document.pageCount {
             guard let page = document.page(at: pageIndex), let text = page.string else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
             let ns = text as NSString
@@ -1427,6 +1549,7 @@ struct AxisBankAuthenticAcceptanceTests {
             }
             var pending: [String] = []
             for y in lines.keys.sorted(by: >) {
+                physicalLine += 1
                 let characters = lines[y]!.sorted { $0.0 < $1.0 }
                 let boundaries: [CGFloat] = [30, 87, 130, 328, 390, 453, 533, 575]
                 var cells = (0..<7).map { column in
@@ -1441,7 +1564,7 @@ struct AxisBankAuthenticAcceptanceTests {
                 if !cells[2].isEmpty { pending.append(cells[2]) }
                 if directISODate(cells[0]) != nil {
                     cells[2] = pending.joined()
-                    observed.append((pageIndex + 1, cells, pending))
+                    observed.append((pageIndex + 1, physicalLine, cells, pending))
                     pending = []
                 }
             }
@@ -1449,29 +1572,37 @@ struct AxisBankAuthenticAcceptanceTests {
         guard observed.count == expected.count,
               let opening = controlRows["OPENING BALANCE"],
               let closing = controlRows["CLOSING BALANCE"],
-              let totals = controlRows["TRANSACTION TOTAL"],
-              try directRequiredDecimal(opening[5]) == directRequiredDecimal(controls.openingBalance),
-              try directRequiredDecimal(closing[5]) == directRequiredDecimal(controls.closingBalance),
-              try directRequiredDecimal(totals[3]) == directRequiredDecimal(controls.debitTotal),
-              try directRequiredDecimal(totals[4]) == directRequiredDecimal(controls.creditTotal) else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
-        var result: [Int: Int] = [:]
-        var descriptions: [Int: String] = [:]
-        for (row, occurrence) in zip(expected, observed) {
-            let cells = occurrence.1
+              let totals = controlRows["TRANSACTION TOTAL"] else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
+        let controls = try Controls(
+            openingBalance: directCanonicalDecimal(directRequiredDecimal(opening[5])),
+            closingBalance: directCanonicalDecimal(directRequiredDecimal(closing[5])),
+            debitTotal: directCanonicalDecimal(directRequiredDecimal(totals[3])),
+            creditTotal: directCanonicalDecimal(directRequiredDecimal(totals[4])),
+            printedLiterals: ["openingBalance": opening[5], "closingBalance": closing[5],
+                              "debitTotal": totals[3], "creditTotal": totals[4]]
+        )
+        let rows = try observed.enumerated().map { index, occurrence in
+            let cells = occurrence.cells
             let debit = try directDecimalOrNil(cells[3]), credit = try directDecimalOrNil(cells[4])
             guard (debit == nil) != (credit == nil),
-                  try directISODateRequired(cells[0]) == row.date,
-                  try directNumericReference(cells[1]) == row.reference,
-                  (credit ?? 0) - (debit ?? 0) == row.signedDecimal,
-                  try directRequiredDecimal(cells[5]) == directRequiredDecimal(row.balance),
-                  directWrappedNarrationMatches(occurrence.2, expected: row.description) else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
-            result[row.sourceOrder] = occurrence.0
-            // The PDF's physical line breaks become whitespace in its own
-            // narration. Cross-format matching above checks every glyph while
-            // allowing whitespace only at genuine source wrap boundaries.
-            descriptions[row.sourceOrder] = occurrence.2.joined(separator: " ")
+                  (debit ?? credit ?? 0) > 0 else { throw AxisBankAuthenticAcceptanceError.campaignInvariant }
+            let signed = (credit ?? 0) - (debit ?? 0)
+            let direction = debit == nil ? "credit" : "debit"
+            return try DirectSourceRow(sourceOrder: index + 1, sourceOrdinal: occurrence.ordinal,
+                date: directISODateRequired(cells[0]), direction: direction,
+                signedAmount: directCanonicalDecimal(signed),
+                balance: directCanonicalDecimal(directRequiredDecimal(cells[5])),
+                description: occurrence.narrationLines.joined(separator: " "),
+                reference: directNumericReference(cells[1]),
+                upi: directUPI(narration: occurrence.narrationLines.joined(), direction: direction))
         }
-        return (result, descriptions)
+        let correspondence = try directUniqueCorrespondence(expected: expected, observed: rows) { left, right in
+            left.date == right.date && left.direction == right.direction &&
+                left.signedDecimal == right.signedDecimal && left.reference == right.reference &&
+                directWrappedNarrationMatches(observed[right.sourceOrder - 1].narrationLines, expected: left.description)
+        }
+        let pages = Dictionary(uniqueKeysWithValues: observed.enumerated().map { ($0.offset + 1, $0.element.page) })
+        return (pages, rows, controls, correspondence)
     }
 
     private static func directXLSGrid(_ bytes: Data) throws -> [[String]] {
@@ -1612,24 +1743,37 @@ struct AxisBankAuthenticAcceptanceTests {
         return result
     }
 
-    private static func directRepresentationOrdinals(
+    private static func directUniqueCorrespondence(
         expected: [DirectSourceRow],
-        observed: [DirectTabularRow]
+        observed: [DirectSourceRow],
+        agrees: (DirectSourceRow, DirectSourceRow) -> Bool
     ) throws -> [Int: Int] {
         guard expected.count == observed.count else {
             throw AxisBankAuthenticAcceptanceError.campaignInvariant
         }
-
-        var result = [Int: Int]()
-        for (source, representation) in zip(expected, observed) {
-            guard source.representationFingerprint ==
-                    representation.representationFingerprint,
-                  result[source.sourceOrder] == nil else {
+        var assigned = Set<Int>()
+        var result: [Int: Int] = [:]
+        for source in expected {
+            let matches = observed.filter { agrees(source, $0) }
+            guard matches.count == 1, let match = matches.first,
+                  assigned.insert(match.sourceOrder).inserted else {
                 throw AxisBankAuthenticAcceptanceError.campaignInvariant
             }
-            result[source.sourceOrder] = representation.physicalRow + 1
+            result[match.sourceOrder] = source.sourceOrder
         }
         return result
+    }
+
+    private static func directRowControls(_ rows: [DirectSourceRow]) throws -> Controls {
+        guard let first = rows.first, let last = rows.last else {
+            throw AxisBankAuthenticAcceptanceError.campaignInvariant
+        }
+        return try Controls(
+            openingBalance: directCanonicalDecimal(directRequiredDecimal(first.balance) - first.signedDecimal),
+            closingBalance: last.balance,
+            debitTotal: directCanonicalDecimal(rows.reduce(Decimal.zero) { $0 + max(-$1.signedDecimal, .zero) }),
+            creditTotal: directCanonicalDecimal(rows.reduce(Decimal.zero) { $0 + max($1.signedDecimal, .zero) })
+        )
     }
 
     private static func directCSVFields(_ line: String) throws -> [String] {
@@ -1918,4 +2062,100 @@ struct AxisBankAuthenticAcceptanceTests {
         #expect(condition, comment, sourceLocation: sourceLocation)
     }
 
+}
+
+/// Source-independent bipartite-graph mechanics only. These symbols are not
+/// statement rows, financial values, domain objects or repository fixtures.
+@MainActor
+struct BankOccurrenceCorrespondenceMechanicsTests {
+    @Test
+    func singleCandidatesPreserveMultiplicity() {
+        #expect(BankImportDecision.uniqueAssignment([
+            "left-a": ["right-a"], "left-b": ["right-b"]
+        ]) == ["left-a": "right-a", "left-b": "right-b"])
+    }
+
+    @Test
+    func completeGraphCanDisambiguateAnIndividualCandidate() {
+        #expect(BankImportDecision.uniqueAssignment([
+            "left-a": ["right-a", "right-b"], "left-b": ["right-b"]
+        ]) == ["left-a": "right-a", "left-b": "right-b"])
+    }
+
+    @Test
+    func insufficientDistinctTargetsAreRejected() {
+        #expect(BankImportDecision.uniqueAssignment([
+            "left-a": ["right-a"], "left-b": ["right-a"]
+        ]) == nil)
+        #expect(BankImportDecision.uniqueAssignment(["left-a": []]) == nil)
+    }
+
+    @Test
+    func multipleCompleteAssignmentsAreRejected() {
+        #expect(BankImportDecision.uniqueAssignment([
+            "left-a": ["right-a", "right-b"], "left-b": ["right-a", "right-b"]
+        ]) == nil)
+    }
+
+    @Test
+    func emptyGraphHasOneEmptyAssignment() {
+        #expect(BankImportDecision.uniqueAssignment([:]) == [:])
+    }
+}
+
+
+/// Opaque text-scanner mechanics only. These literals contain no statement
+/// rows, transaction descriptions, financial facts or repository fixtures.
+@MainActor
+struct AxisStandaloneNarrationWhitespaceMechanicsTests {
+    @Test
+    func additionalPDFSpacesRetainTabularWordBoundaries() {
+        for printed in ["a bc def", "abc d ef", "a bc d ef"] {
+            #expect(BankImportDecision.axisStandalonePDFNarrationAgrees(
+                pdfNarration: printed, tabularNarration: "abc def"))
+        }
+    }
+
+    @Test
+    func whitespaceRunsAreComparedWithoutRewritingCharacters() {
+        #expect(BankImportDecision.axisStandalonePDFNarrationAgrees(
+            pdfNarration: " \ta bc\n\n d ef  ", tabularNarration: "abc\t def"))
+        #expect(BankImportDecision.axisStandalonePDFNarrationAgrees(
+            pdfNarration: "a bc-de f", tabularNarration: "abc-def"))
+    }
+
+    @Test
+    func missingOrMovedTabularWordBoundaryIsRejected() {
+        for printed in ["abcdef", "ab cdef", "abcde f"] {
+            #expect(!BankImportDecision.axisStandalonePDFNarrationAgrees(
+                pdfNarration: printed, tabularNarration: "abc def"))
+        }
+    }
+
+    @Test
+    func characterCaseAndPunctuationChangesAreRejected() {
+        let changed: [(pdf: String, tabular: String)] = [
+            ("Abc def", "abc def"),
+            ("abc de", "abc def"),
+            ("abc defg", "abc def"),
+            ("abd def", "abc def"),
+            ("abc def", "abc-def"),
+            ("abc-def", "abc/def")
+        ]
+        for pair in changed {
+            #expect(!BankImportDecision.axisStandalonePDFNarrationAgrees(
+                pdfNarration: pair.pdf, tabularNarration: pair.tabular))
+        }
+    }
+
+    @Test
+    func emptyInputCannotEstablishCorrespondence() {
+        let empty: [(pdf: String, tabular: String)] = [
+            ("", ""), (" ", "\t\n"), ("abc", ""), ("", "abc"), ("   ", "abc")
+        ]
+        for pair in empty {
+            #expect(!BankImportDecision.axisStandalonePDFNarrationAgrees(
+                pdfNarration: pair.pdf, tabularNarration: pair.tabular))
+        }
+    }
 }

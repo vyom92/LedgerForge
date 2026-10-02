@@ -15,7 +15,8 @@ enum AccountMetadataCoordinatorError: Error, Equatable {
 
 protocol AccountMetadataCoordinating: AnyObject {
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool
+    func markAccountHistoryOnly(accountId: String, workspaceId: String) throws -> Bool
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool
 }
 
 /// Coordinates bounded owner account metadata writes with canonical runtime
@@ -99,10 +100,19 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
     }
 #endif
 
-    /// Records the owner's closed-and-settled decision without altering source
+    /// Records the owner's history-only decision without altering source
     /// balances, due dates, transactions, or historical import eligibility.
     @discardableResult
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
+    func markAccountHistoryOnly(accountId: String, workspaceId: String) throws -> Bool {
+        try setHistoryOnly(true, accountId: accountId, workspaceId: workspaceId)
+    }
+
+    @discardableResult
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool {
+        try setHistoryOnly(false, accountId: accountId, workspaceId: workspaceId)
+    }
+
+    private func setHistoryOnly(_ historyOnly: Bool, accountId: String, workspaceId: String) throws -> Bool {
         let lease: DatabaseActivityLease
         do { lease = try DatabaseActivityGate.shared.begin(.repositoryWrite) }
         catch { throw AccountMetadataCoordinatorError.saveFailed }
@@ -111,7 +121,7 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
 #if DEBUG
         do {
             try acknowledgementGate.requireAuthorization(
-                for: .creditCardHistoryOnlyMutation,
+                for: .accountHistoryOnlyMutation,
                 providerGeneration: currentProvider.generationToken
             )
         } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
@@ -125,10 +135,10 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
         }
         let changed: Bool
         do {
-            changed = try currentProvider.accountRepo.markCreditCardHistoryOnly(
+            changed = historyOnly ? try currentProvider.accountRepo.markAccountHistoryOnly(
                 accountId: accountId, workspaceId: workspaceId,
                 markedAtISO: ISO8601DateFormatter().string(from: Date())
-            )
+            ) : try currentProvider.accountRepo.markAccountCurrent(accountId: accountId, workspaceId: workspaceId)
         } catch { throw AccountMetadataCoordinatorError.saveFailed }
         // Also refresh an idempotent retry after a previous refresh failure.
         do { _ = try forcedHydration(currentProvider, workspaceId) }
@@ -180,14 +190,11 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
             throw AccountMetadataCoordinatorError.saveFailed
         }
 
-        guard didUpdate else {
-            return false
-        }
-
+        // An unchanged retry must recover a prior saved-but-not-refreshed edit.
         developerConsole?.info(.runtime, "Account display-name update succeeded")
         do {
             _ = try forcedHydration(currentProvider, workspaceId)
-            return true
+            return didUpdate
         } catch {
             developerConsole?.error(.runtime, "Account-detail hydration failed")
             throw AccountMetadataCoordinatorError.savedButRefreshFailed

@@ -13,6 +13,9 @@ private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDeleg
             if BackupRestoreCoordinator.shared.isBusy || DatabaseActivityGate.shared.hasActiveOperations || DatabaseActivityGate.shared.hasExclusiveOperation {
                 return .terminateCancel
             }
+            guard SalaryWorkspaceViewModel.retainOpenWorkspacesBeforeTermination() else {
+                return .terminateCancel
+            }
             return .terminateNow
         }
     }
@@ -39,9 +42,22 @@ struct LedgerForgeApp: App {
         return true
     }())
     @StateObject private var transactionViewModel = TransactionListViewModel()
+    @StateObject private var salaryViewModel = SalaryWorkspaceViewModel(
+        selectionDefaults: LedgerForgeApp.isolatedPersistencePurpose() == nil ? .standard : nil
+    )
     @StateObject private var investmentPriceSession = InvestmentPriceSession(enabled: onlineServicesEnabled)
     @StateObject private var onlineRefresh = OnlineRefreshCoordinator(enabled: onlineServicesEnabled)
     @StateObject private var ispSyncSession = ZurichISPSyncSession(enabled: onlineServicesEnabled)
+    @StateObject private var ibkrFlexSession = IBKRFlexSyncSession(enabled: ibkrServicesEnabled)
+    private static var ibkrServicesEnabled: Bool {
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if environment["LEDGERFORGE_TEST_HOST"] != "1",
+           environment["LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE"]?.hasPrefix("s100-ibkr-") == true,
+           environment["LEDGERFORGE_IBKR_FLEX_QUALIFICATION"] == "1" { return true }
+#endif
+        return onlineServicesEnabled
+    }
     private static var onlineServicesEnabled: Bool {
         let environment = ProcessInfo.processInfo.environment
         if environment["LEDGERFORGE_TEST_HOST"] == "1" { return false }
@@ -66,14 +82,15 @@ struct LedgerForgeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(transactionViewModel: transactionViewModel, transactionAmountMeasurement: transactionAmountMeasurement,
-                alDarReferenceSession: alDarReferenceSession, investmentPriceSession: investmentPriceSession, ispSyncSession: ispSyncSession)
+                salaryViewModel: salaryViewModel, alDarReferenceSession: alDarReferenceSession,
+                investmentPriceSession: investmentPriceSession, ispSyncSession: ispSyncSession, ibkrFlexSession: ibkrFlexSession)
                 .task {
                     CategoryAutomationSession.shared.start()
                     SalaryAssistanceSession.shared.start()
                     investmentPriceSession.activate()
                     investmentPriceSession.observeRates(alDarReferenceSession)
                     BackgroundUpdatesSession.shared.start(rates: alDarReferenceSession, prices: investmentPriceSession,
-                        isp: ispSyncSession, online: onlineRefresh)
+                        isp: ispSyncSession, online: onlineRefresh, ibkr: ibkrFlexSession)
                 }
         }
         .windowStyle(.hiddenTitleBar)

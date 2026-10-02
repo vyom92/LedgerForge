@@ -451,7 +451,7 @@ public final class SQLiteRepositoryProvider {
             ? SQLiteSalaryRepository(db: database, generationToken: generationToken)
             : PlaceholderSalaryRepo()
         self.fundingPlanRepo = supportsSalary
-            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 })
+            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 }, supportsScratchpads: verifiedMigrationPrefix.contains { $0.version == 30 })
             : PlaceholderFundingPlanRepo()
     }
 
@@ -479,7 +479,7 @@ public final class SQLiteRepositoryProvider {
     }
 }
 
-private final class SQLiteCardRepo: CardRepository {
+final class SQLiteCardRepo: CardRepository {
     private let db: SQLiteDatabase
     init(db: SQLiteDatabase) { self.db = db }
 
@@ -1787,19 +1787,19 @@ final class SQLiteAccountRepo: AccountRepository {
         VALUES (?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             workspace_id = excluded.workspace_id,
-            name = excluded.name,
+            name = accounts.name,
             institution_id = excluded.institution_id,
             account_type = excluded.account_type,
             native_currency = excluded.native_currency,
             description = excluded.description,
             created_at = excluded.created_at,
-            closed_at = COALESCE(accounts.closed_at, excluded.closed_at);
+            closed_at = accounts.closed_at;
         """
         try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now, account.closedAtISO ?? NSNull()])
         return account.id
     }
 
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool {
         try db.withExclusiveAccess {
             guard ISO8601DateFormatter().date(from: markedAtISO) != nil else {
                 throw RepositoryError.relationshipViolation("History-only classification requires its recorded time.")
@@ -1807,14 +1807,25 @@ final class SQLiteAccountRepo: AccountRepository {
             guard let existing = try account(id: accountId) else {
                 throw RepositoryError.recordNotFound("Account does not exist.")
             }
-            guard existing.workspaceId == workspaceId, existing.accountType == "credit_card" else {
-                throw RepositoryError.relationshipViolation("History-only classification requires a credit card in this workspace.")
+            guard existing.workspaceId == workspaceId else {
+                throw RepositoryError.relationshipViolation("History-only classification requires an account in this workspace.")
             }
             guard existing.closedAtISO == nil else { return false }
             try db.executePrepared(
                 sql: "UPDATE accounts SET closed_at = ? WHERE id = ? AND workspace_id = ? AND closed_at IS NULL;",
                 params: [markedAtISO, accountId, workspaceId]
             )
+            return true
+        }
+    }
+
+    func markAccountCurrent(accountId: String, workspaceId: String) throws -> Bool {
+        try db.withExclusiveAccess {
+            guard let existing = try account(id: accountId) else { throw RepositoryError.recordNotFound("Account does not exist.") }
+            guard existing.workspaceId == workspaceId else { throw RepositoryError.relationshipViolation("Account status requires an account in this workspace.") }
+            guard existing.closedAtISO != nil else { return false }
+            try db.executePrepared(sql: "UPDATE accounts SET closed_at=NULL WHERE id=? AND workspace_id=? AND closed_at IS NOT NULL;",
+                params: [accountId, workspaceId])
             return true
         }
     }

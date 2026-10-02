@@ -17,6 +17,7 @@ struct SpendingAndMovementView: View {
     let onBack: () -> Void
     let onTransactions: (Set<String>) -> Void
     let onCategories: () -> Void
+    var onPeriodOverview: ((TransactionPresentationFilterSpec) -> Void)? = nil
     @State private var currency = "INR"
     @State private var accountID = ""
     @State private var startText = ""
@@ -37,6 +38,7 @@ struct SpendingAndMovementView: View {
     @State private var showsPeriods = false
     @State private var showsComparisonDetails = false
     @State private var reviewLimit = 40
+    @State private var contentWidth: CGFloat = 1000
 #if DEBUG
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pending: (() -> Void)?
@@ -55,7 +57,8 @@ struct SpendingAndMovementView: View {
     }
 
     var body: some View {
-        ScrollView {
+        let pagePadding = theme.spacing.pagePadding
+        return ScrollView {
             VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                 header
                 if !usable {
@@ -67,7 +70,7 @@ struct SpendingAndMovementView: View {
                     if let inputError { Text(inputError).foregroundStyle(LFTheme.warning) }
                     if let message { Text(message).foregroundStyle(LFTheme.warning).textSelection(.enabled) }
                     if let generation, reconciliation.isBlocked(for: generation) {
-                        Button("Refresh saved interpretation") { perform { try FinancialIntelligenceCoordinator().retryRefresh(workspaceID: store.snapshot!.workspaceID, generation: generation) } }
+                        Button("Reload saved decisions") { perform { try FinancialIntelligenceCoordinator().retryRefresh(workspaceID: store.snapshot!.workspaceID, generation: generation) } }
                     }
                     if model.isWorking { ProgressView("Reading recorded activity…").frame(maxWidth: .infinity, minHeight: 200) }
                     else if let projection = model.projection {
@@ -79,6 +82,8 @@ struct SpendingAndMovementView: View {
             .padding(theme.spacing.pagePadding)
         }
         .foregroundStyle(theme.palette.primaryText)
+        .font(theme.typography.body)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width - pagePadding * 2 } action: { contentWidth = $0 }
         .onAppear { if !initializedPeriod { initializedPeriod = true; selectCalendarMonth(); applyDates() } else { refresh() } }
         .onDisappear { model.cancel() }
         .onChange(of: isActive) { _, _ in refresh() }
@@ -88,7 +93,8 @@ struct SpendingAndMovementView: View {
         .onChange(of: currency) { _, _ in accountID = ""; refresh() }
         .onChange(of: accountID) { _, _ in refresh() }
         .sheet(item: $selection) { draft in
-            MovementReviewEditor(draft: draft, rows: model.sourceRows, generation: generation, sources: store.sources)
+            MovementReviewEditor(draft: draft, rows: model.sourceRows, generation: generation, sources: store.sources,
+                historyScope: relationshipHistoryScope)
         }
 #if DEBUG
         .alert(DevelopmentProfileAcknowledgementPresentation.title,
@@ -103,64 +109,94 @@ struct SpendingAndMovementView: View {
     }
 
     private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.sectionGap) {
-                heading
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Transactions").font(theme.typography.pageTitle)
+                Text("Spending & movements").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+            HStack(spacing: 16) {
+                Button(action: onBack) { Label("Transactions", systemImage: "chevron.left") }.lfSecondaryAction()
+                Picker("View", selection: $section) {
+                    Text("Spending").tag("Spending")
+                    Text("Movement review").tag("Movement review")
+                }.labelsHidden().pickerStyle(.segmented).frame(width: 360)
                 Spacer(minLength: 12)
-                sectionControl
-            }.fixedSize(horizontal: true, vertical: false)
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) { heading; sectionControl }
-        }.frame(maxWidth: .infinity, alignment: .leading)
-    }
-    private var heading: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Button(action: onBack) { Label("Transactions", systemImage: "chevron.left") }.buttonStyle(.borderless)
-            Text("Spending & movements").font(theme.typography.formTitle)
+                if let onPeriodOverview {
+                    Button("Period overview") { onPeriodOverview(overviewFilter) }
+                        .lfSecondaryAction().accessibilityIdentifier("spending.periodOverview")
+                }
+            }
         }
     }
-    private var sectionControl: some View {
-        Picker("View", selection: $section) { Text("Spending").tag("Spending"); Text("Movement review").tag("Movement review") }
-            .labelsHidden().pickerStyle(.segmented).frame(width: 290)
+    private var overviewFilter: TransactionPresentationFilterSpec {
+        var filter = TransactionPresentationFilterSpec()
+        filter.currencies = [CurrencyCode(rawValue: currency)]
+        if !accountID.isEmpty { filter.accountIDs = [accountID] }
+        let start = try? StatementDate(canonical: appliedStart)
+        let end = try? StatementDate(canonical: appliedEnd)
+        if start != nil || end != nil {
+            filter.statementDateRange = .init(start: start, end: end)
+        }
+        return filter
     }
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
-                currencyControl; accountControl
-                Picker("Periods", selection: $periodMode) {
-                    ForEach(["Calendar months", "Custom ranges", "All dates"], id: \.self) { Text($0) }
-                }.tint(theme.palette.primaryText).frame(width: 235)
+            if contentWidth >= 1260 && periodMode != "Custom ranges" {
+                HStack(alignment: .lastTextBaseline, spacing: 16) { scopeControls; dateControls }
+            } else {
+                scopeControls
+                dateControls
             }
-            dateControls
         }.onChange(of: periodMode) { _, mode in
             if mode == "Calendar months" { selectCalendarMonth() }
             else if mode == "All dates" { startText = ""; endText = ""; baselineStartText = ""; baselineEndText = "" }
             applyDates()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+    private var scopeControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) { currencyControl; accountControl; periodControl }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 14) { currencyControl; periodControl }
+                accountControl
+            }
+        }
+    }
+    private var periodControl: some View {
+        Picker("Periods", selection: $periodMode) {
+            ForEach(["Calendar months", "Custom ranges", "All dates"], id: \.self) { Text($0) }
+        }.tint(theme.palette.primaryText).frame(width: 245)
+    }
     private var currencyControl: some View {
         Picker("Currency", selection: $currency) {
+            if !store.sources.accounts.contains(where: { $0.currency == currency }) {
+                Text("\(currency) · no accounts").tag(currency)
+            }
             ForEach(Set(store.sources.accounts.map(\.currency)).sorted(), id: \.self) { Text($0).tag($0) }
-        }.tint(theme.palette.primaryText).frame(width: 150)
+        }.tint(theme.palette.primaryText).frame(width: 165)
     }
     private var accountControl: some View {
-        Picker("Account", selection: $accountID) {
-            Text("All \(currency) accounts").tag("")
-            ForEach(store.sources.accounts.filter { $0.currency == currency }) { Text($0.selectionTitle).tag($0.id) }
-        }.tint(theme.palette.primaryText).frame(minWidth: 180, idealWidth: 245, maxWidth: 340)
+        LFAccountMenu(title: store.sources.accounts.first { $0.id == accountID }?.title ?? "Current \(currency) accounts",
+            allTitle: "Current \(currency) accounts", options: store.sources.accounts.filter { $0.currency == currency }.map {
+                .init(id: $0.id, title: $0.title, detail: $0.selectionContext, selected: accountID == $0.id)
+            }) { accountID = $0 ?? "" }
+            .accessibilityLabel("Account").frame(minWidth: 220, idealWidth: 290, maxWidth: 340)
     }
     @ViewBuilder private var dateControls: some View {
         if periodMode == "Calendar months" {
             HStack(spacing: 10) {
-                Text("Analysis month")
+                Text("Analysis month").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                 TextField("YYYY-MM", text: $monthText).frame(width: 110).onSubmit { selectCalendarMonth(); applyDates() }
+                    .accessibilityLabel("Analysis month")
                 Button("Apply month") { selectCalendarMonth(); applyDates() }.lfSecondaryAction()
                     .disabled((try? SelectedStatementMonth(canonical: monthText)) == nil)
-                Text("Compared with the previous calendar month. Current month stops today.").foregroundStyle(theme.palette.secondaryText)
             }.textFieldStyle(.roundedBorder)
+                .help("Compared with the previous calendar month. Current month stops today.")
         } else if periodMode == "Custom ranges" {
             VStack(alignment: .leading, spacing: 8) {
                 rangeFields("Analysis", start: $startText, end: $endText)
-                HStack { rangeFields("Comparison", start: $baselineStartText, end: $baselineEndText); Button("Apply ranges", action: applyDates).lfSecondaryAction().disabled(inputError != nil) }
+                rangeFields("Comparison", start: $baselineStartText, end: $baselineEndText)
+                Button("Apply ranges", action: applyDates).lfSecondaryAction().disabled(inputError != nil)
             }
         }
     }
@@ -185,7 +221,7 @@ struct SpendingAndMovementView: View {
     }
 
     private var activeScope: String {
-        let account = store.sources.accounts.first { $0.id == accountID }?.selectionTitle ?? "All \(currency) accounts"
+        let account = store.sources.accounts.first { $0.id == accountID }?.title ?? "Current \(currency) accounts"
         let from = (try? StatementDate(canonical: appliedStart))?.presentation
         let to = (try? StatementDate(canonical: appliedEnd))?.presentation
         let period = from == nil && to == nil ? "all recorded dates" : "\(from ?? "earliest record") – \(to ?? "latest record")"
@@ -217,29 +253,33 @@ struct SpendingAndMovementView: View {
         let labelledPeriods = plottedPeriods.enumerated().compactMap { index, period in
             labelIndices.contains(index) ? period : nil
         }
-        HStack(alignment: .firstTextBaseline, spacing: 32) {
-            total("Recorded income", value.income)
-            total("Recognized spending", value.spending)
-            VStack(alignment: .leading, spacing: 5) {
-                Text("\(value.unresolvedCount) need review").font(theme.typography.formSection)
-                Button("Review financial treatment") { section = "Movement review"; reviewKind = "Needs review" }.buttonStyle(.borderless)
+        LFPanel {
+            let layout = contentWidth >= 1000 ? AnyLayout(HStackLayout(alignment: .top, spacing: 30)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
+            layout {
+                total("Recorded spending", value.spending).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 12) {
+                    total("Recorded income", value.income)
+                    Text("Interpretation and coverage may be incomplete.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Needs review").font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                    Text(value.unresolvedCount.formatted()).font(theme.typography.headlineMoney).monospacedDigit().foregroundStyle(LFTheme.warning)
+                    Button("Review financial treatment") { section = "Movement review"; reviewKind = "Needs review" }.lfSecondaryAction()
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer()
         }
-        Text("Native \(currency) · Source transaction dates where available, otherwise the labelled financial date. Unresolved movements and missing coverage prevent a complete surplus estimate.")
-            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
         if value.missingDateCount > 0 { Text("\(value.missingDateCount) undated transactions are outside the time chart.").font(theme.typography.formCaption) }
         if value.rows.isEmpty { ContentUnavailableView("No recorded activity in this selection", systemImage: "chart.bar.xaxis") }
         else {
             LFPanel(title: "Income and spending") {
-                if plottedPeriods.count > 1 {
+                if !plottedPeriods.isEmpty {
                 Chart(plottedPeriods) { period in
                     BarMark(x: .value("Month", period.id), y: .value("Native amount", geometry(period.income)))
                         .foregroundStyle(by: .value("Role", "Income")).position(by: .value("Role", "Income"))
                         .accessibilityLabel("\(period.title), recorded income \(amount(period.income))")
                     BarMark(x: .value("Month", period.id), y: .value("Native amount", geometry(period.spending)))
                         .foregroundStyle(by: .value("Role", "Spending")).position(by: .value("Role", "Spending"))
-                        .accessibilityLabel("\(period.title), recognized spending \(amount(period.spending))")
+                        .accessibilityLabel("\(period.title), recorded spending \(amount(period.spending))")
                 }
                 .chartForegroundStyleScale(["Income": Color.mint, "Spending": Color.cyan])
                 .chartXAxis {
@@ -266,13 +306,20 @@ struct SpendingAndMovementView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Monthly income and spending in \(currency)")
                 .accessibilityValue(plottedPeriods.map {
-                    "\($0.title): recorded income \(amount($0.income)), recognized spending \(amount($0.spending))"
+                    "\($0.title): recorded income \(amount($0.income)), recorded spending \(amount($0.spending))"
                 }.joined(separator: "; "))
                 .accessibilityHint("Open Monthly values and coverage for exact amounts and source transactions.")
-                Text("Only periods with recognized amounts are plotted. A missing bar does not establish zero spending; review the monthly coverage below.")
+                Text("Missing bars do not mean zero spending.")
                     .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                } else {
+                    Text("No nonzero recorded amounts are available to plot in this selection.")
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
+            }
+            LFPanel {
                 DisclosureGroup("Monthly values & coverage", isExpanded: $showsPeriods) {
+                    Text("Source transaction dates are used where available; otherwise the labelled financial date. Unresolved movements and missing coverage prevent a complete surplus estimate.")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText).padding(.vertical, 8)
                     ForEach(value.periods) { period in
                         Button { onTransactions(period.transactionIDs) } label: {
                             HStack {
@@ -289,7 +336,7 @@ struct SpendingAndMovementView: View {
             LFPanel(title: "Spending by category") {
                 if value.categories.isEmpty { Text("No spending is yet recognized in this selection.").foregroundStyle(theme.palette.secondaryText) }
                 else if value.categories.count == 1 && value.categories.first?.id == "uncategorized" {
-                    Text("All recognized spending is uncategorized. Review transactions or apply category rules to see category drivers.")
+                    Text("Recorded spending has no categories yet. Review transactions or apply category rules to see category drivers.")
                     HStack {
                         Button("Review transactions") { onTransactions(value.categories[0].transactionIDs) }.lfSecondaryAction()
                         Button("Category rules", action: onCategories).lfSecondaryAction()
@@ -323,61 +370,85 @@ struct SpendingAndMovementView: View {
         }
     }
     private func total(_ title: String, _ number: Decimal) -> some View {
-        VStack(alignment: .leading, spacing: 5) { Text(title).foregroundStyle(theme.palette.secondaryText).font(theme.typography.formCaption); Text(amount(number)).font(theme.typography.formTitle).monospacedDigit() }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).foregroundStyle(theme.palette.secondaryText).font(theme.typography.secondary)
+            Text(amount(number)).font(theme.typography.headlineMoney).monospacedDigit().fixedSize(horizontal: true, vertical: false)
+        }
     }
     private func comparisonView(_ value: SpendingComparison) -> some View {
         let hasBothPeriods = !value.analysis.report.rows.isEmpty && !value.baseline.report.rows.isEmpty
-        return LFPanel(title: periodName(value.analysis) + " compared with " + periodName(value.baseline) + " · " + currency) {
+        return VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
             if hasBothPeriods {
-                comparisonAnswer(value)
-                comparisonChart(value)
-                categoryDrivers(value)
+                let layout = contentWidth >= 1120 ? AnyLayout(HStackLayout(alignment: .top, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+                layout {
+                    comparisonPrimary(value).frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 16) {
+                        comparisonReview(value)
+                        LFPanel(title: "Category drivers") { categoryDrivers(value) }
+                    }.frame(width: contentWidth >= 1120 ? contentWidth * 0.35 : nil)
+                }
             } else {
-                missingComparison(value)
+                LFPanel { missingComparison(value) }
             }
-            DisclosureGroup("Coverage and calculation", isExpanded: $showsComparisonDetails) {
-                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                    if !hasBothPeriods {
-                        Text("These are differences between recorded totals only. Missing records do not establish a spending reduction.")
-                            .foregroundStyle(LFTheme.warning)
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), alignment: .topLeading)], alignment: .leading, spacing: 24) {
-                        comparisonPeriod(value.analysis, title: "Analysis")
-                        comparisonPeriod(value.baseline, title: "Comparison")
-                    }
-                    HStack(alignment: .top, spacing: 30) {
-                        difference("Recorded income difference", value.incomeChange, baseline: value.baseline.report.income,
-                            ids: recognizedIDs(value.analysis.report, treatment: .income).union(recognizedIDs(value.baseline.report, treatment: .income)))
-                        difference("Recorded spending difference", value.spendingChange, baseline: value.baseline.report.spending,
-                            ids: spendingIDs(value.analysis.report).union(spendingIDs(value.baseline.report)))
-                    }
-                    Text("Same \(currency) accounts and recognition rules in both periods. Source transaction dates are used where available; otherwise the labelled financial date. Purchases count once on their original dates. Refunds and charges are separate; loan and EMI entries are excluded.")
-                        .foregroundStyle(theme.palette.secondaryText)
-                }.padding(.top, theme.spacing.controlGap)
-            }.font(theme.typography.body)
-                .accessibilityIdentifier("spending.comparisonDetails")
+            LFPanel {
+                DisclosureGroup("Coverage and calculation", isExpanded: $showsComparisonDetails) {
+                    VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                        if !hasBothPeriods {
+                            Text("These are differences between recorded totals only. Missing records do not establish a spending reduction.")
+                                .foregroundStyle(LFTheme.warning)
+                        }
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), alignment: .topLeading), count: contentWidth >= 820 ? 2 : 1), alignment: .leading, spacing: 24) {
+                            comparisonPeriod(value.analysis, title: "Analysis")
+                            comparisonPeriod(value.baseline, title: "Comparison")
+                        }
+                        let layout = contentWidth >= 900 ? AnyLayout(HStackLayout(alignment: .top, spacing: 30)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+                        layout {
+                            difference("Recorded income difference", value.incomeChange, baseline: value.baseline.report.income,
+                                ids: recognizedIDs(value.analysis.report, treatment: .income).union(recognizedIDs(value.baseline.report, treatment: .income)))
+                            difference("Recorded spending difference", value.spendingChange, baseline: value.baseline.report.spending,
+                                ids: spendingIDs(value.analysis.report).union(spendingIDs(value.baseline.report)))
+                        }
+                        Text("Same \(currency) accounts and recognition rules in both periods. Source transaction dates are used where available; otherwise the labelled financial date. Purchases count once on their original dates. Refunds and charges are separate; loan and EMI entries are excluded.")
+                            .foregroundStyle(theme.palette.secondaryText)
+                    }.padding(.top, theme.spacing.controlGap)
+                }.font(theme.typography.body).accessibilityIdentifier("spending.comparisonDetails")
+            }
         }
     }
 
-    private func comparisonAnswer(_ value: SpendingComparison) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            Text("Recorded spending").font(theme.typography.body)
-            Text(amount(value.analysis.report.spending)).font(theme.typography.headlineMoney).monospacedDigit()
-            Text(spendingChangeSummary(value)).font(theme.typography.rowTitle).monospacedDigit()
+    private func comparisonPrimary(_ value: SpendingComparison) -> some View {
+        LFPanel(title: periodName(value.analysis)) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Recorded spending").font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                Text(amount(value.analysis.report.spending)).font(theme.typography.headlineMoney).monospacedDigit()
+                Text(spendingChangeSummary(value)).font(theme.typography.rowTitle).monospacedDigit()
+                    .foregroundStyle(value.spendingChange > 0 ? LFTheme.warning : theme.palette.primaryText)
+                Text("Compared with " + periodName(value.baseline)).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }.accessibilityIdentifier("spending.comparisonAnswer")
+            comparisonChart(value).padding(.vertical, 20)
+            Divider()
             Text(value.analysis.isPartialCalendarMonth || value.baseline.isPartialCalendarMonth
-                 ? "Partial period · compares recognized records only."
-                 : "Change in recognized records; coverage and interpretation may be incomplete.")
+                 ? "Partial period · recorded transactions only."
+                 : "Based on recorded transactions; some records may be missing or need review.")
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-            HStack(spacing: theme.spacing.sectionGap) {
-                Button("View transactions") { onTransactions(spendingIDs(value.analysis.report)) }
-                    .lfSecondaryAction().disabled(spendingIDs(value.analysis.report).isEmpty)
-                if value.analysis.report.unresolvedCount > 0 {
-                    Button("\(value.analysis.report.unresolvedCount) transactions need interpretation") {
-                        section = "Movement review"; reviewKind = "Needs review"
-                    }.buttonStyle(.borderless).font(theme.typography.body)
-                }
+            Button("Recorded spending transactions") { onTransactions(spendingIDs(value.analysis.report)) }
+                .buttonStyle(.borderless).disabled(spendingIDs(value.analysis.report).isEmpty)
+        }
+    }
+
+    private func comparisonReview(_ value: SpendingComparison) -> some View {
+        let ids = Set(value.analysis.report.rows.filter { $0.treatment == .unresolved }.map(\.id))
+        return LFPanel(contentSpacing: 18) {
+            Text(ids.isEmpty ? "Review status" : "Needs review").font(theme.typography.secondary).foregroundStyle(ids.isEmpty ? theme.palette.secondaryText : LFTheme.warning)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(ids.count.formatted()).font(theme.typography.headlineMoney).monospacedDigit()
+                    .foregroundStyle(ids.isEmpty ? theme.palette.primaryText : LFTheme.warning)
+                Text("transactions in this selection").font(theme.typography.body)
             }
-        }.accessibilityIdentifier("spending.comparisonAnswer")
+            Button("View transactions") { onTransactions(ids) }.lfSecondaryAction().disabled(ids.isEmpty)
+            Button("Review financial treatment") { section = "Movement review"; reviewKind = "Needs review" }
+                .buttonStyle(.borderless).disabled(ids.isEmpty)
+        }
     }
 
     private func missingComparison(_ value: SpendingComparison) -> some View {
@@ -405,44 +476,51 @@ struct SpendingAndMovementView: View {
     }
 
     private func comparisonChart(_ value: SpendingComparison) -> some View {
-        Chart {
-            comparisonBar(value.baseline, label: "Comparison · " + periodName(value.baseline), color: theme.palette.secondaryText)
-            comparisonBar(value.analysis, label: "Analysis · " + periodName(value.analysis), color: .cyan)
+        // Shared numeric domain, derived only from the two existing exact projections.
+        // Negative recorded spending (for example refunds) retains a signed axis.
+        let lower = min(Decimal.zero, value.analysis.report.spending, value.baseline.report.spending)
+        let upper = max(Decimal.zero, value.analysis.report.spending, value.baseline.report.spending)
+        let domain = geometry(lower)...(lower == upper ? geometry(upper) + 1 : geometry(upper))
+        return VStack(alignment: .leading, spacing: 24) {
+            comparisonBar(value.baseline, color: theme.palette.secondaryText, domain: domain)
+            comparisonBar(value.analysis, color: .cyan, domain: domain)
         }
-        .chartXScale(range: .plotDimension(startPadding: 8, endPadding: 110))
-        .chartXAxis(.hidden)
-        .chartYAxis {
-            AxisMarks { _ in AxisValueLabel().font(theme.typography.body) }
-        }
-        .frame(height: 115)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recorded spending comparison in \(currency)")
         .accessibilityValue("\(periodName(value.baseline)): \(amount(value.baseline.report.spending)); \(periodName(value.analysis)): \(amount(value.analysis.report.spending))")
         .accessibilityIdentifier("spending.comparisonChart")
     }
 
-    private func comparisonBar(_ period: SpendingComparisonPeriod, label: String, color: Color) -> some ChartContent {
-        BarMark(x: .value("Recorded spending", geometry(period.report.spending)), y: .value("Period", label), height: .fixed(26))
-            .foregroundStyle(color).cornerRadius(3)
-            .annotation(position: .trailing) { Text(amount(period.report.spending)).font(theme.typography.body.weight(.semibold)).monospacedDigit() }
+    private func comparisonBar(_ period: SpendingComparisonPeriod, color: Color, domain: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(periodName(period)).font(theme.typography.body)
+                Spacer()
+                Text(amount(period.report.spending)).font(theme.typography.rowTitle).monospacedDigit()
+            }
+            Chart {
+                BarMark(xStart: .value("Zero", 0), xEnd: .value("Recorded spending", geometry(period.report.spending)), y: .value("Period", period.title))
+                    .foregroundStyle(color).cornerRadius(3)
+            }.chartXScale(domain: domain).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 24)
+                .background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: 3))
+        }
     }
 
     @ViewBuilder private func categoryDrivers(_ value: SpendingComparison) -> some View {
         if value.contributors.count == 1 && value.contributors.first?.id == "uncategorized" {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                Text("Category drivers are not available yet—all recognized spending is uncategorized.")
+                Text("Recorded spending has no categories yet.")
                     .font(theme.typography.body)
-                HStack(spacing: theme.spacing.controlGap) {
-                    Button("Review categories") { onTransactions(spendingIDs(value.analysis.report).union(spendingIDs(value.baseline.report))) }.lfSecondaryAction()
-                    Button("Category rules", action: onCategories).lfSecondaryAction()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.spacing.controlGap) { categoryReviewActions(value) }
+                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) { categoryReviewActions(value) }
                 }
             }
         } else if !value.contributors.isEmpty {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                Text("Categories behind the change").font(theme.typography.rowTitle)
                 ForEach(value.contributors) { item in
-                    HStack {
-                        Text(item.title).frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.title).font(theme.typography.body.weight(.semibold))
                         Button("Analysis " + amount(item.analysis)) { onTransactions(item.analysisIDs) }.disabled(item.analysisIDs.isEmpty)
                         Button("Comparison " + amount(item.baseline)) { onTransactions(item.baselineIDs) }.disabled(item.baselineIDs.isEmpty)
                         Button("Change " + amount(item.change)) { onTransactions(item.analysisIDs.union(item.baselineIDs)) }
@@ -451,7 +529,14 @@ struct SpendingAndMovementView: View {
                 Text("These categories explain the recorded difference, not the reason your spending changed.")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             }
+        } else {
+            Text("No category contributions are established for this comparison.").foregroundStyle(theme.palette.secondaryText)
         }
+    }
+
+    @ViewBuilder private func categoryReviewActions(_ value: SpendingComparison) -> some View {
+        Button("Review categories") { onTransactions(spendingIDs(value.analysis.report).union(spendingIDs(value.baseline.report))) }.lfSecondaryAction()
+        Button("Category rules", action: onCategories).lfSecondaryAction()
     }
 
     private func spendingChangeSummary(_ value: SpendingComparison) -> String {
@@ -464,21 +549,23 @@ struct SpendingAndMovementView: View {
 
     private func periodName(_ period: SpendingComparisonPeriod) -> String {
         guard periodMode == "Calendar months" else { return period.title }
-        return String(period.start.presentation.dropFirst(3))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = .current
+        return "\(calendar.monthSymbols[period.start.month - 1]) \(period.start.year)"
     }
     private func comparisonPeriod(_ value: SpendingComparisonPeriod, title: String) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             Text(title + " · " + value.title).font(theme.typography.formSection)
             if value.report.rows.isEmpty { Text("No observed transactions in this scope. Zero recorded totals do not establish zero activity.").foregroundStyle(LFTheme.warning) }
             Button("Recorded income: " + amount(value.report.income)) { onTransactions(recognizedIDs(value.report, treatment: .income)) }.buttonStyle(.borderless)
-            Button("Recognized spending: " + amount(value.report.spending)) { onTransactions(spendingIDs(value.report)) }.buttonStyle(.borderless)
+            Button("Recorded spending: " + amount(value.report.spending)) { onTransactions(spendingIDs(value.report)) }.buttonStyle(.borderless)
             Button("\(value.purchaseIDs.count) purchases · average " + (value.averagePurchase.map(averageAmount) ?? "unavailable")) { onTransactions(value.purchaseIDs) }
                 .buttonStyle(.borderless).disabled(value.purchaseIDs.isEmpty)
             Button("Fees / interest " + amount(value.chargeAmount)) { onTransactions(value.chargeIDs) }.buttonStyle(.borderless).disabled(value.chargeIDs.isEmpty)
             let refunds = value.report.rows.filter { $0.treatment == .refund }
             Button("Refunds " + amount(refunds.reduce(0) { $0 + $1.spending })) { onTransactions(Set(refunds.map(\.id))) }.buttonStyle(.borderless).disabled(refunds.isEmpty)
             let unresolved = value.report.rows.filter { $0.treatment == .unresolved }
-            Button("\(unresolved.count) unresolved · " + amount(unresolved.reduce(0) { $0 + $1.source.amount }) + " gross native amount") {
+            Button("\(unresolved.count) need review · " + amount(unresolved.reduce(0) { $0 + $1.source.amount }) + " before offsets") {
                 onTransactions(Set(unresolved.map(\.id)))
             }.buttonStyle(.borderless).disabled(unresolved.isEmpty)
             let excluded = value.report.rows.filter { ![.income, .expense, .refund, .unresolved].contains($0.treatment) }
@@ -487,7 +574,10 @@ struct SpendingAndMovementView: View {
             }.buttonStyle(.borderless).disabled(excluded.isEmpty)
             DisclosureGroup("Source coverage · \(value.coverage.filter { !$0.complete }.count) accounts incomplete") {
                 ForEach(value.coverage) { item in
-                    Text(item.title + " · recorded through " + (item.recordedThrough?.presentation ?? "unknown") + (item.complete ? " · period covered" : " · selected period has gaps"))
+                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                        Text(item.title).font(theme.typography.body)
+                        Text("Recorded through " + (item.recordedThrough?.presentation ?? "unknown") + (item.complete ? " · period covered" : " · selected period has gaps"))
+                    }
                 }
                 Text("Coverage comes from source periods. Classification uncertainty is shown separately above. Missing or unreviewed data is not zero.")
             }.font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
@@ -518,102 +608,164 @@ struct SpendingAndMovementView: View {
         return amount(rounded)
     }
     @ViewBuilder private func movements(_ value: SpendingProjection) -> some View {
-        HStack {
-            Picker("Review", selection: $reviewKind) { ForEach(["Suggestions", "Needs review", "Confirmed", "Dismissed"], id: \.self) { Text($0).tag($0) } }.pickerStyle(.segmented).frame(maxWidth: 520)
-            Spacer()
-            Button("Review selected transactions…") { selection = .init(event: nil, suggested: nil, selectedIDs: [], kind: .ownTransfer) }
+        let layout = contentWidth >= 1080 ? AnyLayout(HStackLayout(spacing: 16)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+        layout {
+            Picker("Review", selection: $reviewKind) {
+                ForEach(["Suggestions", "Needs review", "Confirmed", "Dismissed"], id: \.self) { Text($0).tag($0) }
+            }.pickerStyle(.segmented).frame(maxWidth: 650)
+            Button("Review selected transactions…") { selection = .init(event: nil, suggested: nil, selectedIDs: [], kind: .ownTransfer) }.lfSecondaryAction()
         }
-        Text("Confirm relationships when the original entries support them. Both account entries stay in the ledger. Names and similar amounts are clues, never automatic proof.")
-            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+        Text("Review suggestions before linking entries.")
+            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         if reviewKind == "Suggestions" {
             if value.suggestions.isEmpty { ContentUnavailableView("No movement suggestions in this selection", systemImage: "arrow.left.arrow.right") }
             let groups = SpendingIntelligence.suggestionGroups(value.suggestions)
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(groups.prefix(reviewLimit)) { group in
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(group.suggestions.count == 1 ? group.suggestions[0].tentativeTitle : "\(group.suggestions.count) alternatives sharing these entries")
-                            .font(theme.typography.formSection)
-                        legs(group.transactionIDs.sorted())
-                        if group.suggestions.count > 1 {
-                            Text("One decision: these alternatives share at least one entry. Review the complete reference and source roles before choosing.").foregroundStyle(LFTheme.warning)
-                        }
-                        ForEach(group.suggestions) { suggestion in
-                            HStack(alignment: .top, spacing: 16) {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(suggestion.tentativeTitle + " · " + candidateAccounts(suggestion)).font(theme.typography.body.weight(.semibold))
-                                    Text(suggestion.explanation).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
-                                    if let warning = suggestion.routeWarning { Text(warning).foregroundStyle(LFTheme.warning) }
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                                Button("Review") { selection = .init(event: nil, suggested: suggestion, selectedIDs: Set(suggestion.transactionIDs), kind: suggestion.kind) }
-                                Button("Dismiss") { dismiss(suggestion) }.buttonStyle(.borderless)
+                    LFPanel(contentSpacing: 12) {
+                        if group.suggestions.count == 1, let suggestion = group.suggestions.first {
+                            suggestionHeading(suggestion)
+                            legs(group.transactionIDs.sorted())
+                            suggestionEvidence(suggestion)
+                        } else {
+                            Text("\(group.suggestions.count) alternatives sharing these entries").font(theme.typography.rowTitle)
+                            legs(group.transactionIDs.sorted())
+                            Text("One decision: these alternatives share at least one entry. Review the complete reference and source roles before choosing.")
+                                .font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+                            ForEach(group.suggestions) { suggestion in
+                                Divider()
+                                suggestionHeading(suggestion)
+                                Text(candidateAccounts(suggestion)).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                                suggestionEvidence(suggestion)
                             }
                         }
-                    }.padding(.vertical, 10)
-                    Divider()
+                    }
                 }
             }
-            if groups.count > reviewLimit { Button("Show more decisions") { reviewLimit += 40 } }
+            if groups.count > reviewLimit { Button("Show more decisions") { reviewLimit += 40 }.lfSecondaryAction() }
         } else if reviewKind == "Needs review" {
             let unresolved = value.rows.filter { $0.treatment == .unresolved }
-            LazyVStack(alignment: .leading, spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(unresolved.prefix(reviewLimit)) { row in
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            sourceRow(row.source)
-                            Text(row.explanation).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                    LFPanel(contentSpacing: 12) {
+                        HStack {
+                            Text("Needs review").font(theme.typography.rowTitle)
+                            Spacer()
+                            Button("Review") { selection = .init(event: nil, suggested: nil, selectedIDs: [row.id], kind: row.source.isBankIn ? .income : .expense) }.lfSecondaryAction()
                         }
-                        Button("Review") { selection = .init(event: nil, suggested: nil, selectedIDs: [row.id], kind: row.source.isBankIn ? .income : .expense) }
-                    }.padding(.vertical, 10)
-                    Divider()
+                        sourceRow(row.source)
+                        Text(row.explanation).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    }
                 }
             }
-            if unresolved.count > reviewLimit { Button("Show more entries") { reviewLimit += 40 } }
+            if unresolved.isEmpty { Text("No transactions need review in this selection.").foregroundStyle(theme.palette.secondaryText) }
+            if unresolved.count > reviewLimit { Button("Show more entries") { reviewLimit += 40 }.lfSecondaryAction() }
         } else {
-            let events = store.snapshot?.movements.filter { $0.decision == (reviewKind == "Confirmed" ? .confirmed : .rejected) && $0.transactionIDs.contains(where: Set(value.rows.map(\.id)).contains) } ?? []
+            let hiddenHistoryRows = Set(model.sourceRows.filter { !relationshipHistoryScope.includes($0.accountID) }.map(\.id))
+            let events = store.snapshot?.movements.filter { $0.decision == (reviewKind == "Confirmed" ? .confirmed : .rejected)
+                && $0.transactionIDs.contains(where: Set(value.rows.map(\.id)).contains)
+                && $0.transactionIDs.allSatisfy { !hiddenHistoryRows.contains($0) } } ?? []
             if events.isEmpty { Text("No \(reviewKind.lowercased()) relationships in this selection.").foregroundStyle(theme.palette.secondaryText) }
             ForEach(events) { event in
-                VStack(alignment: .leading, spacing: 8) {
+                LFPanel(contentSpacing: 12) {
                     HStack {
-                        Text(event.kind.title).font(theme.typography.formSection)
+                        Text(event.kind.title).font(theme.typography.rowTitle)
                         Spacer()
                         if event.kind.isInScope {
-                            Button("Edit") { selection = .init(event: event, suggested: nil, selectedIDs: Set(event.transactionIDs), kind: event.kind) }
-                            Button(event.decision == .confirmed ? "Unlink" : "Revisit") { request { perform { guard let generation else { throw FinancialIntelligenceError.unavailable }; try FinancialIntelligenceCoordinator().removeMovement(event, generation: generation) } } }.buttonStyle(.borderless)
+                            Button("Edit") { selection = .init(event: event, suggested: nil, selectedIDs: Set(event.transactionIDs), kind: event.kind) }.lfSecondaryAction()
+                            Button(event.decision == .confirmed ? "Unlink" : "Revisit") { request { perform { guard let generation else { throw FinancialIntelligenceError.unavailable }; try FinancialIntelligenceCoordinator().removeMovement(event, generation: generation) } } }.lfSecondaryAction()
                         } else {
-                            Text("Historical interpretation · outside analysis scope").font(theme.typography.formCaption)
+                            Text("Saved decision · outside this selection").font(theme.typography.secondary)
                         }
                     }
                     legs(event.transactionIDs)
-                    Text(event.explanation).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                    Text(event.explanation).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     if let conflict = SpendingIntelligence.contradiction(event, rows: model.sourceRows, sources: store.sources) {
                         Text(conflict).foregroundStyle(LFTheme.warning)
                     }
-                }.padding(.vertical, 12)
-                Divider()
+                }
             }
         }
     }
+
+    private func suggestionHeading(_ suggestion: MovementSuggestion) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(suggestion.tentativeTitle).font(theme.typography.rowTitle)
+            Spacer(minLength: 12)
+            Button("Review") { selection = .init(event: nil, suggested: suggestion, selectedIDs: Set(suggestion.transactionIDs), kind: suggestion.kind) }
+                .lfSecondaryAction().accessibilityIdentifier("movements.review.\(suggestion.id)")
+            Button("Dismiss") { dismiss(suggestion) }
+                .lfSecondaryAction().accessibilityIdentifier("movements.dismiss.\(suggestion.id)")
+        }
+    }
+
+    private func suggestionEvidence(_ suggestion: MovementSuggestion) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(suggestion.explanation).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            if let warning = suggestion.routeWarning { Text(warning).font(theme.typography.secondary).foregroundStyle(LFTheme.warning) }
+        }
+    }
+
+    private var relationshipHistoryScope: AccountPresentationScope {
+        .init(selectedAccountIDs: [],
+            historyOnlyAccountIDs: Set(store.sources.accounts.filter(\.isHistoryOnly).map(\.id))
+                .subtracting(accountID.isEmpty ? [] : [accountID]))
+    }
+
     private func legs(_ ids: [String]) -> some View {
         let selected = Set(ids)
         return VStack(alignment: .leading, spacing: 6) {
             ForEach(model.sourceRows.filter { selected.contains($0.id) }) { sourceRow($0) }
             if model.sourceRows.contains(where: { selected.contains($0.id) && $0.currency != currency }) {
-                Text("Counterpart entries in another native currency are included for this relationship review.").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                Text("Linked entries in other currencies are shown for this review.").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             }
         }
     }
     private func sourceRow(_ row: SpendingSourceRow) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(row.date?.presentation ?? "Date unavailable").frame(width: 95, alignment: .leading).help(row.dateRole)
-            Text(store.sources.accounts.first { $0.id == row.accountID }?.selectionTitle ?? row.accountTitle).frame(width: 205, alignment: .leading)
-            Text(row.transaction.description).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
-            Text(row.exactAmount).monospacedDigit().frame(width: 180, alignment: .trailing)
-            Button { onTransactions([row.id]) } label: { Image(systemName: "arrow.up.right.square") }.buttonStyle(.borderless).help("Inspect the original transaction")
-        }.font(theme.typography.formCaption)
+        VStack(alignment: .leading, spacing: 6) {
+            if contentWidth >= 1050 {
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                    Text(row.date?.presentation ?? "Date unavailable").font(theme.typography.secondary)
+                        .frame(width: 100, alignment: .leading).help(row.dateRole)
+                    movementAccount(row)
+                        .font(theme.typography.body.weight(.semibold)).frame(width: 240, alignment: .leading)
+                    Text(row.transaction.description).font(theme.typography.body).lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading).help(row.transaction.description)
+                    movementAmount(row)
+                    inspectEntry(row)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    movementAccount(row)
+                        .font(theme.typography.body.weight(.semibold))
+                    Spacer()
+                    movementAmount(row)
+                    inspectEntry(row)
+                }
+                Text(row.date?.presentation ?? "Date unavailable").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText).help(row.dateRole)
+                Text(row.transaction.description).font(theme.typography.body).lineLimit(2).help(row.transaction.description)
+            }
+        }.padding(.vertical, 3)
+    }
+
+    private func movementAmount(_ row: SpendingSourceRow) -> some View {
+        Text(row.exactAmount).font(theme.typography.tableMoney).monospacedDigit().fixedSize()
+            .foregroundStyle(row.transaction.money.amount == 0 ? theme.palette.primaryText : ((row.isBankOut || row.transaction.cardLiabilityEffect == .increasesAmountOwed) ? LFTheme.danger : (row.isBankIn || row.transaction.cardLiabilityEffect == .decreasesAmountOwed) ? LFTheme.success : theme.palette.primaryText))
+    }
+
+    private func movementAccount(_ row: SpendingSourceRow) -> some View {
+        let account = store.sources.accounts.first { $0.id == row.accountID }
+        return LFAccountLabel(title: account?.title ?? row.accountTitle, detail: account?.selectionContext ?? row.currency)
+    }
+
+    private func inspectEntry(_ row: SpendingSourceRow) -> some View {
+        Button { onTransactions([row.id]) } label: { Image(systemName: "arrow.up.right.square") }
+            .buttonStyle(.borderless).help("Inspect the original transaction").accessibilityLabel("Inspect original transaction")
+            .accessibilityIdentifier("movements.inspect.\(row.id)")
     }
     private func candidateAccounts(_ suggestion: MovementSuggestion) -> String {
         model.sourceRows.filter { suggestion.transactionIDs.contains($0.id) }.map { row in
-            store.sources.accounts.first { $0.id == row.accountID }?.selectionTitle ?? row.accountTitle
+            store.sources.accounts.first { $0.id == row.accountID }?.title ?? row.accountTitle
         }.joined(separator: " ↔ ")
     }
     private func refresh() {
@@ -673,6 +825,7 @@ private struct MovementReviewEditor: View {
     let rows: [SpendingSourceRow]
     let generation: ProviderGenerationToken?
     let sources: FinancialSourceContext
+    let historyScope: AccountPresentationScope
     @State private var ids: Set<String> = []
     @State private var kind: MovementKind = .ownTransfer
     @State private var explanation = ""
@@ -749,11 +902,11 @@ private struct MovementReviewEditor: View {
     }
     private var matches: [SpendingSourceRow] {
         let words = search.uppercased().split(separator: " ")
-        return rows.filter { row in let text = row.text + " " + row.accountTitle.uppercased(); return !row.isLoanOrEMI && words.allSatisfy { text.contains($0) } }.sorted { ($0.date?.canonical ?? "", $0.id) > ($1.date?.canonical ?? "", $1.id) }
+        return rows.filter { row in let text = row.text + " " + row.accountTitle.uppercased(); return historyScope.includes(row.accountID) && !row.isLoanOrEMI && words.allSatisfy { text.contains($0) } }.sorted { ($0.date?.canonical ?? "", $0.id) > ($1.date?.canonical ?? "", $1.id) }
     }
     private func rowLabel(_ row: SpendingSourceRow) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack { Text(sources.accounts.first { $0.id == row.accountID }?.selectionTitle ?? row.accountTitle); Text(row.date?.presentation ?? "Date unavailable"); Text(row.exactAmount).monospacedDigit() }.font(theme.typography.formSection)
+            HStack { Text(sources.accounts.first { $0.id == row.accountID }?.title ?? row.accountTitle); Text(row.date?.presentation ?? "Date unavailable"); Text(row.exactAmount).monospacedDigit() }.font(theme.typography.formSection)
             Text(row.transaction.description).font(theme.typography.formCaption).textSelection(.enabled)
             Text(row.dateRole + (row.transaction.reference.map { " · Reference " + $0 } ?? "")).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
         }.frame(maxWidth: .infinity, alignment: .leading)

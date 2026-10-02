@@ -33,26 +33,26 @@ int main(void) {
     ole.SSecID = NULL;
     assert(read_MSAT_trailer(&ole) == -1 && ole.SSecID == NULL);
 
-    assert(transcode_latin1_to_utf8("a", SIZE_MAX) == NULL);
-    assert(transcode_latin1_to_utf8("a", SIZE_MAX - 1) == NULL);
-    char *latin = transcode_latin1_to_utf8("A\xE9", 2);
+    assert(transcode_latin1_to_utf8("a", SIZE_MAX, NULL) == NULL);
+    assert(transcode_latin1_to_utf8("a", SIZE_MAX - 1, NULL) == NULL);
+    char *latin = transcode_latin1_to_utf8("A\xE9", 2, NULL);
     assert(latin != NULL && strcmp(latin, "A\xC3\xA9") == 0);
     free(latin);
     xls_locale_t locale = xls_createlocale();
     assert(locale != NULL);
-    assert(unicode_decode_wcstombs("a", SIZE_MAX, locale) == NULL);
+    assert(unicode_decode_wcstombs("a", SIZE_MAX, locale, NULL) == NULL);
     const char invalid_utf16[] = {0, (char)0xD8};
-    assert(unicode_decode_wcstombs(invalid_utf16, sizeof(invalid_utf16), locale) == NULL);
+    assert(unicode_decode_wcstombs(invalid_utf16, sizeof(invalid_utf16), locale, NULL) == NULL);
     const char ascii_utf16[] = {'A', 0};
-    char *wide = unicode_decode_wcstombs(ascii_utf16, sizeof(ascii_utf16), locale);
+    char *wide = unicode_decode_wcstombs(ascii_utf16, sizeof(ascii_utf16), locale, NULL);
     assert(wide != NULL && strcmp(wide, "A") == 0);
     free(wide);
     xls_freelocale(locale);
 #ifdef HAVE_ICONV
     iconv_t converter = iconv_open("UTF-8", "ISO-8859-1");
     assert(converter != (iconv_t)-1);
-    assert(unicode_decode_iconv("a", SIZE_MAX, converter) == NULL);
-    char *expanded = unicode_decode_iconv("\xE9\xE9", 2, converter);
+    assert(unicode_decode_iconv("a", SIZE_MAX, converter, NULL) == NULL);
+    char *expanded = unicode_decode_iconv("\xE9\xE9", 2, converter, NULL);
     assert(expanded != NULL && strcmp(expanded, "\xC3\xA9\xC3\xA9") == 0);
     free(expanded);
     iconv_close(converter);

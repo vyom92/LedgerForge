@@ -76,13 +76,29 @@ struct BackupRestoreSettingsSection: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject private var recovery = BackupRestoreCoordinator.shared
     @State private var selecting = false
+    var availableWidth: CGFloat = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-            Text("Backup & Restore").font(theme.typography.rowTitle)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: theme.spacing.controlGap) { actions }
-                VStack(alignment: .leading, spacing: theme.spacing.controlGap) { actions }
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            LFSettingsPageHeader("Backup & Restore", subtitle: "A verified copy of Current Database, or a saved backup to restore.")
+            LFSettingsColumns(availableWidth: availableWidth) {
+                LFPanel(title: "Create a backup", systemImage: "archivebox") {
+                    Text("Save a verified copy of Current Database.")
+                        .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                    Button("Create Backup…", systemImage: "archivebox") { select(destination: true) }
+                        .lfPrimaryAction()
+                        .disabled(selecting || recovery.isBusy || recovery.candidateManifest != nil)
+                        .padding(.top, theme.spacing.sectionGap)
+                }
+            } trailing: {
+                LFPanel(title: "Restore a backup", systemImage: "arrow.counterclockwise") {
+                    Text("Choose a saved LedgerForge backup.")
+                        .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                    Button("Restore Backup…", systemImage: "arrow.counterclockwise") { select(destination: false) }
+                        .lfSecondaryAction()
+                        .disabled(selecting || recovery.isBusy || recovery.candidateManifest != nil)
+                        .padding(.top, theme.spacing.sectionGap)
+                }
             }
             if recovery.canCreateNewLedger {
                 Button("Create New Ledger…") {
@@ -113,14 +129,6 @@ struct BackupRestoreSettingsSection: View {
         }
     }
 
-    @ViewBuilder private var actions: some View {
-        Button("Create Backup…") { select(destination: true) }
-            .lfSecondaryAction()
-            .disabled(selecting || recovery.isBusy || recovery.candidateManifest != nil)
-        Button("Restore Backup…") { select(destination: false) }
-            .lfSecondaryAction()
-            .disabled(selecting || recovery.isBusy || recovery.candidateManifest != nil)
-    }
     private func select(destination: Bool) {
         selecting = true
         Task {

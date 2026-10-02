@@ -95,6 +95,7 @@ final class BackupPackageTests: XCTestCase {
             try BackupCompatibility.verifyDatabase(db)
             XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, allMigrations.count)
             XCTAssertEqual(try db.queryInt("SELECT count(*) FROM net_worth_exclusions;"), 0)
+            XCTAssertEqual(try db.queryInt("SELECT count(*) FROM monthly_plan_scratchpads;"), 0)
         }
     }
 
@@ -332,6 +333,78 @@ final class BackupPackageTests: XCTestCase {
             unchanged.database.close()
         }
     }
+    func testExplicitRestoreRecoversFailedRollbackAndRetainsReceiptOwnedAssets() async throws {
+        for failStartupRecovery in [false, true] {
+            let directory = try temporary()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let backup = try package(at: directory)
+            let current = directory.appendingPathComponent("current.sqlite")
+            let layout = RestoreLayout(current: current)
+            let provider = try SQLiteRepositoryProvider(path: current.path, migrations: allMigrations)
+            let initial = try provider.database.validatedActivationStamp()
+            let saved = DatabaseProvider.shared
+            DatabaseProvider.shared = .verifiedSQLite(provider)
+            defer { DatabaseProvider.shared = saved }
+            let coordinator = BackupRestoreCoordinator(testingAt: current)
+            coordinator.installTestProvider(provider)
+            coordinator.failuresForTesting = [.afterPreservation, .rollbackOpen]
+            await coordinator.verifyRestore(from: backup)
+            XCTAssertNotNil(coordinator.candidateManifest, coordinator.message)
+            await coordinator.replaceLedger()
+            XCTAssertFalse(DatabaseProvider.shared.persistenceState.isUsable, coordinator.message)
+            XCTAssertTrue(DatabaseActivityGate.shared.isUnavailable)
+            XCTAssertNil(coordinator.ledgerLifecyclePermit)
+            XCTAssertFalse(DatabaseActivityGate.shared.hasExclusiveOperation)
+
+            let authority = LedgerAccessCoordinator.shared(path: current.path)
+            XCTAssertTrue(try authority.readStamp().transitioning)
+            let failed = try XCTUnwrap(layout.readReceipt())
+            XCTAssertEqual(failed.phase, .preserved)
+            let receiptBytes = try Data(contentsOf: layout.receipt)
+            let assetPaths = ["candidate.sqlite", "candidate.ledgerforgebackup/ledger.sqlite", "candidate.ledgerforgebackup/manifest.json"]
+                + failed.priorFiles.map { "previous/" + $0 }
+            let failedOperation = layout.operation(failed.operationID)
+            let assetHashes = try Dictionary(uniqueKeysWithValues: assetPaths.map {
+                ($0, try BackupFiles.hash(failedOperation.appendingPathComponent($0)).sha256)
+            })
+
+            var recovery = coordinator
+            if failStartupRecovery {
+                // Exercise the receipt-owned failed-startup route as well as
+                // retry in the original coordinator with its closed provider.
+                recovery = BackupRestoreCoordinator(testingAt: current)
+                try recovery.recoverBeforeStartup()
+                XCTAssertNotNil(recovery.ledgerLifecyclePermit)
+                recovery.startupDidFail()
+                XCTAssertNil(recovery.ledgerLifecyclePermit)
+                XCTAssertTrue(try authority.readStamp().transitioning)
+                XCTAssertEqual(try Data(contentsOf: layout.receipt), receiptBytes)
+            }
+            recovery.failuresForTesting = []
+            defer { try? recovery.closeTestProvider() }
+            await recovery.verifyRestore(from: backup)
+            XCTAssertNotNil(recovery.candidateManifest, recovery.message)
+            await recovery.replaceLedger()
+
+            XCTAssertTrue(DatabaseProvider.shared.persistenceState.isUsable, recovery.message)
+            XCTAssertFalse(DatabaseActivityGate.shared.isUnavailable)
+            XCTAssertFalse(DatabaseActivityGate.shared.hasExclusiveOperation)
+            XCTAssertNil(recovery.ledgerLifecyclePermit)
+            let stable = try authority.withAccess { try authority.validate(expected: nil, permit: nil) }
+            XCTAssertFalse(stable.transitioning)
+            XCTAssertNotEqual(stable.epoch, initial.epoch)
+            let restored = try XCTUnwrap(layout.readReceipt())
+            XCTAssertEqual(restored.phase, .activated)
+            XCTAssertNotEqual(restored.operationID, failed.operationID)
+            XCTAssertFalse(restored.priorWasUsable)
+            XCTAssertEqual(try Data(contentsOf: failedOperation.appendingPathComponent("retained-operation.json")), receiptBytes)
+            for (path, hash) in assetHashes {
+                XCTAssertEqual(try BackupFiles.hash(failedOperation.appendingPathComponent(path)).sha256, hash, path)
+            }
+            XCTAssertEqual(try BackupFiles.verifyPackage(backup).backupID, restored.backupID)
+        }
+    }
+
     func testStaleGenerationRejectsOperations() throws {
         let validity = ProviderGenerationValidity()
         XCTAssertEqual(try validity.withValidOperation { 7 }, 7)

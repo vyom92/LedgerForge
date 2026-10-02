@@ -7,6 +7,36 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct GmailInboxTests {
+    @Test(.globalRuntimeStateIsolation)
+    func noUpdateNeededReceiptsSurviveReloadAndReturnOnlyAfterExplicitRevisit() async throws {
+        let provider = DatabaseProvider(inMemory: true)
+        let previous = DatabaseProvider.shared
+        DatabaseProvider.shared = provider
+        defer { DatabaseProvider.shared = previous }
+        var retained = source(attention: .skipped)
+        retained.retainedNewerHoldings = true
+        let digest = try #require(retained.sha256)
+        _ = try provider.gmailInboxRepo.save(state(source: retained), originals: [digest: bytes], expectedRevision: 0)
+        let suite = "LedgerForge.S100.Queue.\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let session = GmailIntakeSession(preferences: preferences)
+        #expect(session.batchSources.isEmpty)
+        await session.reloadInbox()
+        #expect(session.isReconciled)
+        #expect(session.batchSources.isEmpty)
+        #expect(session.status(for: retained) == "Current holdings kept · No update needed")
+        session.selectedSourceID = retained.id
+        session.revisitSelected()
+        #expect(session.batchSources.map(\.id) == [retained.id])
+        #expect(session.selectedSource?.retainedNewerHoldings == nil)
+        #expect(try provider.gmailInboxRepo.original(sha256: digest, byteCount: bytes.count) == bytes)
+        let replacement = DatabaseProvider(inMemory: true)
+        DatabaseProvider.shared = replacement
+        #expect(!session.isReconciled)
+        #expect(session.batchSources.isEmpty)
+    }
+
     @Test func senderEditsSurviveReopenAndCannotAdvanceAnotherSendersCoverage() throws {
         let database = try database(); defer { database.close() }
         let repository = SQLiteGmailInboxRepository(database: database)

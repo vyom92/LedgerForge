@@ -5,6 +5,99 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct ImportCentreCoordinatorTests {
+    @Test func queuedAutomaticCardCommitWaitsForCompleteDistinctChoices() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.nextIdentityReview = .cardChoiceRequired(eligibleLiabilityAccountIds: ["account"])
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.startConfirmedBatch([URL(fileURLWithPath: "/opaque-mechanics/card-choice")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        let preparationID = coordinator.currentItem?.preparation?.id
+        let sections = ["a", "b"]
+        coordinator.selectCardLiabilityAccount(accountID: "account", requiredSectionIDs: sections)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "a",
+            choice: .reuseExistingInstrument(instrumentId: "first-card"), requiredSectionIDs: sections)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .reuseExistingInstrument(instrumentId: "second-card"), requiredSectionIDs: sections)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .reuseExistingInstrument(instrumentId: "first-card"), requiredSectionIDs: sections)
+        for _ in 0..<30 { await Task.yield() }
+        #expect(probe.commitCallCount == 0 && probe.cancelledPreparationIDs.isEmpty)
+        #expect(coordinator.currentItem?.phase == .awaitingConfirmation)
+        #expect(coordinator.currentItem?.preparation?.id == preparationID)
+        #expect(coordinator.currentItem?.cardSectionDraftChoices.count == 2)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .createNewInstrument(), requiredSectionIDs: sections)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .createNewInstrument(relationship: .replacement), requiredSectionIDs: sections)
+        for _ in 0..<30 { await Task.yield() }
+        #expect(probe.commitCallCount == 0 && probe.cancelledPreparationIDs.isEmpty)
+        #expect(coordinator.currentItem?.phase == .awaitingConfirmation)
+        #expect(coordinator.currentItem?.preparation?.id == preparationID)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .createNewInstrument(), requiredSectionIDs: sections)
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(probe.commitCallCount == 1 && probe.prepareCallCount == 1)
+        #expect(probe.committedPreparationIDs == [preparationID].compactMap { $0 })
+        #expect(probe.cancelledPreparationIDs.isEmpty)
+    }
+
+    @Test func repeatedCardDestinationsKeepTheSameReviewOpenUntilCorrected() async {
+        // Opaque queue state only: no statement, financial row or source fixture.
+        let probe = ImportCentreWorkflowProbe()
+        probe.nextIdentityReview = .cardChoiceRequired(eligibleLiabilityAccountIds: ["account"])
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/opaque-mechanics/card-choice")]))
+        await waitUntil { coordinator.currentItem?.phase == .awaitingConfirmation }
+        let preparationID = coordinator.currentItem?.preparation?.id
+        let sections = ["a", "b"]
+        coordinator.updateAccountChoice(.useExistingCardLiabilityAccountSections(accountId: "account",
+            sectionChoices: ["a": .createNewInstrument()]))
+        await coordinator.confirmCurrent()
+        #expect(probe.commitCallCount == 0 && coordinator.currentItem?.preparation?.id == preparationID)
+        coordinator.selectCardLiabilityAccount(accountID: "account", requiredSectionIDs: sections)
+        for section in sections {
+            coordinator.updateCardSectionChoice(accountID: "account", sectionID: section,
+                choice: .reuseExistingInstrument(instrumentId: "same-card"), requiredSectionIDs: sections)
+        }
+        #expect(coordinator.currentItem?.accountChoice == nil)
+        #expect(coordinator.currentItem?.cardSectionDraftChoices.count == 2)
+        await coordinator.confirmCurrent()
+        #expect(probe.commitCallCount == 0)
+        #expect(coordinator.currentItem?.phase == .awaitingConfirmation)
+        #expect(coordinator.currentItem?.preparation?.id == preparationID)
+        #expect(probe.cancelledPreparationIDs.isEmpty)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .createNewInstrument(relationship: .replacement), requiredSectionIDs: sections)
+        #expect(coordinator.currentItem?.accountChoice == nil)
+        await coordinator.confirmCurrent()
+        #expect(probe.commitCallCount == 0)
+        #expect(coordinator.currentItem?.phase == .awaitingConfirmation)
+        #expect(coordinator.currentItem?.preparation?.id == preparationID)
+        #expect(coordinator.currentItem?.cardSectionDraftChoices.count == 2)
+        #expect(probe.cancelledPreparationIDs.isEmpty)
+        coordinator.updateCardSectionChoice(accountID: "account", sectionID: "b",
+            choice: .createNewInstrument(), requiredSectionIDs: sections)
+        #expect(coordinator.currentItem?.accountChoice != nil)
+        await coordinator.confirmCurrent()
+        #expect(probe.commitCallCount == 1)
+        #expect(probe.committedPreparationIDs == [preparationID].compactMap { $0 })
+        #expect(coordinator.batchSummary.isComplete)
+    }
+
+    @Test func noUpdateNeededReleasesPreparationAndAdvancesWithoutACommit() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.retainsNewerHoldings = true
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/tmp/opaque-no-update-first"), URL(fileURLWithPath: "/tmp/opaque-no-update-second")]))
+        await waitUntil { coordinator.batchSummary.isComplete }
+        #expect(probe.prepareCallCount == 2)
+        #expect(probe.commitCallCount == 0)
+        #expect(probe.cancelledPreparationIDs.count == 2)
+        #expect(coordinator.items.allSatisfy { $0.retainedNewerHoldings && $0.preparation == nil })
+        #expect(coordinator.batchSummary.noUpdateNeededCount == 2)
+        #expect(coordinator.batchSummary.committedCount == 0)
+    }
+
     @Test func skippedPresentationRemainsDistinctFromCancellation() {
         let presentation = ImportActivityPresentation(
             importState: .skipped(fileName: "opaque-skipped"),
@@ -209,6 +302,195 @@ struct ImportCentreCoordinatorTests {
         #expect(probe.operationIDs.last != firstOperationID)
         #expect(coordinator.items[1].phase == .pending)
         coordinator.cancelBatch()
+    }
+
+    @Test func productionRetryPolicyKeepsCredentialAndAcquisitionRecoveryBounded() {
+        let cases: [(Error, Bool)] = [
+            (ImportError.passwordRequired, true),
+            (ImportError.incorrectPassword, true),
+            (SourceContentSnapshotError.acquisitionFailed, true),
+            (ImportError.readerFailure(message: "opaque failure"), true),
+            (ImportError.unknown(message: "opaque failure"), true),
+            (SourceContentSnapshotError.invalidated, false),
+            (ImportError.unsupportedFile(extension: "opaque"), false),
+            (ImportError.readerUnavailable(extension: "opaque"), false),
+            (ImportError.invalidDocument(message: "opaque failure"), false),
+            (ImportError.unsupportedStatement(message: "opaque failure"), false),
+            (ImportError.cancelled, false),
+            (CancellationError(), false)
+        ]
+        for (error, expected) in cases {
+            #expect(ImportCentreCoordinator<PreparedImport>.isRetryablePreparationFailure(error) == expected)
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func incorrectPasswordRetryReacquiresSnapshotAndRequestsPasswordForSameItem() async throws {
+        // The reader always fails before returning document content. These are
+        // nonfinancial unlock mechanics, with no real file or credential store.
+        let passwordProvider = ImportCentreRetryPasswordProvider(returnsPasswordOnce: true)
+        let persistence = ImportCentrePreparationFailureProbe()
+        var snapshots: [SourceContentSnapshot] = []
+        var acquiredURLs: [URL] = []
+        let generation = ProviderGenerationToken()
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: ImportCentreRetryReaderRegistry(),
+                passwordProvider: passwordProvider
+            ),
+            sourceSnapshotAcquirer: { url in
+                acquiredURLs.append(url)
+                let snapshot = SourceContentSnapshot(bytes: Data("nonfinancial unlock mechanics".utf8))
+                snapshots.append(snapshot)
+                return snapshot
+            },
+            importPersistenceCoordinator: persistence,
+            developerConsole: DeveloperConsole(),
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { generation },
+            rejectedAttemptHydration: {},
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil })
+        )
+        let coordinator = ImportCentreCoordinator<PreparedImport>.production(using: engine)
+        let sourceURL = URL(fileURLWithPath: "/opaque-mechanics/unlock-retry.pdf")
+        #expect(coordinator.selectSource(sourceURL))
+        await waitUntil { coordinator.currentItem?.phase == .failed && !coordinator.isPreparationDraining }
+        let itemID = try #require(coordinator.currentItem?.id)
+        #expect(coordinator.currentItem?.retrySourceURL == sourceURL)
+        #expect(coordinator.permitsRetry)
+        #expect(passwordProvider.requestIDs().count == 1)
+        #expect(snapshots.count == 1)
+        #expect(throws: SourceContentSnapshotError.invalidated) { try snapshots[0].withBytes { $0.count } }
+
+        #expect(coordinator.retryCurrent())
+        await waitUntil { coordinator.items.first?.phase == .cancelled && !coordinator.isPreparationDraining }
+
+        let requestIDs = passwordProvider.requestIDs()
+        #expect(requestIDs.count == 2 && Set(requestIDs).count == 2)
+        #expect(acquiredURLs == [sourceURL, sourceURL])
+        #expect(snapshots.count == 2 && snapshots[0].id != snapshots[1].id)
+        #expect(throws: SourceContentSnapshotError.invalidated) { try snapshots[1].withBytes { $0.count } }
+        #expect(coordinator.items.count == 1 && coordinator.items[0].id == itemID)
+        #expect(coordinator.items[0].queuePosition == 0)
+        #expect(!coordinator.permitsRetry)
+        #expect(persistence.persistCallCount == 0)
+        #expect(persistence.validationFailureCallCount == 0)
+        #expect(persistence.snapshotRejectionCallCount == 0)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func acquisitionFailureRetryReacquiresSameSourceAndCancellationStaysTerminal() async throws {
+        let passwordProvider = ImportCentreRetryPasswordProvider(returnsPasswordOnce: false)
+        let persistence = ImportCentrePreparationFailureProbe()
+        var acquiredURLs: [URL] = []
+        let generation = ProviderGenerationToken()
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: ImportCentreRetryReaderRegistry(),
+                passwordProvider: passwordProvider
+            ),
+            sourceSnapshotAcquirer: { url in
+                acquiredURLs.append(url)
+                if acquiredURLs.count == 1 { throw SourceContentSnapshotError.acquisitionFailed }
+                return SourceContentSnapshot(bytes: Data("nonfinancial acquisition mechanics".utf8))
+            },
+            importPersistenceCoordinator: persistence,
+            developerConsole: DeveloperConsole(),
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { generation },
+            rejectedAttemptHydration: {},
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil })
+        )
+        let coordinator = ImportCentreCoordinator<PreparedImport>.production(using: engine)
+        let sourceURL = URL(fileURLWithPath: "/opaque-mechanics/acquisition-retry.pdf")
+        #expect(coordinator.selectSource(sourceURL))
+        await waitUntil { coordinator.currentItem?.phase == .failed && !coordinator.isPreparationDraining }
+        let itemID = try #require(coordinator.currentItem?.id)
+        #expect(coordinator.permitsRetry)
+        #expect(await passwordProvider.requestIDs().isEmpty)
+        #expect(persistence.snapshotRejectionCallCount == 1)
+
+        #expect(coordinator.retryCurrent())
+        await waitUntil { coordinator.items.first?.phase == .cancelled && !coordinator.isPreparationDraining }
+
+        #expect(acquiredURLs == [sourceURL, sourceURL])
+        #expect(coordinator.items.count == 1 && coordinator.items[0].id == itemID)
+        #expect(passwordProvider.requestIDs().count == 1)
+        #expect(!coordinator.permitsRetry)
+        #expect(persistence.persistCallCount == 0)
+        #expect(persistence.validationFailureCallCount == 0)
+        #expect(persistence.snapshotRejectionCallCount == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func validationFailureWaitsForContinueAndRecordsOneRejectedOutcome(confirmedBatch: Bool) async throws {
+        let probe = ImportCentreWorkflowProbe()
+        probe.validationPassed = false
+        let coordinator = makeCoordinator(probe)
+        let sourceURL = URL(fileURLWithPath: "/opaque-mechanics/validation-rejection")
+        #expect(confirmedBatch ? coordinator.startConfirmedBatch([sourceURL]) : coordinator.enqueueSources([sourceURL]))
+        await waitUntil { coordinator.currentItem?.phase == .validationFailed && !coordinator.isPreparationDraining }
+        let preparationID = try #require(coordinator.currentItem?.preparation?.id)
+
+        await coordinator.confirmCurrent(expectedPreparationID: preparationID)
+        #expect(probe.commitCallCount == 0)
+        #expect(probe.acknowledgedValidationPreparationIDs.isEmpty)
+        #expect(coordinator.permitsContinue)
+        #expect(!coordinator.permitsRetry)
+        #expect(coordinator.continueAfterCurrent())
+        #expect(!coordinator.continueAfterCurrent())
+
+        #expect(probe.acknowledgedValidationPreparationIDs == [preparationID])
+        #expect(probe.cancelledPreparationIDs.isEmpty)
+        #expect(probe.commitCallCount == 0)
+        #expect(coordinator.items[0].phase == .completed)
+        #expect(coordinator.items[0].preparation == nil)
+        #expect(coordinator.items[0].completionDisposition == .rejected)
+        #expect(coordinator.items[0].outcome?.importAttemptID == "opaque-validation-attempt")
+        #expect(coordinator.items[0].outcome?.persisted == false)
+        #expect(coordinator.items[0].outcome?.allowsViewingTransactions == false)
+        #expect(coordinator.items[0].outcome?.message?.contains("The failure was added to Import History.") == true)
+        #expect(coordinator.batchSummary.rejectedCount == 1)
+        #expect(coordinator.batchSummary.committedCount == 0)
+        #expect(coordinator.batchSummary.isComplete)
+    }
+
+    @Test func validationFailureAuditWriteUnavailableStaysRejectedWithoutRetryingTheWrite() async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.validationPassed = false
+        probe.validationFailureAttemptID = nil
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/opaque-mechanics/audit-unavailable")]))
+        await waitUntil { coordinator.currentItem?.phase == .validationFailed && !coordinator.isPreparationDraining }
+
+        #expect(coordinator.continueAfterCurrent())
+        #expect(!coordinator.continueAfterCurrent())
+        #expect(probe.acknowledgedValidationPreparationIDs.count == 1)
+        #expect(probe.commitCallCount == 0)
+        #expect(coordinator.items[0].completionDisposition == .rejected)
+        #expect(coordinator.items[0].outcome?.importAttemptID == nil)
+        #expect(coordinator.items[0].outcome?.persisted == false)
+        #expect(coordinator.items[0].outcome?.message?.contains("The failure could not be added to Import History.") == true)
+        #expect(coordinator.batchSummary.isComplete)
+    }
+
+    @Test(arguments: ["cancel", "skip", "cancelBatch"])
+    func abandoningFailedValidationDoesNotAcknowledgeOrCommit(action: String) async {
+        let probe = ImportCentreWorkflowProbe()
+        probe.validationPassed = false
+        let coordinator = makeCoordinator(probe)
+        #expect(coordinator.enqueueSources([URL(fileURLWithPath: "/opaque-mechanics/abandoned-validation")]))
+        await waitUntil { coordinator.currentItem?.phase == .validationFailed && !coordinator.isPreparationDraining }
+        let preparationID = coordinator.currentItem?.preparation?.id
+        switch action {
+        case "cancel": coordinator.cancelCurrent()
+        case "skip": coordinator.skipCurrent()
+        default: coordinator.cancelBatch()
+        }
+        #expect(probe.acknowledgedValidationPreparationIDs.isEmpty)
+        #expect(probe.commitCallCount == 0)
+        #expect(probe.cancelledPreparationIDs == [preparationID].compactMap { $0 })
+        #expect(!coordinator.continueAfterCurrent())
     }
 
     @Test func preparationFailureRequiresExplicitContinueAndLeavesPendingItemUntouched() async {
@@ -1217,6 +1499,7 @@ struct ImportCentreCoordinatorTests {
                 commit: { preparation, choice, plan in
                     await probe.commit(preparation, choice: choice, plan: plan)
                 },
+                acknowledgeValidationFailure: { probe.acknowledgeValidationFailure($0) },
                 cancelPreparation: { probe.cancelPreparation($0) },
                 cancelPasswordChallenge: { _ in probe.cancelPasswordChallenge() },
                 failureSummary: { _ in
@@ -1227,14 +1510,17 @@ struct ImportCentreCoordinatorTests {
                         guidance: "Retry the isolated mechanics operation."
                     )
                 },
-                isRetryablePreparationFailure: { $0 is ImportError },
+                isRetryablePreparationFailure: { ImportCentreCoordinator<PreparedImport>.isRetryablePreparationFailure($0) },
                 isAutomaticallyCommittable: { preparation, review in
                     probe.automaticCommitEligible && review.validationPassed
                         && preparation.id != probe.blockedPreparationID
-                        && (!review.identityReview.isBankSectionParent || ImportAccountConfirmationPolicy.allowsConfirmation(
-                            review: review.identityReview, choice: review.initialAccountChoice
+                        && (!review.identityReview.requiresExplicitChoice || ImportAccountConfirmationPolicy.allowsConfirmation(
+                            review: review.identityReview, choice: review.initialAccountChoice,
+                            requiredCardSectionIDs: ["a", "b"]
                         ))
-                }
+                },
+                retainsNewerHoldingsWithoutImport: { _ in probe.retainsNewerHoldings },
+                requiredCardSectionIDs: { _ in ["a", "b"] }
             )
         )
     }
@@ -1278,7 +1564,10 @@ private final class ImportCentreWorkflowProbe {
     var suspendsCommit = false
     var nextPreparationError: Error?
     var nextCommitResult: ImportEngineResult?
+    var validationPassed = true
+    var validationFailureAttemptID: String? = "opaque-validation-attempt"
     var automaticCommitEligible = true
+    var retainsNewerHoldings = false
     var nextIdentityReview: ImportIdentityReview = .unavailable
     var blockedPreparationID: UUID?
     private(set) var prepareCallCount = 0
@@ -1288,6 +1577,7 @@ private final class ImportCentreWorkflowProbe {
     private(set) var passwordCancellationCount = 0
     private(set) var cancelledPreparationIDs: [UUID] = []
     private(set) var committedPreparationIDs: [UUID] = []
+    private(set) var acknowledgedValidationPreparationIDs: [UUID] = []
     private(set) var operationIDs: [UUID] = []
     private(set) var lastOperationID: UUID?
     private(set) var lastProgressCallback: ((ImportProgress) -> Void)?
@@ -1366,8 +1656,21 @@ private final class ImportCentreWorkflowProbe {
             identityReview: nextIdentityReview,
             initialAccountChoice: nil,
             partialReview: .ordinaryFullImport,
-            validationPassed: true
+            validationPassed: validationPassed
         )
+    }
+
+    func acknowledgeValidationFailure(_ preparation: OpaqueImportCentrePreparation) -> ImportOutcomePresentation {
+        acknowledgedValidationPreparationIDs.append(preparation.id)
+        return ImportOutcomePresentation(result: ImportEngineResult(
+            fileName: "opaque",
+            transactionCount: 0,
+            validationPassed: false,
+            persisted: false,
+            errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
+            importAttemptId: validationFailureAttemptID,
+            recoveryRoute: .reviewRequired(.validationFailed)
+        ))
     }
 
     func refreshPartialReview(
@@ -1412,5 +1715,66 @@ private final class ImportCentreWorkflowProbe {
 
     func cancelPasswordChallenge() {
         passwordCancellationCount += 1
+    }
+}
+
+@MainActor
+private final class ImportCentreRetryPasswordProvider: ImportFramework.PasswordProvider {
+    private let returnsPasswordOnce: Bool
+    private var challenges: [UUID] = []
+
+    init(returnsPasswordOnce: Bool) {
+        self.returnsPasswordOnce = returnsPasswordOnce
+    }
+
+    func password(for request: ImportRequest) async throws -> String? {
+        challenges.append(request.id)
+        if returnsPasswordOnce && challenges.count == 1 { return "opaque-incorrect-password" }
+        throw ImportError.cancelled
+    }
+
+    func requestIDs() -> [UUID] { challenges }
+}
+
+private struct ImportCentreRetryReaderRegistry: ImportFramework.ReaderRegistry {
+    func reader(for request: ImportRequest) async -> (any ImportFramework.DocumentReader)? {
+        ImportCentreRetryReader()
+    }
+}
+
+private struct ImportCentreRetryReader: ImportFramework.DocumentReader {
+    let supportedFileExtensions: Set<String> = ["pdf"]
+
+    func read(request: ImportRequest, snapshot: SourceContentSnapshot, password: String?) async throws -> RawDocument {
+        throw password == nil ? ImportError.passwordRequired : ImportError.incorrectPassword
+    }
+}
+
+@MainActor
+private final class ImportCentrePreparationFailureProbe: ImportPersistenceCoordinating {
+    private(set) var persistCallCount = 0
+    private(set) var validationFailureCallCount = 0
+    private(set) var snapshotRejectionCallCount = 0
+
+    func persistValidatedImport(financialDocument: FinancialDocument, importSession: ImportSession,
+                                validation: ImportValidationResult) throws -> ImportPersistenceResult {
+        persistCallCount += 1
+        return .skipped
+    }
+
+    func persistValidatedImport(financialDocument: FinancialDocument, importSession: ImportSession,
+                                validation: ImportValidationResult, accountChoice: ImportAccountChoice?) throws -> ImportPersistenceResult {
+        persistCallCount += 1
+        return .skipped
+    }
+
+    func recordValidationFailure(fileName: String, transactionCount: Int) -> String? {
+        validationFailureCallCount += 1
+        return nil
+    }
+
+    func recordSourceSnapshotRejection(_ kind: SourceSnapshotRejectionKind) -> SourceSnapshotRejectionRecord {
+        snapshotRejectionCallCount += 1
+        return .auditWriteUnavailable
     }
 }

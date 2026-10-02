@@ -7,25 +7,8 @@ struct LFAppearanceIntroduction: View {
     @ObservedObject var appearance: LFAppearanceStore
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: theme.spacing.sectionGap) {
-                introduction
-                Spacer(minLength: theme.spacing.sectionGap)
-                restoreButton
-            }
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                introduction
-                restoreButton
-            }
-        }
-    }
-    private var introduction: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            Text("Appearance").font(theme.typography.sectionTitle)
-            Text("Your dark interface. Changes apply immediately and stay on this Mac.")
-                .font(theme.typography.secondary)
-                .foregroundStyle(theme.palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+        LFSettingsPageHeader("Appearance", subtitle: "Changes apply immediately and stay on this Mac.") {
+            restoreButton
         }
     }
     private var restoreButton: some View {
@@ -42,34 +25,33 @@ struct LFAppearanceControls: View {
     @ObservedObject var appearance: LFAppearanceStore
     let availableWidth: CGFloat
 
-    private var cardLayout: AnyLayout {
-        availableWidth >= max(880, theme.typography.size(.secondary) * 60)
-            ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
-            : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
-    }
-
     var body: some View {
-        cardLayout {
+        LFSettingsColumns(availableWidth: availableWidth) {
             colorCard
+        } trailing: {
             typographyCard
         }
     }
 
     private var colorCard: some View {
-        LFPanel(title: "Colours & surfaces", systemImage: "paintpalette") {
-            Text("One palette across every page. Financial status colours keep their meaning.")
-                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+        LFPanel(title: "Colours & surfaces") {
             colorRows([.accent])
+            Divider().overlay(theme.palette.divider)
             VStack(alignment: .leading, spacing: theme.spacing.small) {
                 colorGroup("Window & navigation", roles: [.background, .navigationHeader])
                 opacityControl("Background tint opacity", background: true)
             }
+            Divider().overlay(theme.palette.divider)
             VStack(alignment: .leading, spacing: theme.spacing.small) {
                 colorGroup("Cards & raised surfaces", roles: [.card, .raisedInspector])
                 opacityControl("Card tint opacity", background: false)
             }
-            colorGroup("Text, controls & selection", roles: [.inputControl, .primaryText, .secondaryText, .navigationSelection, .selectedFocused, .selectedUnfocused])
-            Text("100% is an opaque tint. At 0%, the underlying native blur/material can still be visible.")
+            Divider().overlay(theme.palette.divider)
+            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                Text("Text, controls & selection").font(theme.typography.rowTitle)
+                selectionColorRows
+            }
+            Text("0% leaves native material visible; 100% is an opaque tint. Financial status colours keep their meaning.")
                 .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -84,22 +66,34 @@ struct LFAppearanceControls: View {
 
     private func colorRows(_ roles: [LFAppearanceColorRole]) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            ForEach(roles) { role in
-                HStack(spacing: theme.spacing.small) {
-                    Text(role.title)
-                        .font(theme.typography.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: theme.spacing.small)
-                    ColorPicker(role.title, selection: Binding(
-                        get: { appearance.color(role) },
-                        set: { appearance.setColor($0, for: role) }
-                    ), supportsOpacity: false)
-                    .labelsHidden()
-                    .frame(width: 38)
-                }
-                .padding(.vertical, theme.spacing.micro)
-            }
+            ForEach(roles) { role in colorRow(role) }
         }
+    }
+
+    private var selectionColorRows: some View {
+        let pairedPanels = availableWidth >= max(900, theme.typography.size(.body) * 52)
+        let panelWidth = pairedPanels ? (availableWidth - theme.spacing.sectionGap) / 2 : availableWidth
+        let twoColumns = panelWidth - theme.spacing.panelPadding * 2 >= max(460, theme.typography.size(.secondary) * 38)
+        let roles: [LFAppearanceColorRole] = [.inputControl, .primaryText, .secondaryText,
+                                            .navigationSelection, .selectedFocused, .selectedUnfocused]
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: twoColumns ? 2 : 1),
+                         alignment: .leading, spacing: theme.spacing.controlGap) {
+            ForEach(roles) { role in colorRow(role) }
+        }
+    }
+
+    private func colorRow(_ role: LFAppearanceColorRole) -> some View {
+        HStack(spacing: theme.spacing.small) {
+            Text(role.title).font(theme.typography.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: theme.spacing.small)
+            ColorPicker(role.title, selection: Binding(
+                get: { appearance.color(role) },
+                set: { appearance.setColor($0, for: role) }
+            ), supportsOpacity: false)
+            .labelsHidden().frame(width: 38)
+        }
+        .padding(.vertical, theme.spacing.micro)
     }
 
     private func opacityControl(_ title: String, background: Bool) -> some View {
@@ -121,7 +115,7 @@ struct LFAppearanceControls: View {
     }
 
     private var typographyCard: some View {
-        LFPanel(title: "Typography", systemImage: "textformat") {
+        LFPanel(title: "Typography") {
             VStack(alignment: .leading, spacing: theme.spacing.small) {
                 Picker("Interface font", selection: Binding(
                     get: { appearance.overrides.family ?? "" },
@@ -132,6 +126,7 @@ struct LFAppearanceControls: View {
                     ForEach(appearance.installedFamilies, id: \.self) { family in Text(family).tag(family) }
                 }
                 .pickerStyle(.menu)
+                .tint(theme.palette.primaryText)
                 .font(theme.typography.secondary)
                 if let missing = appearance.missingFamily {
                     Text("\(missing) is not installed. System is being used until you choose an installed family.")
@@ -142,9 +137,9 @@ struct LFAppearanceControls: View {
                     .foregroundStyle(theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Divider().overlay(theme.palette.divider)
             sizeGroup("Interface hierarchy", roles: [.pageTitle, .sectionTitle, .headlineMoney, .rowTitle, .body])
-            sizeGroup("Supporting text", roles: [.secondary, .caption])
-            sizeGroup("Dense tables", roles: [.tableBody, .tableMoney])
+            sizeGroup("Supporting text & tables", roles: [.secondary, .caption, .tableBody, .tableMoney])
             DisclosureGroup("More text sizes") {
                 sizeGroup(nil, roles: [.button, .tableSummary, .formTitle, .formSection, .formHeading, .formBody, .formCallout, .formCaption, .finePrint])
                     .padding(.top, theme.spacing.small)

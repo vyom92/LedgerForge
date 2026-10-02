@@ -220,7 +220,7 @@ private func financialIdentifier(kind: FinancialIdentifierKind, value: String) t
 
 private struct DuplicateCandidateAccountRepository: AccountRepository {
     let candidates: [String]
-    func markCreditCardHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool { throw TestDoubleError.unused }
+    func markAccountHistoryOnly(accountId: String, workspaceId: String, markedAtISO: String) throws -> Bool { throw TestDoubleError.unused }
 
     func upsertAccount(_ account: AccountDTO) throws -> String { throw TestDoubleError.unused }
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { throw TestDoubleError.unused }

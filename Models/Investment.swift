@@ -56,7 +56,7 @@ nonisolated public struct InvestmentDecimal: Equatable, Hashable, Codable, Senda
 nonisolated public enum InvestmentError: Error, LocalizedError, Equatable, Sendable {
     case invalidNumber, invalidEvidence, invalidPersistedState, olderSnapshot, staleReview
     case missingSourceField(String)
-    case identityChoiceRequired, sameDateConflict, unsupportedSource
+    case identityChoiceRequired, sameDateConflict, unsupportedSource, directSourceRetained
 
     public var errorDescription: String? {
         switch self {
@@ -69,6 +69,7 @@ nonisolated public enum InvestmentError: Error, LocalizedError, Equatable, Senda
         case .identityChoiceRequired: "Confirm which portfolio or investment this statement updates."
         case .sameDateConflict: "This statement disagrees with holdings for the same date. Choose which source to use."
         case .unsupportedSource: "This statement does not supply supported current fund holdings."
+        case .directSourceRetained: "IBKR holdings are supplied by the Flex connection. This statement remains a backup; current holdings were kept."
         }
     }
 }
@@ -104,6 +105,7 @@ nonisolated public struct InvestmentContainer: Identifiable, Equatable, Codable,
     /// One complete latest account receipt, anchored to the first policy. CSV
     /// fallback changes current positions without erasing the successful sync.
     public var lastZioAccount: ZurichISPAccountSnapshot? = nil
+    public var ibkrSource: IBKRFlexAccountSnapshot? = nil
 }
 
 nonisolated public struct InvestmentHolding: Identifiable, Equatable, Codable, Sendable {
@@ -130,6 +132,7 @@ nonisolated public struct InvestmentHolding: Identifiable, Equatable, Codable, S
     public var priceMapping: InvestmentPriceMapping?
     public var zioObservationID: String? = nil
     public var zioFundCode: String? = nil
+    public var ibkrObservationID: String? = nil
 
     var sourceDateLabel: String { zioObservationID == nil ? "Holdings as of" : "Portal valuation date" }
 }

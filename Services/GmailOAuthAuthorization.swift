@@ -11,9 +11,15 @@ import AppKit
 /// No server survives this explicit connection operation.
 @MainActor
 final class GmailOAuthAuthorization {
+    nonisolated enum Callback: Equatable, Sendable {
+        case code(String)
+        case authorizationFailed
+    }
+
     private var listener: NWListener?
     private var continuation: CheckedContinuation<(code: String, redirectURI: String), Error>?
     private var timeout: Task<Void, Never>?
+    private var cleanup: (() -> Void)?
     private var state = ""
     private var redirectURI = ""
     private var browserOpened = false
@@ -24,9 +30,7 @@ final class GmailOAuthAuthorization {
         let verifier = try randomString()
         let challenge = base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
         let flow = GmailOAuthAuthorization()
-        let callback = try await withTaskCancellationHandler {
-            try await flow.waitForCode(account: current.account, clientID: current.clientID, challenge: challenge)
-        } onCancel: { Task { @MainActor in flow.finish(.failure(CancellationError())) } }
+        let callback = try await flow.waitForCode(account: current.account, clientID: current.clientID, challenge: challenge)
         try Task.checkCancellation()
         let request = try GmailTokenBroker.tokenRequest([
             "client_id": current.clientID, "client_secret": secret, "code": callback.code,
@@ -87,18 +91,34 @@ final class GmailOAuthAuthorization {
                 }
             }
         }
-        return try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
+        return try await waitForCallback(start: {
             listener.start(queue: .global(qos: .userInitiated))
-            timeout = Task { @concurrent [weak self] in
-                do { try await Task.sleep(for: .seconds(180)) }
-                catch { return }
-                await self?.finish(.failure(GmailIntakeError.timedOut))
-            }
-        }
+        }, cleanup: { [weak self] in
+            self?.listener?.cancel(); self?.listener = nil
+            self?.state = ""; self?.redirectURI = ""
+        })
 #else
         throw GmailIntakeError.configurationRequired
 #endif
+    }
+
+    /// The listener and source-independent checks share the same pending wait,
+    /// cancellation, timeout and single cleanup owner.
+    func waitForCallback(timeoutDuration: Duration = .seconds(180), start: () -> Void,
+                         cleanup: @escaping () -> Void) async throws -> (code: String, redirectURI: String) {
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+                self.cleanup = cleanup
+                timeout = Task { @concurrent [weak self] in
+                    do { try await Task.sleep(for: timeoutDuration) }
+                    catch { return }
+                    await self?.finish(.failure(GmailIntakeError.timedOut))
+                }
+                guard !Task.isCancelled else { finish(.failure(CancellationError())); return }
+                start()
+            }
+        } onCancel: { Task { @MainActor in self.finish(.failure(CancellationError())) } }
     }
 
     private func receive(_ connection: NWConnection, data initial: Data) {
@@ -113,39 +133,59 @@ final class GmailOAuthAuthorization {
                     if complete { connection.cancel() } else { self.receive(connection, data: data) }
                     return
                 }
-                let result = Self.validateCallback(text, expectedState: self.state, redirectURI: self.redirectURI)
-                let body = "You can return to LedgerForge."
-                let response = "HTTP/1.1 \(result == nil ? "400 Bad Request" : "200 OK")\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
-                connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
-                if let result { self.finish(.success((result, self.redirectURI))) }
+                self.dispatchCallback(text, expectedState: self.state, redirectURI: self.redirectURI) { accepted in
+                    let body = "You can return to LedgerForge."
+                    let response = "HTTP/1.1 \(accepted ? "200 OK" : "400 Bad Request")\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+                    connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                }
             }
         }
     }
 
-    nonisolated static func validateCallback(_ request: String, expectedState: String, redirectURI: String) -> String? {
+    @discardableResult
+    func dispatchCallback(_ request: String, expectedState: String, redirectURI: String,
+                          respond: (Bool) -> Void = { _ in }) -> Bool {
+        guard continuation != nil else { return false }
+        let callback = Self.validateCallback(request, expectedState: expectedState, redirectURI: redirectURI)
+        respond(callback != nil)
+        switch callback {
+        case .code(let code): finish(.success((code, redirectURI)))
+        case .authorizationFailed: finish(.failure(GmailIntakeError.authorizationFailed))
+        case nil: return false
+        }
+        return true
+    }
+
+    nonisolated static func validateCallback(_ request: String, expectedState: String, redirectURI: String) -> Callback? {
         guard let redirect = URLComponents(string: redirectURI), let port = redirect.port else { return nil }
-        let lines = request.components(separatedBy: "\r\n")
+        guard let headerEnd = request.range(of: "\r\n\r\n") else { return nil }
+        let lines = String(request[..<headerEnd.lowerBound]).components(separatedBy: "\r\n")
         guard let first = lines.first else { return nil }
         let start = first.split(separator: " ")
         guard start.count == 3, start[0] == "GET", start[2] == "HTTP/1.1",
+              String(start[1]).removingPercentEncoding != nil,
               let callback = URLComponents(string: String(start[1])), callback.scheme == nil,
-              callback.host == nil, callback.path == "/oauth/callback",
+              callback.host == nil, callback.fragment == nil, callback.path == "/oauth/callback",
               lines.filter({ $0.lowercased().hasPrefix("host:") }).map({ $0.dropFirst(5).trimmingCharacters(in: .whitespaces) }) == ["127.0.0.1:\(port)"] else { return nil }
         let states = callback.queryItems?.filter { $0.name == "state" } ?? []
         let codes = callback.queryItems?.filter { $0.name == "code" } ?? []
-        guard states.count == 1, states[0].value == expectedState, !expectedState.isEmpty,
-              codes.count == 1, let code = codes[0].value, !code.isEmpty,
-              !(callback.queryItems?.contains(where: { $0.name == "error" }) ?? false) else { return nil }
-        return code
+        let errors = callback.queryItems?.filter { $0.name == "error" } ?? []
+        guard states.count == 1, states[0].value == expectedState, !expectedState.isEmpty else { return nil }
+        if codes.count == 1, errors.isEmpty, let code = codes[0].value, !code.isEmpty { return .code(code) }
+        guard codes.isEmpty, errors.count == 1, let error = errors[0].value, !error.isEmpty,
+              error.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
+                  || (48...57).contains($0) || [45, 46, 95].contains($0) }) else { return nil }
+        return .authorizationFailed
     }
 
     private func finish(_ result: Result<(code: String, redirectURI: String), Error>) {
-        let continuation = self.continuation
+        guard let continuation = self.continuation else { return }
         self.continuation = nil
         timeout?.cancel(); timeout = nil
-        listener?.cancel(); listener = nil
-        state = ""; redirectURI = ""
-        continuation?.resume(with: result)
+        let cleanup = self.cleanup
+        self.cleanup = nil
+        cleanup?()
+        continuation.resume(with: result)
     }
 
     nonisolated private static func randomString() throws -> String {
@@ -165,10 +205,13 @@ final class GmailOAuthAuthorization {
 
 // Foreground authorization stays out of the scheduled helper target.
 extension GmailTokenBroker {
-    func reauthorizeExistingConnection() async throws {
+    func reauthorizeExistingConnection(
+        authorize: @MainActor @Sendable (GmailSavedGrant, any GmailHTTPTransport) async throws -> GmailSavedGrant
+            = GmailOAuthAuthorization.authorize
+    ) async throws {
         guard refreshTask == nil else { throw GmailIntakeError.busy }
         let current = try store.load()
-        let renewed = try await GmailOAuthAuthorization.authorize(current: current, transport: transport)
+        let renewed = try await authorize(current, transport)
         try Task.checkCancellation()
         try store.updateExisting(renewed)
         grant = renewed

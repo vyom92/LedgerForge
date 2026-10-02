@@ -11,6 +11,12 @@ nonisolated struct PlanningAccountAnchor: Identifiable, Sendable {
     let historyOnly: Bool
 }
 
+nonisolated struct RecurringOccurrenceSelection: Equatable, Sendable {
+    let id: String
+    let date: StatementDate
+    let isExcludedFromPlan: Bool
+}
+
 nonisolated struct RecurringPaymentProjection: Identifiable, Sendable {
     let definition: RecurringDefinition
     let date: StatementDate
@@ -22,10 +28,12 @@ nonisolated struct RecurringPaymentProjection: Identifiable, Sendable {
     let isWaived: Bool
     let hasCoverage: Bool
     var plannedDueDate: StatementDate? = nil
+    var isExcludedFromPlan = false
     var forecastDate: StatementDate { plannedDueDate ?? date }
     var id: String { definition.id + ":" + date.canonical }
     var remaining: Decimal { isWaived ? 0 : max(0, expected - paid) }
     var status: String {
+        if isExcludedFromPlan { return "Not included in the monthly plan" }
         if isWaived { return "Waived for this occurrence" }
         if paid > expected { return "Paid above the planned amount" }
         if paid == expected { return "Matched payment" }
@@ -159,11 +167,52 @@ nonisolated enum PlanningIntelligence {
         return nil
     }
 
+    /// A reviewed monthly occurrence keeps its exact identity when the template
+    /// due day changes. Only an unowned calendar month adopts the new due day.
+    /// Retain every existing identity if earlier owner metadata contains more
+    /// than one; selecting a record to merge or delete is a separate decision.
+    static func occurrenceDates(definitionID: String, month: SelectedStatementMonth,
+                                generatedDate: StatementDate?, retaining occurrenceIDs: Set<String>) -> [StatementDate] {
+        let retained = Set(occurrenceIDs.compactMap { id -> StatementDate? in
+            guard let date = try? StatementDate(canonical: String(id.suffix(10))),
+                  id == definitionID + ":" + date.canonical,
+                  date.year == month.year, date.month == month.month else { return nil }
+            return date
+        })
+        return retained.isEmpty ? [generatedDate].compactMap { $0 } : retained.sorted()
+    }
+
+    /// Keep excluded occurrences reviewable so the existing explicit monthly
+    /// prefill can add one back. Cash planning and automatic inclusion omit it.
+    static func occurrenceSelections(definitionID: String, month: SelectedStatementMonth,
+                                     generatedDate: StatementDate?, retaining occurrenceIDs: Set<String>,
+                                     excluding excludedIDs: Set<String>) -> [RecurringOccurrenceSelection] {
+        occurrenceDates(definitionID: definitionID, month: month, generatedDate: generatedDate,
+            retaining: occurrenceIDs.union(excludedIDs)).map { date in
+                let id = definitionID + ":" + date.canonical
+                return .init(id: id, date: date, isExcludedFromPlan: excludedIDs.contains(id))
+            }
+    }
+
+    /// The current editor owns its month's retained state, including empty sets
+    /// after an explicit removal or re-add. Compatible drafts supersede disk.
+    static func resolvedOccurrenceIDs(currentMonth: SelectedStatementMonth, currentIDs: Set<String>,
+                                     savedByMonth: [SelectedStatementMonth: Set<String>],
+                                     draftByMonth: [SelectedStatementMonth: Set<String>]) -> Set<String> {
+        var byMonth = savedByMonth
+        byMonth.merge(draftByMonth) { _, draft in draft }
+        byMonth[currentMonth] = currentIDs
+        return Set(byMonth.values.flatMap { $0 })
+    }
+
     static func payments(metadata: FinancialIntelligenceSnapshot, rows: [SpendingSourceRow], sources: FinancialSourceContext,
-                         start: StatementDate, end: StatementDate) throws -> [RecurringPaymentProjection] {
+                         start: StatementDate, end: StatementDate, retaining occurrenceIDs: Set<String> = [],
+                         excluding excludedOccurrenceIDs: Set<String> = []) throws -> [RecurringPaymentProjection] {
         try Task.checkCancellation()
         let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
         let occurrenceMap = Dictionary(uniqueKeysWithValues: metadata.occurrences.map { ($0.id, $0) })
+        let retainedOccurrenceIDs = occurrenceIDs.union(occurrenceMap.keys)
+            .union(metadata.plans.flatMap { $0.appliedRecurringIDs.keys })
         let alreadyUsed = Set(metadata.occurrences.flatMap(\.transactionIDs))
         let accountRows = Dictionary(grouping: rows, by: \.accountID)
         var results: [RecurringPaymentProjection] = []
@@ -172,24 +221,32 @@ nonisolated enum PlanningIntelligence {
             guard let selected = try? SelectedStatementMonth(year: year, month: month) else { break }
             for definition in metadata.recurring where definition.isEnabled {
                 try Task.checkCancellation()
-                guard let (date, revision) = dueDate(definition: definition, month: selected), date >= start, date <= end,
-                      let expectedMoney = try? revision.amount.money() else { continue }
-                let saved = occurrenceMap[definition.id + ":" + date.canonical]
-                let actual = (saved?.transactionIDs ?? []).compactMap { byID[$0] }
-                let paid = actual.reduce(Decimal.zero) { $0 - $1.transaction.money.amount }
-                let lower = FinancialCalendar.addDays(-10, to: date) ?? date, upper = FinancialCalendar.addDays(10, to: date) ?? date
-                let suggestions = definition.predicates.isEmpty ? [] : try accountRows[definition.accountID, default: []].filter { row in
-                    try Task.checkCancellation()
-                    guard !row.isLoanOrEMI, !alreadyUsed.contains(row.id), row.isBankOut, row.currency == revision.amount.currency,
-                          let day = row.date, day >= lower, day <= upper else { return false }
-                    return definition.predicates.allSatisfy { predicate in
-                        let text = predicate.field == .narration ? row.transaction.description : (row.transaction.reference ?? "")
-                        return predicate.match == .exact ? text.caseInsensitiveCompare(predicate.text) == .orderedSame : text.range(of: predicate.text, options: .caseInsensitive) != nil
-                    }
-                }.map(\.id)
-                results.append(.init(definition: definition, date: date, expected: (try? saved?.amountOverride?.money().amount) ?? expectedMoney.amount,
-                    paid: paid, currency: revision.amount.currency, actualIDs: Set(actual.map(\.id)), suggestionIDs: suggestions,
-                    isWaived: saved?.isWaived ?? false, hasCoverage: sources.hasCompleteCoverage(accountID: definition.accountID, start: lower, end: upper)))
+                let generated = dueDate(definition: definition, month: selected)
+                let selections = occurrenceSelections(definitionID: definition.id, month: selected,
+                    generatedDate: generated?.0, retaining: retainedOccurrenceIDs, excluding: excludedOccurrenceIDs)
+                for selection in selections {
+                    let date = selection.date
+                    let revision = generated.flatMap { $0.0 == date ? $0.1 : nil } ?? definition.revision(on: date)
+                    guard date >= start, date <= end, definition.endsOn.map({ date.canonical <= $0 }) ?? true,
+                          let revision, let expectedMoney = try? revision.amount.money() else { continue }
+                    let saved = occurrenceMap[definition.id + ":" + date.canonical]
+                    let actual = (saved?.transactionIDs ?? []).compactMap { byID[$0] }
+                    let paid = actual.reduce(Decimal.zero) { $0 - $1.transaction.money.amount }
+                    let lower = FinancialCalendar.addDays(-10, to: date) ?? date, upper = FinancialCalendar.addDays(10, to: date) ?? date
+                    let suggestions = definition.predicates.isEmpty ? [] : try accountRows[definition.accountID, default: []].filter { row in
+                        try Task.checkCancellation()
+                        guard !row.isLoanOrEMI, !alreadyUsed.contains(row.id), row.isBankOut, row.currency == revision.amount.currency,
+                              let day = row.date, day >= lower, day <= upper else { return false }
+                        return definition.predicates.allSatisfy { predicate in
+                            let text = predicate.field == .narration ? row.transaction.description : (row.transaction.reference ?? "")
+                            return predicate.match == .exact ? text.caseInsensitiveCompare(predicate.text) == .orderedSame : text.range(of: predicate.text, options: .caseInsensitive) != nil
+                        }
+                    }.map(\.id)
+                    results.append(.init(definition: definition, date: date, expected: (try? saved?.amountOverride?.money().amount) ?? expectedMoney.amount,
+                        paid: paid, currency: revision.amount.currency, actualIDs: Set(actual.map(\.id)), suggestionIDs: suggestions,
+                        isWaived: saved?.isWaived ?? false, hasCoverage: sources.hasCompleteCoverage(accountID: definition.accountID, start: lower, end: upper),
+                        isExcludedFromPlan: selection.isExcludedFromPlan))
+                }
             }
             month += 1; if month == 13 { month = 1; year += 1 }
         }
@@ -227,7 +284,9 @@ nonisolated enum PlanningIntelligence {
 
     static func project(plan: FundingPlan, anchors: [PlanningAccountAnchor], rows: [SpendingSourceRow],
                         metadata: FinancialIntelligenceSnapshot, sources: FinancialSourceContext, cards: CardStoreSnapshot,
-                        today: StatementDate, scenario: PlanningScenario = .init()) throws -> PlanningProjection {
+                        today: StatementDate, scenario: PlanningScenario = .init(), selectedHistoryAccountIDs: Set<String> = [],
+                        retainedRecurringOccurrenceIDs: Set<String> = [],
+                        excludedRecurringOccurrenceIDs: Set<String> = []) throws -> PlanningProjection {
 #if DEBUG
         let timing = GmailQualificationTiming.begin(.planningProjection, count: rows.count)
         defer { GmailQualificationTiming.end(.planningProjection, started: timing, count: rows.count) }
@@ -235,14 +294,21 @@ nonisolated enum PlanningIntelligence {
         try Task.checkCancellation()
         let started = Date()
         let excluded = metadata.preferences?.excludedPlanningAccountIDs ?? []
+        let excludedHistory = Set(anchors.filter(\.historyOnly).map(\.id))
+            .union(sources.accounts.filter(\.isHistoryOnly).map(\.id)).subtracting(selectedHistoryAccountIDs)
+        let unavailableFundingAccounts = excluded.union(excludedHistory)
+        let rows = rows.filter { !excludedHistory.contains($0.accountID) }
         // Availability controls planning inputs, not whether an imported card
         // obligation still needs payment review.
-        let cardAnchors = anchors.filter { $0.domain == "credit_card" && !$0.historyOnly }
-        let anchors = anchors.filter { !excluded.contains($0.id) }
+        let cardAnchors = anchors.filter { $0.domain == "credit_card" && !excludedHistory.contains($0.id) }
+        let anchors = anchors.filter { !excludedHistory.contains($0.id) && !excluded.contains($0.id) }
         let monthStart = plan.recurringStart
         let monthEnd = plan.recurringEnd
         let start = max(monthStart, today), end = FinancialCalendar.addDays(89, to: start)!
-        let generated = try payments(metadata: metadata, rows: rows, sources: sources, start: monthStart, end: end)
+        let generated = try payments(metadata: metadata, rows: rows, sources: sources, start: monthStart, end: end,
+            retaining: retainedRecurringOccurrenceIDs.union(plan.assistance?.appliedRecurringIDs.keys.map { $0 } ?? []),
+            excluding: excludedRecurringOccurrenceIDs)
+            .filter { !excludedHistory.contains($0.definition.accountID) }
         let payments = generated.map { payment -> RecurringPaymentProjection in
             guard let rowID = plan.assistance?.appliedRecurringIDs[payment.id],
                   let row = (plan.qatarCommitments + plan.indiaCommitments).first(where: { $0.id == rowID }),
@@ -251,10 +317,11 @@ nonisolated enum PlanningIntelligence {
             // New actual payments reduce it; monthly edits do not change the template.
             return .init(definition: payment.definition, date: payment.date, expected: row.money.amount + paidAtPrefill.amount, paid: payment.paid,
                 currency: payment.currency, actualIDs: payment.actualIDs, suggestionIDs: payment.suggestionIDs,
-                isWaived: !row.included || payment.isWaived, hasCoverage: payment.hasCoverage, plannedDueDate: plan.dueDate(for: row))
+                isWaived: !row.included || payment.isWaived, hasCoverage: payment.hasCoverage, plannedDueDate: plan.dueDate(for: row),
+                isExcludedFromPlan: payment.isExcludedFromPlan)
         }
         let selectedPayments = payments.filter { $0.date <= monthEnd }
-        let assistance = plan.assistance
+        let assistance = plan.assistance?.excludingHistoryAccounts(excludedHistory, reserves: metadata.reserves)
         let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
         let bankIDs = Set(anchors.filter { $0.domain == "bank" }.map(\.id))
         func funding(_ bill: FundingPlanCommitment) -> String? {
@@ -277,10 +344,11 @@ nonisolated enum PlanningIntelligence {
             actualIDs[value.source.currency, default: []].insert(value.id)
         }
         var planned: [String: Decimal] = [:]
-        for value in selectedPayments where !value.isWaived { planned[value.currency, default: 0] += value.expected }
+        for value in selectedPayments where !value.isWaived && !value.isExcludedFromPlan { planned[value.currency, default: 0] += value.expected }
         let representedRows = Set(payments.compactMap { assistance?.appliedRecurringIDs[$0.id] })
         let replacedBills = Set(assistance?.datedAdjustments.compactMap(\.replacesCommitmentID) ?? [])
-        let genericBills = (plan.qatarCommitments + plan.indiaCommitments).filter { $0.included && !representedRows.contains($0.id) && !replacedBills.contains($0.id) }
+        let genericBills = (plan.qatarCommitments + plan.indiaCommitments).filter { $0.included && !representedRows.contains($0.id) && !replacedBills.contains($0.id)
+            && $0.isInAccountScope(excluding: excludedHistory, fundingOverrides: assistance?.billFundingAccounts) }
         for value in genericBills { planned[value.money.currency.code, default: 0] += value.money.amount }
         var cardNeeds: [String] = []
         let boundaryNeedsReview = assistance?.salaryCycle?.needsPreviousBoundaryReview(in: metadata) == true
@@ -329,10 +397,10 @@ nonisolated enum PlanningIntelligence {
                 floor = max(floor, plan.keepInCBQ?.amount ?? 0)
             }
             if anchor.currency == "QAR", (plan.keepInCBQ?.amount ?? 0) > 0, metadata.preferences?.retentionAccountID == nil {
-                notes.append("Choose the canonical account for Keep in CBQ in Salary assistance; that floor is not yet assigned.")
+                notes.append("Choose the account for Keep in CBQ in Salary assistance.")
             }
             guard let anchorDate = anchor.date, let opening = anchor.amount else {
-                return .init(anchor: anchor, points: [], events: [], reserveFloor: floor, limitations: ["A source-owned balance and date are required."])
+                return .init(anchor: anchor, points: [], events: [], reserveFloor: floor, limitations: ["A dated account balance is needed."])
             }
             if anchorDate > start { notes.append("The latest balance is later than this forecast's start. Earlier cash positions are unavailable.") }
             let coverageStart = FinancialCalendar.addDays(1, to: anchorDate) ?? anchorDate
@@ -356,12 +424,12 @@ nonisolated enum PlanningIntelligence {
                           payday >= start, payday > anchorDate, payday <= end, let net = try? payslip.net.money() {
                     events.append(.init(id: "payslip:" + payslip.statementID, accountID: anchor.id, date: payday,
                         title: "Expected net salary from payslip", change: net.amount, kind: .income, transactionIDs: []))
-                    notes.append("Payslip income is expected; bank receipt is not yet recorded.")
+                    notes.append("Salary payment not yet recorded.")
                 } else {
-                    notes.append("Payslip salary receipt needs current bank evidence. The worksheet's captured-balance acknowledgement does not update this source balance or add a forecast credit.")
+                    notes.append("A recorded bank payment is needed to include this salary in the forecast.")
                 }
             }
-            for payment in payments where payment.definition.accountID == anchor.id && payment.remaining > 0 {
+            for payment in payments where payment.definition.accountID == anchor.id && payment.remaining > 0 && !payment.isExcludedFromPlan {
                 guard payment.forecastDate >= start else {
                     if !payment.isWaived { notes.append("\(payment.definition.title) on \(payment.date.presentation) needs payment review before carrying an amount forward.") }
                     continue
@@ -436,11 +504,11 @@ nonisolated enum PlanningIntelligence {
                     change: scenario.extraIncome - scenario.extraCost - scenario.contributionChange, kind: .provision, transactionIDs: []))
             }
             if genericBills.contains(where: { funding($0) == nil && $0.money.currency.code == anchor.currency }) { notes.append("A commitment in this currency has no funding bank. A related card is not a funding account.") }
-            if payments.contains(where: { excluded.contains($0.definition.accountID) && $0.currency == anchor.currency && $0.remaining > 0 }) {
-                notes.append("A recurring payment uses an account removed from planning. Add the account back or reassign the commitment; its cost has not disappeared.")
+            if payments.contains(where: { unavailableFundingAccounts.contains($0.definition.accountID) && $0.currency == anchor.currency && $0.remaining > 0 && !$0.isExcludedFromPlan }) {
+                notes.append("A recurring payment uses a history-only account or one removed from planning. Choose a current funding account; the payment still needs review.")
             }
-            if assistance?.contributions.contains(where: { excluded.contains($0.fundingAccountID) }) == true || assistance?.datedAdjustments.contains(where: { excluded.contains($0.accountID) }) == true || assistance?.transfers?.contains(where: { excluded.contains($0.fromAccountID) || excluded.contains($0.toAccountID) }) == true || assistance?.allowanceAccountID.map({ excluded.contains($0) }) == true {
-                notes.append("Saved funding uses an account removed from planning. Review account funding before relying on this forecast.")
+            if assistance?.contributions.contains(where: { unavailableFundingAccounts.contains($0.fundingAccountID) }) == true || assistance?.datedAdjustments.contains(where: { unavailableFundingAccounts.contains($0.accountID) }) == true || assistance?.transfers?.contains(where: { unavailableFundingAccounts.contains($0.fromAccountID) || unavailableFundingAccounts.contains($0.toAccountID) }) == true || assistance?.allowanceAccountID.map({ unavailableFundingAccounts.contains($0) }) == true {
+                notes.append("Saved funding uses a history-only account or one removed from planning. Review account funding before relying on this forecast.")
             }
             if assistance?.sourceBalanceAcknowledgements[anchor.id] == anchorDate.canonical { notes.append("You chose this dated balance as a planning assumption. It is not a live balance.") }
             if assistance?.reserveAllocationReviewed != true { notes.append("No monthly reserve allocation selected.") }
@@ -462,7 +530,7 @@ nonisolated enum PlanningIntelligence {
             }
             return .init(anchor: anchor, points: points, events: events, reserveFloor: floor, limitations: Array(Set(notes)).sorted())
         }
-        let reserves = metadata.reserves.map { designation -> ReserveProgress in
+        let reserves = metadata.reserves.filter { $0.accountID.map { !excludedHistory.contains($0) } ?? true }.map { designation -> ReserveProgress in
             let contribution = assistance?.contributions.first { $0.designationID == designation.id }.flatMap { try? $0.amount.money().amount } ?? 0
             if designation.kind == .planningDeposit {
                 return .init(designation: designation, fundedAfterBills: try? designation.planningBalance?.money().amount,

@@ -194,6 +194,19 @@ nonisolated public struct PlanAssistance: Codable, Equatable, Sendable {
     /// This source link is saved only with the reviewed monthly plan.
     var payslipFunding: PayslipFunding?
 
+    /// Filters presentation and forecast assumptions only; the saved plan is retained intact.
+    func excludingHistoryAccounts(_ ids: Set<String>, reserves: [ReserveDesignation]) -> Self {
+        var value = self
+        value.datedAdjustments.removeAll { ids.contains($0.accountID) || $0.cardAccountID.map(ids.contains) == true }
+        value.transfers?.removeAll { ids.contains($0.fromAccountID) || ids.contains($0.toAccountID) }
+        value.contributions.removeAll { contribution in
+            ids.contains(contribution.fundingAccountID) || reserves.first(where: { $0.id == contribution.designationID })?.accountID.map(ids.contains) == true
+        }
+        if value.payslipFunding.map({ ids.contains($0.accountID) }) == true { value.payslipFunding = nil }
+        if value.allowanceAccountID.map(ids.contains) == true { value.allowance = nil; value.allowanceAccountID = nil }
+        return value
+    }
+
     func includesRecurring(_ date: StatementDate) -> Bool {
         salaryCycle?.includesRecurring(dueOn: date) ?? (String(date.canonical.prefix(7)) == month)
     }

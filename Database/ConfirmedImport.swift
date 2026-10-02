@@ -436,23 +436,19 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
                   }) else { return false }
             return digest == calculatedDigest()
         }
-        guard let previous = summaryByCode["previous_balance"]?.moneyMinor,
-              let credits = summaryByCode["new_credits"]?.moneyMinor,
-              let debits = summaryByCode["new_debits"]?.moneyMinor,
-              let balance = summaryByCode["new_balance"]?.moneyMinor,
-              let instrumentNet = summaryByCode["instrument_net_total"]?.moneyMinor,
-              previous - credits + debits == balance,
-              events.filter({ $0.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue })
-                .reduce(Int64(0), { $0 + $1.postedAmountMinor }) == debits,
-              -events.filter({ $0.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue })
-                .reduce(Int64(0), { $0 + $1.postedAmountMinor }) == credits,
-              sections.reduce(Int64(0), { $0 + $1.signedTotalMinor }) == instrumentNet,
-              sections.allSatisfy({ section in
-                  let sectionEvents = events.filter({ $0.documentScopedSectionId == section.documentScopedSectionId })
-                  return sectionEvents.isEmpty
-                    ? section.signedTotalMinor == 0
-                    : sectionEvents.reduce(Int64(0), { $0 + $1.postedAmountMinor }) == section.signedTotalMinor
-              }) else { return false }
+        // Exact source controls remain part of the persisted digest. For
+        // nonempty projections their agreement is not occurrence admission;
+        // the structural, Money and ownership checks above still apply.
+        if events.isEmpty {
+            guard let previous = summaryByCode["previous_balance"]?.moneyMinor,
+                  let credits = summaryByCode["new_credits"]?.moneyMinor,
+                  let debits = summaryByCode["new_debits"]?.moneyMinor,
+                  let balance = summaryByCode["new_balance"]?.moneyMinor,
+                  let instrumentNet = summaryByCode["instrument_net_total"]?.moneyMinor,
+                  credits == 0, debits == 0, instrumentNet == 0,
+                  previous == balance,
+                  sections.allSatisfy({ $0.signedTotalMinor == 0 }) else { return false }
+        }
         return digest == calculatedDigest()
     }
 }
@@ -1528,5 +1524,166 @@ enum ReviewedPartialImportPlanner {
             }
         }
         return true
+    }
+}
+
+/// Amex retains its historical source digest. Correspondence is an independent
+/// decision over actual occurrences and confirmed instrument ownership.
+enum AmexStatementCorrespondence {
+    static func resolve(
+        incoming: CardStatementSemanticProjectionDTO,
+        incomingSections: [CardStatementSectionDTO],
+        incomingTransactions: [TransactionDTO],
+        authoritative: CardStatementSemanticProjectionRecordDTO,
+        authoritativeSections: [CardStatementSectionDTO],
+        canonicalTransactions: [TransactionDTO]
+    ) -> [Int: String]? {
+        guard incoming.algorithmIdentifier == CardStatementSemanticProjectionDTO.amexAlgorithm,
+              authoritative.algorithm == incoming.algorithmIdentifier,
+              incoming.institutionCode == authoritative.institutionCode,
+              incoming.statementFamilyCode == authoritative.statementFamilyCode,
+              incoming.parserProfileId == authoritative.parserProfileId,
+              incoming.parserProfileVersion == authoritative.parserProfileVersion,
+              incoming.statementDateISO == authoritative.statementDateISO,
+              incoming.statementStartDateISO == authoritative.statementStartDateISO,
+              incoming.statementEndDateISO == authoritative.statementEndDateISO,
+              incoming.nativeCurrency == authoritative.nativeCurrency,
+              incoming.events.count == authoritative.events.count,
+              incoming.events.count == incomingTransactions.count,
+              Set(incomingTransactions.map(\.id)).count == incomingTransactions.count,
+              Set(canonicalTransactions.map(\.id)).count == canonicalTransactions.count,
+              Set(incoming.events.map(\.incomingTransactionId)).count == incoming.events.count,
+              Set(incoming.events.map(\.sourceOrdinal)).count == incoming.events.count,
+              Set(incomingSections.map(\.documentScopedSectionId)).count == incomingSections.count,
+              Set(authoritativeSections.map(\.documentScopedSectionId)).count == authoritativeSections.count,
+              Set(incomingSections.map(\.instrumentId)) == Set(authoritativeSections.map(\.instrumentId)) else { return nil }
+        if incoming.events.isEmpty {
+            // Empty statements retain their independent typed zero controls.
+            return incoming.digest == authoritative.digest ? [:] : nil
+        }
+        let incomingByID = Dictionary(uniqueKeysWithValues: incomingTransactions.map { ($0.id, $0) })
+        let canonicalByID = Dictionary(uniqueKeysWithValues: canonicalTransactions.map { ($0.id, $0) })
+        let incomingOwners = Dictionary(uniqueKeysWithValues: incomingSections.map { ($0.documentScopedSectionId, $0.instrumentId) })
+        let authoritativeOwners = Dictionary(uniqueKeysWithValues: authoritativeSections.map { ($0.documentScopedSectionId, $0.instrumentId) })
+        let canonicalIDs = authoritative.events.compactMap(\.canonicalTransactionId)
+        guard canonicalIDs.count == authoritative.events.count,
+              Set(canonicalIDs).count == canonicalIDs.count else { return nil }
+        var candidates: [String: [String]] = [:]
+        for incomingEvent in incoming.events {
+            guard let transaction = incomingByID[incomingEvent.incomingTransactionId],
+                  transaction.postedDateISO == incomingEvent.financialDateISO,
+                  transaction.financialDateRole == incomingEvent.financialDateRoleCode,
+                  transaction.direction == incomingEvent.liabilityEffectCode,
+                  transaction.nativeCurrency == incomingEvent.postedCurrency,
+                  transaction.amountMinor == incomingEvent.postedAmountMinor,
+                  transaction.amountDecimal == incomingEvent.postedAmountDecimal,
+                  transaction.reference == incomingEvent.sourceReference else { return nil }
+            var matches: [String] = authoritative.events.compactMap { event in
+                guard let canonicalID = event.canonicalTransactionId,
+                      let canonical = canonicalByID[canonicalID],
+                      canonical.accountId == authoritative.liabilityAccountId,
+                      factsAgree(event, incomingEvent, authoritativeOwners: authoritativeOwners,
+                                 incomingOwners: incomingOwners) else { return nil }
+                if let reference = incomingEvent.sourceReference, !reference.isEmpty {
+                    guard canonical.reference == reference else { return nil }
+                } else {
+                    // A missing reference does not license date/amount-only
+                    // identity. The actual source narration must also agree.
+                    guard let narration = transaction.description, !narration.isEmpty,
+                          narration == canonical.description, canonical.reference == nil else { return nil }
+                }
+                return canonicalID
+            }
+            if matches.count > 1, let narration = transaction.description, !narration.isEmpty {
+                let narrated = matches.filter { canonicalByID[$0]?.description == narration }
+                if !narrated.isEmpty { matches = narrated }
+            }
+            candidates[incomingEvent.incomingTransactionId] = matches
+        }
+        guard let assignment = BankImportDecision.uniqueAssignment(candidates),
+              assignment.count == incoming.events.count,
+              Set(assignment.values) == Set(canonicalIDs) else { return nil }
+        return Dictionary(uniqueKeysWithValues: incoming.events.compactMap { event in
+            assignment[event.incomingTransactionId].map { (event.sourceOrdinal, $0) }
+        })
+    }
+
+    static func factsAgree(
+        _ persisted: CardStatementSemanticProjectionEventDTO,
+        _ incoming: CardStatementSemanticProjectionEventPlanDTO,
+        authoritativeOwners: [String: String], incomingOwners: [String: String]
+    ) -> Bool {
+        guard persisted.financialDateISO == incoming.financialDateISO,
+              persisted.financialDateRoleCode == incoming.financialDateRoleCode,
+              persisted.sourceTransactionDateISO == incoming.sourceTransactionDateISO,
+              persisted.liabilityEffectCode == incoming.liabilityEffectCode,
+              persisted.postedCurrency == incoming.postedCurrency,
+              persisted.postedAmountMinor == incoming.postedAmountMinor,
+              persisted.postedAmountDecimal == incoming.postedAmountDecimal,
+              persisted.originalCurrency == incoming.originalCurrency,
+              persisted.originalAmountMinor == incoming.originalAmountMinor,
+              persisted.originalAmountDecimal == incoming.originalAmountDecimal,
+              persisted.sourceReference == incoming.sourceReference,
+              persisted.rowScopeCode == incoming.rowScopeCode else { return false }
+        if incoming.rowScopeCode == "account_level" {
+            return persisted.documentScopedSectionId == nil && incoming.documentScopedSectionId == nil
+        }
+        guard incoming.rowScopeCode == "instrument_level",
+              let priorSection = persisted.documentScopedSectionId,
+              let nextSection = incoming.documentScopedSectionId,
+              let priorOwner = authoritativeOwners[priorSection],
+              let nextOwner = incomingOwners[nextSection] else { return false }
+        return priorOwner == nextOwner
+    }
+
+    /// Read-back validates the already stored canonical binding. It never
+    /// reruns a choice or retroactively reassigns accepted occurrences.
+    static func retainedBindingsAgree(
+        _ supporting: CardStatementSemanticProjectionRecordDTO,
+        sections: [CardStatementSectionDTO],
+        authoritative: CardStatementSemanticProjectionRecordDTO,
+        authoritativeSections: [CardStatementSectionDTO]
+    ) -> Bool {
+        let supportingIDs = supporting.events.compactMap(\.canonicalTransactionId)
+        let authoritativeIDs = authoritative.events.compactMap(\.canonicalTransactionId)
+        guard supporting.algorithm == CardStatementSemanticProjectionDTO.amexAlgorithm,
+              authoritative.algorithm == supporting.algorithm,
+              supporting.workspaceId == authoritative.workspaceId,
+              supporting.liabilityAccountId == authoritative.liabilityAccountId,
+              supporting.institutionCode == authoritative.institutionCode,
+              supporting.statementFamilyCode == authoritative.statementFamilyCode,
+              supporting.parserProfileId == authoritative.parserProfileId,
+              supporting.parserProfileVersion == authoritative.parserProfileVersion,
+              supporting.statementDateISO == authoritative.statementDateISO,
+              supporting.statementStartDateISO == authoritative.statementStartDateISO,
+              supporting.statementEndDateISO == authoritative.statementEndDateISO,
+              supporting.nativeCurrency == authoritative.nativeCurrency,
+              supportingIDs.count == supporting.events.count,
+              authoritativeIDs.count == authoritative.events.count,
+              Set(supportingIDs).count == supportingIDs.count,
+              Set(authoritativeIDs).count == authoritativeIDs.count,
+              Set(supportingIDs) == Set(authoritativeIDs),
+              Set(sections.map(\.documentScopedSectionId)).count == sections.count,
+              Set(authoritativeSections.map(\.documentScopedSectionId)).count == authoritativeSections.count,
+              Set(sections.map(\.instrumentId)) == Set(authoritativeSections.map(\.instrumentId)) else { return false }
+        let authorityByID = Dictionary(uniqueKeysWithValues: authoritative.events.compactMap { event in
+            event.canonicalTransactionId.map { ($0, event) }
+        })
+        let owners = Dictionary(uniqueKeysWithValues: sections.map { ($0.documentScopedSectionId, $0.instrumentId) })
+        let priorOwners = Dictionary(uniqueKeysWithValues: authoritativeSections.map { ($0.documentScopedSectionId, $0.instrumentId) })
+        return supporting.events.allSatisfy { event in
+            guard let canonicalID = event.canonicalTransactionId, let prior = authorityByID[canonicalID] else { return false }
+            let incoming = CardStatementSemanticProjectionEventPlanDTO(
+                incomingTransactionId: canonicalID, normalizedRowId: event.normalizedRowId,
+                sourceOrdinal: event.sourceOrdinal, financialDateISO: event.financialDateISO,
+                financialDateRoleCode: event.financialDateRoleCode, sourceTransactionDateISO: event.sourceTransactionDateISO,
+                liabilityEffectCode: event.liabilityEffectCode, postedCurrency: event.postedCurrency,
+                postedAmountMinor: event.postedAmountMinor, postedAmountDecimal: event.postedAmountDecimal,
+                originalCurrency: event.originalCurrency, originalAmountMinor: event.originalAmountMinor,
+                originalAmountDecimal: event.originalAmountDecimal, sourceReference: event.sourceReference,
+                rowScopeCode: event.rowScopeCode, documentScopedSectionId: event.documentScopedSectionId,
+                documentSectionOrdinal: event.documentSectionOrdinal)
+            return factsAgree(prior, incoming, authoritativeOwners: priorOwners, incomingOwners: owners)
+        }
     }
 }
