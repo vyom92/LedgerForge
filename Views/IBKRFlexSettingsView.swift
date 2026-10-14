@@ -35,7 +35,7 @@ struct IBKRFlexSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-            LFSettingsPageHeader("IBKR connection", subtitle: "Holdings and prices from your Flex report, as of its report date.")
+            LFSettingsPageHeader("IBKR connection", subtitle: "Holdings from your Flex report. Market prices from Nasdaq.")
             connectionSummaryPanel
             LFSettingsColumns(availableWidth: availableWidth, leadingFraction: 0.64, minimumWidth: 1040) {
                 setupPanel

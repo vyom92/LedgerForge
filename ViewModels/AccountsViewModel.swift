@@ -75,7 +75,7 @@ enum AccountDetailPresentationState: Equatable {
     case savedButRefreshFailed
     case historyOnlySaveFailed
     case historyOnlySavedButRefreshFailed
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     case acknowledgementRequired
     case developmentProfileChanged
 #endif
@@ -96,7 +96,7 @@ enum AccountDetailPresentationState: Equatable {
             return "The account status could not be changed. Try again."
         case .historyOnlySavedButRefreshFailed:
             return "The account status was saved but could not be refreshed. Retry or reopen the app."
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         case .acknowledgementRequired:
             return "Acknowledge the active development database profile before saving the account change."
         case .developmentProfileChanged:
@@ -150,7 +150,7 @@ final class AccountsViewModel: ObservableObject {
     @Published var displayNameDraft = ""
     @Published private(set) var editState: AccountDisplayNameEditState = .idle
     @Published private(set) var presentationState: AccountDetailPresentationState = .ready
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @Published private(set) var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
 
@@ -159,7 +159,7 @@ final class AccountsViewModel: ObservableObject {
     private let importSessionStore: ImportSessionStore
     private let cardStore: CardStore
     private let metadataCoordinator: AccountMetadataCoordinating
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
     private var pendingDisplayNameMutation: PendingAccountDisplayNameMutation?
     private var pendingHistoryOnlyMutation: PendingAccountHistoryOnlyMutation?
@@ -180,7 +180,7 @@ final class AccountsViewModel: ObservableObject {
         )
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     init(
         accountStore: AccountStore,
         transactionStore: TransactionStore,
@@ -274,7 +274,7 @@ final class AccountsViewModel: ObservableObject {
     }
 
     func cancelDisplayNameEdit() {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         discardPendingAcknowledgement()
 #endif
         editState = .idle
@@ -308,7 +308,7 @@ final class AccountsViewModel: ObservableObject {
             workspaceID: workspaceID,
             displayName: trimmedDraft
         )
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         switch acknowledgementGate.authorization(for: .accountDisplayNameMutation) {
         case .allowed:
             performDisplayNameMutation(mutation)
@@ -324,7 +324,7 @@ final class AccountsViewModel: ObservableObject {
 #endif
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     var requiresDevelopmentProfileAcknowledgement: Bool {
         acknowledgementChallenge != nil && (pendingDisplayNameMutation != nil || pendingHistoryOnlyMutation != nil)
     }
@@ -372,7 +372,7 @@ final class AccountsViewModel: ObservableObject {
               let account = selectedRuntimeAccount,
               account.isHistoryOnly != historyOnly, let workspaceID = account.workspaceId else { return }
         let mutation = PendingAccountHistoryOnlyMutation(accountID: accountID, workspaceID: workspaceID, historyOnly: historyOnly)
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         discardPendingAcknowledgement()
         switch acknowledgementGate.authorization(for: .accountHistoryOnlyMutation) {
         case .allowed:
@@ -397,7 +397,7 @@ final class AccountsViewModel: ObservableObject {
             presentationState = .ready
             refreshPresentation()
         } catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if let coordinatorError = error as? AccountMetadataCoordinatorError {
                 switch coordinatorError {
                 case .acknowledgementRequired(let challenge):
@@ -430,7 +430,7 @@ final class AccountsViewModel: ObservableObject {
             presentationState = .ready
             refreshPresentation()
         } catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if let coordinatorError = error as? AccountMetadataCoordinatorError {
                 switch coordinatorError {
                 case .acknowledgementRequired(let challenge):

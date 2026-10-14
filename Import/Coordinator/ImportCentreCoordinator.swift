@@ -315,9 +315,9 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         startBatch(sourceURLs, confirmedForAutomaticCommit: false)
     }
 
-    /// The sole entry point for the owner-approved one-confirmation workflow.
-    /// The caller invokes this only after displaying the selected source count and
-    /// the explicit “Prepare and import batch” action.
+    /// Starts a queue authorized either by the explicit batch action or the
+    /// owner-approved automatic intake of newly pending email originals.
+    /// Each source still passes the same preparation, review and commit gates.
     @discardableResult
     func startConfirmedBatch(_ sourceURLs: [URL], preparationLimit: Int = 1) -> Bool {
         startBatch(sourceURLs, confirmedForAutomaticCommit: true, preparationLimit: preparationLimit)

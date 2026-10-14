@@ -3,11 +3,11 @@
 
 import Foundation
 import SQLite3
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import Combine
 #endif
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 enum DevelopmentDatabaseNamespaceError: Error, Equatable, LocalizedError {
     case invalid
 
@@ -47,10 +47,20 @@ struct DevelopmentDatabaseProfileTarget: Equatable {
 }
 
 struct DevelopmentDatabaseIdentity: Equatable {
+    enum CurrentLocation: Equatable { case development, personal }
+
+    static var buildCurrentLocation: CurrentLocation {
+#if DEBUG
+        .development
+#else
+        .personal
+#endif
+    }
     static let namespaceEnvironmentKey = "LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE"
     static let namespaceOverrideIsCompiled = true
 
     let canonicalDevelopmentURL: URL
+    let currentDatabaseURL: URL
     let persistentDebugURL: URL
     let nonDevelopmentURL: URL
     let backupURL: URL
@@ -61,14 +71,16 @@ struct DevelopmentDatabaseIdentity: Equatable {
     private let authorizedResolvedCurrentURL: URL
     private let authorizedResolvedPersistentDebugURL: URL
     private let authorizedDevelopmentRootURL: URL
+    private let authorizedCurrentRootURL: URL
 
-    init(applicationSupportDirectory: URL) {
-        self.init(applicationSupportDirectory: applicationSupportDirectory, namespace: nil)
+    init(applicationSupportDirectory: URL, currentLocation: CurrentLocation = Self.buildCurrentLocation) {
+        self.init(applicationSupportDirectory: applicationSupportDirectory, namespace: nil, currentLocation: currentLocation)
     }
 
     private init(
         applicationSupportDirectory: URL,
-        namespace: DevelopmentDatabaseNamespace?
+        namespace: DevelopmentDatabaseNamespace?,
+        currentLocation: CurrentLocation = Self.buildCurrentLocation
     ) {
         let applicationDirectory = applicationSupportDirectory
             .appendingPathComponent("LedgerForge", isDirectory: true)
@@ -96,6 +108,7 @@ struct DevelopmentDatabaseIdentity: Equatable {
         nonDevelopmentURL = applicationDirectory
             .appendingPathComponent("ledgerforge.sqlite")
             .standardizedFileURL
+        currentDatabaseURL = currentLocation == .personal ? nonDevelopmentURL : canonical
         backupURL = developmentDirectory
             .appendingPathComponent("Lifecycle Backups", isDirectory: true)
             .appendingPathComponent("previous-persistent-debug.sqlite")
@@ -106,9 +119,12 @@ struct DevelopmentDatabaseIdentity: Equatable {
         migrationSandboxDirectoryURL = developmentDirectory
             .appendingPathComponent("Migration Sandboxes", isDirectory: true)
             .standardizedFileURL
-        authorizedResolvedCurrentURL = canonical
+        authorizedResolvedCurrentURL = currentDatabaseURL
         authorizedResolvedPersistentDebugURL = persistentDebugURL
         authorizedDevelopmentRootURL = defaultDevelopmentDirectory.standardizedFileURL
+        authorizedCurrentRootURL = currentLocation == .personal
+            ? currentDatabaseURL.deletingLastPathComponent()
+            : defaultDevelopmentDirectory.standardizedFileURL
     }
 
     static func applicationOwned() -> DevelopmentDatabaseIdentity {
@@ -127,6 +143,7 @@ struct DevelopmentDatabaseIdentity: Equatable {
         applicationSupportDirectory: URL,
         environment: [String: String]
     ) throws -> DevelopmentDatabaseIdentity {
+#if DEBUG
         guard let rawNamespace = environment[namespaceEnvironmentKey] else {
             return DevelopmentDatabaseIdentity(applicationSupportDirectory: applicationSupportDirectory)
         }
@@ -135,6 +152,11 @@ struct DevelopmentDatabaseIdentity: Equatable {
             applicationSupportDirectory: applicationSupportDirectory,
             namespace: namespace
         )
+#else
+        // Developer controls do not turn Release into a test host or redirect
+        // its adopted Current Database through a development environment flag.
+        return DevelopmentDatabaseIdentity(applicationSupportDirectory: applicationSupportDirectory)
+#endif
     }
 
     var isIsolatedCanonicalNamespace: Bool { namespace != nil }
@@ -142,6 +164,7 @@ struct DevelopmentDatabaseIdentity: Equatable {
     func authorizesIsolatedCleanup(at candidate: URL) -> Bool {
         guard namespace != nil else { return false }
         return candidate.standardizedFileURL != canonicalDevelopmentURL
+            && candidate.standardizedFileURL != currentDatabaseURL
             && candidate.standardizedFileURL != persistentDebugURL
             && containsNoSymlink(from: candidate.standardizedFileURL, through: authorizedDevelopmentRootURL)
     }
@@ -153,7 +176,7 @@ struct DevelopmentDatabaseIdentity: Equatable {
             guard profile.ownershipID == nil, profile.migrationSourceVersion == nil else {
                 throw DevelopmentDatabaseProfileIdentityError.invalidProfile
             }
-            url = canonicalDevelopmentURL
+            url = currentDatabaseURL
         case .persistentDebug:
             guard profile.ownershipID == nil, profile.migrationSourceVersion == nil else {
                 throw DevelopmentDatabaseProfileIdentityError.invalidProfile
@@ -182,7 +205,7 @@ struct DevelopmentDatabaseIdentity: Equatable {
     func authorizesCurrentDatabaseIdentity(at candidate: URL) -> Bool {
         let standardizedCandidate = candidate.standardizedFileURL
         return standardizedCandidate == authorizedResolvedCurrentURL
-            && containsNoSymlink(from: standardizedCandidate, through: authorizedDevelopmentRootURL)
+            && containsNoSymlink(from: standardizedCandidate, through: authorizedCurrentRootURL)
     }
 
     func authorizesPersistentDebugReset(at candidate: URL) -> Bool {
@@ -339,6 +362,7 @@ public final class SQLiteRepositoryProvider {
     public let gmailInboxRepo: any GmailInboxRepository
     public let netWorthMembershipRepo: any NetWorthMembershipRepository
     public let intelligenceRepo: any FinancialIntelligenceRepository
+    public let tagRepo: any TransactionTagRepository
     let backgroundJobRepo: any BackgroundJobRepository
     let backgroundPublicCacheRepo: any BackgroundPublicCacheRepository
     let backgroundScheduleRepo: any BackgroundScheduleRepository
@@ -422,8 +446,12 @@ public final class SQLiteRepositoryProvider {
         ) { _ in true }.isEmpty == false) ?? false
         let supportsInvestments = (try? database.queryInt("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'investment_holdings';")) == 1
         let supportsBankSections = verifiedMigrationPrefix.contains { $0.version == migrationV24.version }
+        let supportsSpendingAndTags = verifiedMigrationPrefix.contains { $0.version == migrationV34.version }
+        self.tagRepo = SQLiteTransactionTagRepository(db: database, supportsTags: supportsSpendingAndTags)
         self.intelligenceRepo = verifiedMigrationPrefix.contains { $0.version == migrationV28.version }
-            ? SQLiteFinancialIntelligenceRepository(db: database, supportsBalanceDates: migrations.contains { $0.version == 29 }) : UnavailableFinancialIntelligenceRepository()
+            ? SQLiteFinancialIntelligenceRepository(db: database,
+                supportsBalanceDates: verifiedMigrationPrefix.contains { $0.version == migrationV29.version },
+                supportsRefundAllocations: supportsSpendingAndTags) : UnavailableFinancialIntelligenceRepository()
         self.netWorthMembershipRepo = verifiedMigrationPrefix.contains { $0.version == migrationV27.version }
             ? SQLiteNetWorthMembershipRepository(db: database) : UnavailableNetWorthMembershipRepository()
         self.investmentRepo = supportsInvestments ? SQLiteInvestmentRepository(db: database, generationToken: generationToken) : EmptyInvestmentRepository()
@@ -440,7 +468,9 @@ public final class SQLiteRepositoryProvider {
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
-        self.categoryRepo = SQLiteCategoryRepo(db: database, supportsAutomation: migrations.contains { $0.version == 28 })
+        self.categoryRepo = SQLiteCategoryRepo(db: database,
+            supportsAutomation: verifiedMigrationPrefix.contains { $0.version == migrationV28.version },
+            supportsSpendingIntent: supportsSpendingAndTags)
         self.accountRepo = SQLiteAccountRepo(db: database, supportsBankSections: supportsBankSections)
         self.cardRepo = supportsCards ? SQLiteCardRepo(db: database) : EmptyCardRepo()
         self.importSessionRepo = SQLiteImportSessionRepo(db: database, supportsBankSections: supportsBankSections)
@@ -451,7 +481,7 @@ public final class SQLiteRepositoryProvider {
             ? SQLiteSalaryRepository(db: database, generationToken: generationToken)
             : PlaceholderSalaryRepo()
         self.fundingPlanRepo = supportsSalary
-            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 }, supportsScratchpads: verifiedMigrationPrefix.contains { $0.version == 30 })
+            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 }, supportsScratchpads: verifiedMigrationPrefix.contains { $0.version == 30 }, supportsRefundAllocations: supportsSpendingAndTags)
             : PlaceholderFundingPlanRepo()
     }
 
@@ -637,7 +667,7 @@ final class SQLiteCardRepo: CardRepository {
     }
 }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 enum DevelopmentDatabaseLifecycleResult: Equatable, CustomStringConvertible {
     case temporarySessionStarted(RepositoryStoreHydrationResult)
     case permanentResetCompleted(RepositoryStoreHydrationResult)
@@ -1557,10 +1587,12 @@ fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
 final class SQLiteCategoryRepo: CategoryRepository {
     let db: SQLiteDatabase
     let automationSupported: Bool
+    let spendingIntentSupported: Bool
 
-    init(db: SQLiteDatabase, supportsAutomation: Bool = true) {
+    init(db: SQLiteDatabase, supportsAutomation: Bool = true, supportsSpendingIntent: Bool = false) {
         self.db = db
         self.automationSupported = supportsAutomation
+        self.spendingIntentSupported = supportsSpendingIntent
     }
 
     func categories(workspaceId: String) throws -> [CategoryDTO] {
@@ -1568,16 +1600,20 @@ final class SQLiteCategoryRepo: CategoryRepository {
             sql: "SELECT id, workspace_id, name, normalized_name, is_archived, created_at, updated_at FROM categories WHERE workspace_id = ? ORDER BY normalized_name ASC, id ASC;",
             params: [workspaceId]
         ) { row in
-            CategoryDTO(
-                id: row.string(at: 0) ?? "",
-                workspaceId: row.string(at: 1) ?? "",
-                name: row.string(at: 2) ?? "",
-                normalizedName: row.string(at: 3) ?? "",
-                isArchived: row.bool(at: 4),
-                createdAtISO: row.string(at: 5) ?? "",
-                updatedAtISO: row.string(at: 6)
-            )
+            Self.decodeCategory(row)
         }
+    }
+
+    nonisolated static func decodeCategory(_ row: SQLiteRow) -> CategoryDTO {
+        CategoryDTO(
+            id: row.string(at: 0) ?? "",
+            workspaceId: row.string(at: 1) ?? "",
+            name: row.string(at: 2) ?? "",
+            normalizedName: row.string(at: 3) ?? "",
+            isArchived: row.bool(at: 4),
+            createdAtISO: row.string(at: 5) ?? "",
+            updatedAtISO: row.string(at: 6)
+        )
     }
 
     func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] {
@@ -1585,12 +1621,16 @@ final class SQLiteCategoryRepo: CategoryRepository {
             sql: "SELECT workspace_id, transaction_id, category_id FROM transaction_category_assignments WHERE workspace_id = ? ORDER BY transaction_id ASC;",
             params: [workspaceId]
         ) { row in
-            TransactionCategoryAssignmentDTO(
-                workspaceId: row.string(at: 0) ?? "",
-                transactionId: row.string(at: 1) ?? "",
-                categoryId: row.string(at: 2) ?? ""
-            )
+            Self.decodeAssignment(row)
         }
+    }
+
+    nonisolated static func decodeAssignment(_ row: SQLiteRow) -> TransactionCategoryAssignmentDTO {
+        TransactionCategoryAssignmentDTO(
+            workspaceId: row.string(at: 0) ?? "",
+            transactionId: row.string(at: 1) ?? "",
+            categoryId: row.string(at: 2) ?? ""
+        )
     }
 
     func createCategory(_ category: CategoryDTO) throws -> CategoryDTO {
@@ -1707,6 +1747,44 @@ final class SQLiteCategoryRepo: CategoryRepository {
 
     func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
         try withImmediateTransaction {
+            try setCategoryWithinTransaction(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId)
+        }
+    }
+
+    func applyCategoryBatch(_ review: CategoryBatchReview) throws -> CategoryBatchReceipt {
+        try Task.checkCancellation()
+        return try withImmediateTransaction {
+            try review.validate()
+            guard try supportsCategoryAutomation() else { throw CategoryAutomationError.unavailable }
+            if let id = review.categoryID {
+                guard let target = try category(id: id) else { throw CategoryRepositoryError.categoryNotFound }
+                guard target.workspaceId == review.workspaceID else { throw CategoryRepositoryError.workspaceMismatch }
+                guard !target.isArchived else { throw CategoryRepositoryError.categoryArchived }
+            }
+            // Validate the complete reviewed set before the first write, including
+            // protected rows. Account identity is never inferred from UI ordering.
+            for item in review.items {
+                let account = try db.query(sql: "SELECT account_id FROM transactions WHERE id = ? AND workspace_id = ? AND is_trusted = 1;",
+                    params: [item.transactionID, review.workspaceID]) { $0.string(at: 0) }.first ?? nil
+                let assigned = try db.query(sql: "SELECT category_id FROM transaction_category_assignments WHERE transaction_id = ? AND workspace_id = ?;",
+                    params: [item.transactionID, review.workspaceID]) { $0.string(at: 0) }.first ?? nil
+                guard account == item.accountID, assigned == item.categoryID,
+                      try readIntent(transactionID: item.transactionID) == item.intent else { throw CategoryAutomationError.stalePreview }
+            }
+            var changed: Set<String> = []
+            for id in review.changedIDs.sorted() {
+                try Task.checkCancellation()
+                if try setCategoryWithinTransaction(categoryId: review.categoryID, transactionId: id, workspaceId: review.workspaceID) {
+                    changed.insert(id)
+                }
+            }
+            guard changed == review.changedIDs else { throw CategoryAutomationError.stalePreview }
+            try Task.checkCancellation()
+            return CategoryBatchReceipt(reviewedIDs: review.transactionIDs, changedIDs: changed, protectedIDs: review.protectedIDs)
+        }
+    }
+
+    private func setCategoryWithinTransaction(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
             guard try count("SELECT COUNT(*) FROM transactions WHERE id = ? AND workspace_id = ? AND is_trusted = 1;", [transactionId, workspaceId]) == 1 else {
                 if try count("SELECT COUNT(*) FROM transactions WHERE id = ?;", [transactionId]) == 0 {
                     throw CategoryRepositoryError.transactionNotFound
@@ -1726,11 +1804,12 @@ final class SQLiteCategoryRepo: CategoryRepository {
             try writeAssignment(categoryID: categoryId, transactionID: transactionId, workspaceID: workspaceId)
             if hasAutomation {
                 try writeIntent(intent, transactionID: transactionId, workspaceID: workspaceId)
-                try db.executePrepared(sql: "UPDATE category_import_work SET outcome = 'protected', explanation = ? WHERE transaction_id = ?;",
+                // A pending joint receipt still owes independent expense evaluation.
+                let pendingGuard = spendingIntentSupported ? " AND outcome NOT IN ('pending','retryable')" : ""
+                try db.executePrepared(sql: "UPDATE category_import_work SET outcome = 'protected', explanation = ? WHERE transaction_id = ?\(pendingGuard);",
                     params: [categoryId == nil ? "You deliberately cleared this category." : "Your category choice is protected.", transactionId])
             }
             return true
-        }
     }
 
     func category(id: String) throws -> CategoryDTO? {
@@ -1872,18 +1951,22 @@ final class SQLiteAccountRepo: AccountRepository {
     func accounts(workspaceId: String) throws -> [AccountDTO] {
         let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at FROM accounts WHERE workspace_id = ? ORDER BY name, id;"
         return try db.query(sql: sql, params: [workspaceId]) { row in
-            AccountDTO(
-                id: row.string(at: 0) ?? "",
-                workspaceId: row.string(at: 1) ?? "",
-                name: row.string(at: 2) ?? "",
-                institutionId: row.string(at: 3),
-                accountType: row.string(at: 4),
-                nativeCurrency: row.string(at: 5) ?? "",
-                description: row.string(at: 6),
-                createdAtISO: row.string(at: 7) ?? "",
-                closedAtISO: row.string(at: 8)
-            )
+            Self.decodeAccount(row)
         }
+    }
+
+    nonisolated static func decodeAccount(_ row: SQLiteRow) -> AccountDTO {
+        AccountDTO(
+            id: row.string(at: 0) ?? "",
+            workspaceId: row.string(at: 1) ?? "",
+            name: row.string(at: 2) ?? "",
+            institutionId: row.string(at: 3),
+            accountType: row.string(at: 4),
+            nativeCurrency: row.string(at: 5) ?? "",
+            description: row.string(at: 6),
+            createdAtISO: row.string(at: 7) ?? "",
+            closedAtISO: row.string(at: 8)
+        )
     }
 
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
@@ -2685,72 +2768,107 @@ final class SQLiteTransactionRepo: TransactionRepository {
         try loadTransactions(workspaceId: workspaceId, importSessionId: nil, trustedOnly: true)
     }
 
-    private func loadTransactions(workspaceId: String, importSessionId: String?, trustedOnly: Bool) throws -> [TransactionDTO] {
+    /// The receipt resolver considers only its linked bank and statement month.
+    /// Both canonical rows and their complete source links use the ordinary loader.
+    func companionReceiptTransactions(workspaceId: String, accountID: String, month: SelectedStatementMonth) throws -> [TransactionDTO] {
+        try loadTransactions(workspaceId: workspaceId, importSessionId: nil, trustedOnly: true,
+                             receiptAccountID: accountID, receiptMonth: month.canonical)
+    }
+
+    private func loadTransactions(workspaceId: String, importSessionId: String?, trustedOnly: Bool,
+                                  receiptAccountID: String? = nil, receiptMonth: String? = nil) throws -> [TransactionDTO] {
         var scope = "t.workspace_id = ?"
         var params: [Any?] = [workspaceId]
         if let importSessionId { scope += " AND t.import_session_id = ?"; params.append(importSessionId) }
         if trustedOnly { scope += " AND t.is_trusted = 1" }
+        if let receiptAccountID { scope += " AND t.account_id = ?"; params.append(receiptAccountID) }
+        if let receiptMonth { scope += " AND substr(t.posted_date,1,7) = ?"; params.append(receiptMonth) }
 
-        // Both reads share the existing connection/namespace gate. Batch source
-        // links once rather than re-entering that gate for every transaction.
         return try db.withExclusiveAccess {
-            let rawSQL = """
-                SELECT trr.transaction_id, trr.id, trr.normalized_row_id, trr.contribution_type,
-                       nr.row_index, nr.record_digest, nr.normalized_document_id, nd.profile_id, nd.profile_version
-                FROM transaction_raw_rows trr
-                INNER JOIN transactions t ON t.id = trr.transaction_id
-                INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id
-                INNER JOIN normalized_documents nd ON nd.id = nr.normalized_document_id
-                WHERE \(scope)
-                ORDER BY trr.transaction_id ASC, nr.row_index ASC, trr.id ASC;
-                """
-            let links = try db.query(sql: rawSQL, params: params) { row in
-                (row.string(at: 0) ?? "", TransactionRawRowDTO(
-                    id: row.string(at: 1) ?? "",
-                    normalizedRowId: row.string(at: 2) ?? "",
-                    contributionType: row.string(at: 3),
-                    sourceOrdinal: row.int64(at: 4).map(Int.init),
-                    normalizedRecordDigest: row.string(at: 5),
-                    normalizedDocumentId: row.string(at: 6),
-                    parserProfileId: row.string(at: 7),
-                    parserProfileVersion: row.string(at: 8)
-                ))
-            }
-            var rawByTransaction: [String: [TransactionRawRowDTO]] = [:]
-            for (id, row) in links { rawByTransaction[id, default: []].append(row) }
-            let sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE \(scope) ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
-            return try db.query(sql: sql, params: params) { row in
-                let transactionId = row.string(at: 0) ?? ""
-                return TransactionDTO(
-                    id: transactionId,
-                    workspaceId: row.string(at: 1) ?? "",
-                    accountId: row.string(at: 2),
-                    importSessionId: row.string(at: 3),
-                    documentId: row.string(at: 4),
-                    originalRowId: row.string(at: 5),
-                    postedDateISO: row.string(at: 6) ?? "",
-                    financialDateRole: row.string(at: 21) ?? "transaction_date",
-                    statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
-                    valueDateISO: row.string(at: 7),
-                    description: row.string(at: 8),
-                    payee: row.string(at: 9),
-                    reference: row.string(at: 10),
-                    nativeCurrency: row.string(at: 11) ?? "",
-                    amountMinor: row.int64(at: 12) ?? 0,
-                    amountDecimal: row.string(at: 13) ?? "",
-                    direction: row.string(at: 14) ?? "",
-                    runningBalanceMinor: row.int64(at: 15),
-                    isReconciled: row.bool(at: 16),
-                    isTrusted: row.bool(at: 17),
-                    trustedAtISO: row.string(at: 18),
-                    createdAtISO: row.string(at: 19) ?? "",
-                    updatedAtISO: row.string(at: 20),
-                    rawRows: rawByTransaction[transactionId] ?? []
-                )
-            }
+            try Self.captureRows(db, scope: scope, params: params, ordered: true).decode()
         }
     }
 
+    /// The caller owns one complete connection/ledger scope. Only copied rows
+    /// cross to a worker; ordinary reads retain their existing source ordering.
+    nonisolated static func captureRows(_ db: SQLiteDatabase, scope: String, params: [Any?], ordered: Bool) throws -> SQLiteTransactionReadRows {
+        let rawSQL = """
+            SELECT trr.transaction_id, trr.id, trr.normalized_row_id, trr.contribution_type,
+                   nr.row_index, nr.record_digest, nr.normalized_document_id, nd.profile_id, nd.profile_version
+            FROM transaction_raw_rows trr
+            INNER JOIN transactions t ON t.id = trr.transaction_id
+            INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id
+            INNER JOIN normalized_documents nd ON nd.id = nr.normalized_document_id
+            WHERE \(scope)
+            \(ordered ? "ORDER BY trr.transaction_id ASC, nr.row_index ASC, trr.id ASC;" : ";")
+            """
+        let sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE \(scope)" + (ordered ? " ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;" : ";")
+
+        return try SQLiteTransactionReadRows(
+            links: db.query(sql: rawSQL, params: params) { $0 },
+            transactions: db.query(sql: sql, params: params) { $0 }, needsSourceOrdering: !ordered)
+    }
+
+}
+
+
+/// Exact ordinary repository query columns, copied under connection ownership.
+nonisolated struct SQLiteTransactionReadRows: Sendable {
+    let links: [SQLiteRow]
+    let transactions: [SQLiteRow]
+    let needsSourceOrdering: Bool
+
+    func decode() -> [TransactionDTO] {
+        let decodedLinks = links.map { row in
+            (row.string(at: 0) ?? "", TransactionRawRowDTO(
+                id: row.string(at: 1) ?? "",
+                normalizedRowId: row.string(at: 2) ?? "",
+                contributionType: row.string(at: 3),
+                sourceOrdinal: row.int64(at: 4).map(Int.init),
+                normalizedRecordDigest: row.string(at: 5),
+                normalizedDocumentId: row.string(at: 6),
+                parserProfileId: row.string(at: 7),
+                parserProfileVersion: row.string(at: 8)
+            ))
+        }
+        var rawByTransaction: [String: [TransactionRawRowDTO]] = [:]
+        for (id, row) in decodedLinks { rawByTransaction[id, default: []].append(row) }
+        if needsSourceOrdering {
+            rawByTransaction = rawByTransaction.mapValues { rows in rows.sorted {
+                if $0.sourceOrdinal != $1.sourceOrdinal { return ($0.sourceOrdinal ?? 0) < ($1.sourceOrdinal ?? 0) }
+                return $0.id < $1.id
+            } }
+        }
+        return transactions.map { row in
+            let transactionId = row.string(at: 0) ?? ""
+            return TransactionDTO(
+                id: transactionId,
+                workspaceId: row.string(at: 1) ?? "",
+                accountId: row.string(at: 2),
+                importSessionId: row.string(at: 3),
+                documentId: row.string(at: 4),
+                originalRowId: row.string(at: 5),
+                postedDateISO: row.string(at: 6) ?? "",
+                financialDateRole: row.string(at: 21) ?? "transaction_date",
+                statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
+                valueDateISO: row.string(at: 7),
+                description: row.string(at: 8),
+                payee: row.string(at: 9),
+                reference: row.string(at: 10),
+                nativeCurrency: row.string(at: 11) ?? "",
+                amountMinor: row.int64(at: 12) ?? 0,
+                amountDecimal: row.string(at: 13) ?? "",
+                direction: row.string(at: 14) ?? "",
+                runningBalanceMinor: row.int64(at: 15),
+                isReconciled: row.bool(at: 16),
+                isTrusted: row.bool(at: 17),
+                trustedAtISO: row.string(at: 18),
+                createdAtISO: row.string(at: 19) ?? "",
+                updatedAtISO: row.string(at: 20),
+                rawRows: rawByTransaction[transactionId] ?? []
+            )
+        }
+    }
 }
 
 // MARK: - Utilities

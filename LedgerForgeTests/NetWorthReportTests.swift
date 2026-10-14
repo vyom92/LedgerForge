@@ -14,12 +14,7 @@ struct NetWorthReportTests {
         let cache: BackgroundPublicCacheSnapshot
         let now: Date
         var valuations: [String: InvestmentValuation] {
-            Dictionary(uniqueKeysWithValues: snapshot.investments.holdings.map { holding in
-                let quote = holding.priceMapping.flatMap { mapping in
-                    InvestmentPriceRegistry.confirmedMapping(for: holding) == mapping ? cache.investmentQuotes[mapping.identity] : nil
-                }
-                return (holding.id, InvestmentValuation(holding: holding, quote: quote))
-            })
+            InvestmentPriceSession.makeValuations(snapshot: snapshot.investments, quotes: cache.investmentQuotes)
         }
         func report(excluded: Set<NetWorthMemberID> = [], legs: [AlDarCurrency: AlDarUnitReference]? = nil,
                     valuations supplied: [String: InvestmentValuation]? = nil, now date: Date? = nil,
@@ -45,6 +40,75 @@ struct NetWorthReportTests {
         let now = Date()
         return .init(provider: provider, snapshot: snapshot, workspaceID: workspace,
                      cache: try provider.backgroundPublicCacheRepo.snapshot(now: now), now: now)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func authenticCachedObservationsKeepFetchAndValuationDatesAcrossCheckFailureAndRelaunch() throws {
+        let source = try context(); defer { source.provider.database.close() }
+        let quote = try #require(source.cache.investmentQuotes.values.first)
+        let name = "LedgerForge.offline-observation.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        InvestmentQuoteCache(defaults: defaults).save(source.cache.investmentQuotes)
+        let session = InvestmentPriceSession(defaults: defaults, enabled: false)
+        #expect(session.quotes == source.cache.investmentQuotes && session.checkedAt.isEmpty)
+        let checked = source.now
+        session.installShared(source.cache.investmentQuotes, failures: [quote.mapping.identity: .unavailable], busy: false,
+                              checkedAt: [quote.mapping.identity: checked], networkAvailable: false)
+        #expect(session.observationStatus == "Offline · cached")
+        #expect(session.checkedAt[quote.mapping.identity] == checked)
+        #expect(session.quotes == source.cache.investmentQuotes)
+        let reopened = InvestmentPriceSession(defaults: defaults, enabled: false)
+        #expect(reopened.quotes == source.cache.investmentQuotes && reopened.checkedAt.isEmpty)
+        #expect(reopened.quotes[quote.mapping.identity]?.fetchedAt == quote.fetchedAt)
+        #expect(reopened.quotes[quote.mapping.identity]?.valuationDay == quote.valuationDay)
+        let rates = AlDarReferenceSession(defaults: defaults, enabled: false)
+        rates.installShared(source.cache.alDarLegs, failures: Set(source.cache.alDarLegs.keys), busy: false,
+                            checkedAt: source.cache.alDarLegs.mapValues { _ in checked }, networkAvailable: false)
+        #expect(rates.legs == source.cache.alDarLegs && rates.observationStatus == "Offline · cached")
+        let ratesReopened = AlDarReferenceSession(defaults: defaults, enabled: false)
+        #expect(ratesReopened.legs == source.cache.alDarLegs && ratesReopened.checkedAt.isEmpty)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func authenticCBQINREquivalentsPreserveNativeAndQARTotalsAndMissingFX() throws {
+        let source = try context(); defer { source.provider.database.close() }
+        let snapshot = source.snapshot.investments
+        let before = try NetWorthTestSupport.financialDigest(source.provider.database)
+        let usdRate = try #require(source.cache.alDarLegs[.usd])
+        let inrRate = try #require(source.cache.alDarLegs[.inr])
+        func cbq(_ legs: [AlDarCurrency: AlDarUnitReference]) throws -> InvestmentPortfolioSummary {
+            try #require(InvestmentOverview.build(holdings: snapshot.holdings, valuations: source.valuations,
+                legs: legs, containers: snapshot.containers, ispAccount: snapshot.latestZioAccount)
+                .portfolios.first { $0.group == .cbq })
+        }
+        let full = try cbq(source.cache.alDarLegs), missingINR = try cbq([.usd: usdRate])
+        let ids = Set(full.funds.flatMap(\.holdingIDs))
+        let holdings = snapshot.holdings.filter { ids.contains($0.id) }
+        #expect(!holdings.isEmpty && holdings.allSatisfy { $0.currency == "USD" })
+        let scopes = [(full.scope, missingINR.scope, holdings)] + full.funds.map { fund in
+            (fund.scope, missingINR.funds.first { $0.id == fund.id }!.scope,
+             holdings.filter { fund.holdingIDs.contains($0.id) })
+        }
+        for (scope, missing, members) in scopes {
+            #expect(scope.lines.map(\.currency) == ["USD", "QAR", "INR"])
+            #expect(scope.lines.filter { $0.currency != "INR" } == missing.lines.filter { $0.currency != "INR" })
+            #expect(scope.returnPercent == missing.returnPercent && missing.fxMissing)
+            #expect(missing.lines.first { $0.currency == "INR" }?.value == nil)
+            let measures: [(KeyPath<InvestmentOverviewLine, InvestmentConvertedAmount?>, KeyPath<InvestmentValuation, Decimal?>)] =
+                [(\.value, \.currentValue), (\.cost, \.supportedCost), (\.gain, \.gain)]
+            for (field, nativeField) in measures {
+                let native = try members.map { try #require(source.valuations[$0.id]?[keyPath: nativeField]) }.reduce(Decimal.zero, +)
+                for line in scope.lines {
+                    let amount = try #require(line[keyPath: field]?.covering(members.count))
+                    let multiplier = line.currency == "INR" ? inrRate.returned.decimal : Decimal(1)
+                    let divisor = line.currency == "USD" ? Decimal(1) : usdRate.returned.decimal
+                    #expect(try InvestmentArithmetic.product(amount.numerator, InvestmentArithmetic.Exact(divisor))
+                        == InvestmentArithmetic.product(InvestmentArithmetic.Exact(native * multiplier), amount.denominator))
+                }
+            }
+        }
+        #expect(try NetWorthTestSupport.financialDigest(source.provider.database) == before)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -193,7 +257,8 @@ struct NetWorthReportTests {
         for holding in snapshot.investments.holdings {
             let mapping = holding.priceMapping
             let quote = mapping.flatMap { source.cache.investmentQuotes[$0.identity] }
-            let qualified = mapping != nil && mapping == InvestmentPriceRegistry.confirmedMapping(for: holding)
+            let qualified = mapping != nil && mapping == InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.investments.containers.first { $0.id == holding.containerID })
                 && quote?.mapping == mapping && quote?.mapping.currency == holding.currency
             // Foundation's checked primitive is deliberately independent of the
             // production digit-array product and reporting conversion functions.

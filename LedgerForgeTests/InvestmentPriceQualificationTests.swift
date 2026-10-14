@@ -94,8 +94,9 @@ struct InvestmentPriceQualificationTests {
         try verifyOverview(session.overview, against: oracle)
         let usdLegOnly = InvestmentOverview.build(holdings: mapped.holdings, valuations: session.valuations, legs: [.usd: fx[.usd]!])
         let cbq = usdLegOnly.portfolios.first { $0.group == .cbq }!
-        #expect(cbq.scope.lines.map(\.currency) == ["USD", "QAR"] && !cbq.scope.fxMissing)
-        #expect(cbq.scope.lines.last?.value?.coverage == cbq.scope.holdingCount)
+        #expect(cbq.scope.lines.map(\.currency) == ["USD", "QAR", "INR"] && cbq.scope.fxMissing)
+        #expect(cbq.scope.lines.first { $0.currency == "QAR" }?.value?.coverage == cbq.scope.holdingCount)
+        #expect(cbq.scope.lines.first { $0.currency == "INR" }?.value == nil)
         #expect(usdLegOnly.total.fxMissing)
         let noFX = InvestmentOverview.build(holdings: mapped.holdings, valuations: session.valuations, legs: [:])
         #expect(noFX.total.fxMissing)
@@ -355,11 +356,11 @@ def scope(rows,parent=None,currencies=('USD','INR')):
  return result
 def scope_amounts(rows):
  return {k:sum((converted(r,k,'USD') for r in rows if r[k] is not None),F(0)) if any(r[k] is not None for r in rows) else None for k in ['cost','gain']}
-portfolios={g:scope([r for r in positions if r['group']==g],positions,('USD','QAR') if g=='CBQ Investments' else ('USD','INR')) for g in ['ISP','IBKR','Indian MF','CBQ Investments']}
+portfolios={g:scope([r for r in positions if r['group']==g],positions,('USD','QAR','INR') if g=='CBQ Investments' else ('USD','INR')) for g in ['ISP','IBKR','Indian MF','CBQ Investments']}
 funds={}
 for group,code in sorted(set((r['group'],r['code']) for r in positions)):
  rows=[r for r in positions if r['group']==group and r['code']==code];key=group+'|'+code
- funds[key]=scope(rows,[r for r in positions if r['group']==group],('USD','QAR') if group=='CBQ Investments' else ('USD','INR'));funds[key]['units']=canon(sum(r['units'] for r in rows));funds[key]['days']=sorted(set(r['day'] for r in rows))
+ funds[key]=scope(rows,[r for r in positions if r['group']==group],('USD','QAR','INR') if group=='CBQ Investments' else ('USD','INR'));funds[key]['units']=canon(sum(r['units'] for r in rows));funds[key]['days']=sorted(set(r['day'] for r in rows))
 json.dump(dict(holdings=out,total=scope(positions),portfolios=portfolios,funds=funds),sys.stdout)
 """#
         let data = try JSONSerialization.data(withJSONObject: [

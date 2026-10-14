@@ -1,7 +1,7 @@
 import Foundation
 
 /// Editor-only lexical adapter. Money's canonical persistence contract is unchanged.
-enum PlannerInputCodec {
+nonisolated enum PlannerInputCodec {
     enum InputError: Error { case invalid }
 
     private static func normalized(_ text: String, locale: Locale, fractionLimit: Int) throws -> String {

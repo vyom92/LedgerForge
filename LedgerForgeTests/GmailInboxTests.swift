@@ -37,6 +37,34 @@ struct GmailInboxTests {
         #expect(session.batchSources.isEmpty)
     }
 
+    @Test(.globalRuntimeStateIsolation)
+    func automaticIntakeSelectsOnlyPendingKnownOriginalsAndRejectsStaleCoverage() async throws {
+        let provider = DatabaseProvider(inMemory: true), previous = DatabaseProvider.shared
+        DatabaseProvider.shared = provider
+        defer { DatabaseProvider.shared = previous }
+        var inbox = GmailInboxState(account: account)
+        let attentions: [GmailInboxSource.Attention] = [.pending, .review, .password, .unsupported, .invalid, .failed, .skipped]
+        for (index, attention) in attentions.enumerated() {
+            let candidate = source(message: "attention-\(index)", attention: attention)
+            inbox.sources[candidate.id] = candidate
+        }
+        var dismissed = source(message: "dismissed"); dismissed.dismissed = true
+        let unknown = source(message: "unknown", family: .other)
+        var unavailable = source(message: "unavailable"); unavailable.acquisition = .unavailable
+        var retained = source(message: "retained"); retained.retainedNewerHoldings = true
+        for candidate in [dismissed, unknown, unavailable, retained] { inbox.sources[candidate.id] = candidate }
+        _ = try provider.gmailInboxRepo.save(inbox, originals: [GmailInboxSource.digest(bytes): bytes], expectedRevision: 0)
+        let name = "LedgerForge.AutomaticIntake.\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: name))
+        defer { preferences.removePersistentDomain(forName: name) }
+        let session = GmailIntakeSession(preferences: preferences)
+        // Unbound metadata inspection cannot start an import or parse opaque mechanics bytes.
+        await session.reloadInbox()
+        #expect(session.automaticSources.map(\.id) == [source(message: "attention-0").id])
+        DatabaseProvider.shared = DatabaseProvider(inMemory: true)
+        #expect(session.automaticSources.isEmpty && !session.isReconciled)
+    }
+
     @Test func senderEditsSurviveReopenAndCannotAdvanceAnotherSendersCoverage() throws {
         let database = try database(); defer { database.close() }
         let repository = SQLiteGmailInboxRepository(database: database)
@@ -63,11 +91,11 @@ struct GmailInboxTests {
     private let account = "mechanics@example.invalid"
     private let bytes = Data([0, 255, 32, 13, 10, 17, 0, 88])
 
-    private func source(message: String = "one", attention: GmailInboxSource.Attention = .pending) -> GmailInboxSource {
+    private func source(message: String = "one", attention: GmailInboxSource.Attention = .pending, family: GmailSourceFamily = .consolidatedFunds) -> GmailInboxSource {
         .init(id: GmailInboxSource.deliveryID(account: account, messageID: message, partID: "0"),
               account: account, messageID: message, partID: "0", originalFilename: "../../same.pdf",
               fileExtension: "pdf", mimeType: "application/octet-stream", sender: "transport@example.invalid",
-              family: .consolidatedFunds, receivedMilliseconds: 1_000,
+              family: family, receivedMilliseconds: 1_000,
               expectedByteCount: bytes.count, acquisition: .available, retrievedAt: Date(timeIntervalSince1970: 2),
               sha256: GmailInboxSource.digest(bytes), attention: attention, dismissed: false)
     }

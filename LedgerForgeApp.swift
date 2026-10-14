@@ -21,7 +21,7 @@ private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDeleg
     }
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #else
             LedgerForgeApp.closeProductionProvider()
@@ -67,7 +67,7 @@ struct LedgerForgeApp: App {
         return true
     }
     @State private var transactionAmountMeasurement = TransactionAmountWidthMeasurement()
-#if !DEBUG
+#if !DEBUG && !LEDGERFORGE_DEVELOPER_TOOLS
     private static var sqliteProvider: SQLiteRepositoryProvider?
 #endif
 
@@ -87,6 +87,7 @@ struct LedgerForgeApp: App {
                 .task {
                     CategoryAutomationSession.shared.start()
                     SalaryAssistanceSession.shared.start()
+                    CompanionMacCoordinator.shared.start(rates: alDarReferenceSession, prices: investmentPriceSession)
                     investmentPriceSession.activate()
                     investmentPriceSession.observeRates(alDarReferenceSession)
                     BackgroundUpdatesSession.shared.start(rates: alDarReferenceSession, prices: investmentPriceSession,
@@ -98,7 +99,7 @@ struct LedgerForgeApp: App {
 
     @discardableResult
     static func configurePersistence(path: String? = nil) -> Bool {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #else
         sqliteProvider?.database.close()
@@ -127,7 +128,7 @@ struct LedgerForgeApp: App {
     }
 
     private static func configureInMemoryPersistence(for purpose: PersistenceNonDurablePurpose) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #else
         sqliteProvider?.database.close()
@@ -135,7 +136,7 @@ struct LedgerForgeApp: App {
         ApplicationAvailability.shared.begin()
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .intentionalNonDurable(purpose)
-#if !DEBUG
+#if !DEBUG && !LEDGERFORGE_DEVELOPER_TOOLS
         sqliteProvider = nil
 #endif
     }
@@ -168,7 +169,7 @@ struct LedgerForgeApp: App {
         isolatedPersistencePurpose(environment: environment) == .debugMemory
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     static func startTemporaryEmptySession() -> DevelopmentDatabaseLifecycleResult {
         DevelopmentDatabaseLifecycleCoordinator.shared.startTemporaryEmptySession()
     }
@@ -179,7 +180,7 @@ struct LedgerForgeApp: App {
 #endif
 
     private static func installSQLiteProvider(path: String? = nil) throws {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         guard path == nil || usesIsolatedTestPersistence() else {
             throw DevelopmentDatabaseProfileIdentityError.invalidProfile
         }
@@ -215,7 +216,7 @@ struct LedgerForgeApp: App {
             // migration or prevent the foreground ledger from opening.
             try? BackgroundEnrollmentStore().reconcileMigration(path: target.path, from: priorStableActivation, to: updated)
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         let coordinator = DevelopmentDatabaseLifecycleCoordinator.shared
         coordinator.loadRememberedSelection(from: DevelopmentDatabaseProfilePreferences())
         try coordinator.installInitialProvider(
@@ -229,7 +230,7 @@ struct LedgerForgeApp: App {
     }
 
     static func currentSQLiteProviderForRecovery() throws -> SQLiteRepositoryProvider? {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         return try DevelopmentDatabaseLifecycleCoordinator.shared.currentProviderForRecovery()
 #else
         return sqliteProvider
@@ -238,7 +239,7 @@ struct LedgerForgeApp: App {
 
     static func publishRecoveredCurrent(_ provider: SQLiteRepositoryProvider, runtime: DatabaseProvider,
                                         hydrator: RepositoryStoreHydrator, snapshot: RepositoryRuntimeSnapshot) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         DevelopmentDatabaseLifecycleCoordinator.shared.publishRecoveredCurrent(provider, runtime: runtime, hydrator: hydrator, snapshot: snapshot)
 #else
         DatabaseProvider.shared.invalidateGeneration()
@@ -248,7 +249,7 @@ struct LedgerForgeApp: App {
         hydrator.notifyObserversOfInstalledSnapshot()
 #endif
     }
-#if !DEBUG
+#if !DEBUG && !LEDGERFORGE_DEVELOPER_TOOLS
     static func closeProductionProvider() {
         do { try sqliteProvider?.database.checkpointAndClose() }
         catch { RuntimeDiagnostic.record(RuntimeDiagnostic.failure(error, operation: "termination", stage: "checked close"), category: .database) }

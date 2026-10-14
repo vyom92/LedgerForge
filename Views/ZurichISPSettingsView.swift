@@ -172,7 +172,7 @@ private struct SalaryISPVerificationSettings: View {
     @State private var baseline: IntelligencePreferences?
     @State private var generation: ProviderGenerationToken?
     @State private var message: String?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pending: (() -> Void)?
 #endif
@@ -225,7 +225,7 @@ private struct SalaryISPVerificationSettings: View {
             if let message { Text(message).foregroundStyle(LFTheme.warning) }
         }
         .onAppear { reloadDraft() }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pending = nil } })) {
                 Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
@@ -279,7 +279,7 @@ private struct SalaryISPVerificationSettings: View {
     private func change(_ operation: @escaping () throws -> Void) {
         do { try operation(); message = nil }
         catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if case DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) = error {
                 challenge = value; pending = { change(operation) }; return
             }

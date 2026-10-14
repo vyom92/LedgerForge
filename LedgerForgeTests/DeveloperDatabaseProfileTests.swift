@@ -5,6 +5,22 @@ import Testing
 #if DEBUG
 @MainActor
 struct DeveloperDatabaseProfileTests {
+    @Test func releaseDeveloperProfilesKeepPersonalCurrentSeparateAndProtected() throws {
+        let root = try makeTemporaryDirectory("PersonalCurrentProfile")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root, currentLocation: .personal)
+        let current = try identity.target(for: DevelopmentDatabaseProfile.resolve(.current))
+        let debug = try identity.target(for: DevelopmentDatabaseProfile.resolve(.persistentDebug))
+        #expect(current.databaseURL == identity.nonDevelopmentURL)
+        #expect(current.databaseURL != identity.canonicalDevelopmentURL)
+        #expect(identity.authorizesCurrentDatabaseIdentity(at: current.databaseURL))
+        #expect(!identity.authorizesCurrentDatabaseIdentity(at: identity.canonicalDevelopmentURL))
+        #expect(!identity.authorizesDestructiveWork(at: current.databaseURL))
+        #expect(!identity.authorizesCleanup(of: current))
+        #expect(debug.databaseURL != current.databaseURL)
+        #expect(identity.authorizesPersistentDebugReset(at: debug.databaseURL))
+    }
+
     @Test func currentProfileUsesExistingCanonicalIdentityAndCannotResetOrCleanUp() throws {
         let root = try makeTemporaryDirectory("CurrentProfile")
         defer { try? FileManager.default.removeItem(at: root) }

@@ -71,7 +71,7 @@ public enum CategoryRepositoryError: Error, Equatable, LocalizedError {
     }
 }
 
-enum CategoryName {
+nonisolated enum CategoryName {
     static let maximumLength = 80
 
     static func validated(_ value: String) throws -> (display: String, normalized: String) {
@@ -130,7 +130,7 @@ public enum PersistenceNonDurablePurpose: String, Equatable {
     case testMemory
     case debugMemory
     case debugTemporarySQLite
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     case debugMigrationSandboxSQLite
 #endif
 }
@@ -159,7 +159,7 @@ public enum PersistenceState: Equatable {
             return "Intentional Debug Memory"
         case .intentionalNonDurable(.debugTemporarySQLite):
             return "Temporary Debug SQLite"
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         case .intentionalNonDurable(.debugMigrationSandboxSQLite):
             return "Migration Sandbox SQLite"
 #endif
@@ -178,7 +178,7 @@ public enum PersistenceState: Equatable {
             return "An explicitly selected in-memory Debug provider is active."
         case .intentionalNonDurable(.debugTemporarySQLite):
             return "An explicitly selected temporary Debug database is active for this process."
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         case .intentionalNonDurable(.debugMigrationSandboxSQLite):
             return "An explicitly selected migrated Debug sandbox is active for this process."
 #endif
@@ -211,13 +211,64 @@ public protocol TransactionRepository {
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO]
 }
 
+/// Read-only inputs captured from one provider while canonical hydration holds
+/// its consistent snapshot. There is deliberately no initializer from arrays:
+/// category writes and ordinary reads must obtain their own current facts.
+public struct CategoryAutomationHydrationInputs {
+    let workspaceID: String
+    let providerGeneration: ProviderGenerationToken
+    fileprivate let providerIdentity: ObjectIdentifier
+    let transactions: [TransactionDTO]
+    let accounts: [AccountDTO]
+    let intelligence: FinancialIntelligenceSnapshot?
+
+    private init(workspaceID: String, provider: DatabaseProvider,
+                 transactions: [TransactionDTO], accounts: [AccountDTO],
+                 intelligence: FinancialIntelligenceSnapshot?) {
+        self.workspaceID = workspaceID
+        self.providerGeneration = provider.generationToken
+        self.providerIdentity = ObjectIdentifier(provider)
+        self.transactions = transactions
+        self.accounts = accounts
+        self.intelligence = intelligence
+    }
+
+    static func capture(from provider: DatabaseProvider, workspaceID: String) throws -> Self {
+        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
+        let accounts = try provider.accountRepo.accounts(workspaceId: workspaceID)
+        let intelligence = try provider.intelligenceRepo.snapshot(workspaceID: workspaceID)
+        guard transactions.allSatisfy({ $0.workspaceId == workspaceID && $0.isTrusted }),
+              Set(transactions.map(\.id)).count == transactions.count,
+              accounts.allSatisfy({ $0.workspaceId == workspaceID }),
+              Set(accounts.map(\.id)).count == accounts.count,
+              intelligence == nil || intelligence?.workspaceID == workspaceID else {
+            throw CategoryAutomationError.invalidState
+        }
+        return Self(workspaceID: workspaceID, provider: provider,
+                    transactions: transactions, accounts: accounts, intelligence: intelligence)
+    }
+
+    func validate(workspaceID: String, trustedImportSessions: [String: String]) throws {
+        guard self.workspaceID == workspaceID, transactions.count == trustedImportSessions.count,
+              transactions.allSatisfy({ trustedImportSessions[$0.id] == ($0.importSessionId ?? "") }) else {
+            throw CategoryAutomationError.invalidState
+        }
+    }
+}
+
 public protocol CategoryRepository {
     /// Nil means a historical schema predates this feature; a current read failure throws.
     func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot?
+    /// Only canonical hydration may reuse the same provider's captured read facts.
+    func automationSnapshot(workspaceId: String, hydrationInputs: CategoryAutomationHydrationInputs) throws -> CategoryAutomationSnapshot?
     func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws
     func deleteRule(id: String, workspaceId: String, version: Int) throws
     @discardableResult
     func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int
+    func applyReviewedCategoryEvaluation(_ preview: CategoryHistoricalPreview, workspaceId: String) throws -> CategoryApplyReceipt
+    func applyCategoryBatch(_ review: CategoryBatchReview) throws -> CategoryBatchReceipt
+    @discardableResult
+    func setSpendingSuppressed(_ suppressed: Bool, transactionID: String, workspaceId: String, expected: TransactionSpendingIntent?) throws -> Bool
 
     func categories(workspaceId: String) throws -> [CategoryDTO]
     func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO]
@@ -234,9 +285,15 @@ public protocol CategoryRepository {
 
 public extension CategoryRepository {
     func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot? { nil }
+    func automationSnapshot(workspaceId: String, hydrationInputs: CategoryAutomationHydrationInputs) throws -> CategoryAutomationSnapshot? {
+        try automationSnapshot(workspaceId: workspaceId)
+    }
     func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws { throw CategoryAutomationError.unavailable }
     func deleteRule(id: String, workspaceId: String, version: Int) throws { throw CategoryAutomationError.unavailable }
     func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int { throw CategoryAutomationError.unavailable }
+    func applyReviewedCategoryEvaluation(_ preview: CategoryHistoricalPreview, workspaceId: String) throws -> CategoryApplyReceipt { throw CategoryAutomationError.unavailable }
+    func applyCategoryBatch(_ review: CategoryBatchReview) throws -> CategoryBatchReceipt { throw CategoryAutomationError.unavailable }
+    func setSpendingSuppressed(_ suppressed: Bool, transactionID: String, workspaceId: String, expected: TransactionSpendingIntent?) throws -> Bool { throw CategoryAutomationError.unavailable }
 }
 
 public protocol AccountRepository {
@@ -365,6 +422,7 @@ public final class DatabaseProvider {
     public let gmailInboxRepo: any GmailInboxRepository
     public let netWorthMembershipRepo: any NetWorthMembershipRepository
     public let intelligenceRepo: any FinancialIntelligenceRepository
+    public let tagRepo: any TransactionTagRepository
     private let generationValidity: ProviderGenerationValidity?
     private(set) var sqliteProvider: SQLiteRepositoryProvider?
 
@@ -382,6 +440,7 @@ public final class DatabaseProvider {
         gmailInboxRepo: (any GmailInboxRepository)? = nil,
         netWorthMembershipRepo: (any NetWorthMembershipRepository)? = nil,
         intelligenceRepo: (any FinancialIntelligenceRepository)? = nil,
+        tagRepo: (any TransactionTagRepository)? = nil,
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         protectsGeneration: Bool = false,
@@ -397,12 +456,13 @@ public final class DatabaseProvider {
         let resolvedGmailInboxRepo = gmailInboxRepo ?? UnavailableGmailInboxRepository()
         let resolvedMembershipRepo = netWorthMembershipRepo ?? UnavailableNetWorthMembershipRepository()
         let resolvedIntelligenceRepo = intelligenceRepo ?? UnavailableFinancialIntelligenceRepository()
+        let resolvedTagRepo = tagRepo ?? UnavailableTransactionTagRepository()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
             self.workspaceRepo = GenerationCheckedWorkspaceRepository(base: workspaceRepo, validity: validity)
             self.transactionRepo = GenerationCheckedTransactionRepository(base: transactionRepo, validity: validity)
-            self.categoryRepo = GenerationCheckedCategoryRepository(base: resolvedCategoryRepo, validity: validity)
+            self.categoryRepo = GenerationCheckedCategoryRepository(base: resolvedCategoryRepo, validity: validity, generationToken: generationToken)
             self.accountRepo = GenerationCheckedAccountRepository(base: accountRepo, validity: validity)
             self.cardRepo = GenerationCheckedCardRepository(base: cardRepo, validity: validity)
             self.importSessionRepo = GenerationCheckedImportSessionRepository(base: importSessionRepo, validity: validity)
@@ -413,6 +473,7 @@ public final class DatabaseProvider {
             self.gmailInboxRepo = GenerationCheckedGmailInboxRepository(base: resolvedGmailInboxRepo, validity: validity)
             self.netWorthMembershipRepo = GenerationCheckedNetWorthMembershipRepository(base: resolvedMembershipRepo, validity: validity)
             self.intelligenceRepo = GenerationCheckedFinancialIntelligenceRepository(base: resolvedIntelligenceRepo, validity: validity)
+            self.tagRepo = GenerationCheckedTransactionTagRepository(base: resolvedTagRepo, validity: validity)
             return
         }
         self.generationValidity = nil
@@ -429,6 +490,7 @@ public final class DatabaseProvider {
         self.gmailInboxRepo = resolvedGmailInboxRepo
         self.netWorthMembershipRepo = resolvedMembershipRepo
         self.intelligenceRepo = resolvedIntelligenceRepo
+        self.tagRepo = resolvedTagRepo
     }
 
     /// Convenience initializer for an isolated in-memory provider. This is
@@ -449,6 +511,7 @@ public final class DatabaseProvider {
             gmailInboxRepo: provider.gmailInboxRepo,
             netWorthMembershipRepo: provider.netWorthMembershipRepo,
             intelligenceRepo: provider.intelligenceRepo,
+            tagRepo: provider.tagRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(.testMemory),
             protectsGeneration: true
@@ -488,6 +551,7 @@ public final class DatabaseProvider {
             gmailInboxRepo: provider.gmailInboxRepo,
             netWorthMembershipRepo: provider.netWorthMembershipRepo,
             intelligenceRepo: provider.intelligenceRepo,
+            tagRepo: provider.tagRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(purpose),
             protectsGeneration: true
@@ -513,6 +577,7 @@ public final class DatabaseProvider {
             gmailInboxRepo: provider.gmailInboxRepo,
             netWorthMembershipRepo: provider.netWorthMembershipRepo,
             intelligenceRepo: provider.intelligenceRepo,
+            tagRepo: provider.tagRepo,
             generationToken: provider.generationToken,
             persistenceState: persistenceState,
             protectsGeneration: protectsGeneration
@@ -532,6 +597,39 @@ public final class DatabaseProvider {
         }
         if let sqlite = sqliteProvider { return try sqlite.database.withExclusiveAccess(read) }
         return try read()
+    }
+
+#if !BACKGROUND_WORKER && !SUBPROCESS_PROBE
+    /// Only an actual current SQLite provider can mint this narrowly scoped
+    /// immutable read request. Custom and historical providers keep full hydration.
+    func categoryOverrideReadRequest(workspaceID: String) -> CategoryOverrideReadRequest? {
+        guard persistenceState.isUsable, let sqliteProvider, let generationValidity,
+              let categories = sqliteProvider.categoryRepo as? SQLiteCategoryRepo,
+              categories.automationSupported, categories.spendingIntentSupported else { return nil }
+        return CategoryOverrideReadRequest(database: sqliteProvider.database, validity: generationValidity,
+            binding: CategorySourceBinding(provider: ObjectIdentifier(self), database: ObjectIdentifier(sqliteProvider.database),
+                generation: generationToken, workspaceID: workspaceID))
+    }
+
+    func categoryApplyWriteRequest(workspaceID: String) -> CategoryApplyWriteRequest? {
+        guard let read = categoryOverrideReadRequest(workspaceID: workspaceID) else { return nil }
+        return CategoryApplyWriteRequest(read: read)
+    }
+
+#endif
+
+    /// The hydrator consumes this basis synchronously inside its existing
+    /// consistent snapshot; the basis is never stored for a later operation.
+    func categoryAutomationSnapshot(workspaceID: String, hydrationInputs: CategoryAutomationHydrationInputs) throws -> CategoryAutomationSnapshot? {
+        guard hydrationInputs.providerIdentity == ObjectIdentifier(self),
+              hydrationInputs.providerGeneration == generationToken,
+              hydrationInputs.workspaceID == workspaceID else { throw RepositoryError.staleProviderGeneration }
+        // Custom or historical providers may expose no intelligence repository
+        // while their category repository still supplies its own current facts.
+        guard hydrationInputs.intelligence != nil else {
+            return try categoryRepo.automationSnapshot(workspaceId: workspaceID)
+        }
+        return try categoryRepo.automationSnapshot(workspaceId: workspaceID, hydrationInputs: hydrationInputs)
     }
 
     func invalidateGeneration() {
@@ -626,10 +724,20 @@ private struct GenerationCheckedTransactionRepository: TransactionRepository {
 private struct GenerationCheckedCategoryRepository: CategoryRepository {
     let base: CategoryRepository
     let validity: ProviderGenerationValidity
+    let generationToken: ProviderGenerationToken
     func automationSnapshot(workspaceId: String) throws -> CategoryAutomationSnapshot? { try validity.withValidOperation { try base.automationSnapshot(workspaceId: workspaceId) } }
+    func automationSnapshot(workspaceId: String, hydrationInputs: CategoryAutomationHydrationInputs) throws -> CategoryAutomationSnapshot? {
+        try validity.withValidOperation {
+            guard hydrationInputs.providerGeneration == generationToken else { throw RepositoryError.staleProviderGeneration }
+            return try base.automationSnapshot(workspaceId: workspaceId, hydrationInputs: hydrationInputs)
+        }
+    }
     func saveRule(_ rule: CategoryRule, previousVersion: Int?) throws { try validity.withValidOperation { try base.saveRule(rule, previousVersion: previousVersion) } }
     func deleteRule(id: String, workspaceId: String, version: Int) throws { try validity.withValidOperation { try base.deleteRule(id: id, workspaceId: workspaceId, version: version) } }
     func applyCategoryEvaluation(_ evaluation: CategoryEvaluation, workspaceId: String, historical: Bool) throws -> Int { try validity.withValidOperation { try base.applyCategoryEvaluation(evaluation, workspaceId: workspaceId, historical: historical) } }
+    func applyReviewedCategoryEvaluation(_ preview: CategoryHistoricalPreview, workspaceId: String) throws -> CategoryApplyReceipt { try validity.withValidOperation { try base.applyReviewedCategoryEvaluation(preview, workspaceId: workspaceId) } }
+    func applyCategoryBatch(_ review: CategoryBatchReview) throws -> CategoryBatchReceipt { try validity.withValidOperation { try base.applyCategoryBatch(review) } }
+    func setSpendingSuppressed(_ suppressed: Bool, transactionID: String, workspaceId: String, expected: TransactionSpendingIntent?) throws -> Bool { try validity.withValidOperation { try base.setSpendingSuppressed(suppressed, transactionID: transactionID, workspaceId: workspaceId, expected: expected) } }
     func categories(workspaceId: String) throws -> [CategoryDTO] { return try validity.withValidOperation { try base.categories(workspaceId: workspaceId) } }
     func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { return try validity.withValidOperation { try base.assignments(workspaceId: workspaceId) } }
     func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { return try validity.withValidOperation { try base.createCategory(category) } }
@@ -637,6 +745,15 @@ private struct GenerationCheckedCategoryRepository: CategoryRepository {
     func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.setCategoryArchived(id: id, workspaceId: workspaceId, isArchived: isArchived, updatedAtISO: updatedAtISO) } }
     func deleteUnusedCategory(id: String, workspaceId: String) throws { try validity.withValidOperation { try base.deleteUnusedCategory(id: id, workspaceId: workspaceId) } }
     func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { return try validity.withValidOperation { try base.setCategory(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId) } }
+}
+
+private struct GenerationCheckedTransactionTagRepository: TransactionTagRepository {
+    let base: any TransactionTagRepository
+    let validity: ProviderGenerationValidity
+    func snapshot(workspaceID: String) throws -> TransactionTagSnapshot? { try validity.withValidOperation { try base.snapshot(workspaceID: workspaceID) } }
+    func saveTag(_ tag: TransactionTagDefinition, replacing expected: TransactionTagDefinition?) throws -> Bool { try validity.withValidOperation { try base.saveTag(tag, replacing: expected) } }
+    func removeTag(_ tag: TransactionTagDefinition, expectedTransactionIDs: Set<String>) throws -> Bool { try validity.withValidOperation { try base.removeTag(tag, expectedTransactionIDs: expectedTransactionIDs) } }
+    func setMembership(tag: TransactionTagDefinition, transactionIDs: Set<String>, isAttached: Bool, expectedAttachedTransactionIDs: Set<String>) throws -> Bool { try validity.withValidOperation { try base.setMembership(tag: tag, transactionIDs: transactionIDs, isAttached: isAttached, expectedAttachedTransactionIDs: expectedAttachedTransactionIDs) } }
 }
 
 private struct GenerationCheckedAccountRepository: AccountRepository {
@@ -763,6 +880,28 @@ private struct GenerationCheckedSalaryRepository: SalaryRepository {
 private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
     let base: FundingPlanRepository
     let validity: ProviderGenerationValidity
+
+    func companionActivationEpoch() throws -> String {
+        try validity.withValidOperation { try base.companionActivationEpoch() }
+    }
+    func companionSessions(workspaceID: String) throws -> [CompanionSyncSessionDTO] {
+        try validity.withValidOperation { try base.companionSessions(workspaceID: workspaceID) }
+    }
+    func createCompanionSession(_ value: CompanionSyncSessionDTO) throws {
+        try validity.withValidOperation { try base.createCompanionSession(value) }
+    }
+    func holdCompanionSession(id: String, workspaceID: String) throws {
+        try validity.withValidOperation { try base.holdCompanionSession(id: id, workspaceID: workspaceID) }
+    }
+    func reconcileCompanionActivation() throws {
+        try validity.withValidOperation { try base.reconcileCompanionActivation() }
+    }
+    func companionMonth(sessionID: String, workspaceID: String, month: String) throws -> CompanionMonthSyncDTO? {
+        try validity.withValidOperation { try base.companionMonth(sessionID: sessionID, workspaceID: workspaceID, month: month) }
+    }
+    func commitCompanionMonth(_ request: CompanionMonthCommitRequest) throws -> CompanionMonthCommitResult {
+        try validity.withValidOperation { try base.commitCompanionMonth(request) }
+    }
 
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
         return try validity.withValidOperation { try base.plans(workspaceId: workspaceId) }

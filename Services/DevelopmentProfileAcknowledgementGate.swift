@@ -1,7 +1,7 @@
 // LedgerForge
 // DevelopmentProfileAcknowledgementGate.swift
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import Foundation
 
 /// Bounded action families that require one process-local acknowledgement for

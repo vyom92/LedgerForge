@@ -57,6 +57,8 @@ final class InvestmentPriceSession: ObservableObject {
     private(set) var mappingMessage: String?
     private(set) var revision = 0
     private(set) var requestCount = 0
+    private(set) var checkedAt: [String: Date] = [:]
+    private(set) var networkAvailable: Bool?
     private var snapshot: InvestmentSnapshot = .empty
     private var generation: ProviderGenerationToken?
     private var epoch = UUID()
@@ -76,9 +78,19 @@ final class InvestmentPriceSession: ObservableObject {
     private weak var rates: AlDarReferenceSession?
     var sharedRefresh: (() -> Void)?
 
+    var observationStatus: String {
+        PublicObservationPresentation.cacheStatus(networkAvailable: networkAvailable, failed: !failures.isEmpty)
+    }
+
+    func setNetworkAvailable(_ available: Bool) {
+        networkAvailable = available; objectWillChange.send()
+    }
+
     func installShared(_ values: [String: InvestmentQuote], failures: [String: InvestmentPriceError], busy: Bool,
-                       busyProviders: Set<String>? = nil) {
+                       busyProviders: Set<String>? = nil,
+                       checkedAt: [String: Date] = [:], networkAvailable: Bool? = nil) {
         quotes = values; self.failures = failures
+        self.checkedAt = checkedAt; self.networkAvailable = networkAvailable
         refreshing = busy ? (busyProviders ?? Set(configuredProviders)).intersection(configuredProviders) : []
         cache.save(values); rebuild(); objectWillChange.send()
     }
@@ -95,8 +107,9 @@ final class InvestmentPriceSession: ObservableObject {
 
     var configuredMappings: [InvestmentPriceMapping] {
         let mappings = snapshot.holdings.compactMap { holding -> InvestmentPriceMapping? in
-            guard holding.ibkrObservationID == nil, let mapping = holding.priceMapping,
-                  InvestmentPriceRegistry.confirmedMapping(for: holding) == mapping else { return nil }
+            guard let mapping = holding.priceMapping,
+                  InvestmentPriceRegistry.confirmedMapping(for: holding,
+                    container: snapshot.containers.first { $0.id == holding.containerID }) == mapping else { return nil }
             return mapping
         }
         return Array(Set(mappings)).sorted { $0.identity < $1.identity }
@@ -105,7 +118,12 @@ final class InvestmentPriceSession: ObservableObject {
         let providers = Set(configuredMappings.map(\.provider))
         return InvestmentPriceRegistry.providerOrder.filter { providers.contains($0) }
     }
-    var unmappedCount: Int { snapshot.holdings.filter { $0.ibkrObservationID == nil && (InvestmentPriceRegistry.confirmedMapping(for: $0) != $0.priceMapping || $0.priceMapping == nil) }.count }
+    var unmappedCount: Int {
+        snapshot.holdings.filter { holding in
+            holding.priceMapping == nil || InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.containers.first { $0.id == holding.containerID }) != holding.priceMapping
+        }.count
+    }
 
     func activate(store: InvestmentStore = .shared) {
         guard self.store !== store else { return }
@@ -135,10 +153,13 @@ final class InvestmentPriceSession: ObservableObject {
         if oldGeneration != generation || oldMappings != configuredMappings {
             epoch = UUID()
             for request in requests.values { request.cancel() }
-            requests.removeAll(); refreshing.removeAll(); failures.removeAll(); feedback.removeAll()
+            requests.removeAll(); refreshing.removeAll(); failures.removeAll(); feedback.removeAll(); checkedAt.removeAll()
         }
         rebuild()
-        mappingPersistenceNeeded = snapshot.holdings.contains { $0.ibkrObservationID == nil && $0.priceMapping == nil && InvestmentPriceRegistry.confirmedMapping(for: $0) != nil }
+        mappingPersistenceNeeded = snapshot.holdings.contains { holding in
+            holding.priceMapping == nil && InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.containers.first { $0.id == holding.containerID }) != nil
+        }
     }
 
     func notifyInstalledValue() {
@@ -160,7 +181,8 @@ final class InvestmentPriceSession: ObservableObject {
               generation == store?.generation, ApplicationAvailability.shared.permitsMutation,
               let workspaceID = snapshot.containers.first?.workspaceID else { return }
         let assignments = Dictionary(uniqueKeysWithValues: snapshot.holdings.compactMap { holding -> (String, InvestmentPriceMapping)? in
-            guard holding.ibkrObservationID == nil, let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding), holding.priceMapping != mapping else { return nil }
+            guard let mapping = InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.containers.first { $0.id == holding.containerID }), holding.priceMapping != mapping else { return nil }
             // Never replace a conflicting existing mapping without its own explicit decision.
             guard holding.priceMapping == nil else { return nil }
             return (holding.id, mapping)
@@ -247,6 +269,7 @@ final class InvestmentPriceSession: ObservableObject {
         var updated = 0, unchanged = 0, failed = 0
         for (identity, result) in results {
             guard let mapping = current[identity] else { continue }
+            checkedAt[identity] = now()
             switch result {
             case .success(let incoming):
                 let previous = quotes[identity]
@@ -277,19 +300,7 @@ final class InvestmentPriceSession: ObservableObject {
             if left != right { return left.localizedStandardCompare(right) == .orderedAscending }
             return $0.sourceOrdinal != $1.sourceOrdinal ? $0.sourceOrdinal < $1.sourceOrdinal : $0.id < $1.id
         }
-        valuations = Dictionary(uniqueKeysWithValues: rows.map { holding in
-            if let sourceID = holding.ibkrObservationID,
-               let source = snapshot.containers.first(where: { $0.id == holding.containerID })?.ibkrSource,
-               source.observationID == sourceID,
-               let position = source.positions.first(where: { $0.instrumentIdentity == holding.instrumentIdentity }) {
-                let quote = source.quote(for: position)
-                var routed = holding; routed.priceMapping = quote.mapping
-                return (holding.id, InvestmentValuation(holding: routed, quote: quote, reportedValue: position.reportedValue.value))
-            }
-            let mapping = holding.priceMapping
-            let quote = mapping.flatMap { InvestmentPriceRegistry.confirmedMapping(for: holding) == $0 ? quotes[$0.identity] : nil }
-            return (holding.id, InvestmentValuation(holding: holding, quote: quote))
-        })
+        valuations = Self.makeValuations(snapshot: snapshot, quotes: quotes)
         valueText = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, InvestmentArithmetic.displayedMoney(valuations[$0.id]?.currentValue, currency: $0.currency)) })
         gainText = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, InvestmentArithmetic.displayedMoney(valuations[$0.id]?.gain, currency: $0.currency)) })
         returnText = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, valuations[$0.id]?.simpleReturn?.display ?? "Unavailable") })
@@ -305,6 +316,20 @@ final class InvestmentPriceSession: ObservableObject {
                           containers: snapshot.containers,
                           ispAccount: snapshot.latestZioAccount)
         revision += 1
+    }
+
+    /// The foreground UI and companion publication use this same source-routing
+    /// projection. Publication supplies one captured repository/cache generation.
+    static func makeValuations(snapshot: InvestmentSnapshot, quotes: [String: InvestmentQuote]) -> [String: InvestmentValuation] {
+        Dictionary(uniqueKeysWithValues: snapshot.holdings.map { holding in
+            let mapping = holding.priceMapping
+            let confirmed = InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.containers.first { $0.id == holding.containerID })
+            // Flex supplies positions and source facts; Nasdaq supplies current
+            // market prices. Missing public quotes remain unavailable.
+            let quote = mapping.flatMap { confirmed == $0 ? quotes[$0.identity] : nil }
+            return (holding.id, InvestmentValuation(holding: holding, quote: quote))
+        })
     }
 
     private func subtotal(id: String, title: String, rows: [InvestmentHolding]) -> InvestmentSubtotal {

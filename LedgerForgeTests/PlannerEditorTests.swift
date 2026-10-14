@@ -7,6 +7,174 @@ import Testing
 struct PlannerEditorTests {
     private let locale = Locale(identifier: "en_US_POSIX")
 
+    @Test func clearedAmountsRemainEditableAndBecomeZeroOnlyWhenFocusEnds() throws {
+        let setup = try editor(), vm = setup.vm
+        let month = vm.month
+        #expect(vm.updateMoney(.fee, text: "25.50"))
+        vm.flushPendingEntries()
+        let saved = setup.spy.saves
+        #expect(!vm.updateMoney(.fee, text: ""))
+        vm.flushPendingEntries()
+        #expect(vm.moneyText(.fee).isEmpty)
+        #expect(vm.canEdit && setup.spy.saves == saved)
+        vm.finishEditingAmount("fee", in: month)
+        #expect(vm.moneyText(.fee) == "0")
+        #expect(setup.spy.saves == saved, "Focus completion uses the existing save lifecycle.")
+        vm.flushPendingEntries()
+        #expect(vm.saveState == .saved && vm.plan.configuredTransferFee.amount == 0)
+
+        #expect(!vm.updateMoney(.fee, text: "12."))
+        vm.finishEditingAmount("fee", in: month)
+        vm.flushPendingEntries()
+        #expect(vm.moneyText(.fee) == "12.", "Focus changes must not coerce a partial decimal.")
+        #expect(vm.canEdit)
+        #expect(vm.updateMoney(.fee, text: "12.75"))
+        vm.flushPendingEntries()
+        #expect(try vm.plan.configuredTransferFee.canonicalDecimalString() == "12.75")
+        #expect(vm.saveState == .saved)
+    }
+
+    @Test func focusCompletionCoversBillAndDeductionAmountsWithoutChangingRatesOrOtherMonths() throws {
+        let setup = try editor(), vm = setup.vm
+        let september = vm.month
+        vm.addDeduction()
+        let deduction = try #require(vm.plan.deductions.first)
+        vm.editDeduction(id: deduction.id, label: "Owner planning entry", amount: "")
+        vm.finishEditingAmount("deduction.amount.\(deduction.id)", in: september)
+        #expect(vm.rawText["deduction.amount.\(deduction.id)"] == "0")
+        vm.addCommitment(region: "india")
+        let bill = try #require(vm.plan.indiaCommitments.first)
+        vm.editCommitment(region: "india", id: bill.id, field: "label", text: "Owner planning bill")
+        vm.editCommitment(region: "india", id: bill.id, field: "amount", text: "")
+        vm.finishEditingAmount("amount.\(bill.id)", in: september)
+        #expect(vm.rawText["amount.\(bill.id)"] == "0")
+        #expect(vm.plan.indiaCommitments.first?.money.currency.code == "INR")
+        vm.setFX(rateText: "", dateText: "")
+        vm.finishEditingAmount("fx.rate", in: september)
+        #expect(vm.rawText["fx.rate"] == "")
+        #expect(!vm.updateMoney(.fee, text: ""))
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        #expect(!vm.updateMoney(.fee, text: ""))
+        vm.finishEditingAmount("fee", in: september)
+        #expect(vm.moneyText(.fee).isEmpty, "A delayed old-month focus callback cannot edit the newly selected plan.")
+        vm.switchMonth(to: september)
+        #expect(vm.moneyText(.fee).isEmpty, "Month browsing preserves an unfinished retained draft.")
+    }
+
+    @Test func monthShortcutsCrossYearBoundariesAndRespectRetainedDraftFailures() throws {
+        let setup = try editor(), vm = setup.vm
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-12"))
+        #expect(vm.planningMonth(offsetBy: 1)?.canonical == "2027-01")
+        #expect(vm.planningMonth(offsetBy: 2)?.canonical == "2027-02")
+        #expect(!vm.updateMoney(.fee, text: "15."))
+        setup.spy.rejectRetention = true
+        vm.switchMonth(to: try #require(vm.planningMonth(offsetBy: 1)))
+        #expect(vm.month.canonical == "2026-12" && vm.moneyText(.fee) == "15.")
+        setup.spy.rejectRetention = false
+        vm.switchMonth(to: try #require(vm.planningMonth(offsetBy: 2)))
+        #expect(vm.month.canonical == "2027-02")
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-12"))
+        #expect(vm.moneyText(.fee) == "15.")
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2099-12"))
+        #expect(vm.planningMonth(offsetBy: 1) == nil && vm.planningMonth(offsetBy: 2) == nil)
+    }
+
+    @Test func startupRestoresLastSavedMonthWithoutRememberingMonthBrowsing() throws {
+        let suite = "LedgerForge-last-saved-month-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("2026-09", forKey: "LedgerForge.planning.selectedMonth.v1.default-workspace")
+        let setup = try editor(selectionDefaults: defaults)
+        let october = try SelectedStatementMonth(canonical: "2026-10")
+        let november = try SelectedStatementMonth(canonical: "2026-11")
+        let instant = try #require(ISO8601DateFormatter().date(from: "2026-10-15T12:00:00Z"))
+        func reopen(workspaceID: String = "default-workspace") -> SalaryWorkspaceViewModel {
+            SalaryWorkspaceViewModel(workspaceID: workspaceID, provider: { setup.holder.active },
+                accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: setup.store,
+                selectionDefaults: defaults, locale: locale, now: { instant }, refresh: { _ in })
+        }
+        #expect(reopen().month == october, "A legacy viewed-month preference is not save history.")
+        #expect(setup.vm.updateMoney(.fee, text: "25"))
+        setup.vm.flushPendingEntries()
+        #expect(setup.vm.saveState == .saved)
+        #expect(reopen().month.canonical == "2026-09")
+        #expect(reopen(workspaceID: "separate-workspace").month == october)
+
+        setup.vm.switchMonth(to: october)
+        setup.vm.flushPendingEntries() // Automatic carry-forward may save, but is not an owner edit.
+        #expect(reopen().month.canonical == "2026-09")
+        #expect(setup.vm.updateMoney(.fee, text: "26"))
+        setup.vm.flushPendingEntries()
+        #expect(setup.vm.saveState == .saved)
+        #expect(reopen().month == october)
+        setup.vm.switchMonth(to: november)
+        setup.vm.flushPendingEntries()
+        #expect(reopen().month == october)
+    }
+
+    @Test func invalidRetainedDraftAndFailedSaveDoNotReplaceLastSavedMonth() throws {
+        let suite = "LedgerForge-failed-save-month-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = "LedgerForge.planning.lastSavedMonth.v1.default-workspace"
+        let setup = try editor(selectionDefaults: defaults)
+        #expect(setup.vm.updateMoney(.fee, text: "25"))
+        setup.vm.flushPendingEntries()
+        #expect(defaults.string(forKey: key) == "2026-09")
+        setup.vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        #expect(!setup.vm.updateMoney(.fee, text: "26."))
+        setup.vm.flushPendingEntries()
+        #expect(!setup.vm.retentionPending)
+        #expect(defaults.string(forKey: key) == "2026-09")
+        // Remembering a pending user edit belongs to its month, not the next viewed month.
+        setup.vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-11"))
+        setup.vm.flushPendingEntries()
+        #expect(defaults.string(forKey: key) == "2026-09")
+        setup.vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        #expect(setup.vm.moneyText(.fee) == "26.")
+        #expect(setup.vm.updateMoney(.fee, text: "26"))
+        setup.spy.reject = true
+        setup.vm.flushPendingEntries()
+        #expect(setup.vm.saveState == .failed)
+        #expect(defaults.string(forKey: key) == "2026-09")
+    }
+
+    @Test func committedSaveRemembersMonthEvenWhenCanonicalReloadNeedsRecovery() throws {
+        let suite = "LedgerForge-committed-month-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let setup = try editor(failRefresh: true, selectionDefaults: defaults)
+        #expect(setup.vm.updateMoney(.fee, text: "25"))
+        setup.vm.flushPendingEntries()
+        #expect(setup.vm.saveState == .committedNeedsRefresh)
+        #expect(try setup.spy.plans(workspaceId: "default-workspace").count == 1)
+        #expect(defaults.string(forKey: "LedgerForge.planning.lastSavedMonth.v1.default-workspace") == "2026-09")
+    }
+
+    @Test func retainedInputSpellingRemembersItsMonthOnlyAfterSuccessfulRetention() throws {
+        let suite = "LedgerForge-retained-input-month-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = "LedgerForge.planning.lastSavedMonth.v1.default-workspace"
+        let setup = try editor(selectionDefaults: defaults)
+        #expect(setup.vm.updateMoney(.fee, text: "25"))
+        setup.vm.flushPendingEntries()
+        setup.vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        #expect(setup.vm.updateMoney(.fee, text: "26"))
+        setup.vm.flushPendingEntries()
+        setup.vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-09"))
+        let saves = setup.spy.saves
+        #expect(setup.vm.updateMoney(.fee, text: "25.00"))
+        setup.spy.rejectRetention = true
+        setup.vm.flushPendingEntries()
+        #expect(defaults.string(forKey: key) == "2026-10")
+        setup.spy.rejectRetention = false
+        setup.vm.flushPendingEntries()
+        #expect(setup.vm.saveState == .saved)
+        #expect(setup.spy.saves == saves, "Only the retained spelling changed, not the canonical amount.")
+        #expect(defaults.string(forKey: key) == "2026-09")
+    }
+
     @Test func dashboardNumberAndWordsUseTheSameCurrencySpecificRounding() throws {
         // Source-independent formatting mechanics; these are not statement facts.
         for code in ["INR", "QAR", "USD"] {
@@ -566,7 +734,7 @@ struct PlannerEditorTests {
         )
     }
 
-    private func editor(failRefresh: Bool = false) throws -> (vm: SalaryWorkspaceViewModel, spy: PlanWriteSpy, store: FundingPlanStore, holder: PlannerProviderHolder) {
+    private func editor(failRefresh: Bool = false, selectionDefaults: UserDefaults? = nil) throws -> (vm: SalaryWorkspaceViewModel, spy: PlanWriteSpy, store: FundingPlanStore, holder: PlannerProviderHolder) {
         let memory = InMemoryRepositoryProvider()
         _ = try memory.workspaceRepo.upsertWorkspace(WorkspaceDTO(id: "default-workspace", name: "Planner input", createdAtISO: "2026-09-09T00:00:00Z"))
         let spy = PlanWriteSpy(memory.fundingPlanRepo)
@@ -574,7 +742,7 @@ struct PlannerEditorTests {
         let holder = PlannerProviderHolder(provider)
         let store = FundingPlanStore()
         store.installWithoutObservation([], generation: provider.generationToken)
-        let vm = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(canonical: "2026-09"), provider: { holder.active }, accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: store, locale: locale, refresh: { active in
+        let vm = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(canonical: "2026-09"), provider: { holder.active }, accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: store, selectionDefaults: selectionDefaults, locale: locale, refresh: { active in
             if failRefresh { throw RepositoryStoreHydrationError.invalidFundingPlanState("injected nonfinancial failure") }
             let hydrator = RepositoryStoreHydrator(accountRepo: active.accountRepo, importSessionRepo: active.importSessionRepo, transactionRepo: active.transactionRepo, fundingPlanRepo: active.fundingPlanRepo, accountStore: AccountStore(), transactionStore: TransactionStore(), categoryStore: CategoryStore(), cardStore: CardStore(), salaryStore: SalaryStore(), fundingPlanStore: store, importSessionStore: ImportSessionStore(), importAttemptStore: ImportAttemptStore(), providerGeneration: active.generationToken, participatesInLifecycleGate: false)
             _ = try hydrator.hydrateIfNeeded(forceRefresh: true)

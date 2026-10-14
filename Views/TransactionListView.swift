@@ -10,7 +10,7 @@ import Combine
 private struct TransactionCategoryMutationIntent {
     let categoryID: String?
     let transactionID: String
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     var protectedAction: DevelopmentProtectedAction {
         categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment
     }
@@ -208,13 +208,14 @@ struct TransactionListView: View {
     @StateObject private var viewModel: TransactionListViewModel
     @State private var amountMeasurement: TransactionAmountWidthMeasurement
     @ObservedObject private var categoryStore: CategoryStore
+    @ObservedObject private var tagStore = TransactionTagStore.shared
     private let categoryCoordinator: CategoryManaging
     private let generation: ProviderGenerationToken?
     private let availabilityState: ApplicationDataState
     private let returnToPlanning: (() -> Void)?
     private let overviewBack: (() -> Void)?
     private let overviewBackTitle: String
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
     private struct RulePresentation: Identifiable {
@@ -223,6 +224,12 @@ struct TransactionListView: View {
         var proposal: Transaction?
     }
     @State private var rulePresentation: RulePresentation?
+    @State private var bulkCategorySelection: TransactionCategoryBatchSelection?
+    private struct TagSelection: Identifiable {
+        let id = UUID()
+        let transactionIDs: Set<String>
+    }
+    @State private var tagSelection: TagSelection?
     @State private var spendingPresented = false
     @State private var spendingLoaded = false
     @State private var returnToSpendingFilter: (filter: TransactionPresentationFilterSpec, controls: TransactionPresentationControls)?
@@ -282,9 +289,10 @@ struct TransactionListView: View {
     }
     @State private var categoryMessage: String?
     @State private var categoryReconciliationRequired = false
+    @State private var categoryMutationInFlight = false
     @FocusState private var searchFocused: Bool
     @FocusState private var tableFocused: Bool
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var pendingCategoryMutation: TransactionCategoryMutationIntent?
     @State private var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
@@ -294,7 +302,7 @@ struct TransactionListView: View {
     private var controlBorder: Color { theme.palette.fieldBorder }
     private var focusColor: Color { theme.interaction.focusRing }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @MainActor
     init(
         viewModel: TransactionListViewModel? = nil,
@@ -350,13 +358,13 @@ struct TransactionListView: View {
     private var selectedTransaction: Transaction? { viewModel.selectedPresentationRow?.transaction }
     private var inputError: String? { isOverview ? nil : dateInputError ?? amountInputError }
     private var hasUsableResults: Bool { inputError == nil && result.state == .ready }
-    private var selection: Binding<String?> {
-        Binding(get: { viewModel.selectedPresentationRowID }, set: { id in
-            viewModel.selectPresentationRow(id: id)
+    private var selection: Binding<Set<String>> {
+        Binding(get: { viewModel.selectedPresentationRowIDs }, set: { ids in
+            viewModel.selectPresentationRows(ids: ids)
             // Selection can arrive through accessibility or after the native
             // table is recreated for the inspector. Keep keyboard ownership
             // with that table so its ordinary Up/Down handling remains active.
-            if id != nil { tableFocused = true }
+            if !ids.isEmpty { tableFocused = true }
         })
     }
     private var tableSort: Binding<[TransactionTableComparator]> {
@@ -385,6 +393,12 @@ struct TransactionListView: View {
                     Button("Back to plan insights", systemImage: "arrow.left", action: returnToPlanning).lfSecondaryAction()
                         .accessibilityLabel("Back to plan insights")
                         .accessibilityIdentifier("transactions.backToPlanning")
+                }
+                if let context = viewModel.moneyFlowInspection {
+                    Text("Money Flow · " + context.month.canonical + " · " + context.currency +
+                         " · \(context.transactionIDs.count) contributing · \(context.supportingIDs.count) supporting transactions. Select a row and open Details to see its financial treatment.")
+                        .font(theme.typography.secondary).foregroundStyle(secondary)
+                        .padding(.horizontal, theme.spacing.pagePadding)
                 }
                 transactionBody
             }.opacity(spendingPresented || overviewSession != nil ? 0 : 1)
@@ -470,6 +484,14 @@ struct TransactionListView: View {
             .sheet(item: $rulePresentation) { selection in
                 CategoryRulesView(transactions: selection.transactions, proposal: selection.proposal)
             }
+            .sheet(item: $bulkCategorySelection) { selection in
+                TransactionCategoryBatchSheet(selection: selection, coordinator: categoryCoordinator) { receipt in
+                    categoryMessage = "Saved category choices for \(receipt.changedIDs.count) transactions · \(receipt.protectedIDs.count) protected · \(receipt.unchangedIDs.count) unchanged"
+                }
+            }
+            .sheet(item: $tagSelection) { selection in
+                TransactionTagEditor(transactionIDs: selection.transactionIDs)
+            }
             .sheet(isPresented: $narrowDetailsVisible) {
                 inspector
                     .padding(16)
@@ -496,7 +518,7 @@ struct TransactionListView: View {
         .onChange(of: inputError) { _, newValue in
             if newValue != nil { viewModel.selectPresentationRow(id: nil) }
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .confirmationDialog(
             DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(
@@ -582,6 +604,7 @@ struct TransactionListView: View {
             }
             criteria.append("Category: " + names.sorted().joined(separator: ", "))
         }
+        if filter.tag != .all { criteria.append(tagFilterTitle) }
         if !filter.domains.isEmpty {
             criteria.append(filter.domains.map { $0 == .bank ? "Bank movements" : $0 == .card ? "Card liability" : "Unknown family" }.sorted().joined(separator: ", "))
         }
@@ -613,9 +636,18 @@ struct TransactionListView: View {
                 .help(inputError ?? "Explore the current selection without changing these filters.")
             Button("Spending & movements") { spendingLoaded = true; spendingPresented = true }
                 .lfSecondaryAction().accessibilityIdentifier("transactions.spending")
-            Button("Category rules") {
+            Button("Category rules & history…") {
                 rulePresentation = RulePresentation(transactions: result.rows.map(\.transaction))
             }.lfSecondaryAction().accessibilityIdentifier("transactions.categoryRules")
+            Menu("Tags") {
+                Button("Manage tags…") { tagSelection = .init(transactionIDs: []) }
+                Button("Edit selected transaction’s tags…") {
+                    if let id = selectedTransaction?.repositoryTransactionId { tagSelection = .init(transactionIDs: [id]) }
+                }.disabled(selectedTransaction?.repositoryTransactionId == nil)
+                Button("Edit tags for \(result.rows.count) filtered transactions…") {
+                    tagSelection = .init(transactionIDs: Set(result.rows.compactMap { $0.transaction.repositoryTransactionId }))
+                }.disabled(result.rows.isEmpty || !hasUsableResults)
+            }.lfMenuAction().accessibilityIdentifier("transactions.tags")
         }.fixedSize()
     }
 
@@ -675,18 +707,18 @@ struct TransactionListView: View {
         VStack(alignment: .leading, spacing: 10) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) {
-                    accountMenu; currencyMenu; categoryMenu; familyMenu; effectMenu; moreFiltersButton
+                    accountMenu; currencyMenu; categoryMenu; tagMenu; familyMenu; effectMenu; moreFiltersButton
                     Spacer(minLength: 12)
                     clearFiltersButton
                 }
                 HStack(spacing: 8) {
-                    accountMenu; currencyMenu; categoryMenu; moreFiltersButton
+                    accountMenu; currencyMenu; categoryMenu; tagMenu; moreFiltersButton
                     Spacer(minLength: 0)
                     clearFiltersButton
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) { accountMenu; currencyMenu; categoryMenu }
-                    HStack(spacing: 8) { familyMenu; effectMenu; moreFiltersButton; clearFiltersButton }
+                    HStack(spacing: 8) { tagMenu; familyMenu; effectMenu; moreFiltersButton; clearFiltersButton }
                 }
             }
             if activeCriteriaCount > 0 || viewModel.presentationFilter.canonicalTransactionIDs != nil {
@@ -739,6 +771,28 @@ struct TransactionListView: View {
     }
     private var categoryOptions: [Category] {
         categoryStore.snapshot.categories.sorted { $0.normalizedName == $1.normalizedName ? $0.id < $1.id : $0.normalizedName < $1.normalizedName }
+    }
+
+    private var tagFilterTitle: String {
+        switch viewModel.presentationFilter.tag {
+        case .all: "All tags"
+        case .untagged: "Untagged"
+        case .tag(let id): tagStore.snapshot?.definitions.first(where: { $0.id == id })?.name ?? "Unavailable tag"
+        }
+    }
+
+    private var tagMenu: some View {
+        Menu {
+            Button("All tags") { viewModel.presentationFilter.tag = .all }
+            Button("Untagged") { viewModel.presentationFilter.tag = .untagged }
+            Divider()
+            ForEach(tagStore.snapshot?.definitions ?? []) { tag in
+                Button(tag.name) { viewModel.presentationFilter.tag = .tag(tag.id) }
+            }
+        } label: { Text(viewModel.presentationFilter.tag == .all ? "Tag: All" : "Tag: \(tagFilterTitle)") }
+        .lfMenuAction()
+        .disabled(tagStore.generation != generation || tagStore.snapshot == nil)
+        .accessibilityIdentifier("transactions.tagFilter")
     }
 
     private var accountMenu: some View {
@@ -886,6 +940,7 @@ struct TransactionListView: View {
         return [
             !TransactionPresentationText.normalized(filter.searchText).isEmpty,
             !filter.accountIDs.isEmpty, !filter.currencies.isEmpty, !filter.categories.isEmpty,
+            filter.tag != .all,
             !filter.domains.isEmpty, !filter.effects.isEmpty, !filter.institutionDisplayNames.isEmpty,
             !minimumAmount.isEmpty || !maximumAmount.isEmpty, period != .all
         ].filter { $0 }.count
@@ -1069,9 +1124,9 @@ struct TransactionListView: View {
             Table(hasUsableResults ? result.rows : [], selection: selection, sortOrder: tableSort) {
                 TableColumn(sortHeader(.statementDate), sortUsing: TransactionTableComparator(key: .statementDate, order: .reverse)) { row in
                     HStack(spacing: 5) {
-                        Image(systemName: row.id == viewModel.selectedPresentationRowID ? "checkmark" : "minus")
+                        Image(systemName: viewModel.selectedPresentationRowIDs.contains(row.id) ? "checkmark" : "minus")
                             .font(theme.typography.tableSelectionMark)
-                            .opacity(row.id == viewModel.selectedPresentationRowID ? 1 : 0)
+                            .opacity(viewModel.selectedPresentationRowIDs.contains(row.id) ? 1 : 0)
                             .accessibilityHidden(true)
                         Text(row.sourceCivilDate?.presentation ?? "Unavailable")
                             .font(theme.typography.secondary)
@@ -1080,7 +1135,7 @@ struct TransactionListView: View {
                     .frame(minHeight: theme.typography.tableRowMinimum)
                     .background {
                         LFTableRowBackdrop(
-                            isSelected: row.id == viewModel.selectedPresentationRowID,
+                            isSelected: viewModel.selectedPresentationRowIDs.contains(row.id),
                             isEmphasized: tableFocused && appearsActive
                         )
                         .allowsHitTesting(false)
@@ -1133,12 +1188,19 @@ struct TransactionListView: View {
             .background(panelColor)
             .contextMenu(forSelectionType: String.self) { ids in
                 Button("Show details") {
-                    if let id = ids.first { viewModel.selectPresentationRow(id: id) }
+                    guard ids.count == 1, let id = ids.first else { return }
+                    viewModel.selectPresentationRow(id: id)
                     detailsVisible = true
                     if tableIsNarrow { narrowDetailsVisible = true }
-                }.disabled(ids.isEmpty)
+                }.disabled(ids.count != 1)
+                Button("Review category for selected transactions…") {
+                    viewModel.selectPresentationRows(ids: ids)
+                    showCategoryBatch()
+                }
+                    .disabled(ids.isEmpty || isOverview || !hasUsableResults || categoryMutationInFlight)
             } primaryAction: { ids in
-                if let id = ids.first { viewModel.selectPresentationRow(id: id) }
+                guard ids.count == 1, let id = ids.first else { return }
+                viewModel.selectPresentationRow(id: id)
                 detailsVisible = true
                 if tableIsNarrow { narrowDetailsVisible = true }
             }
@@ -1158,12 +1220,24 @@ struct TransactionListView: View {
 
             HStack(spacing: 12) {
                 Text(inputError == nil && (result.state == .ready || result.state == .validEmpty)
-                     ? "\(result.rows.count) matching · \(viewModel.allPresentationRows.count) total"
+                     ? "\(result.rows.count) matching · \(viewModel.allPresentationRows.count) total · \(viewModel.selectedPresentationRowIDs.count) selected"
                      : "Results unavailable")
                     .font(theme.typography.caption).foregroundStyle(secondary)
                 Spacer()
+                if !isOverview {
+                    Button("Review category for \(viewModel.selectedPresentationRowIDs.count) selected…", action: showCategoryBatch)
+                        .lfSecondaryAction().accessibilityIdentifier("transactions.bulkCategory")
+                        .disabled(viewModel.selectedPresentationRowIDs.isEmpty || !hasUsableResults || categoryMutationInFlight)
+                }
             }
+            if let categoryMessage { Text(categoryMessage).font(theme.typography.secondary).foregroundStyle(secondary) }
         }
+    }
+
+    private func showCategoryBatch() {
+        guard hasUsableResults, let generation, categoryStore.snapshot.providerGeneration == generation,
+              !viewModel.selectedPresentationRows.isEmpty else { return }
+        bulkCategorySelection = .init(rows: viewModel.selectedPresentationRows, snapshot: categoryStore.snapshot, generation: generation)
     }
 
     private func sortHeader(_ key: TransactionPresentationSortKey) -> Text {
@@ -1260,6 +1334,23 @@ struct TransactionListView: View {
                     if isOverview { detailFact("Category", categoryName(for: selected)) }
                     else { categoryPicker(for: selected, titleWidth: 70) }
                     if let id = selected.repositoryTransactionId {
+                        if let context = viewModel.moneyFlowInspection {
+                            if let review = context.reviewRows[id] {
+                                detailFact("Financial treatment", review.treatment.rawValue)
+                                detailFact("Why this treatment", review.explanation)
+                                if let residual = review.refundResidual { detailFact("Credit awaiting allocation", exactMoney(residual)) }
+                            }
+                            if context.unknownDirectionIDs.contains(id) {
+                                detailFact("Flow direction", "The source does not establish an unambiguous incoming or outgoing direction.")
+                            }
+                            if context.supportingIDs.contains(id) {
+                                detailFact("Money Flow role", "Supporting transaction for the selected flow. Its original date and currency are retained.")
+                            }
+                        }
+                        let tags = tagStore.generation == generation ? tagStore.snapshot?.tags(transactionID: id) ?? [] : []
+                        detailFact("Tags", tags.isEmpty ? "None" : tags.map(\.name).joined(separator: ", "))
+                        Button("Edit tags…") { tagSelection = .init(transactionIDs: [id]) }
+                            .lfSecondaryAction().accessibilityIdentifier("transactions.editTags")
                         if let intent = categoryStore.snapshot.automation?.intents[id] {
                             Text(intent.kind == .automatic ? "Assigned by a saved rule" : intent.kind == .deliberatelyCleared ? "You cleared this category" : "Your category choice")
                                 .font(theme.typography.secondary).foregroundStyle(secondary)
@@ -1321,6 +1412,11 @@ struct TransactionListView: View {
                         .font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
                     Button("Retry refresh", action: retryCanonicalHydration).lfSecondaryAction()
                 }
+            } else if viewModel.selectedPresentationRowIDs.count > 1 {
+                Text("\(viewModel.selectedPresentationRowIDs.count) transactions selected").font(theme.typography.rowTitle)
+                Text("Select one row to inspect its source details, or review a category for the selected records.")
+                    .font(theme.typography.body).foregroundStyle(secondary)
+                if !isOverview { Button("Review selected categories…", action: showCategoryBatch).lfSecondaryAction() }
             } else {
                 Text("Select a transaction").font(theme.typography.rowTitle)
                 Text("Select a row to inspect its original description, category and source details.")
@@ -1364,7 +1460,7 @@ struct TransactionListView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .tint(theme.palette.primaryText)
-            .disabled(transaction.repositoryTransactionId == nil)
+            .disabled(transaction.repositoryTransactionId == nil || categoryMutationInFlight)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(theme.typography.formCaption)
@@ -1401,7 +1497,7 @@ struct TransactionListView: View {
     }
 
     private func requestCategoryMutation(_ intent: TransactionCategoryMutationIntent) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         switch acknowledgementGate.authorization(for: intent.protectedAction) {
         case .allowed:
             executeCategoryMutation(intent)
@@ -1417,42 +1513,47 @@ struct TransactionListView: View {
     }
 
     private func executeCategoryMutation(_ intent: TransactionCategoryMutationIntent) {
-        do {
-            _ = try categoryCoordinator.setCategory(
-                categoryID: intent.categoryID,
-                transactionID: intent.transactionID
-            )
-            categoryMessage = nil
-            categoryReconciliationRequired = false
-        } catch {
-#if DEBUG
-            if let coordinatorError = error as? CategoryManagementCoordinatorError {
-                switch coordinatorError {
-                case .acknowledgementRequired(let challenge):
-                    pendingCategoryMutation = intent
-                    acknowledgementChallenge = challenge
-                    return
-                case .staleDevelopmentProfile:
-                    pendingCategoryMutation = nil
-                    acknowledgementChallenge = nil
-                    categoryMessage = "The active development database changed. Start the category change again."
-                    return
-                default:
-                    break
+        guard !categoryMutationInFlight else { return }
+        categoryMutationInFlight = true
+        Task { @MainActor in
+            defer { categoryMutationInFlight = false }
+            do {
+                _ = try await categoryCoordinator.setCategory(
+                    categoryID: intent.categoryID,
+                    transactionID: intent.transactionID
+                )
+                categoryMessage = nil
+                categoryReconciliationRequired = false
+            } catch {
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+                if let coordinatorError = error as? CategoryManagementCoordinatorError {
+                    switch coordinatorError {
+                    case .acknowledgementRequired(let challenge):
+                        pendingCategoryMutation = intent
+                        acknowledgementChallenge = challenge
+                        return
+                    case .staleDevelopmentProfile:
+                        pendingCategoryMutation = nil
+                        acknowledgementChallenge = nil
+                        categoryMessage = "The active development database changed. Start the category change again."
+                        return
+                    default:
+                        break
+                    }
                 }
-            }
 #endif
-            categoryMessage = CategoryManagementPresentation.message(for: error)
-            if let error = error as? CategoryManagementCoordinatorError {
-                categoryReconciliationRequired = switch error {
-                case .savedButRefreshFailed, .reconciliationRequired: true
-                default: false
+                categoryMessage = CategoryManagementPresentation.message(for: error)
+                if let error = error as? CategoryManagementCoordinatorError {
+                    categoryReconciliationRequired = switch error {
+                    case .savedButRefreshFailed, .reconciliationRequired: true
+                    default: false
+                    }
                 }
             }
         }
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func approveDevelopmentProfileAcknowledgement() {
         guard let challenge = acknowledgementChallenge,
               let intent = pendingCategoryMutation else { return }
@@ -1494,4 +1595,146 @@ struct TransactionListView: View {
 
 #Preview {
     TransactionListView()
+}
+
+private struct TransactionCategoryBatchSelection: Identifiable {
+    let id = UUID()
+    let rows: [TransactionPresentationRow]
+    let snapshot: CategorySnapshot
+    let generation: ProviderGenerationToken
+}
+
+private struct TransactionCategoryBatchSheet: View {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    let selection: TransactionCategoryBatchSelection
+    let coordinator: CategoryManaging
+    let onSaved: (CategoryBatchReceipt) -> Void
+    @State private var categoryChoice = ""
+    @State private var replaceProtected = false
+    @State private var isApplying = false
+    @State private var message: String?
+    @State private var needsRefresh = false
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+    @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
+#endif
+
+    private var items: [CategoryBatchReview.Item] {
+        selection.rows.compactMap { row in
+            guard let id = row.transaction.repositoryTransactionId, let account = row.accountID else { return nil }
+            return .init(transactionID: id, accountID: account, categoryID: selection.snapshot.assignments[id],
+                intent: selection.snapshot.automation?.intents[id])
+        }
+    }
+    private var review: CategoryBatchReview? {
+        guard !categoryChoice.isEmpty else { return nil }
+        return .init(workspaceID: "default-workspace", categoryID: categoryChoice == "clear" ? nil : categoryChoice,
+            items: items, replaceProtectedChoices: replaceProtected)
+    }
+    private var targetName: String {
+        categoryChoice == "clear" ? "Uncategorized (deliberately cleared)" :
+            selection.snapshot.categories.first { $0.id == categoryChoice }?.name ?? "Choose a category"
+    }
+
+    var body: some View {
+        let review = review
+        let protectedIDs = review?.protectedIDs ?? []
+        let changedIDs = review?.changedIDs ?? []
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Review selected categories").font(theme.typography.formTitle)
+            Text("\(selection.rows.count) selected transactions. This list is fixed for this review.")
+                .font(theme.typography.formCaption)
+            Picker("Category", selection: $categoryChoice) {
+                Text("Choose a category").tag("")
+                ForEach(selection.snapshot.activeCategories) { Text($0.name).tag($0.id) }
+                Text("Clear category deliberately").tag("clear")
+            }.accessibilityIdentifier("categoryBatch.category")
+            let protectedCount = items.filter(\.isProtected).count
+            if protectedCount > 0 {
+                Toggle("Replace \(protectedCount) existing manual or deliberately cleared choices", isOn: $replaceProtected)
+                    .accessibilityIdentifier("categoryBatch.replaceProtected")
+                Text(replaceProtected ? "The reviewed changes below will replace those choices with your new manual choice." :
+                    "Existing manual categories and deliberate clears will be kept.")
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
+            if let review {
+                Text("\(changedIDs.count) category choices will be saved · \(protectedIDs.count) protected · \(review.transactionIDs.subtracting(changedIDs).subtracting(protectedIDs).count) unchanged")
+                    .font(theme.typography.formHeading).accessibilityIdentifier("categoryBatch.count")
+            }
+            Text("These are category labels. Financial treatment, transfers and account ownership are unchanged.")
+                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(selection.rows) { row in
+                        let id = row.transaction.repositoryTransactionId ?? ""
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.transaction.description).font(theme.typography.body)
+                            Text(row.accountDisplayName + " · " + (row.sourceCivilDate?.presentation ?? "Date unavailable") +
+                                 " · " + row.transaction.currency + " " + NSDecimalNumber(decimal: row.transaction.money.amount).stringValue)
+                                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                            Text(row.currentCategoryDisplayName + " → " +
+                                 (protectedIDs.contains(id) ? "Kept (protected)" : targetName))
+                                .font(theme.typography.formCaption)
+                        }
+                        Divider()
+                    }
+                }
+            }.frame(minHeight: 180, maxHeight: .infinity)
+            if let message { Text(message).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning) }
+            HStack {
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(isApplying)
+                if needsRefresh {
+                    Button("Reload saved categories") {
+                        do {
+                            if try coordinator.retryCanonicalHydration() != .failed { dismiss() }
+                        } catch { message = CategoryManagementPresentation.message(for: error) }
+                    }
+                }
+                Spacer()
+                if isApplying { ProgressView().controlSize(.small) }
+                Button("Apply \(changedIDs.count) category choices", action: apply)
+                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("categoryBatch.apply")
+                    .disabled(review == nil || changedIDs.isEmpty || isApplying || needsRefresh)
+            }
+        }
+        .padding(22).frame(minWidth: 650, idealWidth: 780, minHeight: 480, idealHeight: 620)
+        .foregroundStyle(theme.palette.primaryText).background(theme.palette.contentSurface)
+        .interactiveDismissDisabled(isApplying)
+        .disabled(isApplying)
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+        .confirmationDialog(DevelopmentProfileAcknowledgementPresentation.title,
+            isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil } }), titleVisibility: .visible) {
+                Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
+                    guard let challenge else { return }
+                    let outcome = DevelopmentProfileAcknowledgementGate.shared.acknowledge(challenge)
+                    self.challenge = nil
+                    if outcome == .granted || outcome == .noAcknowledgementRequired { apply() }
+                }
+                Button("Cancel", role: .cancel) { challenge = nil }
+            } message: { Text(DevelopmentProfileAcknowledgementPresentation.message) }
+#endif
+    }
+
+    private func apply() {
+        guard !isApplying, let review else { return }
+        isApplying = true; message = nil
+        Task { @MainActor in
+            defer { isApplying = false }
+            do {
+                let receipt = try await coordinator.applyCategoryBatch(review, expectedGeneration: selection.generation)
+                onSaved(receipt); dismiss()
+            } catch {
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+                if case CategoryManagementCoordinatorError.acknowledgementRequired(let value) = error {
+                    challenge = value; return
+                }
+#endif
+                message = CategoryManagementPresentation.message(for: error)
+                if let value = error as? CategoryManagementCoordinatorError {
+                    needsRefresh = value == .savedButRefreshFailed || value == .reconciliationRequired
+                }
+            }
+        }
+    }
 }

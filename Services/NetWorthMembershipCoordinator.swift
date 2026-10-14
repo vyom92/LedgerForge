@@ -5,7 +5,7 @@ import Foundation
 final class NetWorthMembershipCoordinator {
     private let provider: () -> DatabaseProvider
     private let forcedHydration: (DatabaseProvider, String) throws -> Void
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 
     init(
@@ -40,7 +40,7 @@ final class NetWorthMembershipCoordinator {
         let current = provider()
         guard current.generationToken == expectedGeneration else { throw RepositoryError.staleProviderGeneration }
         guard current.persistenceState.isUsable else { throw AccountMetadataCoordinatorError.persistenceUnavailable }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         try acknowledgementGate.requireAuthorization(for: .netWorthMembershipMutation,
             providerGeneration: current.generationToken)
 #endif

@@ -69,7 +69,7 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
 /// This is the one backup compatibility policy. A future schema requires an
 /// explicit policy decision here; the migration registry alone does not grant it.
 nonisolated enum BackupCompatibility {
-    static let supportedSchemaVersion = 32
+    static let supportedSchemaVersion = 34
     static var migrationIdentities: [BackupManifest.MigrationIdentity] {
         allMigrations.map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
     }
@@ -103,6 +103,8 @@ nonisolated enum BackupCompatibility {
     private static let v30Inventory = Result { try expectedInventory(version: 30) }
     private static let v31Inventory = Result { try expectedInventory(version: 31) }
     private static let v32Inventory = Result { try expectedInventory(version: 32) }
+    private static let v33Inventory = Result { try expectedInventory(version: 33) }
+    private static let v34Inventory = Result { try expectedInventory(version: 34) }
     private static func expectedInventory(version: Int) throws -> [SchemaObject] {
         // Empty, source-independent schema authority; no financial fixture/data.
         let schema = SQLiteDatabase(path: ":memory:")
@@ -118,7 +120,7 @@ nonisolated enum BackupCompatibility {
             SchemaObject(kind: $0.string(at: 0), name: $0.string(at: 1), table: $0.string(at: 2), sql: $0.string(at: 3))
         }
     }
-    static func checkContents(_ db: SQLiteDatabase) throws {
+    static func checkContents(_ db: SQLiteDatabase, schemaVersion: Int = supportedSchemaVersion) throws {
         // Only V23's named inbox owns the newly approved original payloads.
         // Unknown/nonempty legacy attachments still require a content decision.
         guard try db.queryInt("SELECT count(*) FROM attachments WHERE blob IS NOT NULL AND length(blob) > 0;") == 0 else {
@@ -128,18 +130,29 @@ nonisolated enum BackupCompatibility {
             do { try SQLiteGmailInboxRepository.verifyBackupContents(db) }
             catch { throw BackupError.damaged }
         }
+        do { try SQLiteCompanionSyncPersistence.verifyBackupContents(db) }
+        catch { throw BackupError.damaged }
+        // The verified chain determines available metadata. A current decode or
+        // parent/source-validation failure must not become an empty backup.
+        if schemaVersion >= 28 {
+            do {
+                try SQLiteCategoryRepo.verifyBackupContents(db, schemaVersion: schemaVersion)
+                try SQLiteFinancialIntelligenceRepository.verifyBackupContents(db, supportsRefundAllocations: schemaVersion >= 34)
+                if schemaVersion >= 34 { try SQLiteTransactionTagRepository.verifyBackupContents(db) }
+            } catch { throw BackupError.damaged }
+        }
     }
     static func verifyDatabase(_ db: SQLiteDatabase, schemaVersion: Int = supportedSchemaVersion) throws {
         let chain = try migrations(for: schemaVersion)
         do { _ = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: true) }
         catch { throw BackupError.incompatible }
-        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : schemaVersion == 22 ? v22Inventory : schemaVersion == 23 ? v23Inventory : schemaVersion == 24 ? v24Inventory : schemaVersion == 25 ? v25Inventory : schemaVersion == 26 ? v26Inventory : schemaVersion == 27 ? v27Inventory : schemaVersion == 28 ? v28Inventory : schemaVersion == 29 ? v29Inventory : schemaVersion == 30 ? v30Inventory : schemaVersion == 31 ? v31Inventory : v32Inventory).get()
+        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : schemaVersion == 22 ? v22Inventory : schemaVersion == 23 ? v23Inventory : schemaVersion == 24 ? v24Inventory : schemaVersion == 25 ? v25Inventory : schemaVersion == 26 ? v26Inventory : schemaVersion == 27 ? v27Inventory : schemaVersion == 28 ? v28Inventory : schemaVersion == 29 ? v29Inventory : schemaVersion == 30 ? v30Inventory : schemaVersion == 31 ? v31Inventory : schemaVersion == 32 ? v32Inventory : schemaVersion == 33 ? v33Inventory : v34Inventory).get()
         guard try schemaInventory(db) == inventory else { throw BackupError.incompatible }
         let integrity = try db.query(sql: "PRAGMA integrity_check;") { $0.string(at: 0) }
         guard integrity == ["ok"], try db.query(sql: "PRAGMA foreign_key_check;", map: { _ in true }).isEmpty else {
             throw BackupError.damaged
         }
-        try checkContents(db)
+        try checkContents(db, schemaVersion: schemaVersion)
     }
 
     /// Receipt-owned startup and supported older candidates share this exact
@@ -151,7 +164,7 @@ nonisolated enum BackupCompatibility {
         if history.count < supportedSchemaVersion {
             try verifyDatabase(db, schemaVersion: history.count)
             // runMigrations validates the immutable prefix and applies only
-            // its exact missing tail through V32 inside SQLite migration ownership.
+            // its exact missing tail through V34 inside SQLite migration ownership.
             try db.runMigrations(chain)
         }
         try verifyDatabase(db)

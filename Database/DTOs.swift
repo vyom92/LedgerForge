@@ -208,7 +208,7 @@ public struct CategoryDTO: nonisolated Equatable, Sendable {
     public let createdAtISO: String
     public let updatedAtISO: String?
 
-    public init(
+    nonisolated public init(
         id: String = UUID().uuidString,
         workspaceId: String,
         name: String,
@@ -232,7 +232,7 @@ public struct TransactionCategoryAssignmentDTO: nonisolated Equatable, Sendable 
     public let transactionId: String
     public let categoryId: String
 
-    public init(workspaceId: String, transactionId: String, categoryId: String) {
+    nonisolated public init(workspaceId: String, transactionId: String, categoryId: String) {
         self.workspaceId = workspaceId
         self.transactionId = transactionId
         self.categoryId = categoryId
@@ -249,7 +249,7 @@ public struct TransactionRawRowDTO: nonisolated Equatable, Sendable {
     public let parserProfileId: String?
     public let parserProfileVersion: String?
 
-    public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil, sourceOrdinal: Int? = nil, normalizedRecordDigest: String? = nil, normalizedDocumentId: String? = nil, parserProfileId: String? = nil, parserProfileVersion: String? = nil) {
+    nonisolated public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil, sourceOrdinal: Int? = nil, normalizedRecordDigest: String? = nil, normalizedDocumentId: String? = nil, parserProfileId: String? = nil, parserProfileVersion: String? = nil) {
         self.id = id
         self.normalizedRowId = normalizedRowId
         self.contributionType = contributionType
@@ -308,7 +308,7 @@ public struct TransactionDTO: nonisolated Equatable, Sendable {
     public let updatedAtISO: String?
     public let rawRows: [TransactionRawRowDTO]
 
-    public init(id: String = UUID().uuidString,
+    nonisolated public init(id: String = UUID().uuidString,
                 workspaceId: String,
                 accountId: String? = nil,
                 importSessionId: String? = nil,
@@ -372,7 +372,7 @@ public struct AccountDTO: nonisolated Equatable, Sendable {
     /// This is administrative metadata, not an issuer closure or settlement date.
     public let closedAtISO: String?
 
-    public init(id: String = UUID().uuidString,
+    nonisolated public init(id: String = UUID().uuidString,
                 workspaceId: String,
                 name: String,
                 institutionId: String? = nil,

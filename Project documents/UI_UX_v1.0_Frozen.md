@@ -68,6 +68,7 @@ Every screen must derive visible financial and workflow state from its authorita
 - Imported source values remain distinguishable from future corrections or derived values.
 - Missing provenance is omitted or marked unavailable rather than inferred.
 - Privacy-safe summaries replace raw identifiers.
+- Edited text fields end editing when the owner clicks outside them in the app window or its sheets/popovers, subject to ordinary native responder validation. The click still reaches its intended control; field-to-field clicks, selection and Tab navigation retain native behavior. This [owner-requested correction](SCOPE_DECISIONS.md#combined-v11-publication-20261013) preserves existing amount parsing and save semantics.
 
 ## Prohibited behavior
 

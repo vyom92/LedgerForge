@@ -2,7 +2,7 @@ import SwiftUI
 
 private enum RuleAction {
     case categoryCreate, categoryDelete, transactionCategoryAssignment
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     var protectedAction: DevelopmentProtectedAction {
         switch self {
         case .categoryCreate: .categoryCreate
@@ -32,13 +32,14 @@ struct CategoryRulesView: View {
     @State private var preview: CategoryHistoricalPreview?
     @State private var showUnchangedPreview = false
     @State private var isPreviewing = false
+    @State private var isApplying = false
     @State private var message: String?
     @State private var showCategoryManagement = false
     @State private var newCategoryName = ""
     @State private var draftOwner = CategoryRuleDraftOwner()
     @State private var confirmClose = false
     @State private var pendingDeletion: CategoryRule?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pendingAction: (() -> Void)?
 #endif
@@ -54,33 +55,44 @@ struct CategoryRulesView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Category rules").font(theme.typography.formTitle)
-                    Text("New imports use enabled rules. Your manual categories and clears always stay in place.")
+                    Text("Enabled rules apply to new imports. Review existing transactions below before applying rules to history.")
                         .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 }
                 Spacer()
                 Button("Done") { if draftOwner.isDirty { confirmClose = true } else { dismiss() } }
                     .keyboardShortcut(.cancelAction)
+                    .disabled(isApplying)
             }
             HSplitView {
                 ruleList.frame(minWidth: 240, idealWidth: 290, maxWidth: 360)
                 ScrollView { editor.padding(.leading, 16).padding(.trailing, 4) }
                     .frame(minWidth: 470, maxWidth: .infinity)
             }
+            .disabled(isApplying)
             Divider()
+            Text("Historical review · \(transactions.count) transactions from the list when this window opened. All enabled rules are checked; selecting a rule above only edits that rule.")
+                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             HStack(spacing: 12) {
-                Button("Preview rules on \(transactions.count) shown transactions", action: makePreview)
-                    .disabled(isPreviewing || categories.snapshot.automation == nil || transactions.isEmpty)
-                if isPreviewing { ProgressView().controlSize(.small) }
+                Button("Preview rules on \(transactions.count) existing transactions", action: makePreview)
+                    .accessibilityIdentifier("categoryRules.previewHistory")
+                    .disabled(isPreviewing || isApplying || categories.snapshot.automation == nil || transactions.isEmpty)
+                if isPreviewing || isApplying { ProgressView().controlSize(.small) }
                 Spacer()
                 if let preview {
-                    Text("\(preview.decisions.filter { $0.outcome == .assigned }.count) assignments · \(preview.removalCount) removals · \(preview.decisions.filter { $0.outcome == .conflict }.count) conflicts")
-                        .font(theme.typography.formCaption)
                     Button("Apply reviewed results") { request(.transactionCategoryAssignment, action: applyPreview) }
                         .buttonStyle(.borderedProminent)
-                        .disabled(preview.decisions.isEmpty)
+                        .accessibilityIdentifier("categoryRules.applyHistory")
+                        .disabled(preview.receipt.changedIDs.isEmpty || isPreviewing || isApplying)
                 }
             }
             if let preview {
+                VStack(alignment: .leading, spacing: 4) {
+                    let receipt = preview.receipt
+                    Text("\(receipt.changedIDs.count) records will change · \(receipt.unchangedIDs.count) unchanged · \(receipt.protectedIDs.count) manual or cleared choices protected")
+                    Text(receipt.categorySummary)
+                    Text(receipt.metadataSummary)
+                    Text("A record can have more than one effect; the record count counts it once. Category changes do not confirm income or movement relationships.")
+                }.font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 Toggle("Show \(preview.unchangedCount) unchanged results", isOn: $showUnchangedPreview)
                     .font(theme.typography.formCaption)
                 previewList(preview).frame(minHeight: 140, maxHeight: 230)
@@ -90,7 +102,7 @@ struct CategoryRulesView: View {
                 HStack {
                     Text(status).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                     if !(categories.snapshot.automation?.pendingIDs.isEmpty ?? true) {
-                        Button("Retry categories") { session.retry() }.disabled(session.isWorking)
+                        Button("Retry rules") { session.retry() }.disabled(session.isWorking)
                     }
                 }
             }
@@ -103,7 +115,9 @@ struct CategoryRulesView: View {
             generation = categories.snapshot.providerGeneration
             resetEditor()
             if let proposal {
-                draft.accountID = proposal.repositoryAccountId; draft.currency = proposal.currency
+                // A proposed reusable rule starts portable. Narrow account or
+                // currency scope remains an explicit editor choice.
+                draft.accountID = nil; draft.currency = nil
                 draft.direction = proposal.cardLiabilityEffect?.rawValue ?? (proposal.debitMoney != nil ? "debit" : "credit")
                 draft.predicates = [.init(field: .narration, match: .exact, text: proposal.description)]
                 draft.categoryID = proposal.repositoryTransactionId.flatMap { categories.snapshot.assignments[$0] } ?? ""
@@ -116,6 +130,9 @@ struct CategoryRulesView: View {
         .onChange(of: categories.snapshot.rulesForDisplay) { _, _ in preview = nil }
         .onChange(of: categories.snapshot.assignments) { _, _ in preview = nil }
         .onChange(of: categories.snapshot.automation?.intents) { _, _ in preview = nil }
+        .onChange(of: categories.snapshot.automation?.work) { _, _ in preview = nil }
+        .onChange(of: categories.snapshot.automation?.spendingIntents) { _, _ in preview = nil }
+        .onChange(of: categories.snapshot.automation?.spendingContexts) { _, _ in preview = nil }
         .onChange(of: categories.snapshot.providerGeneration) { _, value in
             if value != generation { preview = nil; message = "The ledger changed. Close this editor and reopen it before saving." }
         }
@@ -141,8 +158,8 @@ struct CategoryRulesView: View {
                 }
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
-        } message: { Text("Existing categories stay as they are. This rule will no longer match future imports.") }
-#if DEBUG
+        } message: { Text("Existing categories and spending treatment stay as they are. This rule will no longer apply to future imports.") }
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .confirmationDialog(DevelopmentProfileAcknowledgementPresentation.title, isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pendingAction = nil } }), titleVisibility: .visible) {
             Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
                 guard let challenge else { return }
@@ -168,6 +185,10 @@ struct CategoryRulesView: View {
                                     Text(rule.name).font(theme.typography.body.weight(.medium))
                                     Text((categories.categories.first { $0.id == rule.categoryID }?.name ?? "Unavailable category") + " · v\(rule.version)")
                                         .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                                    if rule.bankExpenseAction == .expense {
+                                        Text("Bank outflows count as spending").font(theme.typography.formCaption)
+                                            .foregroundStyle(theme.palette.secondaryText)
+                                    }
                                 }
                                 Spacer()
                             }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
@@ -215,23 +236,39 @@ struct CategoryRulesView: View {
                     Text("Card charge").tag(Optional("card_increase_owed")); Text("Card credit").tag(Optional("card_decrease_owed"))
                 }
             }
+            if categories.snapshot.automation?.supportsSpendingIntent == true {
+                VStack(alignment: .leading, spacing: 5) {
+                    Toggle("Count matching bank outflows as spending", isOn: Binding(
+                        get: { draft.bankExpenseAction == .expense },
+                        set: { draft.bankExpenseAction = $0 ? .expense : nil }))
+                        .toggleStyle(.checkbox)
+                    Text("Applies to eligible bank debits. Manual categories and clears do not change this treatment; reviewed transfers and source exclusions keep their meaning.")
+                        .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                }
+            }
             Divider()
             Text("Match every condition").font(theme.typography.formHeading)
             ForEach(draft.predicates.indices, id: \.self) { index in
                 HStack {
                     Picker("Source field", selection: $draft.predicates[index].field) {
-                        Text("Narration").tag(CategoryTextPredicate.Field.narration); Text("Reference").tag(CategoryTextPredicate.Field.reference)
+                        Text("Narration").tag(CategoryTextPredicate.Field.narration)
+                        Text("Reference").tag(CategoryTextPredicate.Field.reference)
+                            .disabled(draft.predicates[index].match == .doesNotContain)
                     }.labelsHidden().frame(width: 120)
                     Picker("Match", selection: $draft.predicates[index].match) {
                         Text("Contains").tag(CategoryTextPredicate.Match.contains); Text("Is exactly").tag(CategoryTextPredicate.Match.exact)
-                    }.labelsHidden().frame(width: 108)
+                        if categories.snapshot.automation?.supportsSpendingIntent == true {
+                            Text("Does not contain").tag(CategoryTextPredicate.Match.doesNotContain)
+                                .disabled(draft.predicates[index].field != .narration)
+                        }
+                    }.labelsHidden().frame(minWidth: 108, idealWidth: 150)
                     TextField("Source text", text: $draft.predicates[index].text).textFieldStyle(.roundedBorder)
                     Button { draft.predicates.remove(at: index) } label: { Image(systemName: "minus.circle") }
                         .disabled(draft.predicates.count == 1).help("Remove condition")
                 }
             }
             Button("Add condition") { draft.predicates.append(.init(field: .narration, match: .contains, text: "")) }.disabled(draft.predicates.count >= 12)
-            Text("Matching ignores letter case. Conflicting categories stay for review. Saving changes future imports; use the preview below to apply rules to history.")
+            Text("All conditions must match, including exclusions. Keep a positive narration or reference condition. Saving changes future imports; preview before applying to history.")
                 .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             HStack {
                 Button("Save rule") { request(.categoryCreate, action: saveRule) }.buttonStyle(.borderedProminent)
@@ -258,13 +295,34 @@ struct CategoryRulesView: View {
                             if value.removesCategory(decision) {
                                 Text("Applying these results will remove the automatic category.")
                             }
+                            if let spending = decision.spending {
+                                Text("Spending: " + spending.explanation).foregroundStyle(theme.palette.secondaryText)
+                                if spending.context?.sourceEligible == true, spending.context?.protectsInterpretation == false {
+                                    let suppressed = value.spendingIntents[decision.transactionID]?.kind == .deliberatelySuppressed
+                                    Button(suppressed ? "Allow automatic spending treatment" : "Disable automatic spending treatment") {
+                                        request(.transactionCategoryAssignment) {
+                                            setSpendingSuppressed(!suppressed, transactionID: decision.transactionID,
+                                                expected: value.spendingIntents[decision.transactionID])
+                                        }
+                                    }
+                                    .disabled(isApplying)
+                                    .help(suppressed ? "Remove this transaction's opt-out, then preview rules to apply treatment." : "Keep this transaction out of automatic spending treatment without changing its category.")
+                                }
+                            }
                         } label: {
                             HStack {
                                 Text(transaction.statementDate?.presentation ?? "Date unavailable").frame(width: 84, alignment: .leading)
                                 Text(accounts.accounts.first { $0.repositoryAccountId == transaction.repositoryAccountId }?.preferredDisplayName ?? transaction.account)
                                     .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                                Text(transaction.signedAmountDisplay).monospacedDigit().frame(width: 140, alignment: .trailing)
-                                Text(value.removesCategory(decision) ? "Remove category" : (decision.categoryID.flatMap { id in categories.categories.first { $0.id == id }?.name } ?? decision.outcome.displayTitle)).frame(width: 155, alignment: .leading)
+                                Text(transaction.signedAmountDisplay).monospacedDigit().fixedSize(horizontal: true, vertical: false)
+                                    .frame(minWidth: 140, alignment: .trailing)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(value.removesCategory(decision) ? "Remove category" : (decision.categoryID.flatMap { id in categories.categories.first { $0.id == id }?.name } ?? decision.outcome.displayTitle))
+                                    if decision.spending?.changesIntent == true {
+                                        Text(decision.spending?.removesIntent == true ? "Remove spending treatment" : "Count as spending")
+                                            .foregroundStyle(theme.palette.secondaryText)
+                                    }
+                                }.frame(width: 185, alignment: .leading)
                             }
                         }.padding(.vertical, 6).font(theme.typography.formCaption)
                         Divider()
@@ -297,18 +355,48 @@ struct CategoryRulesView: View {
             }.value
             isPreviewing = false
             guard categories.snapshot.providerGeneration == generation, snapshot.rulesForDisplay == categories.snapshot.rulesForDisplay,
-                  snapshot.assignments == categories.snapshot.assignments, metadata.intents == categories.snapshot.automation?.intents else {
+                  snapshot.assignments == categories.snapshot.assignments, metadata.intents == categories.snapshot.automation?.intents,
+                  metadata.spendingIntents == categories.snapshot.automation?.spendingIntents,
+                  metadata.spendingContexts == categories.snapshot.automation?.spendingContexts,
+                  metadata.work == categories.snapshot.automation?.work else {
                 message = "The ledger or rules changed. Create a fresh preview."; return
             }
-            preview = CategoryHistoricalPreview(evaluation: result, assignments: snapshot.assignments, intents: metadata.intents)
+            preview = CategoryHistoricalPreview(evaluation: result, assignments: snapshot.assignments, intents: metadata.intents,
+                spendingIntents: metadata.spendingIntents, spendingContexts: metadata.spendingContexts,
+                work: metadata.work, importSessionIDs: Dictionary(transactions.compactMap { transaction in
+                    guard let id = transaction.repositoryTransactionId, let session = transaction.repositoryImportSessionId else { return nil }
+                    return (id, session)
+                }, uniquingKeysWith: { first, _ in first }))
         }
     }
     private func applyPreview() {
-        perform {
+        guard !isApplying else { return }
+        do {
             guard let preview, let generation, let metadata = categories.snapshot.automation,
-                  preview.matches(assignments: categories.snapshot.assignments, intents: metadata.intents) else { throw CategoryAutomationError.stalePreview }
-            _ = try CategoryManagementCoordinator().applyEvaluation(preview.evaluation, historical: true, expectedGeneration: generation)
-            self.preview = nil; message = "Reviewed category results saved. Manual choices were preserved."
+                  preview.matches(assignments: categories.snapshot.assignments, intents: metadata.intents,
+                    spendingIntents: metadata.spendingIntents, spendingContexts: metadata.spendingContexts) else { throw CategoryAutomationError.stalePreview }
+            isApplying = true; message = nil
+            Task {
+                defer { isApplying = false }
+                do {
+                    let receipt = try await CategoryManagementCoordinator().applyReviewedEvaluation(preview, expectedGeneration: generation)
+                    self.preview = nil; message = "Saved reviewed results. " + receipt.summary + ". " + receipt.categorySummary + ". " + receipt.metadataSummary
+                } catch {
+                    message = (error as? CategoryAutomationError)?.localizedDescription ?? CategoryManagementPresentation.message(for: error)
+                }
+            }
+        } catch {
+            message = (error as? CategoryAutomationError)?.localizedDescription ?? CategoryManagementPresentation.message(for: error)
+        }
+    }
+    private func setSpendingSuppressed(_ suppressed: Bool, transactionID: String, expected: TransactionSpendingIntent?) {
+        perform {
+            guard let generation else { throw CategoryAutomationError.unavailable }
+            _ = try CategoryManagementCoordinator().setSpendingSuppressed(suppressed, transactionID: transactionID,
+                expected: expected, expectedGeneration: generation)
+            preview = nil
+            message = suppressed ? "Automatic spending treatment is disabled for this transaction. Its category is unchanged." :
+                "Automatic spending treatment is available again. Preview the rules before applying it to this transaction."
         }
     }
     private func perform(_ action: () throws -> Void) {
@@ -316,7 +404,7 @@ struct CategoryRulesView: View {
         catch { message = (error as? CategoryAutomationError)?.localizedDescription ?? CategoryManagementPresentation.message(for: error) }
     }
     private func request(_ action: RuleAction, action operation: @escaping () -> Void) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         switch DevelopmentProfileAcknowledgementGate.shared.authorization(for: action.protectedAction) {
         case .allowed: operation()
         case .acknowledgementRequired(let value): challenge = value; pendingAction = operation

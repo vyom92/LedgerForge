@@ -73,7 +73,25 @@ nonisolated enum InvestmentPriceRegistry {
         return amfi + etfs + isp + cbq
     }()
 
-    static func confirmedMapping(for holding: InvestmentHolding) -> InvestmentPriceMapping? {
+    static func confirmedMapping(for holding: InvestmentHolding, container: InvestmentContainer? = nil) -> InvestmentPriceMapping? {
+        if let observationID = holding.ibkrObservationID {
+            // Current Flex identity must qualify the existing Nasdaq listing.
+            // Accumulated holding aliases can contain earlier source metadata.
+            guard let container, container.id == holding.containerID,
+                  let source = container.ibkrSource, source.observationID == observationID,
+                  source.accountID == container.identity,
+                  let position = source.positions.first(where: { $0.instrumentIdentity == holding.instrumentIdentity }),
+                  position.currency == holding.currency else { return nil }
+            let matches = definitions.filter { definition in
+                definition.mapping.provider == "nasdaq"
+                    && definition.sourceIdentity == position.instrumentIdentity
+                    && definition.isin == position.isin
+                    && definition.mapping.code == position.symbol
+                    && definition.mapping.currency == position.currency
+                    && definition.mapping.listing == position.listing
+            }
+            return matches.count == 1 ? matches[0].mapping : nil
+        }
         if holding.zioObservationID != nil, holding.parserProfile == "zurich.isp.zio", let code = holding.zioFundCode {
             return definitions.first { $0.mapping.provider == "fe" && $0.mapping.code == code && $0.mapping.currency == holding.currency }?.mapping
         }

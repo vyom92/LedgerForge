@@ -14,10 +14,14 @@ struct DashboardLiveFXHeaderAccessory: View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: theme.spacing.micro) {
                 HStack(spacing: theme.spacing.small) {
-                    Label("Live FX · Al Dar", systemImage: "arrow.left.arrow.right.circle")
+                    Label("FX · Al Dar", systemImage: "arrow.left.arrow.right.circle")
                         .font(theme.typography.caption.weight(.semibold))
                         .foregroundStyle(theme.palette.primaryText)
                     freshness(at: context.date)
+                }
+                if !session.legs.isEmpty {
+                    Text(session.observationStatus).font(theme.typography.caption)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
 
                 ViewThatFits(in: .horizontal) {
@@ -120,6 +124,10 @@ struct AlDarFXCard: View {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     freshnessBadge(at: context.date)
                 }
+                if !session.legs.isEmpty {
+                    Text(session.observationStatus).font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText)
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(pairs.indices, id: \.self) { index in
@@ -136,6 +144,8 @@ struct AlDarFXCard: View {
                     ForEach(AlDarCurrency.allCases, id: \.self) { currency in
                         if let leg = session.legs[currency] {
                             Text("1 QAR → \(leg.returned.rawToken) \(currency.rawValue) · fetched \(AppDateDisplay.timestamp(leg.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))")
+                            Text(session.checkedAt[currency].map { "Checked: " + InvestmentPriceDates.fetchInstant($0) }
+                                 ?? "Check time not recorded")
                         }
                     }
                 }.font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText).textSelection(.enabled)

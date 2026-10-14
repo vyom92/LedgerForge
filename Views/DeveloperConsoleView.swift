@@ -14,7 +14,7 @@ struct DeveloperConsoleView: View {
     @ObservedObject var console = DeveloperConsole.shared
     @ObservedObject private var accountStore = AccountStore.shared
     @ObservedObject private var transactionStore = TransactionStore.shared
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @ObservedObject private var profileViewModel: DeveloperDatabaseProfileViewModel
 
     init(
@@ -53,7 +53,7 @@ struct DeveloperConsoleView: View {
                         diagnosticsPanel(availableWidth: diagnosticsWidth, logHeight: logHeight)
                     } trailing: {
                         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
                             databaseProfilePanel
 #endif
                             runtimePanel
@@ -64,7 +64,7 @@ struct DeveloperConsoleView: View {
                 .padding(theme.spacing.pagePadding)
             }
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .confirmationDialog(
             profileViewModel.resetActionLabel.map { "\($0)?" } ?? "Reset Development Profile?",
             isPresented: $showsResetConfirmation,
@@ -493,7 +493,7 @@ struct DeveloperConsoleView: View {
         }
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private var databaseProfilePanel: some View {
         LFPanel(title: "Database context") {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
@@ -637,7 +637,7 @@ struct DeveloperConsoleView: View {
         isRunningRepositoryAction = false
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func resetActiveProfile() {
         isRunningRepositoryAction = true
         actionError = nil
@@ -701,7 +701,7 @@ private enum CategoryPicker: Hashable {
 
 struct DeveloperConsoleView_Previews: PreviewProvider {
     static var previews: some View {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         DeveloperConsoleView(profileViewModel: DeveloperDatabaseProfileViewModel())
 #else
         DeveloperConsoleView()

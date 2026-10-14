@@ -216,6 +216,13 @@ public struct MonthlyPlanScratchpadDTO: nonisolated Equatable, Sendable {
 }
 
 public protocol FundingPlanRepository {
+    func companionActivationEpoch() throws -> String
+    func companionSessions(workspaceID: String) throws -> [CompanionSyncSessionDTO]
+    func createCompanionSession(_ value: CompanionSyncSessionDTO) throws
+    func holdCompanionSession(id: String, workspaceID: String) throws
+    func reconcileCompanionActivation() throws
+    func companionMonth(sessionID: String, workspaceID: String, month: String) throws -> CompanionMonthSyncDTO?
+    func commitCompanionMonth(_ request: CompanionMonthCommitRequest) throws -> CompanionMonthCommitResult
     func plans(workspaceId: String) throws -> [FundingPlanDTO]
     @discardableResult func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO]
@@ -225,6 +232,13 @@ public protocol FundingPlanRepository {
 }
 
 public extension FundingPlanRepository {
+    func companionActivationEpoch() throws -> String { throw RepositoryError.persistenceUnavailable }
+    func companionSessions(workspaceID: String) throws -> [CompanionSyncSessionDTO] { throw RepositoryError.persistenceUnavailable }
+    func createCompanionSession(_ value: CompanionSyncSessionDTO) throws { throw RepositoryError.persistenceUnavailable }
+    func holdCompanionSession(id: String, workspaceID: String) throws { throw RepositoryError.persistenceUnavailable }
+    func reconcileCompanionActivation() throws { throw RepositoryError.persistenceUnavailable }
+    func companionMonth(sessionID: String, workspaceID: String, month: String) throws -> CompanionMonthSyncDTO? { throw RepositoryError.persistenceUnavailable }
+    func commitCompanionMonth(_ request: CompanionMonthCommitRequest) throws -> CompanionMonthCommitResult { throw RepositoryError.persistenceUnavailable }
     // Historical read-only providers can hydrate existing plans. Mutations
     // never silently discard editor state when V30 is unavailable.
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] { [] }

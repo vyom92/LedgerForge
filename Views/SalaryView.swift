@@ -28,6 +28,10 @@ struct SalaryView: View {
     @State private var choosingAccounts: String?
     @State private var balanceDetailsID: String?
     @State private var billDetailsID: String?
+    @State private var showingMonthPicker = false
+    @State private var pickerMonth = 1
+    @State private var pickerYear = 2026
+    @State private var focusedMonth: SelectedStatementMonth?
     @FocusState private var focusedInput: String?
 
     private var amountWidth: CGFloat {
@@ -102,7 +106,7 @@ struct SalaryView: View {
                                 }
                                 Spacer()
                                 Button("Review salary draft") {
-                                    viewModel.switchMonth(to: statement.evidence.financialPeriod)
+                                    selectPlanningMonth(statement.evidence.financialPeriod)
                                     if viewModel.month == statement.evidence.financialPeriod && viewModel.canEdit { reviewingPayslip = statement }
                                 }.lfPrimaryAction().disabled(!viewModel.canEdit)
                             }.padding(16).background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
@@ -147,7 +151,11 @@ struct SalaryView: View {
             viewModel.receiveSharedReference(referenceSession.legs[.inr])
             showingManualFX = viewModel.plan.referenceMode == .manual
         }
-        .onDisappear { viewModel.flushPendingEntries() }
+        .onDisappear { finishFocusedAmount(); viewModel.flushPendingEntries() }
+        .onChange(of: focusedInput) { previous, current in
+            if let previous, let focusedMonth { viewModel.finishEditingAmount(previous, in: focusedMonth) }
+            focusedMonth = current == nil ? nil : viewModel.month
+        }
         .onReceive(referenceSession.$legs) { viewModel.receiveSharedReference($0[.inr]) }
         .onChange(of: viewModel.month) { _, _ in
             showingManualFX = viewModel.plan.referenceMode == .manual
@@ -179,8 +187,11 @@ struct SalaryView: View {
             layout {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Budget Planning").font(theme.typography.pageTitle)
-                    Text(section == "Salary History" ? "Salary history · Read-only" : "Monthly estimates · \(fullMonthTitle(viewModel.month))")
-                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    if section == "Salary History" {
+                        Text("Salary history · Read-only").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    } else {
+                        monthPicker
+                    }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if section == "Salary History" {
                     HStack(spacing: 16) {
@@ -206,37 +217,64 @@ struct SalaryView: View {
 
     private var planningControls: some View {
         HStack(spacing: 12) {
-            Menu {
-                ForEach(1...12, id: \.self) { number in
-                    Button(monthNames[number - 1]) { selectPlanningMonth(number, year: viewModel.month.year) }
-                        .disabled(viewModel.month.year < 2026 || (viewModel.month.year == 2026 && number < 9))
-                }
-                let earlier = viewModel.availableMonths.filter { !SalaryWorkspaceViewModel.planningMonths.contains($0) }
-                if !earlier.isEmpty {
-                    Divider()
-                    Menu("Saved history") {
-                        ForEach(earlier, id: \.self) { month in
-                            Button(fullMonthTitle(month)) { viewModel.switchMonth(to: month) }
-                        }
-                    }
-                }
-            } label: {
-                Label(monthNames[viewModel.month.month - 1], systemImage: "calendar")
-            }.lfMenuAction().accessibilityLabel("Planning month")
-            Menu {
-                ForEach(2026...2099, id: \.self) { year in
-                    Button(String(year)) {
-                        selectPlanningMonth(year == 2026 ? max(9, viewModel.month.month) : viewModel.month.month, year: year)
-                    }
-                }
-            } label: { Text(String(viewModel.month.year)) }
-                .lfMenuAction().accessibilityLabel("Planning year").accessibilityValue(String(viewModel.month.year))
+            ForEach(1...2, id: \.self) { offset in
+                Button(offset == 1 ? "+1 month" : "+2 months") {
+                    if let target = viewModel.planningMonth(offsetBy: offset) { selectPlanningMonth(target) }
+                }.lfSecondaryAction()
+                    .disabled(viewModel.planningMonth(offsetBy: offset) == nil)
+                    .help(viewModel.planningMonth(offsetBy: offset).map { "Open \(fullMonthTitle($0))" } ?? "Outside the planning range")
+            }
             Text(!SalaryWorkspaceViewModel.planningMonths.contains(viewModel.month) ? "Saved plan · read only" : viewModel.statusText)
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             Spacer(minLength: 4)
             Button("Planning accounts") { showingPlanningAccounts = true }.lfSecondaryAction().disabled(!viewModel.canEdit)
         }
         .disabled(viewModel.saveState == .saving || viewModel.saveState == .committedNeedsRefresh)
+    }
+
+    private var monthPicker: some View {
+        Button {
+            pickerYear = max(2026, viewModel.month.year)
+            pickerMonth = pickerYear == 2026 ? max(9, viewModel.month.month) : viewModel.month.month
+            showingMonthPicker = true
+        } label: {
+            Label(fullMonthTitle(viewModel.month), systemImage: "calendar")
+                .font(theme.typography.sectionTitle)
+        }.buttonStyle(.plain)
+            .accessibilityLabel("Planning month and year").accessibilityValue(fullMonthTitle(viewModel.month))
+            .disabled(viewModel.saveState == .saving || viewModel.saveState == .committedNeedsRefresh)
+            .popover(isPresented: $showingMonthPicker) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Picker("Month", selection: $pickerMonth) {
+                        ForEach((pickerYear == 2026 ? 9 : 1)...12, id: \.self) { number in
+                            Text(monthNames[number - 1]).tag(number)
+                        }
+                    }
+                    Picker("Year", selection: $pickerYear) {
+                        ForEach(2026...2099, id: \.self) { Text(String($0)).tag($0) }
+                    }.onChange(of: pickerYear) { _, year in
+                        if year == 2026 { pickerMonth = max(9, pickerMonth) }
+                    }
+                    let earlier = viewModel.availableMonths.filter { !SalaryWorkspaceViewModel.planningMonths.contains($0) }
+                    if !earlier.isEmpty {
+                        Menu("Saved history") {
+                            ForEach(earlier, id: \.self) { month in
+                                Button(fullMonthTitle(month)) { selectPlanningMonth(month); showingMonthPicker = false }
+                            }
+                        }
+                    }
+                    HStack {
+                        Button("Cancel") { showingMonthPicker = false }.keyboardShortcut(.cancelAction)
+                        Spacer()
+                        Button("Open month") {
+                            if let target = try? SelectedStatementMonth(year: pickerYear, month: pickerMonth) {
+                                selectPlanningMonth(target)
+                                if viewModel.month == target { showingMonthPicker = false }
+                            }
+                        }.keyboardShortcut(.defaultAction)
+                    }
+                }.padding(20).frame(width: 300)
+            }
     }
 
     private var planningDates: some View {
@@ -250,7 +288,7 @@ struct SalaryView: View {
                     Label("Review changed salary dates", systemImage: "exclamationmark.circle").foregroundStyle(LFTheme.warning)
                 }
             } else {
-                Text("Calendar-month plan · \(fullMonthTitle(viewModel.month))").foregroundStyle(theme.palette.secondaryText)
+                Text("Calendar-month plan").foregroundStyle(theme.palette.secondaryText)
                 Spacer(minLength: 0)
             }
             Button(viewModel.plan.assistance?.salaryCycle == nil ? "Use salary dates" : "Edit payday") { showingSalaryCycle = true }
@@ -260,8 +298,13 @@ struct SalaryView: View {
 
     private var monthNames: [String] { ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] }
     private func fullMonthTitle(_ month: SelectedStatementMonth) -> String { "\(monthNames[month.month - 1]) \(month.year)" }
-    private func selectPlanningMonth(_ number: Int, year: Int) {
-        if let month = try? SelectedStatementMonth(year: year, month: number) { viewModel.switchMonth(to: month) }
+    private func finishFocusedAmount() {
+        if let focusedInput, let focusedMonth { viewModel.finishEditingAmount(focusedInput, in: focusedMonth) }
+    }
+    private func selectPlanningMonth(_ month: SelectedStatementMonth) {
+        finishFocusedAmount()
+        focusedInput = nil
+        viewModel.switchMonth(to: month)
     }
 
     private func comparison(width: CGFloat) -> some View {
@@ -618,8 +661,7 @@ struct SalaryView: View {
                         }
                     }
                     HStack(alignment: .top) {
-                        Text([account.sourceAccountLabel ?? account.identitySummaries.first?.redactedValue,
-                              balance.map { cashBasis($0) }].compactMap { $0 }.joined(separator: " · "))
+                        Text(balance.map { cashBasis($0) } ?? "Enter a planning balance")
                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                         Spacer(minLength: 4)
                         Button("Details") { balanceDetailsID = key }.buttonStyle(.link)
@@ -627,6 +669,11 @@ struct SalaryView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     LFAccountLabel(title: account.preferredDisplayName, detail: account.selectionContext)
                                         .font(theme.typography.body.weight(.semibold))
+                                    if let sourceLabel = account.sourceAccountLabel ?? account.identitySummaries.first?.redactedValue,
+                                       !sourceLabel.isEmpty {
+                                        Text(sourceLabel).font(theme.typography.body)
+                                            .textSelection(.enabled)
+                                    }
                                     Text(balance.map { viewModel.balanceProvenanceText($0) } ?? "Enter a planning balance")
                                         .font(theme.typography.body)
                                     if !receivedSalaryContext.isEmpty { Text(receivedSalaryContext).font(theme.typography.secondary) }
@@ -808,7 +855,7 @@ struct SalaryView: View {
                         .environment(\.calendar, Calendar(identifier: .gregorian))
                     HStack {
                         Button("Clear") {
-                            viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: "")
+                            viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: "", rateWasEdited: false)
                             showingFXDatePicker = false
                         }.lfSecondaryAction().disabled((viewModel.rawText["fx.date"] ?? "").isEmpty)
                         Spacer()

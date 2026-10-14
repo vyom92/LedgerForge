@@ -117,6 +117,7 @@ nonisolated struct PlanningProjection: Sendable {
     let reserves: [ReserveProgress]
     let actualSpending: [String: Decimal]
     let actualTransactionIDs: [String: Set<String>]
+    var actualSpendingByTransaction: [String: Decimal] = [:]
     let plannedCommitments: [String: Decimal]
     let unmatchedSpendingCount: Int
     let cardNeeds: [String]
@@ -286,13 +287,17 @@ nonisolated enum PlanningIntelligence {
                         metadata: FinancialIntelligenceSnapshot, sources: FinancialSourceContext, cards: CardStoreSnapshot,
                         today: StatementDate, scenario: PlanningScenario = .init(), selectedHistoryAccountIDs: Set<String> = [],
                         retainedRecurringOccurrenceIDs: Set<String> = [],
-                        excludedRecurringOccurrenceIDs: Set<String> = []) throws -> PlanningProjection {
+                        excludedRecurringOccurrenceIDs: Set<String> = [],
+                        spendingIntents: [String: TransactionSpendingIntent] = [:]) throws -> PlanningProjection {
 #if DEBUG
         let timing = GmailQualificationTiming.begin(.planningProjection, count: rows.count)
         defer { GmailQualificationTiming.end(.planningProjection, started: timing, count: rows.count) }
 #endif
         try Task.checkCancellation()
         let started = Date()
+        // Resolve refund links before the existing planning account/cycle scope.
+        let resolved = try SpendingIntelligence.resolvedRows(rows: rows, metadata: metadata, spendingIntents: spendingIntents)
+        let resolvedByID = Dictionary(uniqueKeysWithValues: resolved.map { ($0.id, $0) })
         let excluded = metadata.preferences?.excludedPlanningAccountIDs ?? []
         let excludedHistory = Set(anchors.filter(\.historyOnly).map(\.id))
             .union(sources.accounts.filter(\.isHistoryOnly).map(\.id)).subtracting(selectedHistoryAccountIDs)
@@ -333,10 +338,10 @@ nonisolated enum PlanningIntelligence {
         let knownPaymentIDs = Set(metadata.occurrences.flatMap(\.transactionIDs))
         let monthRows = rows.filter { $0.date.map { $0 >= monthStart && $0 <= monthEnd } ?? false }
         let meanings = monthRows.map { row -> SpendingReviewRow in
-            if confirmed[row.id] == nil, knownPaymentIDs.contains(row.id) {
+            if !row.isLoanOrEMI, confirmed[row.id] == nil, knownPaymentIDs.contains(row.id) {
                 return .init(source: row, treatment: row.isBankOut ? .expense : .refund, explanation: "Owner-matched recurring payment or reversal.")
             }
-            return SpendingIntelligence.interpretation(row, confirmed: confirmed[row.id])
+            return resolvedByID[row.id]!
         }
         var actual: [String: Decimal] = [:], actualIDs: [String: Set<String>] = [:]
         for value in meanings where [.expense,.refund].contains(value.treatment) {
@@ -545,7 +550,9 @@ nonisolated enum PlanningIntelligence {
                 basis: "Dated bank balance less known future bills; \(runway?.anchor.date?.presentation ?? "date unavailable"). Coverage and unreviewed payments remain conditional.")
         }
         return .init(month: plan.month, start: start, end: end, recurring: payments, candidates: try recurringCandidates(rows: rows, metadata: metadata),
-            runways: runways, reserves: reserves, actualSpending: actual, actualTransactionIDs: actualIDs, plannedCommitments: planned,
+            runways: runways, reserves: reserves, actualSpending: actual, actualTransactionIDs: actualIDs,
+            actualSpendingByTransaction: Dictionary(uniqueKeysWithValues: meanings.filter { [.expense, .refund].contains($0.treatment) }.map { ($0.id, $0.spending) }),
+            plannedCommitments: planned,
             unmatchedSpendingCount: meanings.filter { $0.treatment == .unresolved }.count, cardNeeds: cardNeeds,
             scenarioIsActive: scenario.isActive, calculationSeconds: Date().timeIntervalSince(started))
     }

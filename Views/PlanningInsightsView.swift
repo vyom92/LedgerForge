@@ -159,6 +159,7 @@ struct PlanningInsightsView: View {
     @ObservedObject var planner: SalaryWorkspaceViewModel
     @Binding var selection: SalaryWorkspaceViewModel.InsightSelection
     @ObservedObject private var store = FinancialIntelligenceStore.shared
+    @ObservedObject private var categoryStore = CategoryStore.shared
     @ObservedObject private var salarySession = SalaryAssistanceSession.shared
     @ObservedObject var model: PlanningAnalysisModel
     let onTransactions: (Set<String>) -> Void
@@ -175,7 +176,7 @@ struct PlanningInsightsView: View {
     @State private var message: String?
     @State private var showAssumptions = false
     @State private var expandedCommitmentID: String?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pending: (() -> Void)?
 #endif
@@ -251,6 +252,7 @@ struct PlanningInsightsView: View {
         .onChange(of: planner.retainedRecurringOccurrenceIDs) { _, _ in refresh() }
         .onChange(of: planner.recurringOccurrenceExclusions) { _, _ in refresh() }
         .onChange(of: store.revision) { _, _ in refresh() }
+        .onChange(of: categoryStore.revision) { _, _ in refresh() }
         .onChange(of: scenario) { _, _ in refresh() }
         .onChange(of: model.isWorking) { _, working in
             if !working, model.projection?.runways.contains(where: { $0.id == accountID }) != true {
@@ -268,7 +270,7 @@ struct PlanningInsightsView: View {
                     editor = nil; onMonthlyPlan()
                 }, onPrefills: { planner.applyRecurring($0); editor = nil; onMonthlyPlan() })
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pending = nil } })) {
                 Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
@@ -642,9 +644,8 @@ struct PlanningInsightsView: View {
                        assistance.allowanceAccountID.map(planner.excludedHistoryAccountIDs.contains) != true {
                 let committedIDs = Set(payments.flatMap(\.actualIDs))
                 let spendingIDs = projection.actualTransactionIDs[currency, default: []].subtracting(committedIDs)
-                let discretionary = model.rows.filter { spendingIDs.contains($0.id) && $0.accountID == assistance.allowanceAccountID }.reduce(Decimal.zero) { total, row in
-                    total + SpendingIntelligence.interpretation(row, confirmed: metadata?.confirmedByTransaction[row.id]).spending
-                }
+                let allowanceIDs = Set(model.rows.filter { spendingIDs.contains($0.id) && $0.accountID == assistance.allowanceAccountID }.map(\.id))
+                let discretionary = allowanceIDs.reduce(Decimal.zero) { $0 + projection.actualSpendingByTransaction[$1, default: 0] }
                 let limit = (try? allowance.money().amount) ?? 0
                 Text("Discretionary allowance: " + allowance.decimal + " " + currency + " · remaining " + amount(limit - discretionary, currency)).font(theme.typography.body.weight(.semibold))
                 Chart {
@@ -701,7 +702,7 @@ struct PlanningInsightsView: View {
     private func mutate(_ body: @escaping () throws -> Void) {
         do { try body(); editor = nil; message = nil }
         catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if case DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) = error { pending = { mutate(body) }; challenge = value; return }
 #endif
             message = error.localizedDescription

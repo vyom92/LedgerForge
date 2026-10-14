@@ -4,7 +4,7 @@
 import Foundation
 
 enum AccountMetadataCoordinatorError: Error, Equatable {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     case acknowledgementRequired(DevelopmentProfileAcknowledgementChallenge)
     case staleDevelopmentProfile
 #endif
@@ -26,11 +26,11 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
     private let provider: () -> DatabaseProvider
     private let forcedHydration: (DatabaseProvider, String) throws -> RepositoryStoreHydrationResult
     private let developerConsole: DeveloperConsole?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     convenience init(
         databaseProvider: DatabaseProvider? = nil,
         developerConsole: DeveloperConsole? = .shared,
@@ -118,7 +118,7 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
         catch { throw AccountMetadataCoordinatorError.saveFailed }
         defer { lease.finish() }
         let currentProvider = provider()
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do {
             try acknowledgementGate.requireAuthorization(
                 for: .accountHistoryOnlyMutation,
@@ -157,7 +157,7 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
         defer { lifecycleLease.finish() }
 
         let currentProvider = provider()
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do {
             try acknowledgementGate.requireAuthorization(
                 for: .accountDisplayNameMutation,

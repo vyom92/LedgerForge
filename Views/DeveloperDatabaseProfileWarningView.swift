@@ -1,7 +1,7 @@
 // LedgerForge
 // DeveloperDatabaseProfileWarningView.swift
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import SwiftUI
 
 struct DeveloperDatabaseProfileWarningPresentation: Equatable {

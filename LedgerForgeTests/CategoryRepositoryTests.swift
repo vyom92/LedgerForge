@@ -97,7 +97,7 @@ struct CategoryRepositoryTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func everyCategoryAndTransactionMutationEntryPointUsesAcknowledgementGate() {
+    func everyCategoryAndTransactionMutationEntryPointUsesAcknowledgementGate() async {
         let provider = DatabaseProvider(inMemory: true)
         let state = DevelopmentProfileAcknowledgementState(
             providerGeneration: provider.generationToken,
@@ -110,9 +110,9 @@ struct CategoryRepositoryTests {
             acknowledgementGate: gate
         )
 
-        func expectAcknowledgement(_ operation: () throws -> Void) {
+        func expectAcknowledgement(_ operation: () async throws -> Void) async {
             do {
-                try operation()
+                try await operation()
                 Issue.record("Expected acknowledgement requirement")
             } catch CategoryManagementCoordinatorError.acknowledgementRequired {
                 // Expected before repository access.
@@ -121,13 +121,18 @@ struct CategoryRepositoryTests {
             }
         }
 
-        expectAcknowledgement { _ = try coordinator.create(name: "Create") }
-        expectAcknowledgement { _ = try coordinator.rename(categoryID: "category", name: "Rename") }
-        expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: true) }
-        expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: false) }
-        expectAcknowledgement { try coordinator.deleteUnused(categoryID: "category") }
-        expectAcknowledgement { _ = try coordinator.setCategory(categoryID: "category", transactionID: "transaction") }
-        expectAcknowledgement { _ = try coordinator.setCategory(categoryID: nil, transactionID: "transaction") }
+        await expectAcknowledgement { _ = try coordinator.create(name: "Create") }
+        await expectAcknowledgement { _ = try coordinator.rename(categoryID: "category", name: "Rename") }
+        await expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: true) }
+        await expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: false) }
+        await expectAcknowledgement { try coordinator.deleteUnused(categoryID: "category") }
+        await expectAcknowledgement { _ = try await coordinator.setCategory(categoryID: "category", transactionID: "transaction") }
+        await expectAcknowledgement { _ = try await coordinator.setCategory(categoryID: nil, transactionID: "transaction") }
+        let emptyEvaluation = CategoryEvaluation(rules: [], activeCategoryIDs: [], decisions: [])
+        await expectAcknowledgement { _ = try await coordinator.applyEvaluation(emptyEvaluation, historical: true, expectedGeneration: provider.generationToken) }
+        await expectAcknowledgement { _ = try await coordinator.applyEvaluation(emptyEvaluation, historical: false, expectedGeneration: provider.generationToken) }
+        await expectAcknowledgement { _ = try await coordinator.applyCategoryBatch(.init(workspaceID: "default-workspace", categoryID: nil, items: [], replaceProtectedChoices: false), expectedGeneration: provider.generationToken) }
+        await expectAcknowledgement { _ = try await coordinator.applyReviewedEvaluation(.init(evaluation: emptyEvaluation, assignments: [:], intents: [:], spendingIntents: [:], spendingContexts: [:]), expectedGeneration: provider.generationToken) }
     }
 #endif
 
@@ -307,6 +312,11 @@ struct CategoryRepositoryTests {
                 #expect(try repository.applyCategoryEvaluation(evaluation, workspaceId: workspace, historical: false) == 1)
                 #expect(try repository.applyCategoryEvaluation(evaluation, workspaceId: workspace, historical: false) == 0)
                 #expect(try repository.automationSnapshot(workspaceId: workspace)?.intents[first.id]?.kind == .automatic)
+                let completed = try #require(try repository.automationSnapshot(workspaceId: workspace))
+                let unchanged = CategoryEvaluation.evaluate(inputs: [.init(transaction: first)], snapshot: completed,
+                    assignments: [first.id: category.id], activeCategoryIDs: [category.id])
+                #expect(try repository.applyCategoryEvaluation(unchanged, workspaceId: workspace, historical: true) == 0)
+                #expect(try repository.automationSnapshot(workspaceId: workspace) == completed)
                 var disabled = rule; disabled.version = 2; disabled.isEnabled = false
                 try repository.saveRule(disabled, previousVersion: 1)
                 let noMatch = CategoryEvaluation.evaluate(inputs: [.init(transaction: first)],
@@ -527,18 +537,22 @@ struct CategoryRepositoryTests {
         #expect(gate.isBlocked(for: provider.generationToken))
 
         let writesBeforeBlockedAttempts = countingRepository.writeCount
-        let blockedOperations: [() throws -> Void] = [
+        let blockedOperations: [() async throws -> Void] = [
             { _ = try coordinator.create(name: "Blocked create") },
             { _ = try coordinator.rename(categoryID: existing.id, name: "Blocked rename") },
             { _ = try coordinator.setArchived(categoryID: existing.id, isArchived: true) },
             { _ = try coordinator.setArchived(categoryID: archived.id, isArchived: false) },
             { try coordinator.deleteUnused(categoryID: existing.id) },
-            { _ = try coordinator.setCategory(categoryID: existing.id, transactionID: seeded.transactionID) },
-            { _ = try coordinator.setCategory(categoryID: archived.id, transactionID: seeded.transactionID) },
-            { _ = try coordinator.setCategory(categoryID: nil, transactionID: seeded.transactionID) }
+            { _ = try await coordinator.setCategory(categoryID: existing.id, transactionID: seeded.transactionID) },
+            { _ = try await coordinator.setCategory(categoryID: archived.id, transactionID: seeded.transactionID) },
+            { _ = try await coordinator.setCategory(categoryID: nil, transactionID: seeded.transactionID) },
+            { _ = try await coordinator.applyEvaluation(.init(rules: [], activeCategoryIDs: [], decisions: []), historical: true, expectedGeneration: provider.generationToken) },
+            { _ = try await coordinator.applyEvaluation(.init(rules: [], activeCategoryIDs: [], decisions: []), historical: false, expectedGeneration: provider.generationToken) },
+            { _ = try await coordinator.applyCategoryBatch(.init(workspaceID: seeded.workspaceID, categoryID: nil, items: [], replaceProtectedChoices: false), expectedGeneration: provider.generationToken) },
+            { _ = try await coordinator.applyReviewedEvaluation(.init(evaluation: .init(rules: [], activeCategoryIDs: [], decisions: []), assignments: [:], intents: [:], spendingIntents: [:], spendingContexts: [:]), expectedGeneration: provider.generationToken) }
         ]
         for operation in blockedOperations {
-            #expect(throws: CategoryManagementCoordinatorError.reconciliationRequired, performing: operation)
+            await #expect(throws: CategoryManagementCoordinatorError.reconciliationRequired) { try await operation() }
         }
         #expect(countingRepository.writeCount == writesBeforeBlockedAttempts)
         #expect(stores.categories.snapshot == previousSnapshot)
@@ -773,4 +787,172 @@ private actor CategoryEvaluationPause {
         await withCheckedContinuation { continuation = $0 }
     }
     func release() { continuation?.resume(); continuation = nil }
+}
+
+extension CategoryRepositoryTests {
+    @Test(.globalRuntimeStateIsolation)
+    func reviewedManualBatchKeepsProtectedChoicesAndExactEffectsAcrossProviders() async throws {
+        for kind in CategoryProviderKind.allCases {
+            try await withCategoryProvider(kind) { provider in
+                let seeded = try await seedTrustedTransaction(in: provider)
+                let facts = try provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID)
+                let selected = Array(facts.sorted { $0.id < $1.id }.prefix(4))
+                #expect(selected.count == 4)
+                let repository = provider.categoryRepo
+                let first = try createCategory(name: "Review one", id: UUID().uuidString, workspaceID: seeded.workspaceID, repository: repository)
+                let second = try createCategory(name: "Review two", id: UUID().uuidString, workspaceID: seeded.workspaceID, repository: repository)
+                _ = try repository.setCategory(categoryId: first.id, transactionId: selected[0].id, workspaceId: seeded.workspaceID)
+                _ = try repository.setCategory(categoryId: nil, transactionId: selected[1].id, workspaceId: seeded.workspaceID)
+                let before = try #require(try repository.automationSnapshot(workspaceId: seeded.workspaceID))
+                let kept = try categoryBatchReview(repository, selected, categoryID: second.id, replacing: false)
+                #expect(kept.changedIDs.count == 2 && kept.protectedIDs.count == 2)
+                // Merely constructing or cancelling a review has no durable effects.
+                let cancelledUnchanged = try repository.automationSnapshot(workspaceId: seeded.workspaceID) == before
+                #expect(cancelledUnchanged)
+                let receipt = try repository.applyCategoryBatch(kept)
+                let exact = receipt.changedIDs == kept.changedIDs && receipt.protectedIDs == kept.protectedIDs
+                #expect(exact)
+                let after = try #require(try repository.automationSnapshot(workspaceId: seeded.workspaceID))
+                let preserved = after.intents[selected[0].id] == before.intents[selected[0].id] &&
+                    after.intents[selected[1].id] == before.intents[selected[1].id] && after.spendingIntents == before.spendingIntents
+                #expect(preserved)
+                #expect(throws: CategoryAutomationError.stalePreview) { try repository.applyCategoryBatch(kept) }
+                let replacement = try categoryBatchReview(repository, selected, categoryID: second.id, replacing: true)
+                #expect(replacement.changedIDs.count == 2 && replacement.protectedIDs.isEmpty)
+                let replaced = try repository.applyCategoryBatch(replacement)
+                #expect(replaced.changedIDs.count == 2 && replaced.unchangedIDs.count == 2)
+                let clear = try categoryBatchReview(repository, selected, categoryID: nil, replacing: true)
+                #expect(try repository.applyCategoryBatch(clear).changedIDs.count == 4)
+                let cleared = try #require(try repository.automationSnapshot(workspaceId: seeded.workspaceID))
+                let allCleared = selected.allSatisfy { cleared.intents[$0.id]?.kind == .deliberatelyCleared }
+                #expect(allCleared)
+                let protected = try categoryBatchReview(repository, selected, categoryID: first.id, replacing: false)
+                #expect(try repository.applyCategoryBatch(protected).changedIDs.isEmpty)
+                let unchangedFinancialFacts = try provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID) == facts
+                #expect(unchangedFinancialFacts)
+            }
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func reviewedManualBatchRollsBackFailuresRejectsStaleOwnershipAndSurvivesReopen() async throws {
+        try await withTemporaryCategoryDatabase { path in
+            let sqlite = try SQLiteRepositoryProvider(path: path)
+            let provider = DatabaseProvider.verifiedSQLite(sqlite)
+            let seeded = try await seedTrustedTransaction(in: provider)
+            let facts = try provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID)
+            let selected = Array(facts.sorted { $0.id < $1.id }.prefix(2))
+            #expect(selected.count == 2)
+            let repository = provider.categoryRepo
+            let category = try createCategory(name: "Reviewed batch", id: UUID().uuidString, workspaceID: seeded.workspaceID, repository: repository)
+            let review = try categoryBatchReview(repository, selected, categoryID: category.id, replacing: true)
+            let before = try repository.automationSnapshot(workspaceId: seeded.workspaceID)
+            let metadata: Set<String> = ["categories", "transaction_category_assignments", "transaction_category_intent", "category_import_work"]
+            let financialBefore = try NetWorthTestSupport.financialDigest(sqlite.database, excluding: metadata)
+            let second = selected[1].id.replacingOccurrences(of: "'", with: "''")
+            try sqlite.database.execute(sql: "CREATE TEMP TRIGGER reject_reviewed_second BEFORE INSERT ON transaction_category_assignments WHEN NEW.transaction_id = '\(second)' BEGIN SELECT RAISE(ABORT, 'reviewed batch failure'); END;")
+            #expect(throws: (any Error).self) { try repository.applyCategoryBatch(review) }
+            let rolledBack = try repository.automationSnapshot(workspaceId: seeded.workspaceID) == before && repository.assignments(workspaceId: seeded.workspaceID).isEmpty
+            #expect(rolledBack)
+            try sqlite.database.execute(sql: "DROP TRIGGER reject_reviewed_second;")
+            let cancelled = Task { @MainActor in
+                withUnsafeCurrentTask { $0?.cancel() }
+                return try repository.applyCategoryBatch(review)
+            }
+            await #expect(throws: CancellationError.self) { try await cancelled.value }
+            let cancelledUnchanged = try repository.automationSnapshot(workspaceId: seeded.workspaceID) == before
+            #expect(cancelledUnchanged)
+            let wrongOwner = CategoryBatchReview(workspaceID: review.workspaceID, categoryID: review.categoryID,
+                items: review.items.map { .init(transactionID: $0.transactionID, accountID: "not-the-reviewed-account", categoryID: $0.categoryID, intent: $0.intent) }, replaceProtectedChoices: true)
+            #expect(throws: CategoryAutomationError.stalePreview) { try repository.applyCategoryBatch(wrongOwner) }
+            _ = try repository.setCategory(categoryId: nil, transactionId: selected[1].id, workspaceId: seeded.workspaceID)
+            #expect(throws: CategoryAutomationError.stalePreview) { try repository.applyCategoryBatch(review) }
+            let fresh = try categoryBatchReview(repository, selected, categoryID: category.id, replacing: true)
+            let receipt = try repository.applyCategoryBatch(fresh)
+            #expect(receipt.changedIDs.count == 2)
+            let saved = try repository.automationSnapshot(workspaceId: seeded.workspaceID)
+            let onlyCategoryMetadataChanged = try NetWorthTestSupport.financialDigest(sqlite.database, excluding: metadata) == financialBefore
+            #expect(onlyCategoryMetadataChanged)
+            provider.invalidateGeneration()
+            #expect(throws: (any Error).self) { try repository.applyCategoryBatch(fresh) }
+            try sqlite.database.checkpointAndClose()
+            let reopened = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing)
+            defer { reopened.database.close() }
+            let exactReopen = try reopened.categoryRepo.automationSnapshot(workspaceId: seeded.workspaceID) == saved &&
+                reopened.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID) == facts
+            #expect(exactReopen)
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func historicalReviewedReceiptSeparatesNoopsOwnershipReceiptsConflictsAndManualRaces() async throws {
+        for kind in CategoryProviderKind.allCases {
+            try await withCategoryProvider(kind) { provider in
+                let seeded = try await seedTrustedTransaction(in: provider)
+                let facts = try provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID)
+                let selected = Array(facts.sorted { $0.id < $1.id }.prefix(4))
+                #expect(selected.count == 4)
+                let repository = provider.categoryRepo
+                let first = try createCategory(name: "History one", id: UUID().uuidString, workspaceID: seeded.workspaceID, repository: repository)
+                let second = try createCategory(name: "History two", id: UUID().uuidString, workspaceID: seeded.workspaceID, repository: repository)
+                var rule = CategoryRule(id: UUID().uuidString, workspaceID: seeded.workspaceID, name: "Reviewed original narration", version: 1,
+                    isEnabled: true, categoryID: first.id, accountID: selected[0].accountId,
+                    predicates: [.init(field: .narration, match: .exact, text: try #require(selected[0].description))])
+                try repository.saveRule(rule, previousVersion: nil)
+                _ = try repository.setCategory(categoryId: nil, transactionId: selected[3].id, workspaceId: seeded.workspaceID)
+                let review = try categoryHistoryReview(repository, selected)
+                let receipt = try repository.applyReviewedCategoryEvaluation(review, workspaceId: seeded.workspaceID)
+                let exactReceipt = receipt == review.receipt
+                #expect(exactReceipt && !receipt.categoryChangedIDs.isEmpty && receipt.protectedIDs.count == 1)
+                let unchanged = try categoryHistoryReview(repository, selected)
+                #expect(unchanged.receipt.changedIDs.isEmpty)
+                #expect(try repository.applyReviewedCategoryEvaluation(unchanged, workspaceId: seeded.workspaceID).changedIDs.isEmpty)
+                rule.version += 1
+                try repository.saveRule(rule, previousVersion: 1)
+                let ownership = try categoryHistoryReview(repository, selected)
+                #expect(ownership.receipt.categoryChangedIDs.isEmpty && !ownership.receipt.intentChangedIDs.isEmpty)
+                let updated = try repository.applyReviewedCategoryEvaluation(ownership, workspaceId: seeded.workspaceID)
+                let exactOwnership = updated == ownership.receipt
+                #expect(exactOwnership)
+                var competing = rule; competing.id = UUID().uuidString; competing.version = 1; competing.categoryID = second.id
+                try repository.saveRule(competing, previousVersion: nil)
+                let conflict = try categoryHistoryReview(repository, selected)
+                #expect(!conflict.receipt.categoryRemovedIDs.isEmpty && !conflict.receipt.conflictIDs.isEmpty)
+                let conflicted = try repository.applyReviewedCategoryEvaluation(conflict, workspaceId: seeded.workspaceID)
+                let exactConflict = conflicted == conflict.receipt
+                #expect(exactConflict)
+                let stale = try categoryHistoryReview(repository, selected)
+                _ = try repository.setCategory(categoryId: second.id, transactionId: selected[0].id, workspaceId: seeded.workspaceID)
+                let savedManual = try repository.automationSnapshot(workspaceId: seeded.workspaceID)
+                #expect(throws: CategoryAutomationError.stalePreview) { try repository.applyReviewedCategoryEvaluation(stale, workspaceId: seeded.workspaceID) }
+                let noResidue = try repository.automationSnapshot(workspaceId: seeded.workspaceID) == savedManual &&
+                    provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID) == facts
+                #expect(noResidue)
+            }
+        }
+    }
+}
+
+@MainActor
+private func categoryBatchReview(_ repository: CategoryRepository, _ facts: [TransactionDTO], categoryID: String?, replacing: Bool) throws -> CategoryBatchReview {
+    let workspace = try #require(facts.first?.workspaceId)
+    let snapshot = try #require(try repository.automationSnapshot(workspaceId: workspace))
+    let assigned = Dictionary(uniqueKeysWithValues: try repository.assignments(workspaceId: workspace).map { ($0.transactionId, $0.categoryId) })
+    return try .init(workspaceID: workspace, categoryID: categoryID, items: facts.map {
+        .init(transactionID: $0.id, accountID: try #require($0.accountId), categoryID: assigned[$0.id], intent: snapshot.intents[$0.id])
+    }, replaceProtectedChoices: replacing)
+}
+
+@MainActor
+private func categoryHistoryReview(_ repository: CategoryRepository, _ facts: [TransactionDTO]) throws -> CategoryHistoricalPreview {
+    let workspace = try #require(facts.first?.workspaceId)
+    let snapshot = try #require(try repository.automationSnapshot(workspaceId: workspace))
+    let assigned = Dictionary(uniqueKeysWithValues: try repository.assignments(workspaceId: workspace).map { ($0.transactionId, $0.categoryId) })
+    let active = Set(try repository.categories(workspaceId: workspace).filter { !$0.isArchived }.map(\.id))
+    let evaluation = CategoryEvaluation.evaluate(inputs: facts.map(CategoryRuleInput.init), snapshot: snapshot, assignments: assigned, activeCategoryIDs: active)
+    return .init(evaluation: evaluation, assignments: assigned, intents: snapshot.intents,
+        spendingIntents: snapshot.spendingIntents, spendingContexts: snapshot.spendingContexts,
+        work: snapshot.work, importSessionIDs: Dictionary(uniqueKeysWithValues: facts.compactMap { value in
+            value.importSessionId.map { (value.id, $0) }
+        }))
 }

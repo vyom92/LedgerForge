@@ -148,6 +148,7 @@ nonisolated struct TransactionPresentationFilterSpec: Equatable, Sendable {
     var excludesAllAccounts = false
     var currencies: Set<CurrencyCode> = []
     var categories: Set<TransactionPresentationCategoryChoice> = []
+    var tag: TransactionTagFilter = .all
     var domains: Set<TransactionPresentationDomain> = []
     var effects: Set<TransactionPresentationEffect> = []
     /// Values are privacy-safe institution display strings normalized by
@@ -403,13 +404,19 @@ nonisolated enum TransactionPresentationEngine {
         categories: [Category],
         filter: TransactionPresentationFilterSpec,
         sort: TransactionPresentationSortSpec,
-        availability: TransactionPresentationAvailability
+        availability: TransactionPresentationAvailability,
+        tagSnapshot: TransactionTagSnapshot? = nil
     ) -> TransactionPresentationResult {
 #if DEBUG
         let timing = GmailQualificationTiming.begin(.transactionQuery, count: allRows.count)
         defer { GmailQualificationTiming.end(.transactionQuery, started: timing, count: allRows.count) }
 #endif
         guard availability == .available else { return .unavailable }
+        if filter.tag != .all {
+            guard let tagSnapshot else { return invalid(.invalidSelection) }
+            if case .tag(let id) = filter.tag,
+               !tagSnapshot.definitions.contains(where: { $0.id == id }) { return invalid(.invalidSelection) }
+        }
         guard filter.amountRange?.isValid ?? true else {
             return invalid(.invalidAmountRange)
         }
@@ -439,6 +446,7 @@ nonisolated enum TransactionPresentationEngine {
 
         for row in allRows {
             guard filter.canonicalTransactionIDs.map({ $0.contains(row.transaction.repositoryTransactionId ?? "") }) ?? true else { continue }
+            guard filter.tag == .all || tagSnapshot?.matches(transactionID: row.transaction.repositoryTransactionId, filter: filter.tag) == true else { continue }
             if !searchTokens.isEmpty {
                 let searchable = [
                     row.transaction.description,
@@ -689,6 +697,7 @@ final class TransactionListViewModel: ObservableObject {
     private let importSessionStore: ImportSessionStore
     private let accountStore: AccountStore
     private let categoryStore: CategoryStore
+    private let tagStore: TransactionTagStore
     private var importSessions: [RepositoryImportSession] = []
     private var accounts: [Account] = []
     private var categorySnapshot: CategorySnapshot = .empty
@@ -723,7 +732,19 @@ final class TransactionListViewModel: ObservableObject {
             reconcilePresentationSelection()
         }
     }
-    @Published private(set) var selectedPresentationRowID: String?
+    @Published private(set) var selectedPresentationRowIDs: Set<String> = []
+    @Published private(set) var moneyFlowInspection: MoneyFlowInspection?
+    var selectedPresentationRowID: String? {
+        selectedPresentationRowIDs.count == 1 ? selectedPresentationRowIDs.first : nil
+    }
+    var selectedPresentationRows: [TransactionPresentationRow] {
+        transactionPresentationResult.rows.filter { selectedPresentationRowIDs.contains($0.stableID) }
+    }
+
+    func showMoneyFlowInspection(_ inspection: MoneyFlowInspection) {
+        selectedPresentationRowIDs = []
+        moneyFlowInspection = inspection
+    }
 
     var presentationAccounts: [Account] { accounts }
 
@@ -756,12 +777,12 @@ final class TransactionListViewModel: ObservableObject {
     /// hydrated records. Returning never rewrites the originating screen.
     func makePeriodOverview(filter: TransactionPresentationFilterSpec? = nil) -> TransactionListViewModel {
         let model = TransactionListViewModel(transactionStore: transactionStore,
-            importSessionStore: importSessionStore, accountStore: accountStore, categoryStore: categoryStore)
+            importSessionStore: importSessionStore, accountStore: accountStore, categoryStore: categoryStore, tagStore: tagStore)
         model.synchronizePresentation(generation: synchronizedGeneration,
             availabilityState: presentationAvailability == .available ? .current : .unavailable)
         model.presentationFilter = filter ?? presentationFilter
         model.presentationSort = presentationSort
-        model.selectPresentationRow(id: selectedPresentationRowID)
+        model.selectPresentationRows(ids: selectedPresentationRowIDs)
         return model
     }
 
@@ -769,12 +790,14 @@ final class TransactionListViewModel: ObservableObject {
         transactionStore: TransactionStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         accountStore: AccountStore = .shared,
-        categoryStore: CategoryStore = .shared
+        categoryStore: CategoryStore = .shared,
+        tagStore: TransactionTagStore = .shared
     ) {
         self.transactionStore = transactionStore
         self.importSessionStore = importSessionStore
         self.accountStore = accountStore
         self.categoryStore = categoryStore
+        self.tagStore = tagStore
         transactions = transactionStore.transactions
         importSessions = importSessionStore.importSessions
         accounts = accountStore.accounts
@@ -785,7 +808,8 @@ final class TransactionListViewModel: ObservableObject {
         Publishers.MergeMany([
             transactionStore.$transactions.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             accountStore.$accounts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher()
+            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            tagStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher()
         ])
         .sink { [weak self] in self?.requestCanonicalRefresh() }
         .store(in: &cancellables)
@@ -813,6 +837,7 @@ final class TransactionListViewModel: ObservableObject {
     }
 
     private func refreshCanonicalSnapshot() {
+        moneyFlowInspection = nil
         pendingRefreshID = nil
         accounts = accountStore.accounts
         categorySnapshot = categoryStore.snapshot
@@ -836,7 +861,7 @@ final class TransactionListViewModel: ObservableObject {
 
         objectWillChange.send()
         if synchronizedGeneration != nil, synchronizedGeneration != generation {
-            selectedPresentationRowID = nil
+            selectedPresentationRowIDs = []
         }
         synchronizedGeneration = generation
         presentationAvailability = availability
@@ -857,13 +882,14 @@ final class TransactionListViewModel: ObservableObject {
     }
 
     func selectPresentationRow(id: String?) {
-        guard let id else {
-            selectedPresentationRowID = nil
-            return
-        }
-        selectedPresentationRowID = transactionPresentationResult.rows.contains(where: { $0.stableID == id })
-            ? id
-            : nil
+        selectPresentationRows(ids: id.map { [$0] } ?? [])
+    }
+
+    func selectPresentationRows(ids: Set<String>) {
+        let eligible = Set(transactionPresentationResult.rows.filter {
+            $0.transaction.repositoryTransactionId != nil && $0.accountID != nil
+        }.map(\.stableID))
+        selectedPresentationRowIDs = ids.intersection(eligible)
     }
 
     /// The immutable, unfiltered rows for the currently available provider generation.
@@ -892,7 +918,8 @@ final class TransactionListViewModel: ObservableObject {
             categories: categorySnapshot.categories,
             filter: presentationFilter,
             sort: presentationSort,
-            availability: presentationAvailability
+            availability: presentationAvailability,
+            tagSnapshot: tagStore.generation == synchronizedGeneration ? tagStore.snapshot : nil
         )
         cachedPresentationResult = result
 #if DEBUG
@@ -907,11 +934,7 @@ final class TransactionListViewModel: ObservableObject {
     }
 
     private func reconcilePresentationSelection() {
-        guard let selectedPresentationRowID,
-              transactionPresentationResult.rows.contains(where: { $0.stableID == selectedPresentationRowID }) else {
-            self.selectedPresentationRowID = nil
-            return
-        }
+        selectPresentationRows(ids: selectedPresentationRowIDs)
     }
 
     private var legacyPresentationResult: TransactionPresentationResult {
@@ -1126,56 +1149,69 @@ final class SpendingAnalysisModel: ObservableObject {
     @Published private(set) var comparison: SpendingComparison?
     @Published private(set) var sourceRows: [SpendingSourceRow] = []
     @Published private(set) var isWorking = false
+    @Published private(set) var errorMessage: String?
     private var sequence: UInt64 = 0
     private var task: Task<Void, Never>?
     private var worker: Task<(SpendingProjection, SpendingComparison?, [SpendingSourceRow], [MovementSuggestion]), Error>?
-    private var cached: (ProviderGenerationToken, UInt64, [SpendingSourceRow], [MovementSuggestion])?
+    private var cached: (ProviderGenerationToken, UInt64, UUID, [SpendingSourceRow], [MovementSuggestion])?
 
     private struct Query: Equatable {
         let generation: ProviderGenerationToken
         let revision: UInt64
+        let categoryRevision: UUID
         let currency: String, accountID: String
         let start: StatementDate?, end: StatementDate?
         let baselineStart: StatementDate?, baselineEnd: StatementDate?
     }
     private var query: Query?
     func cancel() { sequence &+= 1; task?.cancel(); worker?.cancel(); isWorking = false }
-    func clear() { sequence &+= 1; task?.cancel(); worker?.cancel(); projection = nil; comparison = nil; sourceRows = []; isWorking = false }
+    func clear() { sequence &+= 1; task?.cancel(); worker?.cancel(); projection = nil; comparison = nil; sourceRows = []; isWorking = false; errorMessage = nil }
     func refresh(generation: ProviderGenerationToken?, currency: String, accountID: String, start: StatementDate?, end: StatementDate?, baselineStart: StatementDate? = nil, baselineEnd: StatementDate? = nil) {
         guard let generation, let metadata = FinancialIntelligenceStore.shared.snapshot,
               FinancialIntelligenceStore.shared.generation == generation else { clear(); query = nil; return }
         let revision = FinancialIntelligenceStore.shared.revision
-        let requested = Query(generation: generation, revision: revision, currency: currency, accountID: accountID, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd)
+        let categoryRevision = CategoryStore.shared.revision
+        let requested = Query(generation: generation, revision: revision, categoryRevision: categoryRevision, currency: currency, accountID: accountID, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd)
         guard query != requested || (projection == nil && !isWorking) else { return }
         clear(); query = requested
         let current = sequence
         let source = FinancialIntelligenceStore.shared.sources
         let transactions = TransactionStore.shared.transactions
         let categories = CategoryStore.shared.snapshot
+        let spendingIntents = categories.automation?.spendingIntents ?? [:]
         let cards = CardStore.shared.snapshot
-        let cached = self.cached.flatMap { $0.0 == generation && $0.1 == revision ? $0 : nil }
+        let cached = self.cached.flatMap { $0.0 == generation && $0.1 == revision && $0.2 == categoryRevision ? $0 : nil }
         isWorking = true
         let worker = Task.detached(priority: .userInitiated) {
-            let rows = try cached?.2 ?? SpendingIntelligence.rows(transactions: transactions, sources: source, cards: cards, categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
-            let suggestions = try cached?.3 ?? SpendingIntelligence.suggestions(rows: rows, metadata: metadata, sources: source)
+            let rows = try cached?.3 ?? SpendingIntelligence.rows(transactions: transactions, sources: source, cards: cards, categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+            let suggestions = try cached?.4 ?? SpendingIntelligence.suggestions(rows: rows, metadata: metadata, sources: source)
             let selectedAccounts: Set<String> = accountID.isEmpty ? [] : [accountID]
             let projection = try SpendingIntelligence.project(rows: rows, metadata: metadata, sources: source, currency: currency,
-                accountIDs: selectedAccounts, start: start, end: end, allSuggestions: suggestions)
+                accountIDs: selectedAccounts, start: start, end: end, allSuggestions: suggestions, spendingIntents: spendingIntents)
             let comparison: SpendingComparison?
             if let start, let end, let baselineStart, let baselineEnd {
                 comparison = try SpendingIntelligence.compare(analysis: projection, rows: rows, metadata: metadata, sources: source,
-                    currency: currency, accountIDs: selectedAccounts, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd)
+                    currency: currency, accountIDs: selectedAccounts, start: start, end: end, baselineStart: baselineStart, baselineEnd: baselineEnd,
+                    spendingIntents: spendingIntents)
             } else { comparison = nil }
             return (projection, comparison, rows, suggestions)
         }
         self.worker = worker
         task = Task { [weak self] in
-            guard let (projection, comparison, rows, suggestions) = try? await worker.value else { return }
-            guard let self, !Task.isCancelled, self.sequence == current,
-                  FinancialIntelligenceStore.shared.generation == generation,
-                  FinancialIntelligenceStore.shared.revision == revision else { return }
-            self.sourceRows = rows; self.projection = projection; self.comparison = comparison; self.isWorking = false
-            self.cached = (generation, revision, rows, suggestions)
+            do {
+                let (projection, comparison, rows, suggestions) = try await worker.value
+                guard let self, !Task.isCancelled, self.sequence == current,
+                      FinancialIntelligenceStore.shared.generation == generation,
+                      FinancialIntelligenceStore.shared.revision == revision, CategoryStore.shared.revision == categoryRevision else { return }
+                self.sourceRows = rows; self.projection = projection; self.comparison = comparison; self.isWorking = false
+                self.cached = (generation, revision, categoryRevision, rows, suggestions)
+            } catch {
+                guard let self, !Task.isCancelled, self.sequence == current,
+                      FinancialIntelligenceStore.shared.generation == generation,
+                      FinancialIntelligenceStore.shared.revision == revision, CategoryStore.shared.revision == categoryRevision else { return }
+                self.isWorking = false
+                self.errorMessage = "Recorded spending could not be reconciled. Reload saved decisions and try again."
+            }
         }
     }
 }

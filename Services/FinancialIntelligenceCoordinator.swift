@@ -47,7 +47,7 @@ final class FinancialIntelligenceCoordinator {
         guard current.generationToken == generation else { throw RepositoryError.staleProviderGeneration }
         guard current.persistenceState.isUsable else { throw FinancialIntelligenceError.unavailable }
         guard !gate.isBlocked(for: generation) else { throw FinancialIntelligenceError.refreshRequired }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         try DevelopmentProfileAcknowledgementGate.shared.requireAuthorization(for: .financialIntelligenceMutation, providerGeneration: generation)
 #endif
         try operation(current)

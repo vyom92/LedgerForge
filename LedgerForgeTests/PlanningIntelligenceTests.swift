@@ -1,10 +1,131 @@
 import Foundation
+import CryptoKit
 import Testing
 @testable import LedgerForge
 
 @Suite(.serialized)
 @MainActor
 struct PlanningIntelligenceTests {
+
+    @Test(.globalRuntimeStateIsolation)
+    func retainedOwnerPlansCanBeSavedWithoutLosingDrafts() async throws {
+        let root = try folder(), target = root.appendingPathComponent("qualification.sqlite")
+        let sourceURL = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_BUDGET_REPAIR_DATABASE"]))
+        let source = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: sourceURL)
+        defer { source.database.close() }
+        try source.database.createBackup(at: target.path)
+        let sqlite = try SQLiteRepositoryProvider(path: target.path)
+        defer { sqlite.database.close(); try? FileManager.default.removeItem(at: root) }
+        let workspace = try #require(sqlite.database.query(sql: "SELECT id FROM workspaces;") { $0.string(at: 0) }.compactMap { $0 }.first)
+        let retained = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace)
+        try #require(!retained.isEmpty)
+        let intelligence = try #require(try sqlite.intelligenceRepo.snapshot(workspaceID: workspace))
+        try #require(intelligence.movements.contains { $0.refundAllocations != nil }, "This regression requires an authentic ledger with saved refund allocations.")
+        let before = try retainedPlanDigest(sqlite.database)
+        var first = try MonthlyPlanScratchpad.decode(#require(retained.first))
+        first.canonical = first.plan
+        // Reproduce the historical capability mismatch without disabling any
+        // financial validation. Its failed transaction must preserve every table.
+        let historicalReader = SQLiteFundingPlanRepository(db: sqlite.database, supportsRefundAllocations: false)
+        #expect(throws: FinancialIntelligenceError.unavailable) {
+            try historicalReader.savePlan(first.plan.persistenceDTO(), retaining: first.dto())
+        }
+        let rollbackPreserved = try retainedPlanDigest(sqlite.database) == before
+        #expect(rollbackPreserved)
+        let planningTables: Set<String> = ["funding_plans", "funding_plan_balances", "funding_plan_commitments",
+            "funding_plan_deduction_components", "funding_plan_al_dar_references", "funding_plan_effective_al_dar_references",
+            "plan_assistance", "monthly_plan_scratchpads"]
+        let protected = try retainedPlanDigest(sqlite.database, excluding: planningTables)
+        for value in retained {
+            var draft = try MonthlyPlanScratchpad.decode(value)
+            try #require(draft.fieldErrors.isEmpty, "An incomplete owner draft requires separate qualification.")
+            let otherDrafts = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace).filter { $0.month != value.month }
+            draft.canonical = draft.plan
+            let expected = try draft.plan.persistenceDTO()
+            _ = try sqlite.fundingPlanRepo.savePlan(expected, retaining: draft.dto())
+            let planMatches = try sqlite.fundingPlanRepo.plans(workspaceId: workspace).first { $0.planMonthISO == value.month } == expected
+            let draftsMatch = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace).filter { $0.month != value.month } == otherDrafts
+            #expect(planMatches && draftsMatch)
+        }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite)
+        let hydrator = RepositoryStoreHydrator(databaseProvider: provider, workspaceId: workspace, participatesInLifecycleGate: false)
+        hydrator.publish(try hydrator.stageHydration())
+        let month = first.plan.month
+        let model = SalaryWorkspaceViewModel(month: month, workspaceID: workspace, provider: { provider },
+            refresh: { _ in hydrator.publish(try hydrator.stageHydration()) })
+        try #require(model.canEdit)
+        let bill = try #require(model.plan.qatarCommitments.first)
+        let editedLabel = bill.label + " · edit verification"
+        model.editCommitment(region: "qatar", id: bill.id, field: "label", text: editedLabel)
+        model.flushPendingEntries()
+        #expect(model.saveState == .saved && model.canEdit)
+        let labelSaved = model.plan.qatarCommitments.first { $0.id == bill.id }?.label == editedLabel
+        #expect(labelSaved)
+        let expectedPlans = try sqlite.fundingPlanRepo.plans(workspaceId: workspace)
+        let expectedDrafts = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace)
+        let protectedUnchanged = try retainedPlanDigest(sqlite.database, excluding: planningTables) == protected
+        #expect(protectedUnchanged)
+        sqlite.database.close()
+        let reopened = try SQLiteRepositoryProvider(path: target.path)
+        defer { reopened.database.close() }
+        let reopenedPlansMatch = try reopened.fundingPlanRepo.plans(workspaceId: workspace) == expectedPlans
+        let reopenedDraftsMatch = try reopened.fundingPlanRepo.scratchpads(workspaceId: workspace) == expectedDrafts
+        #expect(reopenedPlansMatch && reopenedDraftsMatch)
+        let reopenedProvider = DatabaseProvider.verifiedSQLite(reopened)
+        let reopenedHydrator = RepositoryStoreHydrator(databaseProvider: reopenedProvider, workspaceId: workspace, participatesInLifecycleGate: false)
+        reopenedHydrator.publish(try reopenedHydrator.stageHydration())
+        let recovered = SalaryWorkspaceViewModel(month: month, workspaceID: workspace, provider: { reopenedProvider })
+        let recoveredLabel = recovered.plan.qatarCommitments.first { $0.id == bill.id }?.label == editedLabel
+        #expect(recovered.canEdit && recoveredLabel)
+        DatabaseProvider.shared = reopenedProvider
+        let backup = BackupRestoreCoordinator(testingAt: target); backup.installTestProvider(reopened)
+        let destination = root.appendingPathComponent("backups")
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+        await backup.createBackup(to: destination)
+        let package = try #require(backup.lastBackupURL), manifest = try BackupFiles.verifyPackage(package)
+        let restoredURL = root.appendingPathComponent("restored.sqlite")
+        _ = try BackupCompatibility.prepareCandidate(package: package, manifest: manifest, destination: restoredURL)
+        let restored = try SQLiteRepositoryProvider(path: restoredURL.path)
+        defer { restored.database.close() }
+        let restoredPlansMatch = try restored.fundingPlanRepo.plans(workspaceId: workspace) == expectedPlans
+        let restoredDraftsMatch = try restored.fundingPlanRepo.scratchpads(workspaceId: workspace) == expectedDrafts
+        let restoredFacts = try retainedPlanDigest(restored.database, excluding: planningTables)
+        let reopenedFacts = try retainedPlanDigest(reopened.database, excluding: planningTables)
+        let restoredFactsMatch = restoredFacts == reopenedFacts
+        if !restoredFactsMatch {
+            print("Backup table differences: \(Set(restoredFacts.keys).union(reopenedFacts.keys).filter { restoredFacts[$0] != reopenedFacts[$0] }.sorted())")
+        }
+        #expect(restoredPlansMatch && restoredDraftsMatch && restoredFactsMatch)
+    }
+
+    private func retainedPlanDigest(_ database: SQLiteDatabase, excluding excluded: Set<String> = []) throws -> [String: String] {
+        let tables = try database.query(sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;") { $0.string(at: 0)! }
+        var result: [String: String] = [:]
+        for table in tables where !excluded.contains(table) {
+            var digest = SHA256()
+            if table == "background_investment_quote_cache" {
+                // Opening a provider can re-encode the same public quote. Check
+                // every JSON value independently of dictionary serialization order.
+                let quotes = try database.query(sql: "SELECT identity,quote_json FROM background_investment_quote_cache ORDER BY identity;") { row in
+                    (row.string(at: 0)!, row.data(at: 1)!)
+                }
+                for (identity, data) in quotes {
+                    digest.update(data: Data(identity.utf8))
+                    digest.update(data: try JSONSerialization.data(withJSONObject: JSONSerialization.jsonObject(with: data), options: [.sortedKeys]))
+                }
+                result[table] = digest.finalize().map { String(format: "%02x", $0) }.joined()
+                continue
+            }
+            let escaped = table.replacingOccurrences(of: "\"", with: "\"\"")
+            let columns = try database.query(sql: "PRAGMA table_info(\"\(escaped)\");") { $0.string(at: 1)! }
+            let fields = columns.map { "quote(\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\")" }.joined(separator: " || '|' || ")
+            let rows = try database.query(sql: "SELECT \(fields) FROM \"\(escaped)\";") { $0.string(at: 0)! }.sorted()
+            digest.update(data: Data(table.utf8))
+            for row in rows { digest.update(data: Data((row + "\n").utf8)) }
+            result[table] = digest.finalize().map { String(format: "%02x", $0) }.joined()
+        }
+        return result
+    }
 
     @Test func retainedRecurringIdentitySurvivesDueDayChangesWithinAndAcrossSalaryWindows() throws {
         let month = try SelectedStatementMonth(canonical: "2026-10")
@@ -553,6 +674,88 @@ struct PlanningIntelligenceTests {
         model.cancel()
         model.refresh(plan: plan, scenario: changed)
         #expect(model.isWorking, "An interrupted new scenario cannot reuse the older completed projection")
+    }
+
+
+    @Test(.globalRuntimeStateIsolation)
+    func categoryRevisionRefreshesCachedAnalysisAndReplacesOlderRequests() async throws {
+        let root = try folder(), sqlite = try copy(root)
+        defer { sqlite.database.close(); try? FileManager.default.removeItem(at: root) }
+        let workspace = try #require(sqlite.database.query(sql: "SELECT id FROM workspaces;") { $0.string(at: 0) }.compactMap { $0 }.first)
+        let provider = DatabaseProvider.verifiedSQLite(sqlite)
+        DatabaseProvider.shared = provider
+        let first = try provider.categoryRepo.createCategory(.init(workspaceId: workspace,
+            name: "Category refresh first", normalizedName: "category refresh first", createdAtISO: stamp))
+        let second = try provider.categoryRepo.createCategory(.init(workspaceId: workspace,
+            name: "Category refresh second", normalizedName: "category refresh second", createdAtISO: stamp))
+        let hydrator = RepositoryStoreHydrator(databaseProvider: provider, workspaceId: workspace, participatesInLifecycleGate: false)
+        let staged = try hydrator.stageHydration(), metadata = try #require(staged.intelligence)
+        let sourceRows = try SpendingIntelligence.rows(transactions: staged.transactions, sources: staged.financialSources,
+            cards: staged.cardSnapshot, categories: staged.categorySnapshot)
+        let resolved = try SpendingIntelligence.resolvedRows(rows: sourceRows, metadata: metadata,
+            spendingIntents: staged.categorySnapshot.automation?.spendingIntents ?? [:])
+        let selected = try #require(resolved.first { $0.treatment == .expense && $0.source.date != nil })
+        let id = selected.id, currency = selected.source.currency, account = selected.source.accountID
+        let date = try #require(selected.source.date), month = try SelectedStatementMonth(year: date.year, month: date.month)
+        _ = try provider.categoryRepo.setCategory(categoryId: first.id, transactionId: id, workspaceId: workspace)
+        hydrator.publish(try hydrator.stageHydration())
+        let revision = FinancialIntelligenceStore.shared.revision
+        let plan = try draft(workspace: workspace, month: month)
+        let planning = PlanningAnalysisModel(), spending = SpendingAnalysisModel()
+        let dashboard = DashboardViewModel(workspaceID: workspace)
+        defer { planning.cancel(); spending.cancel() }
+        func waitForModels() async throws {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+            while (planning.isWorking || spending.isWorking || dashboard.moneyFlowWorking ||
+                   planning.projection == nil || spending.projection == nil || dashboard.moneyFlow == nil) && ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let ready = !planning.isWorking && !spending.isWorking && !dashboard.moneyFlowWorking &&
+                planning.projection != nil && spending.projection != nil && dashboard.moneyFlow != nil
+            try #require(ready)
+        }
+        planning.refresh(plan: plan, scenario: .init())
+        spending.refresh(generation: provider.generationToken, currency: currency, accountID: "", start: nil, end: nil)
+        dashboard.selectMoneyFlowMonth(month)
+        try await waitForModels()
+        dashboard.selectMoneyFlowCurrency(currency)
+        try await waitForModels()
+        let initialRowsCurrent = planning.rows.first(where: { $0.id == id })?.categoryID == first.id &&
+            spending.sourceRows.first(where: { $0.id == id })?.categoryID == first.id
+        #expect(initialRowsCurrent)
+        let coordinator = CategoryManagementCoordinator(provider: { provider }, workspaceID: workspace)
+        _ = try await coordinator.setCategory(categoryID: second.id, transactionID: id)
+        planning.refresh(plan: plan, scenario: .init())
+        spending.refresh(generation: provider.generationToken, currency: currency, accountID: "", start: nil, end: nil)
+        dashboard.refreshPresentation()
+        #expect(planning.isWorking && spending.isWorking)
+        try await waitForModels()
+        let categoriesCurrent = planning.rows.first(where: { $0.id == id })?.categoryID == second.id &&
+            spending.sourceRows.first(where: { $0.id == id })?.categoryID == second.id &&
+            dashboard.moneyFlow?.adjusted.nodes.contains(where: { $0.title == second.name && $0.transactionIDs.contains(id) }) == true
+        #expect(categoriesCurrent)
+        #expect(FinancialIntelligenceStore.shared.revision == revision)
+
+        // Prepare a genuine current metadata cut before starting older requests;
+        // installation and their replacement then happen in one MainActor turn.
+        _ = try provider.categoryRepo.setCategory(categoryId: first.id, transactionId: id, workspaceId: workspace)
+        let request = try #require(provider.categoryOverrideReadRequest(workspaceID: workspace))
+        let witness = try #require(CategoryStore.shared.sourceWitness), categoryRevision = CategoryStore.shared.revision
+        let prepared = try await Task.detached { try await request.prepare(expected: witness) }.value
+        var scenario = PlanningScenario(); scenario.extraCost = 1
+        planning.refresh(plan: plan, scenario: scenario)
+        spending.refresh(generation: provider.generationToken, currency: currency, accountID: account, start: nil, end: nil)
+        #expect(planning.isWorking && spending.isWorking)
+        try hydrator.installCategoryOverride(prepared, expected: witness, revision: categoryRevision)
+        planning.refresh(plan: plan, scenario: scenario)
+        spending.refresh(generation: provider.generationToken, currency: currency, accountID: account, start: nil, end: nil)
+        dashboard.refreshPresentation()
+        try await waitForModels()
+        let newerRowsWon = planning.rows.first(where: { $0.id == id })?.categoryID == first.id &&
+            spending.sourceRows.first(where: { $0.id == id })?.categoryID == first.id &&
+            dashboard.moneyFlow?.adjusted.nodes.contains(where: { $0.title == first.name && $0.transactionIDs.contains(id) }) == true
+        #expect(newerRowsWon)
+        #expect(FinancialIntelligenceStore.shared.revision == revision)
     }
 
     @Test(.globalRuntimeStateIsolation)

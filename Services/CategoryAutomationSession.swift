@@ -2,7 +2,8 @@ import Combine
 import Foundation
 
 /// Classification runs only after coherent canonical publication. The repository
-/// owns exact-new work and manual intent; this session owns no financial import.
+/// owns exact-new work and independent category/spending intent. This session
+/// owns no financial import and never replays one after a metadata failure.
 @MainActor
 final class CategoryAutomationSession: ObservableObject {
     static let shared = CategoryAutomationSession()
@@ -50,7 +51,7 @@ final class CategoryAutomationSession: ObservableObject {
         let ids = Set(metadata.pendingIDs.sorted().prefix(256))
         let inputs = Self.inputs(transactions: transactions.transactions, selectedIDs: ids)
         guard Set(inputs.map(\.transactionID)) == ids else {
-            message = "Category work is waiting for the imported transactions to refresh."
+            message = "Rule work is waiting for the imported transactions to refresh."
             return
         }
         lastAttempt = snapshot; isWorking = true; message = nil
@@ -71,10 +72,10 @@ final class CategoryAutomationSession: ObservableObject {
             guard !Task.isCancelled, self.provider().generationToken == generation,
                   self.categories.snapshot.providerGeneration == generation else { return }
             do {
-                _ = try self.coordinator().applyEvaluation(evaluation, historical: false, expectedGeneration: generation)
-                self.message = "Categories checked for \(inputs.count) newly imported transactions."
+                _ = try await self.coordinator().applyEvaluation(evaluation, historical: false, expectedGeneration: generation)
+                self.message = "Categories and spending checked for \(inputs.count) newly imported transactions."
             } catch {
-                self.message = CategoryManagementPresentation.message(for: error) + " Financial import is already saved; Retry checks categories only."
+                self.message = CategoryManagementPresentation.message(for: error) + " Financial import is already saved; Retry checks rule metadata only."
             }
         }
     }
@@ -85,7 +86,7 @@ final class CategoryAutomationSession: ObservableObject {
             let direction = transaction.cardLiabilityEffect?.rawValue ?? (transaction.debitMoney != nil ? "debit" : "credit")
             return CategoryRuleInput(transactionID: id, accountID: transaction.repositoryAccountId,
                 currency: transaction.currency, direction: direction,
-                narration: transaction.description, reference: transaction.reference ?? "")
+                narration: transaction.description, reference: transaction.reference ?? "", importSessionID: transaction.repositoryImportSessionId)
         }.sorted { $0.transactionID < $1.transactionID }
     }
 }

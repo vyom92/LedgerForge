@@ -265,6 +265,14 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var fundingMessage: String?
     @Published private(set) var fundingRateDetail: String?
     @Published private(set) var netWorthReport: NetWorthReport = .withdrawn(.loading)
+    @Published private(set) var moneyFlow: MoneyFlowProjection?
+    @Published private(set) var moneyFlowMonth: SelectedStatementMonth?
+    @Published private(set) var moneyFlowCurrency = ""
+    @Published private(set) var moneyFlowMonths: [SelectedStatementMonth] = []
+    @Published private(set) var moneyFlowCurrencies: [String] = []
+    @Published private(set) var moneyFlowWorking = false
+    @Published private(set) var moneyFlowError: String?
+    private(set) var moneyFlowDuration: TimeInterval?
 
     var fundingMonthTitle: String {
         selectedFundingMonth.map(SalaryWorkspaceViewModel.monthTitle) ?? "Month unavailable"
@@ -283,6 +291,7 @@ final class DashboardViewModel: ObservableObject {
     private let fundingPlanStore: FundingPlanStore
     private weak var fundingWorkspace: SalaryWorkspaceViewModel?
     private let intelligenceStore: FinancialIntelligenceStore
+    private let categoryStore: CategoryStore
     private let investmentStore: InvestmentStore
     private let membershipStore: NetWorthMembershipStore
     private let reportingPreferences: ReportingCurrencyPreferences
@@ -295,6 +304,17 @@ final class DashboardViewModel: ObservableObject {
     private var selectedFundingMonth: SelectedStatementMonth?
     private var cancellables = Set<AnyCancellable>()
     private var pendingRefreshID: UUID?
+    private struct FlowQuery: Equatable {
+        let generation: ProviderGenerationToken
+        let revision: UInt64
+        let categoryRevision: UUID
+        let month: SelectedStatementMonth
+        let currency: String
+    }
+    private var flowQuery: FlowQuery?
+    private var flowSequence: UInt64 = 0
+    private var flowTask: Task<Void, Never>?
+    private var flowWorker: Task<(MoneyFlowProjection, [SelectedStatementMonth], [String], TimeInterval), Error>?
 
     init(
         accountStore: AccountStore = .shared,
@@ -302,6 +322,7 @@ final class DashboardViewModel: ObservableObject {
         cardStore: CardStore = .shared,
         fundingPlanStore: FundingPlanStore = .shared,
         intelligenceStore: FinancialIntelligenceStore = .shared,
+        categoryStore: CategoryStore = .shared,
         investmentStore: InvestmentStore = .shared,
         membershipStore: NetWorthMembershipStore = .shared,
         reportingPreferences: ReportingCurrencyPreferences = .shared,
@@ -320,6 +341,7 @@ final class DashboardViewModel: ObservableObject {
         self.fundingPlanStore = fundingPlanStore
         self.fundingWorkspace = fundingWorkspace
         self.intelligenceStore = intelligenceStore
+        self.categoryStore = categoryStore
         self.investmentStore = investmentStore
         self.membershipStore = membershipStore
         self.reportingPreferences = reportingPreferences
@@ -329,6 +351,7 @@ final class DashboardViewModel: ObservableObject {
         self.availability = availability
         self.workspaceID = workspaceID
         self.selectedFundingMonth = fundingMonth ?? Self.currentMonth(at: now())
+        self.moneyFlowMonth = Self.currentMonth(at: now())
         self.now = now
         // Every notification reads the complete already-installed canonical stores,
         // instead of combining captured values from different publication moments.
@@ -338,6 +361,7 @@ final class DashboardViewModel: ObservableObject {
             cardStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             fundingPlanStore.$plans.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             intelligenceStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            categoryStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             investmentStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             membershipStore.$snapshot.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             reportingPreferences.$currencies.dropFirst().map { _ in () }.eraseToAnyPublisher(),
@@ -407,6 +431,7 @@ final class DashboardViewModel: ObservableObject {
 
     private func invalidatePresentation(for state: ApplicationDataState) {
         pendingRefreshID = nil
+        clearMoneyFlow()
         let loading = state == .loading
         presentationState = loading
             ? .loading("Loading persisted dashboard...")
@@ -424,6 +449,7 @@ final class DashboardViewModel: ObservableObject {
     /// requests hydration, or calls a repository mutation.
     func refreshPresentation() {
         pendingRefreshID = nil
+        refreshMoneyFlow()
         let state = availability.state
         let isCurrent = state == .current || state == .empty
         accounts = accountStore.accounts
@@ -538,5 +564,85 @@ final class DashboardViewModel: ObservableObject {
         let components = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: date)
         guard let year = components.year, let month = components.month else { return nil }
         return try? SelectedStatementMonth(year: year, month: month)
+    }
+
+    func selectMoneyFlowMonth(_ month: SelectedStatementMonth) {
+        guard moneyFlowMonth != month else { return }
+        moneyFlowMonth = month
+        refreshMoneyFlow()
+    }
+
+    func selectMoneyFlowCurrency(_ currency: String) {
+        guard moneyFlowCurrency != currency, moneyFlowCurrencies.contains(currency) else { return }
+        moneyFlowCurrency = currency
+        refreshMoneyFlow()
+    }
+
+    private func clearMoneyFlow() {
+        flowSequence &+= 1
+        flowTask?.cancel(); flowWorker?.cancel()
+        flowQuery = nil
+        moneyFlow = nil; moneyFlowWorking = false; moneyFlowError = nil
+        moneyFlowDuration = nil
+        moneyFlowMonths = []; moneyFlowCurrencies = []
+    }
+
+    /// Capture one canonical generation, calculate away from the UI actor and
+    /// publish only while its full-history source/metadata revision is current.
+    private func refreshMoneyFlow() {
+        guard availability.state == .current || availability.state == .empty,
+              let generation = availability.generation,
+              intelligenceStore.generation == generation,
+              let metadata = intelligenceStore.snapshot,
+              let month = moneyFlowMonth else { clearMoneyFlow(); return }
+        let revision = intelligenceStore.revision
+        let categoryRevision = categoryStore.revision
+        let requested = FlowQuery(generation: generation, revision: revision, categoryRevision: categoryRevision, month: month, currency: moneyFlowCurrency)
+        guard flowQuery != requested || (moneyFlow == nil && !moneyFlowWorking) else { return }
+        flowSequence &+= 1
+        let sequence = flowSequence
+        flowTask?.cancel(); flowWorker?.cancel()
+        flowQuery = requested
+        moneyFlow = nil; moneyFlowError = nil; moneyFlowWorking = true
+        let transactions = transactionStore.transactions
+        let sources = intelligenceStore.sources
+        let cards = cardStore.snapshot
+        let categories = categoryStore.snapshot
+        let worker = Task.detached(priority: .userInitiated) {
+            let started = Date()
+            let rows = try SpendingIntelligence.rows(transactions: transactions, sources: sources, cards: cards,
+                categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+            let currencies = Set(sources.accounts.map(\.currency)).sorted()
+            let currency = currencies.contains(requested.currency) ? requested.currency : (currencies.first ?? "QAR")
+            let months = Set(rows.compactMap { $0.date.flatMap { try? SelectedStatementMonth(year: $0.year, month: $0.month) } }).sorted(by: >)
+            let start = try StatementDate(year: month.year, month: month.month, day: 1)
+            guard let end = (28...31).reversed().compactMap({ try? StatementDate(year: month.year, month: month.month, day: $0) }).first else {
+                throw MoneyFlowError.inconsistentSnapshot
+            }
+            let spending = try SpendingIntelligence.project(rows: rows, metadata: metadata, sources: sources,
+                currency: currency, accountIDs: Set(sources.accounts.map(\.id)), start: start, end: end,
+                allSuggestions: [], spendingIntents: categories.automation?.spendingIntents ?? [:])
+            let projection = try MoneyFlow.project(rows: rows, metadata: metadata, sources: sources,
+                month: month, currency: currency, spending: spending)
+            return (projection, months, currencies, Date().timeIntervalSince(started))
+        }
+        flowWorker = worker
+        flowTask = Task { [weak self] in
+            do {
+                let (projection, months, currencies, duration) = try await worker.value
+                guard let self, !Task.isCancelled, self.flowSequence == sequence,
+                      self.availability.generation == generation, self.intelligenceStore.generation == generation,
+                      self.intelligenceStore.revision == revision, self.categoryStore.revision == categoryRevision else { return }
+                self.moneyFlow = projection; self.moneyFlowMonth = month; self.moneyFlowCurrency = projection.currency
+                self.moneyFlowMonths = months; self.moneyFlowCurrencies = currencies
+                self.moneyFlowDuration = duration; self.moneyFlowWorking = false
+                self.flowQuery = .init(generation: generation, revision: revision, categoryRevision: categoryRevision, month: month, currency: projection.currency)
+            } catch {
+                guard let self, !Task.isCancelled, self.flowSequence == sequence,
+                      self.availability.generation == generation, self.intelligenceStore.revision == revision, self.categoryStore.revision == categoryRevision else { return }
+                self.moneyFlowWorking = false
+                self.moneyFlowError = "Recorded money flow could not be reconciled. Reload saved decisions and try again."
+            }
+        }
     }
 }

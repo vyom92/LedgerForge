@@ -1,7 +1,7 @@
 // LedgerForge
 // DevelopmentDatabaseProfilePreferences.swift
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import Foundation
 
 protocol DevelopmentDatabaseProfilePreferenceAuthority: AnyObject {

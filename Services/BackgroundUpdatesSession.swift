@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import Network
 
 /// Foreground adapter for the same durable executor used by the helper.
 /// Settings owns a separate value draft; incoming status never rewrites it.
@@ -15,6 +16,7 @@ final class BackgroundUpdatesSession: ObservableObject {
     @Published private(set) var activeSchedule = false
     @Published private(set) var nextUpdate: Date?
     @Published private(set) var jobRecords: [BackgroundJobKind: BackgroundJobRecord] = [:]
+    @Published private(set) var publicProgress: [String: BackgroundPublicLegProgress] = [:]
     private let service = BackgroundWorkerService()
     private let enrollmentStore: BackgroundEnrollmentStore
     private let workerControl = BackgroundWorkerControlClient()
@@ -23,6 +25,12 @@ final class BackgroundUpdatesSession: ObservableObject {
     private var executorActivation: LedgerActivationStamp?
     private var executorEnrollmentRevision: UUID?
     private var unavailableHelperRevision: UUID?
+    private var networkMonitor: NWPathMonitor?
+    @Published private(set) var networkAvailable: Bool?
+    private var recoverInterruptedGmail = false
+    private var reconnectEmail = true
+    private(set) var helperRecoveryGeneration = UUID()
+    private let serviceStatus: @MainActor () -> BackgroundWorkerService.Status
     private var publicRequests = BackgroundPublicControlQueue()
     private var busyPublicScopes: BackgroundPublicControlScopes = []
     private var executionID = UUID()
@@ -44,8 +52,10 @@ final class BackgroundUpdatesSession: ObservableObject {
     private let networkEnabled: Bool
 
     init(networkEnabled: Bool = ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1",
-         enrollmentStore: BackgroundEnrollmentStore = .init()) {
+         enrollmentStore: BackgroundEnrollmentStore = .init(),
+         serviceStatus: (@MainActor () -> BackgroundWorkerService.Status)? = nil) {
         self.enrollmentStore = enrollmentStore
+        self.serviceStatus = serviceStatus ?? { BackgroundWorkerService().status() }
 #if DEBUG
         self.networkEnabled = networkEnabled && ProcessInfo.processInfo.environment["LEDGERFORGE_BACKGROUND_NETWORK_DISABLED"] != "1"
 #else
@@ -65,15 +75,61 @@ final class BackgroundUpdatesSession: ObservableObject {
             DistributedNotificationCenter.default().publisher(for: BackgroundUpdateExecutor.didPublishNotification)
                 .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.queueReload() },
             NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
-                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.queueReload() },
+                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.resumeAfterInterruption() },
             NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-                .sink { [weak self] _ in self?.queueReload() },
+                .sink { [weak self] _ in self?.resumeAfterInterruption() },
+            NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)
+                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.resumeAfterInterruption() },
             DatabaseActivityGate.shared.didBecomeAvailable.sink { [weak self] in self?.queueReload() }
         ]
         observations.append(FinancialIntelligenceStore.shared.$snapshot.dropFirst().removeDuplicates().sink { [weak self] _ in self?.queueReload() })
+        if networkEnabled {
+            let monitor = NWPathMonitor()
+            monitor.pathUpdateHandler = { [weak self] path in
+                let available = path.status == .satisfied
+                Task { @MainActor [weak self] in self?.networkPathChanged(available: available) }
+            }
+            networkMonitor = monitor
+            monitor.start(queue: DispatchQueue(label: "com.vyom.LedgerForge.background-connectivity"))
+        }
         reload()
         isp.start(); ibkr?.start()
     }
+
+    /// A failed XPC exchange is temporary. Recheck the same enrollment on a
+    /// real lifecycle opportunity; ordinary receipt reloads must not spin it.
+    func resumeAfterInterruption() {
+        helperRecoveryGeneration = UUID()
+        unavailableHelperRevision = nil
+        if networkAvailable != false { recoverInterruptedGmail = true }
+        reconnectEmail = true
+        queueReload()
+    }
+
+    func networkPathChanged(available: Bool) {
+        let previous = networkAvailable
+        networkAvailable = available
+        rates?.setNetworkAvailable(available)
+        prices?.setNetworkAvailable(available)
+        if available, previous != true { resumeAfterInterruption() }
+    }
+
+    func observationStatus(identity: String) -> String {
+        observationStatus(identities: [identity])
+    }
+
+    func observationStatus(identities: Set<String>) -> String {
+        PublicObservationPresentation.cacheStatus(networkAvailable: networkAvailable,
+                                                  identities: identities, progress: publicProgress)
+    }
+
+    func helperBecameUnavailable(after recoveryGeneration: UUID) {
+        guard helperRecoveryGeneration == recoveryGeneration else { return }
+        unavailableHelperRevision = executorEnrollmentRevision
+        useForegroundFallback()
+    }
+
+    deinit { networkMonitor?.cancel() }
 
     private func queueReload() {
         guard reloadTask == nil, !reloadInProgress else { return }
@@ -104,7 +160,7 @@ final class BackgroundUpdatesSession: ObservableObject {
             let activation = try current.database.validatedActivationStamp()
             let enrolled = try enrollmentStore.load()
             let matching = enrolled?.enabled == true && enrolled?.databasePath == current.databasePath && enrolled?.activation == activation
-            let managed = available && configuration.enabled && matching && service.status() == .enabled
+            let managed = available && configuration.enabled && matching && serviceStatus() == .enabled
                 && enrolled?.revision != unavailableHelperRevision
             let revision = managed ? enrolled?.revision : nil
             // Relaunch confirmation can adopt a new activation on the same provider.
@@ -132,7 +188,12 @@ final class BackgroundUpdatesSession: ObservableObject {
                    InvestmentStore.shared.snapshot != saved || FinancialIntelligenceStore.shared.snapshot != intelligence {
                     _ = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
                 }
-                Task { await GmailIntakeSession.shared.reloadInbox() }
+                let reconnect = reconnectEmail && networkEnabled && networkAvailable != false
+                if reconnect { reconnectEmail = false }
+                Task {
+                    await GmailIntakeSession.shared.reloadInbox()
+                    if reconnect { GmailIntakeSession.shared.resumeSavedConnection() }
+                }
                 if managed {
                     requestAutomatic()
                     if let revision { workerControl.requestReschedule(enrollmentRevision: revision) { _ in } }
@@ -150,7 +211,7 @@ final class BackgroundUpdatesSession: ObservableObject {
         activeSchedule = false
         isp?.setBackgroundScheduleActive(false)
         if configuration.enabled {
-            status = service.status() == .requiresApproval ? "Needs approval in System Settings · foreground fallback active" : "Not active for this ledger · foreground fallback active"
+            status = serviceStatus() == .requiresApproval ? "Needs approval in System Settings · foreground fallback active" : "Not active for this ledger · foreground fallback active"
         } else { status = "Off · foreground updates available" }
         // Starting the legacy clock consumes its launch opportunity. Wait for
         // hydration/recovery before starting, so a blocked launch is not lost.
@@ -185,6 +246,7 @@ final class BackgroundUpdatesSession: ObservableObject {
 
     private func clearExecutor() {
         cancelExecution()
+        publicProgress = [:]
         executor = nil; provider = nil; executorEnrollmentRevision = nil; executorActivation = nil
     }
 
@@ -193,10 +255,15 @@ final class BackgroundUpdatesSession: ObservableObject {
               let progress = try? BackgroundPublicProgressStore(database: current.database).load() else { return }
         let rateFailures = Set(AlDarCurrency.allCases.filter { progress["aldar:" + $0.rawValue]?.failure != nil })
         let quoteFailures = Dictionary(uniqueKeysWithValues: progress.values.filter { !$0.identity.hasPrefix("aldar:") && $0.failure != nil }.map { ($0.identity, InvestmentPriceError.unavailable) })
+        publicProgress = progress
         rates?.installShared(snapshot.alDarLegs, failures: rateFailures, busy: publicTask != nil,
-            busyCurrencies: Set(AlDarCurrency.allCases.filter { busyPublicScopes.contains(.currency($0)) }))
+            busyCurrencies: Set(AlDarCurrency.allCases.filter { busyPublicScopes.contains(.currency($0)) }),
+            checkedAt: Dictionary(uniqueKeysWithValues: AlDarCurrency.allCases.compactMap { currency in
+                progress["aldar:" + currency.rawValue]?.checkedAt.map { (currency, $0) }
+            }), networkAvailable: networkAvailable)
         prices?.installShared(snapshot.investmentQuotes, failures: quoteFailures, busy: publicTask != nil,
-            busyProviders: Set(InvestmentPriceRegistry.providerOrder.filter { busyPublicScopes.contains(.provider($0)) }))
+            busyProviders: Set(InvestmentPriceRegistry.providerOrder.filter { busyPublicScopes.contains(.provider($0)) }),
+            checkedAt: progress.compactMapValues(\.checkedAt), networkAvailable: networkAvailable)
         jobRecords = Dictionary(uniqueKeysWithValues: BackgroundJobKind.allCases.compactMap { kind in
             (try? current.backgroundJobRepo.jobRecord(kind)).map { (kind, $0) }
         })
@@ -206,6 +273,9 @@ final class BackgroundUpdatesSession: ObservableObject {
         guard networkEnabled, activeSchedule, automaticTask == nil, let executor,
               ApplicationAvailability.shared.permitsMutation else { return }
         let value = configuration, enrollmentRevision = executorEnrollmentRevision, executionID = executionID
+        let recoveryGeneration = helperRecoveryGeneration
+        let recoveringGmail = recoverInterruptedGmail
+        recoverInterruptedGmail = false
         automaticTask = Task { [weak self] in
             guard let self else { return }
             if let enrollmentRevision,
@@ -215,14 +285,16 @@ final class BackgroundUpdatesSession: ObservableObject {
                                                                           prices: value.investmentPublicPricesEnabled),
                                                             manual: false)
                 guard self.executionID == executionID else { return }
-                await self.handleHelperStatus(status, fallbackConfiguration: value, manual: false)
+                await self.handleHelperStatus(status, fallbackConfiguration: value, manual: false,
+                                              recoveryGeneration: recoveryGeneration)
             } else {
                 _ = await executor.refreshPublic(configuration: value, manual: false, scheduledTarget: target)
             }
-            if self.activeSchedule { await executor.runAutomaticNonPublic(configuration: value) }
+            if self.activeSchedule { await executor.runAutomaticNonPublic(configuration: value, recoverInterruptedGmail: recoveringGmail) }
             guard self.executionID == executionID else { return }
             self.automaticTask = nil
             if let provider = self.provider { self.installSharedState(provider) }
+            if self.recoverInterruptedGmail { self.queueReload() }
         }
     }
 
@@ -259,12 +331,14 @@ final class BackgroundUpdatesSession: ObservableObject {
                 value.investmentPublicPricesEnabled = !request.scopes.intersection(.prices).isEmpty
                 value.gmailCollectionEnabled = false; value.zurichISPHoldingsEnabled = false
                 if self.activeSchedule, let enrollmentRevision = self.executorEnrollmentRevision {
+                    let recoveryGeneration = self.helperRecoveryGeneration
                     let status = await self.requestHelperPublic(enrollmentRevision: enrollmentRevision,
                                                                 scopes: request.scopes,
                                                                 manual: request.manual)
                     guard self.executionID == executionID else { return }
                     await self.handleHelperStatus(status, fallbackConfiguration: value,
-                                                  manual: request.manual, scopes: request.scopes)
+                                                  manual: request.manual, scopes: request.scopes,
+                                                  recoveryGeneration: recoveryGeneration)
                 } else {
                     let outcome = await executor.refreshPublic(configuration: value, manual: request.manual, scopes: request.scopes)
                     if outcome == .alreadyRunning || outcome == .authorityRefused {
@@ -305,7 +379,8 @@ final class BackgroundUpdatesSession: ObservableObject {
     /// successful helper work cannot be overwritten or manually duplicated.
     private func handleHelperStatus(_ status: BackgroundWorkerControlStatus,
                                     fallbackConfiguration: BackgroundScheduleConfiguration, manual: Bool,
-                                    scopes: BackgroundPublicControlScopes = .all) async {
+                                    scopes: BackgroundPublicControlScopes = .all,
+                                    recoveryGeneration: UUID) async {
         switch status {
         case .accepted:
             message = "Background helper accepted the public update."
@@ -316,11 +391,13 @@ final class BackgroundUpdatesSession: ObservableObject {
         case .failed:
             message = "The background refresh could not finish. Try again after the current update finishes."
         case .refused, .unavailable, .indeterminate:
+            // A reply from before wake/reconnection cannot revoke the newer
+            // recovery opportunity or put its replacement back into fallback.
+            guard helperRecoveryGeneration == recoveryGeneration else { return }
             message = status == .indeterminate
                 ? "Helper delivery could not be confirmed. Foreground fallback is checking shared update state."
                 : "Background helper is unavailable for this request. Foreground fallback is active."
-            unavailableHelperRevision = executorEnrollmentRevision
-            useForegroundFallback()
+            helperBecameUnavailable(after: recoveryGeneration)
             // Unknown delivery never forces a repeat of a successful leg.
             // The normal due check and OS lease arbitrate with accepted work.
             let executionID = executionID
@@ -538,8 +615,10 @@ final class BackgroundUpdatesSession: ObservableObject {
         case .completed(.refusedCredentialInteraction): "Saved connection needs authorization. Open its Settings page or authorize the helper."
         case .completed(.refusedNoCoverage): "Collect a complete interval in Email Statements before automatic collection."
         case .completed(.failedFinal): "Update failed. Previous successful data is retained."
-        case .completed(.retryPending): "Successful updates saved. Failed public updates will retry once after 60 seconds."
-        case .completed(.collectedNativeReceipts): "Email originals collected. Start a batch in Import Centre to import them."
+        case .completed(.retryPending): kind == .gmailCollection
+            ? "Email collection was interrupted. It will resume when the connection returns or LedgerForge becomes active."
+            : "Successful updates saved. Failed public updates will retry once after 60 seconds."
+        case .completed(.collectedNativeReceipts): "Email originals collected. Ready attachments are processed automatically while LedgerForge is open."
         case .completed(.installedCache): "Public rates and prices updated."
         }
     }

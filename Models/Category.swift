@@ -3,7 +3,7 @@
 
 import Foundation
 
-struct Category: Identifiable, Equatable, Sendable {
+nonisolated struct Category: Identifiable, Equatable, Sendable {
     let id: String
     let workspaceID: String
     let name: String
@@ -11,13 +11,13 @@ struct Category: Identifiable, Equatable, Sendable {
     let isArchived: Bool
 }
 
-struct CategoryAssignment: Equatable, Sendable {
+nonisolated struct CategoryAssignment: Equatable, Sendable {
     let workspaceID: String
     let transactionID: String
     let categoryID: String
 }
 
-struct CategorySnapshot: Equatable, Sendable {
+nonisolated struct CategorySnapshot: Equatable, Sendable {
     static let empty = CategorySnapshot(categories: [], assignments: [:])
 
     let categories: [Category]

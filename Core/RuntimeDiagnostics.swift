@@ -8,7 +8,7 @@ import OSLog
 /// Disabled by default and absent from Release; no source identities or values
 /// are accepted by this measurement surface.
 nonisolated enum GmailQualificationTiming {
-    enum Phase: String { case navigationTransactions, transactionRows, transactionQuery, hydration, hydrationStage, hydrationPublish, inboxAttention, inboxReconciliation, sourceNormalization, sourceParsing, sourceValidation, spendingRows, movementSuggestions, spendingProjection, planningProjection, intelligenceMutation, fundingCalculation }
+    enum Phase: String { case navigationTransactions, transactionRows, transactionQuery, hydration, hydrationStage, hydrationPublish, hydrationFacts, hydrationCategoryMetadata, inboxAttention, inboxReconciliation, sourceNormalization, sourceParsing, sourceValidation, spendingRows, movementSuggestions, spendingProjection, planningProjection, intelligenceMutation, fundingCalculation, categoryEvaluation, categoryApply, categoryApplyMutation, tagMutation, tagRefresh, categoryOverrideMutation, categoryOverrideCapture, categoryOverrideDecode, categoryOverrideInstall, categorySourceCapture }
     private static let enabled = ProcessInfo.processInfo.environment["LEDGERFORGE_GMAIL_TIMING_PROBE"] == "1"
     private static let logger = Logger(subsystem: "com.vyom.LedgerForge", category: "GmailQualificationTiming")
 
@@ -56,7 +56,7 @@ enum DiagnosticPrivacy {
         "code", "operation", "stage", "root_reference", "related_root_reference", "effect", "retry_eligible", "next_action",
         "reason", "family", "outcome", "result", "migration_version", "expected_name", "observed_name", "observed_name_sha256",
         "expected_checksum", "observed_checksum", "requested_target", "requested_profile", "remembered_profile", "active_profile",
-        "build_identity", "provider_kind", "error_type", "cause", "sqlite_primary", "sqlite_extended",
+        "build_identity", "provider_kind", "error_type", "error_type_name", "cause", "sqlite_primary", "sqlite_extended",
         "sqlite_operation", "hydration_domain", "hydration_stage", "accountCount", "transactionCount", "count", "profile", "sourceVersion",
         "schemaVersion", "transactions", "candidates", "eligibleAccounts", "rows", "columns", "headerRow", "firstTransactionRow", "passed", "selection", "scheme", "identifier", "phase", "duration_ms", "acceptedCount", "rejectedCount", "attemptCount"
     ]
@@ -80,10 +80,10 @@ enum DiagnosticPrivacy {
         "scheme": ["Recognized", "Unknown"],
         "selection": ["Recognized", "Unavailable"],
         "operation": ["startup", "startup hydration", "canonical reload", "plan save", "developer forced refresh"],
-        "stage": ["provider initialization", "provider availability", "snapshot validation", "repository transaction", "post-commit canonical reload", "migration verification", "provider activation", "Preparation"],
+        "stage": ["provider initialization", "provider availability", "snapshot validation", "repository transaction", "post-commit canonical reload", "migration verification", "provider activation", "Preparation", "plan scratchpad validation", "plan repository access", "plan input validation", "plan transaction start", "plan workspace preparation", "plan relationship validation", "plan row persistence", "plan assistance validation", "plan scratchpad persistence", "plan transaction commit", "plan intelligence snapshot", "plan salary linkage", "plan assistance persistence"],
         "effect": ["durable outcome not established", "canonical data not loaded", "runtime stores not replaced", "plan committed; runtime data not current", "committed and canonical data current"],
-        "next_action": ["Open Diagnostics to review the failed operation before retrying.", "Restarting does not repair migration history. Keep the database for an explicit recovery decision.", "Use a build that supports this database version. Restarting this older build cannot make it compatible.", "Reload the current database before making another change.", "Reload canonical data. Retained values are not current until reload succeeds.", "Wait for the active database operation to finish, then retry only the failed operation.", "Quit and reopen the app to establish canonical data before deciding whether to save again."],
-        "error_type": ["unknown", "MigrationIntegrityError", "SQLiteRepositoryProviderError", "RepositoryError", "RepositoryStoreHydrationError", "SQLiteExecutionError"],
+        "next_action": ["Open Diagnostics to review the failed operation before retrying.", "Restarting does not repair migration history. Keep the database for an explicit recovery decision.", "Use a build that supports this database version. Restarting this older build cannot make it compatible.", "Reload the current database before making another change.", "Reload canonical data. Retained values are not current until reload succeeds.", "Wait for the active database operation to finish, then retry only the failed operation.", "Quit and reopen the app to establish canonical data before deciding whether to save again.", "Keep the retained draft and review Diagnostics before attempting recovery."],
+        "error_type": ["unknown", "MigrationIntegrityError", "SQLiteRepositoryProviderError", "RepositoryError", "RepositoryStoreHydrationError", "SQLiteExecutionError", "FinancialIntelligenceError", "LedgerAccessError", "DecodingError", "EncodingError"],
         "cause": ["MigrationIntegrityError", "SQLiteExecutionError"],
         "requested_target": ["Test session", "Debug memory session", "Isolated development database", "Current Database", "Personal database"],
         "provider_kind": ["verified SQLite"], "active_profile": ["not established"],
@@ -113,6 +113,8 @@ enum DiagnosticPrivacy {
                 result[key] = "[redacted]"
             } else if key.contains("checksum") || key.hasSuffix("sha256") {
                 result[key] = value.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil ? value : "not captured"
+            } else if key == "error_type_name" {
+                result[key] = value.range(of: "^[A-Za-z_][A-Za-z0-9_.]{0,119}\\z", options: .regularExpression) != nil ? value : "not captured"
             } else if key == "build_identity" {
                 // Generated/validated product identity contains long hexadecimal values.
                 result[key] = value.range(of: "^[a-zA-Z0-9 (),:TZ+.\\-]{1,180}$", options: .regularExpression) != nil ? value : "not captured"
@@ -144,6 +146,7 @@ enum RuntimeDiagnostic {
         var details: [String: String] = ["operation": operation, "stage": stage, "effect": effect,
             "root_reference": reference, "retry_eligible": "false", "error_type": "unknown",
             "requested_target": logicalTarget(), "build_identity": BuildIdentity.read().label]
+        details["error_type_name"] = String(describing: type(of: error))
         if let relatedRoot { details["related_root_reference"] = relatedRoot.reference }
         var integrity = error as? MigrationIntegrityError
         if case SQLiteRepositoryProviderError.migrationIntegrityFailed(let cause) = error {
@@ -185,6 +188,33 @@ enum RuntimeDiagnostic {
                 code = "persistence.initialization_failed"; summary = "Database initialization did not complete"; details["error_type"] = "SQLiteRepositoryProviderError"
             case SQLiteRepositoryProviderError.migrationFailed:
                 code = "migration.execution_failed"; summary = "A database migration could not complete"; details["error_type"] = "SQLiteRepositoryProviderError"
+            case let failure as FinancialIntelligenceError:
+                details["error_type"] = "FinancialIntelligenceError"
+                summary = "Financial context validation prevented this operation"
+                switch failure {
+                case .unavailable: code = "financial_intelligence.unavailable"
+                case .invalidRecord: code = "financial_intelligence.invalid_record"
+                case .invalidLegs: code = "financial_intelligence.invalid_legs"
+                case .occupiedLeg: code = "financial_intelligence.occupied_leg"
+                case .staleReview: code = "financial_intelligence.stale_review"
+                case .refreshRequired: code = "financial_intelligence.refresh_required"
+                case .outsideScope: code = "financial_intelligence.outside_scope"
+                }
+            case let failure as LedgerAccessError:
+                details["error_type"] = "LedgerAccessError"
+                summary = "Ledger access validation prevented this operation"
+                switch failure {
+                case .contention: code = "ledger_access.contention"
+                case .unavailable: code = "ledger_access.unavailable"
+                case .staleActivation: code = "ledger_access.stale_activation"
+                case .transitionPending: code = "ledger_access.transition_pending"
+                case .incompatible: code = "ledger_access.incompatible"
+                case .missingAuthority: code = "ledger_access.missing_authority"
+                }
+            case is DecodingError:
+                code = "serialization.decode_failed"; summary = "Saved data could not be decoded"; details["error_type"] = "DecodingError"
+            case is EncodingError:
+                code = "serialization.encode_failed"; summary = "Data could not be encoded for saving"; details["error_type"] = "EncodingError"
             case RepositoryError.relationshipViolation:
                 code = "repository.relationship_invalid"; summary = "The plan or record references an invalid relationship"; details["error_type"] = "RepositoryError"
             case RepositoryError.persistenceUnavailable, RepositoryError.providerNotConfigured:
@@ -233,7 +263,7 @@ enum RuntimeDiagnostic {
                 summary = relatedRoot == nil ? "Canonical data is blocked by unavailable persistence" : "Hydration is blocked by the persistence failure referenced in Details"
             }
         }
-        if operation == "plan save", effect == "durable outcome not established" { action = "Quit and reopen the app to establish canonical data before deciding whether to save again."; details["retry_eligible"] = "false" }
+        if operation == "plan save", effect == "durable outcome not established" { action = "Keep the retained draft and review Diagnostics before attempting recovery."; details["retry_eligible"] = "false" }
         details["code"] = code; details["next_action"] = action
         return PersistenceFailureContext(reference: reference, code: code, summary: summary, nextAction: action, metadata: DiagnosticPrivacy.metadata(details) ?? [:])
     }

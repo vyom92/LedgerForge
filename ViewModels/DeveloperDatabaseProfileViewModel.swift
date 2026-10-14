@@ -1,7 +1,7 @@
 // LedgerForge
 // DeveloperDatabaseProfileViewModel.swift
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import Combine
 import Foundation
 

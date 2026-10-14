@@ -49,7 +49,7 @@ final class DatabaseActivityLease {
     }
 }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 struct DevelopmentDatabasePreparedImportDrainPermit {
     fileprivate init() {}
 }
@@ -109,7 +109,7 @@ final class DatabaseActivityGate {
         return true
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     /// Creates one synchronous barrier: new work is blocked before prepared
     /// previews are drained, and exclusive ownership is granted only after all
     /// corresponding leases have been released.
@@ -188,7 +188,7 @@ final class DatabaseActivityGate {
 #endif
 }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 // Existing DEBUG callers/tests retain their names; production uses the shared gate.
 typealias DevelopmentDatabaseActivity = DatabaseActivity
 typealias DevelopmentDatabaseActivityError = DatabaseActivityError

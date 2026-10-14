@@ -5,6 +5,34 @@ import Testing
 
 @Suite(.serialized)
 struct GmailAuthorizationTests {
+    @Test @MainActor func quietResumeUsesOnlyItsNoninteractiveBrokerAndDoesNotLoopOnRevocation() async throws {
+        let suite = "LedgerForge.OAuth.Resume.\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let foregroundStore = AuthorizationStoreProbe(grant())
+        let quietStore = AuthorizationStoreProbe(grant())
+        let foregroundHTTP = AuthorizationHTTPProbe(try response())
+        let quietHTTP = AuthorizationHTTPProbe(try response(status: 400))
+        let session = GmailIntakeSession(
+            tokens: GmailTokenBroker(store: foregroundStore, transport: foregroundHTTP), preferences: preferences,
+            quietTokens: GmailTokenBroker(store: quietStore, transport: quietHTTP))
+        #expect(session.resumeSavedConnection() == nil)
+        preferences.set("mechanics@example.invalid", forKey: "LedgerForge.EmailStatements.account")
+        let saved = GmailIntakeSession(
+            tokens: GmailTokenBroker(store: foregroundStore, transport: foregroundHTTP), preferences: preferences,
+            quietTokens: GmailTokenBroker(store: quietStore, transport: quietHTTP))
+        let attempt = try #require(saved.resumeSavedConnection())
+        #expect(saved.resumeSavedConnection() == nil, "Repeated lifecycle events coalesce while checking")
+        await attempt.value
+        #expect(saved.needsAuthorization)
+        #expect(!saved.isConnected)
+        #expect(saved.resumeSavedConnection() == nil, "Revoked authorization needs an explicit connection action")
+        #expect(await quietHTTP.requests.count == 1)
+        #expect(await foregroundHTTP.requests.isEmpty)
+        #expect(quietStore.updates == 0)
+        #expect(foregroundStore.updates == 0)
+    }
+
     private func grant(expired: Bool = true, secret: String? = "mechanics-client") -> GmailSavedGrant {
         .init(account: "mechanics@example.invalid", clientID: "mechanics-client-id", clientSecret: secret,
               accessToken: "mechanics-old", refreshToken: "mechanics-refresh", scope: GmailClient.readOnlyScope,

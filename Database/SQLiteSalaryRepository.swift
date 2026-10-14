@@ -171,9 +171,68 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     private let supportsAssistance: Bool
     private let supportsBalanceDates: Bool
     private let supportsScratchpads: Bool
-    init(db: SQLiteDatabase, supportsAssistance: Bool = true, supportsBalanceDates: Bool = true, supportsScratchpads: Bool = true) {
+    private let supportsRefundAllocations: Bool
+    init(db: SQLiteDatabase, supportsAssistance: Bool = true, supportsBalanceDates: Bool = true, supportsScratchpads: Bool = true, supportsRefundAllocations: Bool = false) {
         self.db = db; self.supportsAssistance = supportsAssistance; self.supportsBalanceDates = supportsBalanceDates
         self.supportsScratchpads = supportsScratchpads
+        self.supportsRefundAllocations = supportsRefundAllocations
+    }
+
+    private var companion: SQLiteCompanionSyncPersistence { .init(db: db) }
+    private func planTransaction<T>(_ operation: () throws -> T) throws -> T {
+        try db.withExclusiveAccess {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                let result = try operation()
+                try db.execute(sql: "COMMIT;")
+                return result
+            } catch { try? db.execute(sql: "ROLLBACK;"); throw error }
+        }
+    }
+    func companionActivationEpoch() throws -> String {
+        try db.withExclusiveAccess { try companion.requireSupport(); return try companion.activationEpoch() }
+    }
+    func companionSessions(workspaceID: String) throws -> [CompanionSyncSessionDTO] {
+        try db.withExclusiveAccess { try companion.sessions(workspaceID: workspaceID) }
+    }
+    func createCompanionSession(_ value: CompanionSyncSessionDTO) throws {
+        try planTransaction { try companion.createSession(value) }
+    }
+    func holdCompanionSession(id: String, workspaceID: String) throws {
+        try planTransaction { try companion.holdSession(id: id, workspaceID: workspaceID) }
+    }
+    func reconcileCompanionActivation() throws {
+        try planTransaction { try companion.reconcileActivation() }
+    }
+    func companionMonth(sessionID: String, workspaceID: String, month: String) throws -> CompanionMonthSyncDTO? {
+        try db.withExclusiveAccess {
+            let session = try companion.session(id: sessionID, workspaceID: workspaceID)
+            return try companion.month(session: session, month: month)
+        }
+    }
+    func commitCompanionMonth(_ request: CompanionMonthCommitRequest) throws -> CompanionMonthCommitResult {
+        try planTransaction {
+            let epoch = try companion.activationEpoch()
+            let session = try companion.session(id: request.sessionID, workspaceID: request.workspaceID)
+            let existing = try companion.month(session: session, month: request.month)
+            let scratchpad = try scratchpads(workspaceId: request.workspaceID).first { $0.month == request.month }
+            let prepared = try CompanionSyncValidation.prepare(request, session: session,
+                existing: existing, scratchpad: scratchpad, activationEpoch: epoch)
+            if prepared.isReplay { return prepared.result }
+            let durableCanonical = try plans(workspaceId: request.workspaceID).first { $0.planMonthISO == request.month }
+            guard try request.binding.baselineScratchpad.canonical?.persistenceDTO() == durableCanonical else {
+                throw CompanionSyncRepositoryError.staleScratchpad
+            }
+            try request.currentAnchor.binding(for: session.scope(month: request.month)).validateAccounts(
+                try SQLiteAccountRepo(db: db).accounts(workspaceId: request.workspaceID),
+                editor: MonthlyPlanScratchpad.decode(request.editor))
+            let editorPlan = try MonthlyPlanScratchpad.decode(request.editor).plan.persistenceDTO()
+            try validateRelationships(editorPlan)
+            if let canonical = request.canonical { _ = try writePlan(canonical, scratchpad: request.editor) }
+            else { try writeScratchpad(request.editor) }
+            try companion.store(prepared.result.stored)
+            return prepared.result
+        }
     }
 
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
@@ -195,16 +254,18 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
-        try db.withExclusiveAccess {
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            do { try writeScratchpad(value); try db.execute(sql: "COMMIT;") }
-            catch { try? db.execute(sql: "ROLLBACK;"); throw error }
+        try planTransaction {
+            try companion.refuseLegacyWrite(workspaceID: value.workspaceID, month: value.month)
+            try writeScratchpad(value)
         }
     }
 
     func removeScratchpad(workspaceId: String, month: String) throws {
         guard supportsScratchpads else { throw RepositoryError.persistenceUnavailable }
-        try db.executePrepared(sql: "DELETE FROM monthly_plan_scratchpads WHERE workspace_id=? AND plan_month=?;", params: [workspaceId, month])
+        try planTransaction {
+            try companion.refuseLegacyWrite(workspaceID: workspaceId, month: month)
+            try db.executePrepared(sql: "DELETE FROM monthly_plan_scratchpads WHERE workspace_id=? AND plan_month=?;", params: [workspaceId, month])
+        }
     }
 
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
@@ -266,91 +327,91 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?) throws -> FundingPlanDTO {
-        return try db.withExclusiveAccess {
-            try SalaryPersistenceDTOValidator.validate(plan: plan)
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            do {
-                // The first explicit planner save can precede the first import.
-                // Workspace creation and the plan remain in one transaction.
-                if plan.workspaceId == "default-workspace" {
-                    try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
-                }
-                try validateRelationships(plan)
-                // Clear the old authority inside this transaction before the
-                // parent upsert; a rollback restores the complete prior plan.
-                try db.executePrepared(sql: "DELETE FROM funding_plan_al_dar_references WHERE funding_plan_id = ?;", params: [plan.id])
-                try db.executePrepared(sql: "DELETE FROM funding_plan_effective_al_dar_references WHERE funding_plan_id=?;", params: [plan.id])
-                try db.executePrepared(sql: """
-                    INSERT INTO funding_plans (
-                      id, workspace_id, plan_month, rollover_source_plan_id,
-                      expected_fixed_minor, expected_fixed_decimal, expected_fixed_provenance,
-                      expected_variable_minor, expected_variable_decimal, expected_variable_provenance,
-                      expected_deductions_minor, expected_deductions_decimal, expected_deductions_provenance,
-                      configured_fee_minor, configured_fee_decimal, configured_fee_provenance,
-                      fx_inr_per_qar_decimal, fx_observation_date, fx_provenance,
-                      planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                    ON CONFLICT(id) DO UPDATE SET
-                      rollover_source_plan_id=excluded.rollover_source_plan_id,
-                      expected_fixed_minor=excluded.expected_fixed_minor, expected_fixed_decimal=excluded.expected_fixed_decimal, expected_fixed_provenance=excluded.expected_fixed_provenance,
-                      expected_variable_minor=excluded.expected_variable_minor, expected_variable_decimal=excluded.expected_variable_decimal, expected_variable_provenance=excluded.expected_variable_provenance,
-                      expected_deductions_minor=excluded.expected_deductions_minor, expected_deductions_decimal=excluded.expected_deductions_decimal, expected_deductions_provenance=excluded.expected_deductions_provenance,
-                      configured_fee_minor=excluded.configured_fee_minor, configured_fee_decimal=excluded.configured_fee_decimal, configured_fee_provenance=excluded.configured_fee_provenance,
-                      fx_inr_per_qar_decimal=excluded.fx_inr_per_qar_decimal, fx_observation_date=excluded.fx_observation_date, fx_provenance=excluded.fx_provenance,
-                      planned_investment_minor=excluded.planned_investment_minor, planned_investment_decimal=excluded.planned_investment_decimal, planned_investment_provenance=excluded.planned_investment_provenance,
-                      updated_at=excluded.updated_at;
-                    """, params: [
-                        plan.id, plan.workspaceId, plan.planMonthISO, plan.rolloverSourcePlanId ?? NSNull(),
-                        plan.expectedFixedMinor, plan.expectedFixedDecimal, plan.expectedFixedProvenance,
-                        plan.expectedVariableMinor, plan.expectedVariableDecimal, plan.expectedVariableProvenance,
-                        plan.expectedDeductionsMinor, plan.expectedDeductionsDecimal, plan.expectedDeductionsProvenance,
-                        plan.configuredFeeMinor, plan.configuredFeeDecimal, plan.configuredFeeProvenance,
-                        plan.fxINRPerQARDecimal ?? NSNull(), plan.fxObservationDateISO ?? NSNull(), plan.fxINRPerQARDecimal == nil ? NSNull() : "user_entered",
-                        plan.plannedInvestmentMinor, plan.plannedInvestmentDecimal, plan.plannedInvestmentProvenance, plan.updatedAtISO
-                    ])
-                try db.executePrepared(sql: "UPDATE funding_plans SET calculation_version=?, keep_in_cbq_minor=?, keep_in_cbq_decimal=?, reference_mode=? WHERE id=?;", params: [plan.calculationVersion, plan.keepInCBQMinor ?? NSNull(), plan.keepInCBQDecimal ?? NSNull(), plan.referenceMode ?? NSNull(), plan.id])
-                try db.executePrepared(sql: "DELETE FROM funding_plan_deduction_components WHERE funding_plan_id=?;", params: [plan.id])
-                for row in plan.deductions {
-                    try db.executePrepared(sql: "INSERT INTO funding_plan_deduction_components (id,funding_plan_id,source_ordinal,label,amount_minor,amount_decimal,recurs,carried_source_row_id) VALUES (?,?,?,?,?,?,?,?);", params: [row.id,row.planId,row.sourceOrdinal,row.label,row.amountMinor,row.amountDecimal,row.recurs ? 1 : 0,row.carriedSourceRowId ?? NSNull()])
-                }
-                if let reference = plan.effectiveReference {
-                    try db.executePrepared(sql: "INSERT INTO funding_plan_effective_al_dar_references (funding_plan_id,returned_inr_raw_decimal,fetched_at) VALUES (?,?,?);", params: [reference.planId,reference.rawINR,reference.fetchedAtISO])
-                }
-                try db.executePrepared(sql: "DELETE FROM funding_plan_balances WHERE funding_plan_id = ?;", params: [plan.id])
-                try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
-                for balance in plan.balances {
-                    try db.executePrepared(sql: "INSERT INTO funding_plan_balances (id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [balance.id, balance.planId, balance.sourceOrdinal, balance.accountId, balance.nativeCurrency, balance.included ? 1 : 0, balance.amountCurrency ?? NSNull(), balance.amountMinor ?? NSNull(), balance.amountDecimal ?? NSNull(), balance.provenanceCode, balance.carriedSourcePlanId ?? NSNull(), balance.capturedAtISO ?? NSNull()])
-                    if supportsBalanceDates {
-                        try db.executePrepared(sql: "UPDATE funding_plan_balances SET financial_balance_date=? WHERE id=?;", params: [balance.financialBalanceDateISO ?? NSNull(), balance.id])
-                    } else if balance.financialBalanceDateISO != nil { throw RepositoryError.relationshipViolation("This historical schema cannot save a financial balance date.") }
-                }
-                for commitment in plan.commitments {
-                    try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
-                    try db.executePrepared(sql: "UPDATE funding_plan_commitments SET recurs=?, temporary_carry_basis_minor=?, temporary_carry_basis_decimal=?, carried_source_row_id=?, remark=?, due_date=? WHERE id=?;", params: [commitment.recurs ? 1 : 0, commitment.temporaryCarryBasisMinor ?? NSNull(), commitment.temporaryCarryBasisDecimal ?? NSNull(), commitment.carriedSourceRowId ?? NSNull(), commitment.remark, commitment.dueDateISO ?? NSNull(), commitment.id])
-                }
-                if let reference = plan.alDarReference {
-                    try db.executePrepared(sql: """
-                        INSERT INTO funding_plan_al_dar_references
-                          (funding_plan_id, provider_code, source_contract_code, direction_code,
-                           submitted_qar_minor, submitted_qar_decimal, returned_inr_raw_decimal,
-                           bound_shortfall_inr_minor, bound_shortfall_inr_decimal, fetched_at, classification_code)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?);
-                        """, params: [reference.fundingPlanId, reference.providerCode, reference.sourceContractCode,
-                                      reference.directionCode, reference.submittedQARMinor, reference.submittedQARDecimal,
-                                      reference.returnedINRRawDecimal, reference.boundShortfallINRMinor,
-                                      reference.boundShortfallINRDecimal, reference.fetchedAtISO, reference.classificationCode])
-                }
-                if supportsAssistance {
-                    try SQLiteFinancialIntelligenceRepository(db: db, supportsBalanceDates: supportsBalanceDates).savePlanAssistance(plan)
-                } else if plan.assistance != nil { throw FinancialIntelligenceError.unavailable }
-                if let scratchpad { try writeScratchpad(scratchpad) }
-                try db.execute(sql: "COMMIT;")
-                return plan
-            } catch {
-                try? db.execute(sql: "ROLLBACK;")
-                throw error
-            }
+        try planTransaction {
+            try companion.refuseLegacyWrite(workspaceID: plan.workspaceId, month: plan.planMonthISO)
+            return try writePlan(plan, scratchpad: scratchpad)
         }
+    }
+
+    /// Caller owns BEGIN through COMMIT/ROLLBACK. Never call public save methods here.
+    private func writePlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?) throws -> FundingPlanDTO {
+        try SalaryPersistenceDTOValidator.validate(plan: plan)
+        // The first explicit planner save can precede the first import.
+        // Workspace creation and the plan remain in one transaction.
+        if plan.workspaceId == "default-workspace" {
+            try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
+        }
+        try validateRelationships(plan)
+        // Clear the old authority inside this transaction before the
+        // parent upsert; a rollback restores the complete prior plan.
+        try db.executePrepared(sql: "DELETE FROM funding_plan_al_dar_references WHERE funding_plan_id = ?;", params: [plan.id])
+        try db.executePrepared(sql: "DELETE FROM funding_plan_effective_al_dar_references WHERE funding_plan_id=?;", params: [plan.id])
+        try db.executePrepared(sql: """
+            INSERT INTO funding_plans (
+              id, workspace_id, plan_month, rollover_source_plan_id,
+              expected_fixed_minor, expected_fixed_decimal, expected_fixed_provenance,
+              expected_variable_minor, expected_variable_decimal, expected_variable_provenance,
+              expected_deductions_minor, expected_deductions_decimal, expected_deductions_provenance,
+              configured_fee_minor, configured_fee_decimal, configured_fee_provenance,
+              fx_inr_per_qar_decimal, fx_observation_date, fx_provenance,
+              planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+              rollover_source_plan_id=excluded.rollover_source_plan_id,
+              expected_fixed_minor=excluded.expected_fixed_minor, expected_fixed_decimal=excluded.expected_fixed_decimal, expected_fixed_provenance=excluded.expected_fixed_provenance,
+              expected_variable_minor=excluded.expected_variable_minor, expected_variable_decimal=excluded.expected_variable_decimal, expected_variable_provenance=excluded.expected_variable_provenance,
+              expected_deductions_minor=excluded.expected_deductions_minor, expected_deductions_decimal=excluded.expected_deductions_decimal, expected_deductions_provenance=excluded.expected_deductions_provenance,
+              configured_fee_minor=excluded.configured_fee_minor, configured_fee_decimal=excluded.configured_fee_decimal, configured_fee_provenance=excluded.configured_fee_provenance,
+              fx_inr_per_qar_decimal=excluded.fx_inr_per_qar_decimal, fx_observation_date=excluded.fx_observation_date, fx_provenance=excluded.fx_provenance,
+              planned_investment_minor=excluded.planned_investment_minor, planned_investment_decimal=excluded.planned_investment_decimal, planned_investment_provenance=excluded.planned_investment_provenance,
+              updated_at=excluded.updated_at;
+            """, params: [
+                plan.id, plan.workspaceId, plan.planMonthISO, plan.rolloverSourcePlanId ?? NSNull(),
+                plan.expectedFixedMinor, plan.expectedFixedDecimal, plan.expectedFixedProvenance,
+                plan.expectedVariableMinor, plan.expectedVariableDecimal, plan.expectedVariableProvenance,
+                plan.expectedDeductionsMinor, plan.expectedDeductionsDecimal, plan.expectedDeductionsProvenance,
+                plan.configuredFeeMinor, plan.configuredFeeDecimal, plan.configuredFeeProvenance,
+                plan.fxINRPerQARDecimal ?? NSNull(), plan.fxObservationDateISO ?? NSNull(), plan.fxINRPerQARDecimal == nil ? NSNull() : "user_entered",
+                plan.plannedInvestmentMinor, plan.plannedInvestmentDecimal, plan.plannedInvestmentProvenance, plan.updatedAtISO
+            ])
+        try db.executePrepared(sql: "UPDATE funding_plans SET calculation_version=?, keep_in_cbq_minor=?, keep_in_cbq_decimal=?, reference_mode=? WHERE id=?;", params: [plan.calculationVersion, plan.keepInCBQMinor ?? NSNull(), plan.keepInCBQDecimal ?? NSNull(), plan.referenceMode ?? NSNull(), plan.id])
+        try db.executePrepared(sql: "DELETE FROM funding_plan_deduction_components WHERE funding_plan_id=?;", params: [plan.id])
+        for row in plan.deductions {
+            try db.executePrepared(sql: "INSERT INTO funding_plan_deduction_components (id,funding_plan_id,source_ordinal,label,amount_minor,amount_decimal,recurs,carried_source_row_id) VALUES (?,?,?,?,?,?,?,?);", params: [row.id,row.planId,row.sourceOrdinal,row.label,row.amountMinor,row.amountDecimal,row.recurs ? 1 : 0,row.carriedSourceRowId ?? NSNull()])
+        }
+        if let reference = plan.effectiveReference {
+            try db.executePrepared(sql: "INSERT INTO funding_plan_effective_al_dar_references (funding_plan_id,returned_inr_raw_decimal,fetched_at) VALUES (?,?,?);", params: [reference.planId,reference.rawINR,reference.fetchedAtISO])
+        }
+        try db.executePrepared(sql: "DELETE FROM funding_plan_balances WHERE funding_plan_id = ?;", params: [plan.id])
+        try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
+        for balance in plan.balances {
+            try db.executePrepared(sql: "INSERT INTO funding_plan_balances (id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [balance.id, balance.planId, balance.sourceOrdinal, balance.accountId, balance.nativeCurrency, balance.included ? 1 : 0, balance.amountCurrency ?? NSNull(), balance.amountMinor ?? NSNull(), balance.amountDecimal ?? NSNull(), balance.provenanceCode, balance.carriedSourcePlanId ?? NSNull(), balance.capturedAtISO ?? NSNull()])
+            if supportsBalanceDates {
+                try db.executePrepared(sql: "UPDATE funding_plan_balances SET financial_balance_date=? WHERE id=?;", params: [balance.financialBalanceDateISO ?? NSNull(), balance.id])
+            } else if balance.financialBalanceDateISO != nil { throw RepositoryError.relationshipViolation("This historical schema cannot save a financial balance date.") }
+        }
+        for commitment in plan.commitments {
+            try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
+            try db.executePrepared(sql: "UPDATE funding_plan_commitments SET recurs=?, temporary_carry_basis_minor=?, temporary_carry_basis_decimal=?, carried_source_row_id=?, remark=?, due_date=? WHERE id=?;", params: [commitment.recurs ? 1 : 0, commitment.temporaryCarryBasisMinor ?? NSNull(), commitment.temporaryCarryBasisDecimal ?? NSNull(), commitment.carriedSourceRowId ?? NSNull(), commitment.remark, commitment.dueDateISO ?? NSNull(), commitment.id])
+        }
+        if let reference = plan.alDarReference {
+            try db.executePrepared(sql: """
+                INSERT INTO funding_plan_al_dar_references
+                  (funding_plan_id, provider_code, source_contract_code, direction_code,
+                   submitted_qar_minor, submitted_qar_decimal, returned_inr_raw_decimal,
+                   bound_shortfall_inr_minor, bound_shortfall_inr_decimal, fetched_at, classification_code)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?);
+                """, params: [reference.fundingPlanId, reference.providerCode, reference.sourceContractCode,
+                              reference.directionCode, reference.submittedQARMinor, reference.submittedQARDecimal,
+                              reference.returnedINRRawDecimal, reference.boundShortfallINRMinor,
+                              reference.boundShortfallINRDecimal, reference.fetchedAtISO, reference.classificationCode])
+        }
+        if supportsAssistance {
+            try SQLiteFinancialIntelligenceRepository(db: db, supportsBalanceDates: supportsBalanceDates,
+                supportsRefundAllocations: supportsRefundAllocations).savePlanAssistance(plan)
+        } else if plan.assistance != nil { throw FinancialIntelligenceError.unavailable }
+        if let scratchpad { try writeScratchpad(scratchpad) }
+        return plan
     }
 
     private func alDarReference(planID: String) throws -> FundingPlanAlDarReferenceDTO? {

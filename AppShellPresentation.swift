@@ -77,6 +77,50 @@ private struct NavigationDrawProbe: NSViewRepresentable {
 }
 #endif
 
+/// Blank SwiftUI/scroll-view space does not move AppKit's field editor. Observe
+/// this window's clicks without consuming them, so the existing focus callbacks
+/// finish editing while the clicked control still receives its original event.
+struct TextEditingClickObserver: NSViewRepresentable {
+    func makeNSView(context: Context) -> ObserverView { ObserverView() }
+    func updateNSView(_ view: ObserverView, context: Context) {}
+    static func dismantleNSView(_ view: ObserverView, coordinator: ()) { view.stopObserving() }
+
+    static func finishEditing(at windowPoint: NSPoint, in window: NSWindow) {
+        guard let editor = window.firstResponder as? NSTextView, editor.isFieldEditor else { return }
+        let field = editor.delegate as? NSView ?? editor
+        guard !field.bounds.contains(field.convert(windowPoint, from: nil)) else { return }
+        window.makeFirstResponder(nil)
+    }
+
+    final class ObserverView: NSView {
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stopObserving()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let owner = self?.window, let target = event.window else { return }
+                    var ancestor: NSWindow? = target
+                    while let candidate = ancestor, candidate !== owner {
+                        ancestor = candidate.sheetParent ?? candidate.parent
+                    }
+                    if ancestor === owner {
+                        TextEditingClickObserver.finishEditing(at: event.locationInWindow, in: target)
+                    }
+                }
+                return event
+            }
+        }
+
+        func stopObserving() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+    }
+}
+
 /// Structural presentation only. ContentView retains every workflow owner and root lifecycle modifier.
 struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, AvailabilityBanner: View, Destination: View>: View {
     @Environment(\.lfTheme) private var theme
@@ -154,6 +198,9 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
             minWidth: AppShellSizing.minimumSize(for: selectedSection).width,
             minHeight: AppShellSizing.minimumSize(for: selectedSection).height
         )
+        .background {
+            TextEditingClickObserver().frame(width: 0, height: 0).allowsHitTesting(false)
+        }
         .background {
             LFChromeBackdrop()
                 .ignoresSafeArea()

@@ -3528,7 +3528,103 @@ ALTER TABLE background_update_receipts_v32 RENAME TO background_update_receipts;
 PRAGMA legacy_alter_table = OFF;
 """, preflightChecks: [], requiresForeignKeysDisabled: true)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29, migrationV30, migrationV31, migrationV32]
+// Owner-approved companion metadata only. No financial rows are seeded and no
+// earlier migration is rewritten. Activation epochs remain outside backups.
+nonisolated public let migrationV33 = Migration(version: 33, name: "companion_month_sync", sql: """
+CREATE TABLE companion_sync_sessions (
+  session_id TEXT PRIMARY KEY NOT NULL,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  activation_epoch TEXT NOT NULL,
+  phone_id TEXT NOT NULL,
+  protocol_version INTEGER NOT NULL CHECK(protocol_version > 0),
+  disposition TEXT NOT NULL CHECK(disposition IN ('active','held'))
+);
+CREATE UNIQUE INDEX companion_one_active_session
+  ON companion_sync_sessions(workspace_id) WHERE disposition='active';
+CREATE TABLE companion_month_sync (
+  session_id TEXT NOT NULL REFERENCES companion_sync_sessions(session_id) ON DELETE RESTRICT,
+  plan_month TEXT NOT NULL,
+  state_revision INTEGER NOT NULL CHECK(state_revision >= 0),
+  state_version INTEGER NOT NULL CHECK(state_version > 0),
+  state_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, plan_month)
+);
+""")
+
+// Independent owner metadata only. Financial/source rows and earlier migration
+// identities remain unchanged; older readers must reject this schema boundary.
+nonisolated public let migrationV34 = Migration(version: 34, name: "independent_spending_intent_and_manual_tags", sql: """
+CREATE TABLE transaction_spending_intent (
+  transaction_id TEXT PRIMARY KEY NOT NULL
+    REFERENCES transactions(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL
+    REFERENCES workspaces(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL
+    CHECK(kind IN ('automaticExpense', 'deliberatelySuppressed')),
+  matches_json TEXT NOT NULL
+);
+CREATE INDEX spending_intent_workspace
+  ON transaction_spending_intent(workspace_id);
+CREATE TRIGGER spending_intent_insert_guard
+BEFORE INSERT ON transaction_spending_intent
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id
+    WHERE t.id = NEW.transaction_id AND t.workspace_id = NEW.workspace_id
+      AND t.is_trusted = 1 AND t.direction = 'debit' AND t.amount_minor < 0
+      AND a.workspace_id = NEW.workspace_id AND a.account_type = 'bank'
+  ) THEN RAISE(ABORT, 'invalid spending intent transaction') END;
+END;
+CREATE TRIGGER spending_intent_update_guard
+BEFORE UPDATE ON transaction_spending_intent
+BEGIN
+  SELECT RAISE(ABORT, 'replace spending intent through delete and insert');
+END;
+CREATE TABLE tag_definitions (
+  id TEXT PRIMARY KEY NOT NULL,
+  workspace_id TEXT NOT NULL
+    REFERENCES workspaces(id) ON DELETE RESTRICT,
+  name TEXT NOT NULL CHECK(length(trim(name)) > 0)
+);
+CREATE INDEX tag_definitions_workspace ON tag_definitions(workspace_id);
+CREATE TRIGGER tag_definition_update_guard
+BEFORE UPDATE ON tag_definitions
+WHEN NEW.id IS NOT OLD.id OR NEW.workspace_id IS NOT OLD.workspace_id
+BEGIN
+  SELECT RAISE(ABORT, 'tag identity and workspace are immutable');
+END;
+CREATE TABLE transaction_tag_memberships (
+  transaction_id TEXT NOT NULL
+    REFERENCES transactions(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL
+    REFERENCES tag_definitions(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL
+    REFERENCES workspaces(id) ON DELETE RESTRICT,
+  PRIMARY KEY(transaction_id, tag_id)
+);
+CREATE INDEX transaction_tag_memberships_workspace_tag
+  ON transaction_tag_memberships(workspace_id, tag_id, transaction_id);
+CREATE TRIGGER transaction_tag_membership_insert_guard
+BEFORE INSERT ON transaction_tag_memberships
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions
+    WHERE id = NEW.transaction_id AND workspace_id = NEW.workspace_id
+      AND is_trusted = 1
+  ) THEN RAISE(ABORT, 'invalid tag transaction') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM tag_definitions
+    WHERE id = NEW.tag_id AND workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'invalid tag definition') END;
+END;
+CREATE TRIGGER transaction_tag_membership_update_guard
+BEFORE UPDATE ON transaction_tag_memberships
+BEGIN
+  SELECT RAISE(ABORT, 'replace tag membership through delete and insert');
+END;
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29, migrationV30, migrationV31, migrationV32, migrationV33, migrationV34]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

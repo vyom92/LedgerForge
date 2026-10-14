@@ -424,6 +424,7 @@ final class BackupRestoreCoordinator: ObservableObject {
             try SQLiteBackgroundJobRepository.reconcileRestore(database: prepared.0.database)
             let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
             try prepared.0.database.adoptCompletedLifecycle(stamp)
+            try? prepared.0.fundingPlanRepo.reconcileCompanionActivation()
             // Failed external enrollment reconciliation leaves the old helper stamp refused.
             try? enrollmentStore.reconcile(path: prepared.0.databasePath, activation: stamp)
             ledgerLifecyclePermit = nil
@@ -467,6 +468,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                     try SQLiteBackgroundJobRepository.reconcileRestore(database: prior.0.database)
                     let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
                     try prior.0.database.adoptCompletedLifecycle(stamp)
+                    try? prior.0.fundingPlanRepo.reconcileCompanionActivation()
                     // Failed external enrollment reconciliation leaves the old helper stamp refused.
                     try? enrollmentStore.reconcile(path: prior.0.databasePath, activation: stamp)
                     ledgerLifecyclePermit = nil
@@ -484,6 +486,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                         try SQLiteBackgroundJobRepository.reconcileRestore(database: prior.0.database)
                         let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
                         try prior.0.database.adoptCompletedLifecycle(stamp)
+                        try? prior.0.fundingPlanRepo.reconcileCompanionActivation()
                         // Failed external enrollment reconciliation leaves the old helper stamp refused.
                         try? enrollmentStore.reconcile(path: prior.0.databasePath, activation: stamp)
                         ledgerLifecyclePermit = nil
@@ -492,6 +495,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                         try SQLiteBackgroundJobRepository.reconcileRestore(database: current.database)
                         let stamp = try permit.finish(schemaVersion: allMigrations.count)
                         try current.database.adoptCompletedLifecycle(stamp)
+                        try? current.fundingPlanRepo.reconcileCompanionActivation()
                         // Failed external enrollment reconciliation leaves the old helper stamp refused.
                         try? enrollmentStore.reconcile(path: current.databasePath, activation: stamp)
                         ledgerLifecyclePermit = nil
@@ -569,6 +573,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                 try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
                 let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
                 try provider.database.adoptCompletedLifecycle(stamp)
+                try? provider.fundingPlanRepo.reconcileCompanionActivation()
                 // Failed external enrollment reconciliation leaves the old helper stamp refused.
                 try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
                 ledgerLifecyclePermit = nil
@@ -583,6 +588,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                 try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
                 let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
                 try provider.database.adoptCompletedLifecycle(stamp)
+                try? provider.fundingPlanRepo.reconcileCompanionActivation()
                 // Failed external enrollment reconciliation leaves the old helper stamp refused.
                 try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
                 ledgerLifecyclePermit = nil
@@ -596,6 +602,7 @@ final class BackupRestoreCoordinator: ObservableObject {
                 try SQLiteBackgroundJobRepository.reconcileRestore(database: provider.database)
                 let stamp = try ledgerLifecyclePermit!.finish(schemaVersion: allMigrations.count)
                 try provider.database.adoptCompletedLifecycle(stamp)
+                try? provider.fundingPlanRepo.reconcileCompanionActivation()
                 // Failed external enrollment reconciliation leaves the old helper stamp refused.
                 try? enrollmentStore.reconcile(path: provider.databasePath, activation: stamp)
                 ledgerLifecyclePermit = nil

@@ -89,24 +89,17 @@ nonisolated struct SpendingSourceRow: Identifiable, Sendable {
     }
     var isReferenceReversal: Bool { text.contains("REV-IMPS-") || text.contains("REVERSAL") }
     var isCharge: Bool {
-        (isBankOut || isCardIncrease) && ["INTEREST", "PROCESSING FEE", "BOUNCE CHARGES", "SERVICE CHARGE", "TRANSFER FEE"].contains(where: text.contains)
+        isCashAdvanceFee || ((isBankOut || isCardIncrease) &&
+            ["INTEREST", "PROCESSING FEE", "BOUNCE CHARGES", "SERVICE CHARGE", "TRANSFER FEE"].contains(where: text.contains))
+    }
+    var isCashAdvanceFee: Bool {
+        isCardIncrease && transaction.money.amount > 0 && SpendingSourcePolicy.isCashAdvanceFee(domain: domain,
+            direction: "card_increase_owed", narration: transaction.description,
+            parserProfileIDs: Set(transaction.sourceProvenance.map(\.parserProfileID)))
     }
     var isLoanOrEMI: Bool {
-        if domain == "loan" { return true }
-        let narration = transaction.description.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if domain == "credit_card", hasProfile(prefix: "axis.") {
-            return ["EMI PRINCIPAL - ", "EMI INTEREST - ", "EMI PROCESSING FEE, REF# ",
-                    "TRANSACTION CONVERSION INTO EMI "].contains(where: narration.hasPrefix)
-        }
-        if domain == "credit_card", hasProfile(prefix: "cbq.") {
-            return summaryMembership == .cbqV2BilledInstallment ||
-                narration.hasPrefix("STANDING ORDER FOR INSTALMENT # ") || narration == "CREDIT FOR TRANSACTION INSTALMENT"
-        }
-        if domain == "bank", hasProfile(prefix: "cbq.") {
-            return ["LOAN REPAYMENT - PRINC ", "LOAN REPAYMENT - INTER ", "NEW LOAN "].contains(where: narration.hasPrefix) ||
-                (narration.hasPrefix("INSURANCE - PERSONAL L ") && narration.hasSuffix("PERSONAL LOAN INSURANCE"))
-        }
-        return false
+        SpendingSourcePolicy.isLoanOrEMI(domain: domain, narration: transaction.description,
+            parserProfileIDs: Set(transaction.sourceProvenance.map(\.parserProfileID)), summaryMembership: summaryMembership)
     }
     private func hasProfile(prefix: String) -> Bool { transaction.sourceProvenance.contains { $0.parserProfileID.hasPrefix(prefix) } }
 
@@ -125,13 +118,47 @@ nonisolated struct SpendingSourceRow: Identifiable, Sendable {
     }
 }
 
+nonisolated struct SpendingAmounts: Equatable, Sendable {
+    let gross: Money
+    let allocatedRefund: Money
+    let net: Money
+
+    static func zero(currency: String) throws -> Self {
+        let zero = try Money(amount: 0, currency: currency)
+        return .init(gross: zero, allocatedRefund: zero, net: zero)
+    }
+
+    func adding(_ other: Self) throws -> Self {
+        .init(gross: try gross + other.gross, allocatedRefund: try allocatedRefund + other.allocatedRefund,
+              net: try net + other.net)
+    }
+}
+
+nonisolated struct SpendingRefundDetail: Identifiable, Sendable {
+    let eventID: String
+    let purchaseTransactionID: String
+    let creditTransactionID: String
+    let purchaseDate: StatementDate?
+    let creditDate: StatementDate?
+    let allocated: Money
+    let creditAmount: Money
+    let residual: Money
+    var id: String { eventID + ":" + creditTransactionID }
+}
+
 nonisolated struct SpendingReviewRow: Identifiable, Sendable {
     let source: SpendingSourceRow
     let treatment: SpendingTreatment
-    let explanation: String
+    var explanation: String
+    var amounts: SpendingAmounts? = nil
+    var refundDetails: [SpendingRefundDetail] = []
+    var refundResidual: Money? = nil
+    var refundNeedsReview = false
     var id: String { source.id }
-    var spending: Decimal { treatment == .expense ? source.amount : (treatment == .refund ? -source.amount : 0) }
+    // Credits never independently deduct spending on their receipt date.
+    var spending: Decimal { treatment == .expense ? (amounts?.net.amount ?? source.amount) : 0 }
     var income: Decimal { treatment == .income ? source.amount : 0 }
+    var supportingTransactionIDs: Set<String> { Set(refundDetails.map(\.creditTransactionID)).subtracting([id]) }
 }
 
 nonisolated struct MovementSuggestion: Identifiable, Equatable, Sendable {
@@ -162,6 +189,8 @@ nonisolated struct SpendingPeriodValue: Identifiable, Sendable {
     let transactionIDs: Set<String>
     let unresolvedIDs: Set<String>
     let incompleteAccounts: [String]
+    let amounts: SpendingAmounts
+    let supportingTransactionIDs: Set<String>
 }
 
 nonisolated struct SpendingCategoryValue: Identifiable, Sendable {
@@ -169,6 +198,8 @@ nonisolated struct SpendingCategoryValue: Identifiable, Sendable {
     let title: String
     let amount: Decimal
     let transactionIDs: Set<String>
+    let amounts: SpendingAmounts
+    let supportingTransactionIDs: Set<String>
 }
 
 nonisolated struct SpendingProjection: Sendable {
@@ -181,6 +212,8 @@ nonisolated struct SpendingProjection: Sendable {
     let spending: Decimal
     let unresolvedCount: Int
     let missingDateCount: Int
+    let amounts: SpendingAmounts
+    let supportingTransactionIDs: Set<String>
 }
 
 nonisolated struct SpendingComparisonPeriod: Sendable {
@@ -242,9 +275,10 @@ nonisolated enum SpendingIntelligence {
 
     static func compare(analysis: SpendingProjection, rows: [SpendingSourceRow], metadata: FinancialIntelligenceSnapshot,
                         sources: FinancialSourceContext, currency: String, accountIDs: Set<String>,
-                        start: StatementDate, end: StatementDate, baselineStart: StatementDate, baselineEnd: StatementDate) throws -> SpendingComparison {
+                        start: StatementDate, end: StatementDate, baselineStart: StatementDate, baselineEnd: StatementDate,
+                        spendingIntents: [String: TransactionSpendingIntent] = [:]) throws -> SpendingComparison {
         let baseline = try project(rows: rows, metadata: metadata, sources: sources, currency: currency, accountIDs: accountIDs,
-            start: baselineStart, end: baselineEnd, allSuggestions: [])
+            start: baselineStart, end: baselineEnd, allSuggestions: [], spendingIntents: spendingIntents)
         func period(_ report: SpendingProjection, _ lower: StatementDate, _ upper: StatementDate) -> SpendingComparisonPeriod {
             let expenses = report.rows.filter { $0.treatment == .expense }
             let purchases = expenses.filter { !$0.source.isCharge }
@@ -288,6 +322,7 @@ nonisolated enum SpendingIntelligence {
         let evidence = Dictionary(uniqueKeysWithValues: cards.transactionEvidence.map { ($0.transactionID, $0) })
         let names = Dictionary(uniqueKeysWithValues: categories.categories.map { ($0.id, $0.name) })
         let activeCategoryIDs = Set(categories.categories.filter { !$0.isArchived }.map(\.id))
+        let activeRules = categories.automation?.rules.filter { activeCategoryIDs.contains($0.categoryID) } ?? []
         let eligibleSalaryIDs = salaryRuleIDs.intersection(eligibleSalaryRules(categories: categories, sources: sources).map(\.id))
         return try transactions.compactMap { transaction in
             try Task.checkCancellation()
@@ -296,11 +331,18 @@ nonisolated enum SpendingIntelligence {
             let card = evidence[id]
             let explicit = card?.sourceTransactionDate ?? transaction.repositoryPreferredSourceTransactionDate ?? transaction.sourceProvenance.first?.sourceTransactionDate
             let categoryID = categories.assignments[id]
-            let input = CategoryAutomationSession.inputs(transactions: [transaction], selectedIDs: [id]).first
-            let matches = categories.automation?.rules.filter { rule in activeCategoryIDs.contains(rule.categoryID) && input.map(rule.matches) == true } ?? []
-            let salary = transaction.creditMoney != nil && account.domain == "bank" &&
-                !(transaction.description.uppercased().contains("BONUS") || transaction.description.uppercased().contains("AD HOC")) &&
-                Set(matches.map(\.categoryID)).count == 1 && matches.contains { eligibleSalaryIDs.contains($0.id) }
+            var salary = false
+            if transaction.creditMoney != nil, account.domain == "bank", !eligibleSalaryIDs.isEmpty {
+                let narration = transaction.description.uppercased()
+                if !narration.contains("BONUS"), !narration.contains("AD HOC") {
+                    let input = CategoryAutomationSession.inputs(transactions: [transaction], selectedIDs: [id]).first
+                    // Every active rule still participates in category conflict
+                    // detection for a possible salary receipt.
+                    let matches = activeRules.filter { rule in input.map(rule.matches) == true }
+                    salary = Set(matches.map(\.categoryID)).count == 1 &&
+                        matches.contains { eligibleSalaryIDs.contains($0.id) }
+                }
+            }
             return SpendingSourceRow(transaction: transaction, id: id, accountID: accountID, accountTitle: account.title,
                 domain: account.domain, date: explicit ?? transaction.statementDate,
                 dateRole: explicit != nil ? "Source transaction date" : transaction.financialDateRole.rawValue.replacingOccurrences(of: "_", with: " ").capitalized,
@@ -310,7 +352,8 @@ nonisolated enum SpendingIntelligence {
         }
     }
 
-    static func interpretation(_ row: SpendingSourceRow, confirmed: MovementEvent?) -> SpendingReviewRow {
+    static func interpretation(_ row: SpendingSourceRow, confirmed: MovementEvent?,
+                               spendingIntent: TransactionSpendingIntent? = nil, rejectedExpense: Bool = false) -> SpendingReviewRow {
         if row.isLoanOrEMI {
             return .init(source: row, treatment: .outsideScope,
                 explanation: "Source-identified loan or EMI entry. Excluded from analysis; the original entry and card balance remain unchanged.")
@@ -324,16 +367,28 @@ nonisolated enum SpendingIntelligence {
             case .borrowing: treatment = .outsideScope
             case .expense: treatment = .expense
             case .income: treatment = .income
-            case .refund: treatment = row.isBankIn || row.isCardDecrease ? .refund : .expense
+            case .refund:
+                treatment = row.isBankIn || row.isCardDecrease ? (event.refundAllocations == nil ? .unresolved : .refund) : .expense
             case .emiConversion:
                 // Preserve legacy relationship metadata without continuing its
                 // superseded instalment-date recognition policy.
                 treatment = row.isCardIncrease && !event.consumptionTransactionIDs.contains(row.id) ? .expense : .outsideScope
             }
-            let explanation = event.kind.isInScope ? "Confirmed \(event.kind.title.lowercased()). " + event.explanation
+            let explanation = event.kind == .refund && event.refundAllocations == nil
+                ? "Saved refund has no reviewed amount allocation. The original purchase stays gross; the credit needs allocation review and is not income or a receipt-month spending deduction. " + event.explanation
+                : event.kind.isInScope ? "Confirmed \(event.kind.title.lowercased()). " + event.explanation
                 : (treatment == .expense ? "Original purchase counted once on its source date. Related EMI entries are excluded from analysis."
                    : "Loan or EMI entry excluded from analysis. Its original facts and saved historical interpretation are retained.")
-            return .init(source: row, treatment: treatment, explanation: explanation)
+            return .init(source: row, treatment: treatment, explanation: explanation,
+                         refundNeedsReview: event.kind == .refund && event.refundAllocations == nil)
+        }
+        if row.isBankOut, spendingIntent?.kind == .deliberatelySuppressed || rejectedExpense {
+            return .init(source: row, treatment: .unresolved,
+                explanation: "Your saved choice suppresses automatic spending treatment. Category and source facts remain separate.")
+        }
+        if row.isBankOut, row.transaction.money.amount < 0, spendingIntent?.kind == .automaticExpense {
+            return .init(source: row, treatment: .expense,
+                explanation: "An explicitly applied spending rule recognises this bank outgoing. Its saved rule version is retained independently of the category.")
         }
         if row.isRegularSalary { return .init(source: row, treatment: .income, explanation: "Matches your enabled regular-salary rule on a real bank credit.") }
         if row.isEmployerSalaryReceipt {
@@ -343,6 +398,10 @@ nonisolated enum SpendingIntelligence {
             return .init(source: row, treatment: .unresolved, explanation: "The source labels a reversal. Review the equal opposite entry and complete reference before cancelling their spending effect.")
         }
         let text = row.text
+        if row.isCashAdvanceFee {
+            return .init(source: row, treatment: .expense,
+                explanation: "The CBQ card source identifies this exact charge as a cash-advance fee. Cash principal and settlements keep their separate meaning.")
+        }
         if row.isCharge {
             return .init(source: row, treatment: .expense, explanation: "The source identifies a fee or interest charge. Principal and settlements remain separate.")
         }
@@ -457,24 +516,117 @@ nonisolated enum SpendingIntelligence {
         return nil
     }
 
+    /// Interpret the complete available history once, before any reporting
+    /// period, account or category filter can hide a supporting credit.
+    static func resolvedRows(rows: [SpendingSourceRow], metadata: FinancialIntelligenceSnapshot,
+                             spendingIntents: [String: TransactionSpendingIntent] = [:]) throws -> [SpendingReviewRow] {
+        try Task.checkCancellation()
+        guard Set(rows.map(\.id)).count == rows.count else { throw FinancialIntelligenceError.invalidRecord }
+        var confirmed: [String: MovementEvent] = [:]
+        for event in metadata.movements where event.decision == .confirmed {
+            guard event.workspaceID == metadata.workspaceID,
+                  Set(event.transactionIDs).count == event.transactionIDs.count else { throw FinancialIntelligenceError.invalidRecord }
+            for id in event.transactionIDs {
+                guard confirmed.updateValue(event, forKey: id) == nil else { throw FinancialIntelligenceError.occupiedLeg }
+            }
+        }
+        let rejectedExpenseIDs = Set(metadata.movements.filter {
+            $0.decision == .rejected && $0.kind == .expense && $0.transactionIDs.count == 1
+        }.flatMap(\.transactionIDs))
+        var review = try rows.map { row -> SpendingReviewRow in
+            try Task.checkCancellation()
+            var value = interpretation(row, confirmed: confirmed[row.id], spendingIntent: spendingIntents[row.id],
+                                       rejectedExpense: rejectedExpenseIDs.contains(row.id))
+            if value.treatment == .expense {
+                let gross = try Money(amount: row.amount, currency: row.currency)
+                value.amounts = .init(gross: gross, allocatedRefund: try Money(amount: 0, currency: row.currency), net: gross)
+            }
+            return value
+        }
+        let indexByID = Dictionary(uniqueKeysWithValues: review.indices.map { (review[$0].id, $0) })
+        for event in metadata.movements where event.decision == .confirmed && event.kind == .refund {
+            try Task.checkCancellation()
+            guard event.refundAllocations != nil else {
+                for id in event.transactionIDs {
+                    guard let index = indexByID[id] else { continue }
+                    let row = review[index].source
+                    if row.isBankIn || row.isCardDecrease {
+                        review[index].refundResidual = try Money(amount: row.amount, currency: row.currency)
+                        review[index].refundNeedsReview = true
+                    }
+                }
+                continue
+            }
+            let legs = try event.transactionIDs.map { id -> MovementRefundValidation.Leg in
+                guard let index = indexByID[id] else { throw FinancialIntelligenceError.invalidRecord }
+                let row = review[index].source
+                let direction = row.isBankOut ? "debit" : row.isBankIn ? "credit" :
+                    row.isCardIncrease ? "card_increase_owed" : row.isCardDecrease ? "card_decrease_owed" : ""
+                return .init(transactionID: id, accountID: row.accountID, domain: row.domain,
+                             direction: direction, money: row.transaction.money)
+            }
+            let resolved = try MovementRefundValidation.resolve(event, legs: legs)
+            guard let purchaseIndex = indexByID[resolved.purchaseTransactionID] else { throw FinancialIntelligenceError.invalidRecord }
+            let purchase = review[purchaseIndex].source
+            let details = try resolved.allocatedByCredit.keys.sorted().map { id -> SpendingRefundDetail in
+                guard let index = indexByID[id], let allocated = resolved.allocatedByCredit[id],
+                      let residual = resolved.residualByCredit[id] else { throw FinancialIntelligenceError.invalidRecord }
+                let credit = review[index].source
+                return .init(eventID: event.id, purchaseTransactionID: purchase.id, creditTransactionID: id,
+                             purchaseDate: purchase.date, creditDate: credit.date, allocated: allocated,
+                             creditAmount: try Money(amount: credit.amount, currency: credit.currency), residual: residual)
+            }
+            // Source exclusions and missing/contradictory analytical dates stay
+            // visible. They cannot produce a subtraction from zero spending.
+            let canAttribute = review[purchaseIndex].treatment == .expense && purchase.date != nil &&
+                details.allSatisfy { detail in
+                    guard let creditDate = detail.creditDate, let purchaseDate = purchase.date,
+                          let index = indexByID[detail.creditTransactionID] else { return false }
+                    return creditDate >= purchaseDate && !review[index].source.isLoanOrEMI
+                }
+            review[purchaseIndex].refundDetails = details
+            review[purchaseIndex].refundNeedsReview = !canAttribute
+            if canAttribute {
+                review[purchaseIndex].amounts = .init(gross: resolved.gross, allocatedRefund: resolved.allocated, net: resolved.net)
+                review[purchaseIndex].explanation += " Allocated refunds reduce this purchase on its source date and current category. Credit receipt dates stay unchanged."
+            } else {
+                review[purchaseIndex].explanation += " Refund attribution needs review because the purchase is outside spending scope or its source dates are unavailable or contradictory."
+            }
+            for detail in details {
+                guard let index = indexByID[detail.creditTransactionID] else { throw FinancialIntelligenceError.invalidRecord }
+                review[index].refundDetails = [detail]
+                review[index].refundResidual = detail.residual
+                review[index].refundNeedsReview = !canAttribute || detail.residual.amount > 0
+                review[index].explanation += " The allocation belongs to the original purchase; this credit adds no receipt-month spending deduction or income."
+                if detail.residual.amount > 0 {
+                    review[index].explanation += " The remaining credit amount is unresolved."
+                }
+            }
+        }
+        return review
+    }
+
+    private static func totalAmounts(_ rows: [SpendingReviewRow], currency: String) throws -> SpendingAmounts {
+        try rows.compactMap(\.amounts).reduce(SpendingAmounts.zero(currency: currency)) { try $0.adding($1) }
+    }
+
     static func project(rows: [SpendingSourceRow], metadata: FinancialIntelligenceSnapshot, sources: FinancialSourceContext,
-                        currency: String, accountIDs: Set<String>, start: StatementDate?, end: StatementDate?, allSuggestions: [MovementSuggestion]? = nil) throws -> SpendingProjection {
+                        currency: String, accountIDs: Set<String>, start: StatementDate?, end: StatementDate?, allSuggestions: [MovementSuggestion]? = nil,
+                        spendingIntents: [String: TransactionSpendingIntent] = [:]) throws -> SpendingProjection {
 #if DEBUG
         let timing = GmailQualificationTiming.begin(.spendingProjection, count: rows.count)
         defer { GmailQualificationTiming.end(.spendingProjection, started: timing, count: rows.count) }
 #endif
         try Task.checkCancellation()
+        let resolved = try resolvedRows(rows: rows, metadata: metadata, spendingIntents: spendingIntents)
         let scope = sources.accountScope(selectedAccountIDs: accountIDs)
         let selectedAccounts = sources.accounts.filter { $0.currency == currency && scope.includes($0.id) }
         let selectedIDs = Set(selectedAccounts.map(\.id))
         let accountRows = rows.filter { $0.currency == currency && selectedIDs.contains($0.accountID) }
         let selected = accountRows.filter {
             ($0.date.map { date in (start == nil || date >= start!) && (end == nil || date <= end!) } ?? (start == nil && end == nil)) }
-        let confirmed = metadata.confirmedByTransaction
-        let review = try selected.map { row in
-            try Task.checkCancellation()
-            return interpretation(row, confirmed: confirmed[row.id])
-        }
+        let visibleIDs = Set(selected.map(\.id))
+        let review = resolved.filter { visibleIDs.contains($0.id) }
         let grouped = Dictionary(grouping: review.compactMap { row in row.source.date.map { (String($0.canonical.prefix(7)), row) } }, by: \.0)
         var months = Set(grouped.keys)
         if let first = start ?? selected.compactMap(\.date).min(), let last = end ?? selected.compactMap(\.date).max() {
@@ -490,27 +642,34 @@ nonisolated enum SpendingIntelligence {
             let values = grouped[key, default: []].map(\.1)
             let lower = max(first, start ?? first), upper = min(last, end ?? last)
             let incomplete = selectedAccounts.filter { !sources.hasCompleteCoverage(accountID: $0.id, start: lower, end: upper) }.map(\.title)
-            return .init(id: key, title: key, income: values.reduce(0) { $0 + $1.income }, spending: values.reduce(0) { $0 + $1.spending },
-                transactionIDs: Set(values.map(\.id)), unresolvedIDs: Set(values.filter { $0.treatment == .unresolved }.map(\.id)), incompleteAccounts: incomplete)
+            let amounts = try totalAmounts(values, currency: currency)
+            return .init(id: key, title: key, income: values.reduce(0) { $0 + $1.income }, spending: amounts.net.amount,
+                transactionIDs: Set(values.map(\.id)), unresolvedIDs: Set(values.filter { $0.treatment == .unresolved || $0.refundNeedsReview }.map(\.id)),
+                incompleteAccounts: incomplete, amounts: amounts, supportingTransactionIDs: Set(values.flatMap(\.supportingTransactionIDs)))
         }
-        let categoryGroups = Dictionary(grouping: review.filter { [.expense,.refund].contains($0.treatment) }) {
+        let categoryGroups = Dictionary(grouping: review.filter { $0.treatment == .expense }) {
             $0.source.categoryConflict ? "conflict" : ($0.source.categoryID ?? "uncategorized")
         }
-        let categories = categoryGroups.map { key, values in
-            SpendingCategoryValue(id: key, title: key == "conflict" ? "Category conflict" : values[0].source.categoryName,
-                amount: values.reduce(0) { $0 + $1.spending }, transactionIDs: Set(values.map(\.id)))
+        let categories = try categoryGroups.map { key, values in
+            let amounts = try totalAmounts(values, currency: currency)
+            return SpendingCategoryValue(id: key, title: key == "conflict" ? "Category conflict" : values[0].source.categoryName,
+                amount: amounts.net.amount, transactionIDs: Set(values.map(\.id)), amounts: amounts,
+                supportingTransactionIDs: Set(values.flatMap(\.supportingTransactionIDs)))
         }.sorted { ($0.amount, $0.id) > ($1.amount, $1.id) }
         let selectedTransactionIDs = Set(selected.map(\.id))
         // Keep the complete relationship for interpretation, but do not expose
         // a partial pair when one of its accounts is outside the history scope.
         let excludedHistory = Set(sources.accounts.filter(\.isHistoryOnly).map(\.id)).subtracting(accountIDs)
         let hiddenHistoryRows = Set(rows.filter { excludedHistory.contains($0.accountID) }.map(\.id))
+        let amounts = try totalAmounts(review, currency: currency)
         return .init(rows: review, periods: periods, categories: categories,
             suggestions: try (allSuggestions ?? suggestions(rows: rows, metadata: metadata, sources: sources)).filter {
                 !$0.transactionIDs.allSatisfy { !selectedTransactionIDs.contains($0) }
                     && $0.transactionIDs.allSatisfy { !hiddenHistoryRows.contains($0) }
             },
-            selectedCurrency: currency, income: review.reduce(0) { $0 + $1.income }, spending: review.reduce(0) { $0 + $1.spending },
-            unresolvedCount: review.filter { $0.treatment == .unresolved }.count, missingDateCount: accountRows.filter { $0.date == nil }.count)
+            selectedCurrency: currency, income: review.reduce(0) { $0 + $1.income }, spending: amounts.net.amount,
+            unresolvedCount: review.filter { $0.treatment == .unresolved || $0.refundNeedsReview }.count,
+            missingDateCount: accountRows.filter { $0.date == nil }.count, amounts: amounts,
+            supportingTransactionIDs: Set(review.flatMap(\.supportingTransactionIDs)))
     }
 }

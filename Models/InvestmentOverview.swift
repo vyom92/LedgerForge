@@ -190,13 +190,13 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
         let portfolios = InvestmentPortfolioGroup.allCases.map { group in
             let members = grouped[group] ?? []
             let part = scope(members, valuations: valuations, legs: legs,
-                             currencies: group == .cbq ? ["USD", "QAR"] : ["USD", "INR"])
+                             currencies: group == .cbq ? ["USD", "QAR", "INR"] : ["USD", "INR"])
             let performancePart = group == .isp ? (ispCapital ?? part) : part
             let performanceTotal = capital ?? total
             return InvestmentPortfolioSummary(group: group, scope: part,
                 capitalShare: share(performancePart.usd?.cost, performanceTotal.usd?.cost, partCount: performancePart.costCount, totalCount: performanceTotal.costCount, positive: true),
                 profitShare: share(performancePart.usd?.gain, performanceTotal.usd?.gain, partCount: performancePart.gainCount, totalCount: performanceTotal.gainCount, positive: false),
-                funds: funds(members, portfolio: group, parent: part, valuations: valuations, legs: legs))
+                funds: funds(members, portfolio: group, parent: part, valuations: valuations, legs: legs, containers: containersByID))
         }
         return .init(total: total, portfolios: portfolios, fxLegs: legs,
                      ispReported: reportedSummary(ispAccount, legs: legs), capitalPerformance: capital, ispPerformance: ispCapital)
@@ -288,20 +288,18 @@ nonisolated struct InvestmentOverview: Equatable, Sendable {
 
     private static func funds(_ holdings: [InvestmentHolding], portfolio: InvestmentPortfolioGroup,
                               parent: InvestmentOverviewScope, valuations: [String: InvestmentValuation],
-                              legs: [AlDarCurrency: AlDarUnitReference]) -> [InvestmentFundSummary] {
+                              legs: [AlDarCurrency: AlDarUnitReference],
+                              containers: [String: InvestmentContainer]) -> [InvestmentFundSummary] {
         // Unmapped positions stay separate. Their source identity is not a
         // license to merge positions across folios or assert a provider mapping.
         let groups = Dictionary(grouping: holdings, by: {
-            InvestmentPriceRegistry.confirmedMapping(for: $0)?.identity ?? "holding:" + $0.id
+            InvestmentPriceRegistry.confirmedMapping(for: $0, container: containers[$0.containerID])?.identity ?? "holding:" + $0.id
         })
         let names = ["N0USD": "iShares North America Index", "USDL3": "L&G WTW Global Equity Diversified Index",
                      "3UUSD": "iShares Emerging Markets Index USD", "B0280": "Qatar Airways ISP Conventional Blend"]
         return groups.keys.sorted().compactMap { key -> InvestmentFundSummary? in
             guard let rows = groups[key], let first = rows.first else { return nil }
-            let directMapping = valuations[first.id]?.quote.flatMap {
-                $0.mapping.provider == "ibkr-flex" ? $0.mapping : nil
-            }
-            let mapping = directMapping ?? InvestmentPriceRegistry.confirmedMapping(for: first)
+            let mapping = InvestmentPriceRegistry.confirmedMapping(for: first, container: containers[first.containerID])
             let part = scope(rows, valuations: valuations, legs: legs, currencies: parent.lines.map(\.currency))
             let units = try? rows.map { $0.units.value }.reduce(Decimal.zero, InvestmentArithmetic.add)
             let identifier = mapping.map { mapping in

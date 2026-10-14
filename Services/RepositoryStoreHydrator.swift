@@ -88,6 +88,7 @@ struct RepositoryRuntimeSnapshot {
     let importSessions: [RepositoryImportSession]
     let importAttempts: [RepositoryImportAttempt]
     let categorySnapshot: CategorySnapshot
+    var categorySourceWitness: CategorySourceWitness? = nil
     let cardSnapshot: CardStoreSnapshot
     let salaryStatements: [SalaryStatement]
     let fundingPlans: [FundingPlan]
@@ -95,6 +96,7 @@ struct RepositoryRuntimeSnapshot {
     let investments: InvestmentSnapshot
     let netWorthMembership: NetWorthMembershipSnapshot?
     let intelligence: FinancialIntelligenceSnapshot?
+    let tags: TransactionTagSnapshot?
     let financialSources: FinancialSourceContext
     let hydrationResult: RepositoryStoreHydrationResult
     let providerGeneration: ProviderGenerationToken?
@@ -112,6 +114,7 @@ struct RepositoryRuntimeSnapshot {
         investments: InvestmentSnapshot = .empty,
         netWorthMembership: NetWorthMembershipSnapshot? = nil,
         intelligence: FinancialIntelligenceSnapshot? = nil,
+        tags: TransactionTagSnapshot? = nil,
         financialSources: FinancialSourceContext = .empty,
         providerGeneration: ProviderGenerationToken?
     ) {
@@ -127,6 +130,7 @@ struct RepositoryRuntimeSnapshot {
         self.investments = investments
         self.netWorthMembership = netWorthMembership
         self.intelligence = intelligence
+        self.tags = tags
         self.financialSources = financialSources
         self.providerGeneration = providerGeneration
         self.hydrationResult = RepositoryStoreHydrationResult(
@@ -217,6 +221,7 @@ final class RepositoryStoreHydrator {
     private let investmentRepo: InvestmentRepository
     private let netWorthMembershipRepo: any NetWorthMembershipRepository
     private let intelligenceRepo: any FinancialIntelligenceRepository
+    private let tagRepo: any TransactionTagRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
@@ -228,6 +233,7 @@ final class RepositoryStoreHydrator {
     private let investmentStore: InvestmentStore
     private let netWorthMembershipStore: NetWorthMembershipStore
     private let intelligenceStore: FinancialIntelligenceStore
+    private let tagStore: TransactionTagStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private let providerGeneration: ProviderGenerationToken?
@@ -240,6 +246,7 @@ final class RepositoryStoreHydrator {
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
+        tagStore: TransactionTagStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -258,12 +265,14 @@ final class RepositoryStoreHydrator {
             investmentRepo: databaseProvider.investmentRepo,
             netWorthMembershipRepo: databaseProvider.netWorthMembershipRepo,
             intelligenceRepo: databaseProvider.intelligenceRepo,
+            tagRepo: databaseProvider.tagRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
             categoryStore: categoryStore,
             cardStore: .shared,
             salaryStore: .shared,
             fundingPlanStore: .shared,
+            tagStore: tagStore,
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
@@ -286,6 +295,7 @@ final class RepositoryStoreHydrator {
         investmentRepo: InvestmentRepository = EmptyInvestmentRepository(),
         netWorthMembershipRepo: any NetWorthMembershipRepository = UnavailableNetWorthMembershipRepository(),
         intelligenceRepo: any FinancialIntelligenceRepository = UnavailableFinancialIntelligenceRepository(),
+        tagRepo: any TransactionTagRepository = UnavailableTransactionTagRepository(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
@@ -295,6 +305,7 @@ final class RepositoryStoreHydrator {
         investmentStore: InvestmentStore = .shared,
         netWorthMembershipStore: NetWorthMembershipStore = .shared,
         intelligenceStore: FinancialIntelligenceStore = .shared,
+        tagStore: TransactionTagStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -313,6 +324,7 @@ final class RepositoryStoreHydrator {
         self.investmentRepo = investmentRepo
         self.netWorthMembershipRepo = netWorthMembershipRepo
         self.intelligenceRepo = intelligenceRepo
+        self.tagRepo = tagRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.categoryStore = categoryStore
@@ -322,6 +334,7 @@ final class RepositoryStoreHydrator {
         self.investmentStore = investmentStore
         self.netWorthMembershipStore = netWorthMembershipStore
         self.intelligenceStore = intelligenceStore
+        self.tagStore = tagStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -379,12 +392,123 @@ final class RepositoryStoreHydrator {
         }
     }
 
+    /// Refreshes the complete canonical tag metadata after a tag-only write.
+    /// The caller holds its repository-write lease. Existing runtime ownership
+    /// must already be current; false requires the ordinary full hydration.
+    /// This does not reconcile other stores or change application availability.
+    @MainActor
+    func refreshTransactionTagsIfCurrent() throws -> Bool {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.tagRefresh, count: tagStore.snapshot?.definitions.count ?? 0)
+        defer { GmailQualificationTiming.end(.tagRefresh, started: timing, count: tagStore.snapshot?.definitions.count ?? 0) }
+#endif
+        guard persistenceState.isUsable else { throw RepositoryStoreHydrationError.persistenceUnavailable }
+        guard let snapshotProvider, let providerGeneration,
+              snapshotProvider.generationToken == providerGeneration else { return false }
+        func runtimeIsCurrent() -> Bool {
+            guard tagStore.generation == providerGeneration,
+                  tagStore.snapshot?.workspaceID == workspaceId,
+                  categoryReconciliationGate?.isBlocked(for: providerGeneration) != true else { return false }
+            return tagStore !== TransactionTagStore.shared ||
+                (DatabaseProvider.shared.generationToken == providerGeneration &&
+                 ApplicationAvailability.shared.generation == providerGeneration &&
+                 ApplicationAvailability.shared.permitsMutation)
+        }
+        guard runtimeIsCurrent() else { return false }
+        try snapshotProvider.withConsistentSnapshot {
+            guard let value = try tagRepo.snapshot(workspaceID: workspaceId) else {
+                throw TransactionTagError.unavailable
+            }
+            guard value.workspaceID == workspaceId else { throw TransactionTagError.workspaceMismatch }
+            try TransactionTagValidation.validate(value)
+            guard runtimeIsCurrent() else { throw RepositoryError.staleProviderGeneration }
+            // Keep provider validity through installation; no notification or
+            // actor suspension occurs while staging the canonical read.
+            tagStore.installWithoutObservation(value, generation: providerGeneration)
+        }
+        // Both backing values are installed before either tag notification.
+        tagStore.notifyInstalledValue()
+        return true
+    }
+
+    /// Manual assignment/clear and reviewed Apply publish complete category
+    /// metadata. Definition/rule edits and explicit recovery retain full hydration.
+    @MainActor
+    func refreshCategoryOverrideIfCurrent() async throws -> Bool {
+        guard let context = try categoryOverrideContextIfCurrent() else { return false }
+        let request = context.request, expected = context.witness
+        let worker = Task.detached(priority: .userInitiated) { try await request.prepare(expected: expected) }
+        let prepared = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
+        try Task.checkCancellation()
+        try installCategoryOverride(prepared, expected: expected, revision: context.revision)
+        return true
+    }
+
+    @MainActor
+    func categoryOverrideContextIfCurrent() throws -> (request: CategoryOverrideReadRequest, witness: CategorySourceWitness, revision: UUID)? {
+        guard persistenceState.isUsable else { throw RepositoryStoreHydrationError.persistenceUnavailable }
+        guard let snapshotProvider, let request = snapshotProvider.categoryOverrideReadRequest(workspaceID: workspaceId),
+              let expected = categoryStore.sourceWitness,
+              expected.binding == request.binding,
+              categoryRuntimeIsCurrent(expected: expected) else { return nil }
+        return (request, expected, categoryStore.revision)
+    }
+
+    @MainActor
+    private func categoryRuntimeIsCurrent(expected: CategorySourceWitness) -> Bool {
+        guard let snapshotProvider, let providerGeneration,
+              expected.binding.provider == ObjectIdentifier(snapshotProvider),
+              expected.binding.generation == providerGeneration, expected.binding.workspaceID == workspaceId,
+              categoryStore.snapshot.providerGeneration == providerGeneration,
+              categoryStore.sourceWitness == expected,
+              categoryReconciliationGate?.isBlocked(for: providerGeneration) != true else { return false }
+        return categoryStore !== CategoryStore.shared ||
+            (DatabaseProvider.shared === snapshotProvider &&
+             ApplicationAvailability.shared.generation == providerGeneration && ApplicationAvailability.shared.permitsMutation)
+    }
+
+    /// Kept as one synchronous boundary so tests can exercise real intervening
+    /// metadata commits without a fabricated financial input or a timing race.
+    @MainActor
+    func installCategoryOverride(_ prepared: CategoryOverrideReadRequest.Prepared, expected: CategorySourceWitness, revision: UUID) throws {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.categoryOverrideInstall)
+        defer { GmailQualificationTiming.end(.categoryOverrideInstall, started: timing) }
+#endif
+        guard let snapshotProvider, let request = snapshotProvider.categoryOverrideReadRequest(workspaceID: workspaceId),
+              request.binding == expected.binding, prepared.witness == expected,
+              prepared.snapshot.providerGeneration == expected.binding.generation else { throw RepositoryError.staleProviderGeneration }
+        try snapshotProvider.withConsistentSnapshot {
+            guard categoryRuntimeIsCurrent(expected: expected), categoryStore.revision == revision,
+                  prepared.snapshot.categories == categoryStore.snapshot.categories,
+                  prepared.snapshot.automation?.rules == categoryStore.snapshot.automation?.rules else { throw CategoryAutomationError.stalePreview }
+            try request.requireCurrent(prepared)
+            categoryStore.installSnapshotWithoutObservation(prepared.snapshot, sourceWitness: prepared.witness)
+        }
+        categoryStore.notifySnapshotOfInstalledValue()
+    }
+
     /// Synchronously reads and validates one explicit provider generation without
     /// changing any global or injected runtime store. Staging deliberately performs
     /// no actor hop and emits no observer publication.
     func stageHydration() throws -> RepositoryRuntimeSnapshot {
-        if let snapshotProvider { return try snapshotProvider.withConsistentSnapshot { try stageConsistentHydration() } }
-        return try stageConsistentHydration()
+        guard let snapshotProvider else { return try stageConsistentHydration() }
+        let request = snapshotProvider.categoryOverrideReadRequest(workspaceID: workspaceId)
+        let (staged, source) = try snapshotProvider.withConsistentSnapshot {
+            let staged = try stageConsistentHydration()
+#if DEBUG
+            let timing = GmailQualificationTiming.begin(.categorySourceCapture)
+            defer { GmailQualificationTiming.end(.categorySourceCapture, started: timing) }
+#endif
+            return (staged, try request?.sourceRows())
+        }
+        var snapshot = staged
+        if let source, let request {
+            // Full hydration remains synchronous. Keep its exact immutable cut
+            // until the first override hashes both cuts off the main actor.
+            snapshot.categorySourceWitness = CategorySourceWitness(binding: request.binding, source: source)
+        }
+        return snapshot
     }
 
     private func stageConsistentHydration() throws -> RepositoryRuntimeSnapshot {
@@ -395,12 +519,35 @@ final class RepositoryStoreHydrator {
         guard persistenceState.isUsable else {
             throw RepositoryStoreHydrationError.persistenceUnavailable
         }
-        let transactionDTOs = try transactionRepo.trustedTransactions(workspaceId: workspaceId)
-        let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
+        // Reuse only reads captured inside the provider's existing consistent
+        // snapshot. Direct repository injection keeps independent reads.
+#if DEBUG
+        let factsTiming = GmailQualificationTiming.begin(.hydrationFacts)
+#endif
+        let hydrationInputs = try snapshotProvider.map {
+            try CategoryAutomationHydrationInputs.capture(from: $0, workspaceID: workspaceId)
+        }
+        let transactionDTOs = try hydrationInputs?.transactions ?? transactionRepo.trustedTransactions(workspaceId: workspaceId)
+        let accountDTOs = try hydrationInputs?.accounts ?? accountRepo.accounts(workspaceId: workspaceId)
+#if DEBUG
+        GmailQualificationTiming.end(.hydrationFacts, started: factsTiming, count: transactionDTOs.count)
+        let categoryTiming = GmailQualificationTiming.begin(.hydrationCategoryMetadata, count: transactionDTOs.count)
+#endif
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
         let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
-        let categoryAutomation = try categoryRepo.automationSnapshot(workspaceId: workspaceId)
-        let intelligence = try intelligenceRepo.snapshot(workspaceID: workspaceId)
+        let categoryAutomation: CategoryAutomationSnapshot?
+        let intelligence: FinancialIntelligenceSnapshot?
+        if let hydrationInputs, let snapshotProvider {
+            categoryAutomation = try snapshotProvider.categoryAutomationSnapshot(workspaceID: workspaceId, hydrationInputs: hydrationInputs)
+            intelligence = hydrationInputs.intelligence
+        } else {
+            categoryAutomation = try categoryRepo.automationSnapshot(workspaceId: workspaceId)
+            intelligence = try intelligenceRepo.snapshot(workspaceID: workspaceId)
+        }
+#if DEBUG
+        GmailQualificationTiming.end(.hydrationCategoryMetadata, started: categoryTiming, count: transactionDTOs.count)
+#endif
+        let tags = try tagRepo.snapshot(workspaceID: workspaceId)
         let cardDTOs = try cardRepo.snapshot(workspaceId: workspaceId)
         let zeroActivityControls = try importSessionRepo.statementZeroActivityControls(workspaceId: workspaceId)
         let bankSections = try importSessionRepo.bankSectionSnapshot(workspaceId: workspaceId)
@@ -514,7 +661,7 @@ final class RepositoryStoreHydrator {
         var categorySnapshot = try Self.categorySnapshot(
             categories: categoryDTOs,
             assignments: categoryAssignmentDTOs,
-            trustedTransactions: transactionDTOs,
+            trustedTransactionIDs: Set(transactionDTOs.map(\.id)),
             workspaceID: workspaceId
         )
         categorySnapshot.automation = categoryAutomation
@@ -546,6 +693,7 @@ final class RepositoryStoreHydrator {
             investments: investments,
             netWorthMembership: membership,
             intelligence: intelligence,
+            tags: tags,
             financialSources: Self.financialSourceContext(accounts: accounts, identifiers: identifiersByAccountID,
                 bankSections: bankSections.sections, projections: statementProjections, cards: cardSnapshot, zeroControls: zeroActivityControls, cbqPeriods: cbqPeriods),
             providerGeneration: providerGeneration
@@ -722,13 +870,14 @@ final class RepositoryStoreHydrator {
         )
         importSessionStore.installImportSessionsWithoutObservation(snapshot.importSessions)
         importAttemptStore.installAttemptsWithoutObservation(snapshot.importAttempts)
-        categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot)
+        categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot, sourceWitness: snapshot.categorySourceWitness)
         cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
         salaryStore.installWithoutObservation(snapshot.salaryStatements)
         fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration, scratchpads: snapshot.monthlyScratchpads)
         investmentStore.installWithoutObservation(snapshot.investments, generation: snapshot.providerGeneration)
         netWorthMembershipStore.installWithoutObservation(snapshot.netWorthMembership, generation: snapshot.providerGeneration)
         intelligenceStore.installWithoutObservation(snapshot.intelligence, generation: snapshot.providerGeneration, sources: snapshot.financialSources)
+        tagStore.installWithoutObservation(snapshot.tags, generation: snapshot.providerGeneration)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -755,6 +904,7 @@ final class RepositoryStoreHydrator {
         salaryStore.notifyInstalledValue()
         fundingPlanStore.notifyInstalledValue()
         investmentStore.notifyInstalledValue()
+        tagStore.notifyInstalledValue()
         netWorthMembershipStore.notifyInstalledValue()
         intelligenceStore.notifyInstalledValue()
     }
@@ -999,10 +1149,10 @@ final class RepositoryStoreHydrator {
         catch { throw RepositoryStoreHydrationError.malformedMoney }
     }
 
-    private static func categorySnapshot(
+    nonisolated static func categorySnapshot(
         categories: [CategoryDTO],
         assignments: [TransactionCategoryAssignmentDTO],
-        trustedTransactions: [TransactionDTO],
+        trustedTransactionIDs: Set<String>,
         workspaceID: String
     ) throws -> CategorySnapshot {
         guard Set(categories.map(\.id)).count == categories.count,
@@ -1030,7 +1180,6 @@ final class RepositoryStoreHydrator {
         }
 
         let categoryIDs = Set(runtimeCategories.map(\.id))
-        let trustedTransactionIDs = Set(trustedTransactions.map(\.id))
         guard Set(assignments.map(\.transactionId)).count == assignments.count,
               assignments.allSatisfy({
                   $0.workspaceId == workspaceID &&
@@ -1101,6 +1250,8 @@ final class RepositoryStoreHydrator {
         }
         let accountIDs = Set(accounts.map(\.id))
         let projectionByID = Dictionary(uniqueKeysWithValues: projections.map { ($0.projection.id, $0) })
+        let transactionsBySession = Dictionary(grouping: transactions, by: \.importSessionId)
+        let transactionsByDocument = Dictionary(grouping: transactions, by: \.documentId)
         for record in projections {
             guard record.workspaceID == workspaceId,
                   accountIDs.contains(record.accountID),
@@ -1152,16 +1303,19 @@ final class RepositoryStoreHydrator {
                       record.projection.sourceFormatCode == member.sourceFormatCode else {
                     throw RepositoryStoreHydrationError.invalidStatementEquivalence("member relationship")
                 }
-                let ownedTransactions = transactions.filter {
-                    $0.importSessionId == record.importSessionID || $0.documentId == record.documentID
-                }
+                // Preserve the original session OR document ownership test,
+                // including multiplicity, without rescanning every transaction.
+                let ownedCount = transactionsBySession[record.importSessionID, default: []].count +
+                    transactionsByDocument[record.documentID, default: []].filter {
+                        $0.importSessionId != record.importSessionID
+                    }.count
                 switch member.role {
                 case .authoritative:
-                    guard ownedTransactions.count == record.projection.eventCount else {
+                    guard ownedCount == record.projection.eventCount else {
                         throw RepositoryStoreHydrationError.invalidStatementEquivalence("authoritative transaction ownership")
                     }
                 case .supporting:
-                    guard ownedTransactions.isEmpty,
+                    guard ownedCount == 0,
                           attempts.contains(where: {
                               $0.importSessionId == record.importSessionID &&
                               $0.outcomeCode == ImportAttemptOutcome.equivalentSourceRecorded.rawValue &&
@@ -2287,23 +2441,32 @@ final class RepositoryStoreHydrator {
     }
 
     private static func sourceProductName(account: AccountDTO, sections: [BankStatementSectionPlanDTO]) -> String? {
+        sourceProductName(account: account, productLabels: sections.map(\.productLabel))
+    }
+
+    static func sourceProductName(account: AccountDTO, productLabels: [String]) -> String? {
         guard account.accountType == "bank", let institution = account.institutionId,
               ["Axis Bank", "HDFC Bank"].contains(institution) else { return nil }
-        let roles = Set(sections.flatMap { section in
-            section.productLabel.uppercased().split(whereSeparator: { !$0.isLetter }).filter { ["NRE", "NRO"].contains(String($0)) }.map(String.init)
+        let roles = Set(productLabels.flatMap { label in
+            label.uppercased().split(whereSeparator: { !$0.isLetter }).filter { ["NRE", "NRO"].contains(String($0)) }.map(String.init)
         })
         guard roles.count == 1, let role = roles.first else { return nil }
         return institution.replacingOccurrences(of: " Bank", with: "") + " " + role
     }
 
     private static func sourceAccountLabel(sections: [BankStatementSectionPlanDTO]) -> String? {
-        let products = Set(sections.map(\.productLabel).filter { !$0.isEmpty }).sorted()
-        let identities = Set(sections.flatMap(\.identityPatterns).filter { $0.kind.contains("account_number") }.map(\.pattern)).sorted()
+        sourceAccountLabel(productLabels: sections.map(\.productLabel),
+            accountNumberPatterns: sections.flatMap(\.identityPatterns).filter { $0.kind.contains("account_number") }.map(\.pattern))
+    }
+
+    static func sourceAccountLabel(productLabels: [String], accountNumberPatterns: [String]) -> String? {
+        let products = Set(productLabels.filter { !$0.isEmpty }).sorted()
+        let identities = Set(accountNumberPatterns).sorted()
         guard !products.isEmpty || !identities.isEmpty else { return nil }
         return (products + identities).joined(separator: " · ")
     }
 
-    private static func identitySummaries(from identifiers: [AccountIdentifierDTO]) -> [AccountIdentitySummary] {
+    static func identitySummaries(from identifiers: [AccountIdentifierDTO]) -> [AccountIdentitySummary] {
         identifiers.compactMap { identifier in
             guard identifier.strength == FinancialIdentifierStrength.strong.rawValue,
                   identifier.verificationState == FinancialIdentifierVerificationState.verified.rawValue else {
@@ -2336,7 +2499,7 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private static func transaction(
+    static func transaction(
         from dto: TransactionDTO,
         accounts: [AccountDTO],
         importedDocumentsByID: [String: ImportedDocumentDTO],
@@ -2495,7 +2658,7 @@ final class RepositoryStoreHydrator {
         return UUID(uuidString: canonical)!
     }
 
-    private static func accountType(from value: String?) -> AccountType {
+    static func accountType(from value: String?) -> AccountType {
         switch value {
         case "credit_card", "creditCard":
             return .creditCard

@@ -904,6 +904,43 @@ struct TransactionListViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func multipleSelectionTracksVisibleMembershipAndKeepsOverviewIndependent() async throws {
+        let context = try await authenticTransactionListContext()
+        let model = TransactionListViewModel(transactionStore: context.transactionStore,
+            importSessionStore: context.importSessionStore, accountStore: context.accountStore,
+            categoryStore: context.categoryStore)
+        model.synchronizePresentation(generation: context.provider.generationToken, availabilityState: .current)
+        let rows = Array(model.transactionPresentationResult.rows.prefix(4))
+        #expect(rows.count == 4)
+        let ids = Set(rows.map(\.stableID))
+        model.selectPresentationRows(ids: ids.union(["not-a-canonical-row"]))
+        #expect(model.selectedPresentationRowIDs == ids)
+        #expect(model.selectedPresentationRowID == nil && model.selectedPresentationRow == nil)
+        model.presentationSort = .init(key: .category, direction: .ascending)
+        #expect(model.selectedPresentationRowIDs == ids)
+        let orderedSelection = model.selectedPresentationRows.map(\.stableID)
+        let expectedOrder = model.transactionPresentationResult.rows.filter { ids.contains($0.stableID) }.map(\.stableID)
+        #expect(orderedSelection == expectedOrder)
+
+        let overview = model.makePeriodOverview()
+        #expect(overview.selectedPresentationRowIDs == ids)
+        overview.selectPresentationRows(ids: [])
+        #expect(model.selectedPresentationRowIDs == ids)
+
+        let selectedCanonicalIDs = Set(rows.prefix(2).compactMap { $0.transaction.repositoryTransactionId })
+        model.presentationFilter.canonicalTransactionIDs = selectedCanonicalIDs
+        let retained = Set(model.transactionPresentationResult.rows.map(\.stableID)).intersection(ids)
+        #expect(retained.count == 2 && model.selectedPresentationRowIDs == retained)
+        model.presentationFilter.canonicalTransactionIDs = nil
+        #expect(model.selectedPresentationRowIDs == retained)
+        model.synchronizePresentation(generation: ProviderGenerationToken(), availabilityState: .current)
+        #expect(model.selectedPresentationRowIDs.isEmpty)
+        model.selectPresentationRows(ids: ids)
+        model.synchronizePresentation(generation: nil, availabilityState: .unavailable)
+        #expect(model.selectedPresentationRowIDs.isEmpty)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func currentProjectionIsReusedAcrossReadsAndQueryChanges() async throws {
         let context = try await authenticTransactionListContext()
         let model = TransactionListViewModel(

@@ -101,7 +101,7 @@ struct PlanningEditorView: View {
     @State private var error: String?
     @State private var acknowledged = false
     @State private var adjustmentKind: PlanDatedAdjustment.Kind = .irregularCost
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pending: (() -> Void)?
 #endif
@@ -144,7 +144,7 @@ struct PlanningEditorView: View {
         }.padding(24).frame(width: 820).frame(maxHeight: 760)
             .font(theme.typography.body).foregroundStyle(theme.palette.primaryText).background(theme.palette.contentSurface)
             .onAppear(perform: populate)
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             .alert(DevelopmentProfileAcknowledgementPresentation.title,
                 isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pending = nil } })) {
                     Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
@@ -463,7 +463,7 @@ struct PlanningEditorView: View {
     private func execute(_ operation: @escaping () throws -> Void) {
         do { try operation(); error = nil }
         catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if case DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) = error { challenge = value; pending = { execute(operation) }; return }
 #endif
             self.error = error.localizedDescription
@@ -529,7 +529,7 @@ struct PlanningAccountsEditor: View {
     @State private var previous: IntelligencePreferences?
     @State private var excluded: Set<String> = []
     @State private var error: String?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
 
@@ -569,7 +569,7 @@ struct PlanningAccountsEditor: View {
                 previous = FinancialIntelligenceStore.shared.snapshot?.preferences
                 excluded = previous?.excludedPlanningAccountIDs ?? []
             }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             .alert(DevelopmentProfileAcknowledgementPresentation.title,
                 isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil } })) {
                     Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
@@ -588,7 +588,7 @@ struct PlanningAccountsEditor: View {
             try FinancialIntelligenceCoordinator().applyPlanning(.preferences(value, replacing: previous), generation: generation)
             dismiss()
         } catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if case DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) = error { challenge = value; return }
 #endif
             self.error = error.localizedDescription

@@ -5,6 +5,7 @@ import SwiftUI
 /// It deliberately performs no valuation, source lookup, refresh, or mutation.
 struct DashboardInvestmentSnapshotCard: View {
     @Environment(\.lfTheme) private var theme
+    @ObservedObject private var backgroundUpdates = BackgroundUpdatesSession.shared
 
     let overview: InvestmentOverview
     let report: NetWorthReport
@@ -101,7 +102,7 @@ struct DashboardInvestmentSnapshotCard: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .accessibilityLabel("\(valueTitle) in USD: \(usdValue.display)")
                 if let inrValue = inr?.value?.covering(scope.priceCount) {
-                    Text(inrValue.display)
+                    Text("INR equivalent: " + inrValue.display)
                         .font(theme.typography.tableMoney)
                         .monospacedDigit()
                         .foregroundStyle(theme.palette.secondaryText)
@@ -113,7 +114,7 @@ struct DashboardInvestmentSnapshotCard: View {
                     .font(theme.typography.secondary)
                     .foregroundStyle(theme.palette.secondaryText)
                 if let inrValue = inr?.value?.covering(scope.priceCount) {
-                    Text(inrValue.display)
+                    Text("INR equivalent: " + inrValue.display)
                         .font(theme.typography.tableMoney)
                         .monospacedDigit()
                         .foregroundStyle(theme.palette.secondaryText)
@@ -128,12 +129,14 @@ struct DashboardInvestmentSnapshotCard: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: theme.spacing.controlGap) {
                 currentValue.frame(maxWidth: .infinity, alignment: .leading)
-                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount))
+                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount),
+                                  inrAmount: inr?.cost?.covering(scope.costCount))
                 growthMetric
             }
             VStack(alignment: .leading, spacing: theme.spacing.small) {
                 currentValue
-                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount))
+                performanceMetric("Invested / allocated", amount: usd?.cost?.covering(scope.costCount),
+                                  inrAmount: inr?.cost?.covering(scope.costCount))
                 growthMetric
             }
         }
@@ -141,7 +144,8 @@ struct DashboardInvestmentSnapshotCard: View {
 
     private var growthMetric: some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
-            performanceMetric("Gain / growth", amount: usd?.gain?.covering(scope.gainCount), profit: true)
+            performanceMetric("Gain / growth", amount: usd?.gain?.covering(scope.gainCount),
+                              inrAmount: inr?.gain?.covering(scope.gainCount), profit: true)
             returnMetric
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,6 +154,7 @@ struct DashboardInvestmentSnapshotCard: View {
     private func performanceMetric(
         _ title: String,
         amount: InvestmentConvertedAmount?,
+        inrAmount: InvestmentConvertedAmount?,
         profit: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.micro) {
@@ -167,6 +172,11 @@ struct DashboardInvestmentSnapshotCard: View {
                     .font(theme.typography.caption)
                     .foregroundStyle(theme.palette.secondaryText)
             }
+            Text("INR equivalent: " + (inrAmount?.display ?? "Unavailable"))
+                .font(theme.typography.tableMoney).monospacedDigit()
+                .foregroundStyle(theme.palette.secondaryText)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("\(title) in INR: \(inrAmount?.display ?? "Unavailable")")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -197,6 +207,7 @@ struct DashboardInvestmentSnapshotCard: View {
                 Text("No prices available.")
                     .foregroundStyle(theme.palette.secondaryText)
             } else {
+                Text(backgroundUpdates.observationStatus(identities: Set(scope.quotes.map(\.mapping.identity))))
                 Label(
                     "\(scope.priceCount)/\(scope.holdingCount) prices available · \(quoteAgeText(now: now))",
                     systemImage: "clock"
@@ -229,11 +240,11 @@ struct DashboardInvestmentSnapshotCard: View {
     }
 
     private func quoteAgeText(now: Date) -> String {
-        ageText(quoteAge(now: now), noun: "oldest")
+        ageText(quoteAge(now: now), noun: "oldest price date")
     }
 
     private func fxAgeText(now: Date) -> String {
-        ageText(fxAge(now: now), noun: "FX refresh")
+        ageText(fxAge(now: now), noun: "FX fetched")
     }
 
     private func ageText(_ days: Int, noun: String) -> String {

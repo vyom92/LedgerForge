@@ -78,6 +78,7 @@ private enum SettingsSubsection: String {
     case ibkrAccount = "IBKR"
     case emailStatements = "Email Statements"
     case backgroundUpdates = "Background Updates"
+    case companion = "iPhone Companion"
     case backup = "Backup & Restore"
     case categories = "Categories"
 
@@ -88,6 +89,7 @@ private enum SettingsSubsection: String {
         case .ispAccount, .ibkrAccount: "link"
         case .emailStatements: "envelope"
         case .backgroundUpdates: "clock.arrow.circlepath"
+        case .companion: "iphone"
         case .backup: "externaldrive"
         case .categories: "tag"
         }
@@ -115,7 +117,7 @@ enum AppShellSection: String, CaseIterable {
     ]
 
     static func developerConsoleVisible(developerModeEnabled: Bool) -> Bool {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         return developerModeEnabled
 #else
         return false
@@ -144,7 +146,7 @@ enum AppShellSection: String, CaseIterable {
     }
 }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 private enum ProtectedImportIntent {
     case presentFileImporter
     case prepareURLs([URL])
@@ -1500,7 +1502,7 @@ struct ContentView: View {
     @State private var sidebarRailOverride: Bool?
     @State private var shellPresentationWidth: CGFloat = 1440
     @State private var didStartRepositoryHydration = false
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @StateObject private var developerDatabaseProfileViewModel = DeveloperDatabaseProfileViewModel()
     @State private var pendingProtectedImportIntent: ProtectedImportIntent?
     @State private var developmentAcknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
@@ -1761,7 +1763,7 @@ struct ContentView: View {
         .onChange(of: activeStatementPasswordChallenge?.id) { _, _ in
             statementPassword = ""
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .confirmationDialog(
             DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(
@@ -1804,7 +1806,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var profileWarning: some View {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         if let activeProfile = developerDatabaseProfileViewModel.activeProfile,
            let warning = DeveloperDatabaseProfileWarningView(profile: activeProfile) {
             warning
@@ -1815,7 +1817,7 @@ struct ContentView: View {
     }
 
     private var developerConsoleVisible: Bool {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         AppShellSection.developerConsoleVisible(
             developerModeEnabled: developerDatabaseProfileViewModel.developerModeEnabled
         )
@@ -1850,7 +1852,7 @@ struct ContentView: View {
             }) },
             settings: { settingsContent },
             developer: {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
                 DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel)
 #else
                 DeveloperConsoleView()
@@ -1879,6 +1881,25 @@ struct ContentView: View {
                         }
                         .frame(width: usesColumns ? investmentWidth : nil)
                         salaryDashboardSummary
+                    }
+                    if let month = dashboardViewModel.moneyFlowMonth {
+                        DashboardMoneyFlowCard(projection: dashboardViewModel.moneyFlow,
+                            selectedMonth: Binding(get: { dashboardViewModel.moneyFlowMonth ?? month },
+                                set: { dashboardViewModel.selectMoneyFlowMonth($0) }),
+                            selectedCurrency: Binding(get: { dashboardViewModel.moneyFlowCurrency },
+                                set: { dashboardViewModel.selectMoneyFlowCurrency($0) }),
+                            availableMonths: dashboardViewModel.moneyFlowMonths,
+                            availableCurrencies: dashboardViewModel.moneyFlowCurrencies,
+                            isWorking: dashboardViewModel.moneyFlowWorking,
+                            errorMessage: dashboardViewModel.moneyFlowError) { inspection in
+                                let ids = inspection.allTransactionIDs
+                                transactionViewModel.clearPresentationCriteria()
+                                transactionViewModel.presentationFilter.canonicalTransactionIDs = ids
+                                transactionViewModel.presentationFilter.accountIDs = Set(transactionViewModel.allPresentationRows
+                                    .filter { ids.contains($0.transaction.repositoryTransactionId ?? "") }.compactMap(\.accountID))
+                                transactionViewModel.showMoneyFlowInspection(inspection)
+                                selectedSection = .transactions
+                            }
                     }
                     columns {
                         dashboardAccountPanel(isCard: false)
@@ -2339,7 +2360,7 @@ struct ContentView: View {
         VStack(spacing: 18) {
             if !showsAutomaticImportProgress { importStepper }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if let developmentActionMessage {
                 Text(developmentActionMessage)
                     .font(theme.typography.formCaption)
@@ -2647,6 +2668,8 @@ struct ContentView: View {
                         }
                     } else if settingsSubsection == .backgroundUpdates {
                         BackgroundUpdatesSettingsView(session: backgroundUpdates, availableWidth: width)
+                    } else if settingsSubsection == .companion {
+                        CompanionMacSettingsView(session: .shared)
                     } else if settingsSubsection == .backup {
                         BackupRestoreSettingsSection(availableWidth: width)
                     } else if settingsSubsection == .categories {
@@ -2672,7 +2695,7 @@ struct ContentView: View {
                 }
             } trailing: {
                 settingsDestinationGroup("Connections & updates", destinations: [
-                    .liveFX, .ispAccount, .ibkrAccount, .emailStatements, .backgroundUpdates
+                    .liveFX, .ispAccount, .ibkrAccount, .emailStatements, .backgroundUpdates, .companion
                 ])
             }
             settingsDataPanel(availableWidth: availableWidth)
@@ -2689,7 +2712,7 @@ struct ContentView: View {
 
     private var settingsApplicationPanel: some View {
         LFPanel(title: "Application") {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             Toggle("Developer Mode", isOn: Binding(
                 get: { developerDatabaseProfileViewModel.developerModeEnabled },
                 set: { updateDeveloperMode($0) }
@@ -2777,6 +2800,7 @@ struct ContentView: View {
         case .emailStatements: summary = emailIntake.connectionSummary
         case .ibkrAccount: summary = ibkrFlexSession.connectionSummary
         case .backgroundUpdates: summary = backgroundUpdates.status
+        case .companion: summary = "Mac snapshots and Monthly Plan sync with your iPhone."
         }
         let needsAttention: Bool
         switch destination {
@@ -4456,7 +4480,7 @@ struct ContentView: View {
                     statementEquivalenceBlocksConfirmation(preparedImport)
             },
             confirm: { preparedImport in
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
                 requestProtectedImportAction(.confirm(preparedImport))
 #else
                 Task {
@@ -4465,7 +4489,7 @@ struct ContentView: View {
 #endif
             },
             retryPreparation: {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
                 requestProtectedImportAction(.retryPreparation)
 #else
                 retryCurrentPreparation()
@@ -4736,7 +4760,7 @@ struct ContentView: View {
         showingImporter = true
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func updateDeveloperMode(_ requestedValue: Bool) {
         developerDatabaseProfileViewModel.setDeveloperModeEnabled(requestedValue)
         if !developerDatabaseProfileViewModel.developerModeEnabled,
@@ -4843,7 +4867,7 @@ struct ContentView: View {
               availableConfirmedImportRecoveryAction(for: outcome) == action else {
             return
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         guard pendingProtectedImportIntent == nil,
               developmentAcknowledgementChallenge == nil else {
             return
@@ -4869,7 +4893,7 @@ struct ContentView: View {
                     guard importCentre.isCurrentRecoveryContext(context.id, route: context.route) else {
                         return false
                     }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
                     requestProtectedImportAction(
                         .prepareRecoveryURL(
                             url,
@@ -4960,7 +4984,7 @@ struct ContentView: View {
         Button("Clear selection") { pendingBatchSourceURLs = [] }
             .lfSecondaryAction()
         Button("Prepare and import batch", systemImage: "square.and.arrow.down") {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             requestProtectedImportAction(.prepareURLs(pendingBatchSourceURLs))
 #else
             beginImportBatch(from: pendingBatchSourceURLs)

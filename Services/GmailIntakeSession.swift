@@ -34,6 +34,7 @@ final class GmailIntakeSession: ObservableObject {
     @Published var selectedSenderAddress: String?
 
     private let tokens: GmailTokenBroker
+    private let quietTokens: GmailTokenBroker
     private let collector = GmailCollector()
     private let preferences: UserDefaults
     private var client: GmailClient?
@@ -41,9 +42,19 @@ final class GmailIntakeSession: ObservableObject {
     private var observation: AnyCancellable?
     private var inboxReloadID: UUID?
     private var inboxGeneration: ProviderGenerationToken?
+    private let importCentre: ImportCentreCoordinator<PreparedImport>
+    private let automaticImportEnabled: Bool
+    private var automaticIntakeTask: Task<Void, Never>?
 
-    init(tokens: GmailTokenBroker = GmailTokenBroker(), preferences: UserDefaults = .standard) {
+    init(tokens: GmailTokenBroker = GmailTokenBroker(), preferences: UserDefaults = .standard,
+         quietTokens: GmailTokenBroker = GmailTokenBroker(store: GmailKeychainGrantStore(interaction: .forbidden)),
+         importCentre: ImportCentreCoordinator<PreparedImport>? = nil) {
         self.tokens = tokens; self.preferences = preferences
+        self.quietTokens = quietTokens
+        self.importCentre = importCentre ?? ProductionImportCentre.shared
+        // The app-hosted test window must not operate on providers installed by
+        // individual tests. An explicitly injected coordinator owns test intake.
+        automaticImportEnabled = importCentre != nil || ProcessInfo.processInfo.environment["LEDGERFORGE_TEST_HOST"] != "1"
         account = preferences.string(forKey: Self.savedAccountKey)
     }
 
@@ -66,6 +77,11 @@ final class GmailIntakeSession: ObservableObject {
             && !importedSourceIDs.contains($0.id) && $0.acquisition == .available
             && [.pending, .review, .skipped].contains($0.attention) }
     }
+    /// Existing holds, skips and dismissals require an explicit revisit. Mail
+    /// nomination only selects preparation; it never establishes parser support.
+    var automaticSources: [GmailInboxSource] {
+        batchSources.filter { $0.attention == .pending && $0.family != .other }
+    }
     var selectedSource: GmailInboxSource? { selectedSourceID.flatMap { inbox?.sources[$0] } }
     var senderRules: [GmailSenderRule] { inbox?.configuredSenders ?? GmailSenderRule.initial }
     var selectedSenders: Set<String> { Set(senderRules.filter(\.isSelected).map(\.address)) }
@@ -76,23 +92,35 @@ final class GmailIntakeSession: ObservableObject {
     var canStartCollection: Bool { canCollect && !selectedSenders.isEmpty }
     var canCollect: Bool {
         isConnected && !isChecking && !isCollecting && DatabaseProvider.shared.persistenceState.isUsable
-            && ProductionImportCentre.shared.permitsSourceSelection
+            && importCentre.permitsSourceSelection
     }
 
     func connect(configuration: Data? = nil, reauthorize: Bool = false) {
         connect {
             if let configuration { try await self.tokens.configureExistingClient(configuration) }
             if reauthorize { try await self.tokens.reauthorizeExistingConnection() }
-            let selectedAccount = try await self.tokens.savedAccount()
-            let connection = GmailClient(expectedAccount: selectedAccount, tokens: self.tokens)
-            try await connection.verifyAccount()
-            try Task.checkCancellation()
-            self.client = connection; self.account = selectedAccount; self.isConnected = true; self.needsClientConfiguration = false
-            self.needsAuthorization = false
-            self.preferences.set(selectedAccount, forKey: Self.savedAccountKey)
-            self.message = "Connected with read-only access. Collection does not import financial data."
-            await self.reloadInbox()
+            try await self.establishConnection(using: self.tokens)
         }
+    }
+
+    /// Reopen the existing grant after launch or connectivity recovery without
+    /// starting OAuth, displaying Keychain UI or collecting a new interval.
+    @discardableResult
+    func resumeSavedConnection() -> Task<Void, Never>? {
+        guard account != nil, !isConnected, !needsAuthorization, !needsClientConfiguration else { return nil }
+        return connect { try await self.establishConnection(using: self.quietTokens) }
+    }
+
+    private func establishConnection(using broker: GmailTokenBroker) async throws {
+        let selectedAccount = try await broker.savedAccount()
+        let connection = GmailClient(expectedAccount: selectedAccount, tokens: broker)
+        try await connection.verifyAccount()
+        try Task.checkCancellation()
+        self.client = connection; self.account = selectedAccount; self.isConnected = true; self.needsClientConfiguration = false
+        self.needsAuthorization = false
+        self.preferences.set(selectedAccount, forKey: Self.savedAccountKey)
+        self.message = "Connected with read-only Gmail access. Ready attachments import automatically while LedgerForge is open."
+        await self.reloadInbox()
     }
 
     /// Owns the connection's busy/error lifecycle independently of the browser
@@ -147,7 +175,7 @@ final class GmailIntakeSession: ObservableObject {
         isCollecting = true; message = nil; progress = .init()
         task = Task { [weak self] in
             guard let self else { return }
-            defer { isCollecting = false; task = nil }
+            defer { isCollecting = false; task = nil; scheduleAutomaticIntake() }
             do {
                 let jobLease: BackgroundJobLease?
                 if let sqlite = provider.sqliteProvider {
@@ -164,7 +192,7 @@ final class GmailIntakeSession: ObservableObject {
                 }
                 guard DatabaseProvider.shared.generationToken == generation else { throw GmailIntakeError.staleProvider }
                 progress = result
-                message = "Collection complete. Review originals in Import Centre when you are ready to import."
+                message = "Collection complete. Ready attachments import automatically; items needing review remain in Import Centre."
                 BackgroundUpdateExecutor.publishHint()
             } catch is CancellationError {
                 message = "Collection stopped. Saved originals are retained; resume the incomplete interval when ready."
@@ -221,8 +249,39 @@ final class GmailIntakeSession: ObservableObject {
 
     func bindImportCentre() {
         guard observation == nil else { return }
-        observation = ProductionImportCentre.shared.$items.sink { [weak self] items in
+        observation = importCentre.$items.sink { [weak self] items in
             self?.recordAttention(items)
+            self?.scheduleAutomaticIntake()
+        }
+    }
+
+    /// Continue only after metadata reconciliation and a mounted app window.
+    /// Active manual queues and owner-held items are never replaced or retried.
+    private func scheduleAutomaticIntake() {
+        guard automaticImportEnabled, automaticIntakeTask == nil else { return }
+        automaticIntakeTask = Task { [weak self] in
+            await Task.yield()
+            guard let self else { return }
+            automaticIntakeTask = nil
+            guard observation != nil, isReconciled, !isCollecting,
+                  DatabaseProvider.shared.persistenceState.isUsable,
+                  !DatabaseActivityGate.shared.hasExclusiveOperation,
+                  importCentre.presentationOwnerCount > 0 else { return }
+            let pending = automaticSources
+            guard !pending.isEmpty else { return }
+            if !importCentre.permitsSourceSelection {
+                // Completed receipts remain in Import History. Only a
+                // successfully drained queue can advance without owner input.
+                guard importCentre.hasTerminalOutcomesForEntireBatch,
+                      importCentre.items.allSatisfy({
+                          $0.completionDisposition == .committed || $0.completionDisposition == .exactDuplicate
+                              || $0.retainedNewerHoldings
+                      }), importCentre.reset() else { return }
+            }
+            let urls = pending.compactMap(\.importURL)
+            guard urls.count == pending.count,
+                  importCentre.startConfirmedBatch(urls, preparationLimit: 2) else { return }
+            message = "Processing \(pending.count) collected attachment(s). Items needing a decision remain in Import Centre."
         }
     }
 
@@ -272,24 +331,24 @@ final class GmailIntakeSession: ObservableObject {
     }
 
     func startConfirmedEmailBatch() -> Bool {
-        guard isReconciled, !isCollecting, ProductionImportCentre.shared.permitsSourceSelection else { return false }
+        guard isReconciled, !isCollecting, importCentre.permitsSourceSelection else { return false }
         let urls = batchSources.compactMap(\.importURL)
         guard !urls.isEmpty, urls.count == batchSources.count else { return false }
-        return ProductionImportCentre.shared.startConfirmedBatch(urls, preparationLimit: 2)
+        return importCentre.startConfirmedBatch(urls, preparationLimit: 2)
     }
 
     func startSelectedEmailImport() -> Bool {
-        guard isReconciled, !isCollecting, ProductionImportCentre.shared.permitsSourceSelection,
+        guard isReconciled, !isCollecting, importCentre.permitsSourceSelection,
               let source = selectedSource, !source.dismissed, source.acquisition == .available,
               let url = source.importURL else { return false }
-        return ProductionImportCentre.shared.startConfirmedBatch([url], preparationLimit: 2)
+        return importCentre.startConfirmedBatch([url], preparationLimit: 2)
     }
 
     func dismissSelected() { updateSelected(dismissed: true) }
     func revisitSelected() { updateSelected(dismissed: false) }
 
     private func updateSelected(dismissed: Bool) {
-        guard !isCollecting, ProductionImportCentre.shared.permitsSourceSelection,
+        guard !isCollecting, importCentre.permitsSourceSelection,
               let account, let id = selectedSourceID else { return }
         do {
             let repository = DatabaseProvider.shared.gmailInboxRepo
@@ -320,7 +379,7 @@ final class GmailIntakeSession: ObservableObject {
         }
         if source.retainedNewerHoldings == true { return "Current holdings kept · No update needed" }
         switch source.attention {
-        case .pending: return "Ready to prepare"
+        case .pending: return source.family == .other ? "Ready to review" : "Waiting for automatic import"
         case .review: return "Needs review"
         case .password: return "Needs password"
         case .unsupported: return "Held · Unsupported source"
@@ -359,7 +418,8 @@ final class GmailIntakeSession: ObservableObject {
                 case .skipped: attention = .skipped
                 case .completed:
                     attention = item.completionDisposition == .rejected || item.completionDisposition == .transactionEventBlocked ? .review : .pending
-                case .pending, .preparing, .committing, .cancelled: attention = nil
+                case .cancelled: attention = .skipped
+                case .pending, .preparing, .committing: attention = nil
                 }
                 if let attention, attention != source.attention {
                     state.sources[source.id]?.attention = attention
@@ -370,7 +430,16 @@ final class GmailIntakeSession: ObservableObject {
                     changed = true
                 }
             }
-            guard changed else { return }
+            guard changed else {
+                // A review-free commit can leave attention at .pending throughout.
+                // Reconcile its newly durable fingerprint before another queue can
+                // start; unchanged inbox metadata does not imply unchanged imports.
+                if emailItems.contains(where: { $0.phase == .completed &&
+                    ($0.completionDisposition == .committed || $0.completionDisposition == .exactDuplicate) }) {
+                    requestReconciliation()
+                }
+                return
+            }
             state = try repository.save(state, originals: [:], expectedRevision: state.revision)
             inbox = state
             inboxGeneration = DatabaseProvider.shared.generationToken
@@ -404,6 +473,7 @@ final class GmailIntakeSession: ObservableObject {
               inbox?.account == snapshot?.account, inbox?.revision == snapshot?.revision else { return }
         importedSourceIDs = imported
         coverage = .init(generation: generation, inbox: snapshot, importedSourceIDs: imported)
+        scheduleAutomaticIntake()
     }
 
     /// Sender and dismissal edits change inbox metadata, not accepted imports.
@@ -414,6 +484,7 @@ final class GmailIntakeSession: ObservableObject {
             return
         }
         coverage = .init(generation: previous.generation, inbox: inbox, importedSourceIDs: previous.importedSourceIDs)
+        scheduleAutomaticIntake()
     }
 
     private func requestReconciliation() {

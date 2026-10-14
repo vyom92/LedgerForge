@@ -72,9 +72,11 @@ actor BackgroundUpdateExecutor {
     /// while Gmail and ISP retain their established executor paths. Keeping
     /// this split here prevents the foreground from racing a helper-owned
     /// public retry after the app closes.
-    func runAutomaticNonPublic(configuration: BackgroundScheduleConfiguration) async {
+    func runAutomaticNonPublic(configuration: BackgroundScheduleConfiguration, recoverInterruptedGmail: Bool = false) async {
         guard configuration.enabled else { return }
-        if configuration.gmailCollectionEnabled { _ = await collectGmail(configuration: configuration, manual: false) }
+        if configuration.gmailCollectionEnabled {
+            _ = await collectGmail(configuration: configuration, manual: false, recoverInterrupted: recoverInterruptedGmail)
+        }
         if configuration.zurichISPHoldingsEnabled { _ = await refreshISP(configuration: configuration, manual: false) }
         _ = await refreshISP(configuration: configuration, manual: false, salaryCheck: true)
         if configuration.ibkrFlexHoldingsEnabled { _ = await refreshIBKR(configuration: configuration, manual: false) }
@@ -101,7 +103,8 @@ actor BackgroundUpdateExecutor {
         let provider = provider, workspaceID = workspaceID
         let snapshot = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID) }
         let mappings = Set(snapshot.holdings.compactMap { holding -> InvestmentPriceMapping? in
-            guard holding.ibkrObservationID == nil, let confirmed = InvestmentPriceRegistry.confirmedMapping(for: holding),
+            guard let confirmed = InvestmentPriceRegistry.confirmedMapping(for: holding,
+                container: snapshot.containers.first { $0.id == holding.containerID }),
                   holding.priceMapping == nil || holding.priceMapping == confirmed else { return nil }
             return confirmed
         })
@@ -134,10 +137,11 @@ actor BackgroundUpdateExecutor {
 
     /// Attempts suppress repeated failures within a slot. Native durable
     /// receipts remain the authority for successful publication after a crash.
-    private func simpleDue(_ kind: BackgroundJobKind, slot: Date, nativeSuccess: Date?) throws -> Bool {
+    private func simpleDue(_ kind: BackgroundJobKind, slot: Date, nativeSuccess: Date?, recoverInterrupted: Bool = false) throws -> Bool {
         if let nativeSuccess, nativeSuccess >= slot { return false }
         if let receipt = try provider.backgroundJobRepo.jobRecord(kind), receipt.completedAt != nil,
            receipt.claimedAt >= slot {
+            if kind == .gmailCollection, recoverInterrupted, receipt.outcome == .retryPending { return true }
             // A helper denied its own Keychain authorization cannot suppress
             // an already-authorized foreground identity for the whole slot.
             return origin == .foreground && receipt.origin == .helper && receipt.outcome == .refusedCredentialInteraction
@@ -201,6 +205,7 @@ actor BackgroundUpdateExecutor {
                 var value = attempts[identity]!
                 do {
                     let reference = try await rates.fetchUnit(currency: currency)
+                    value.checkedAt = Date()
                     try Task.checkCancellation()
                     try withAuthority {
                         let cache = SQLiteBackgroundPublicCacheRepository(database: provider.database)
@@ -212,6 +217,7 @@ actor BackgroundUpdateExecutor {
                     }
                     Self.publishHint()
                 } catch {
+                    value.checkedAt = Date()
                     value.succeeded = false; value.failure = "Rate unavailable"; value.retryAt = value.attempts < 2 ? Date().addingTimeInterval(60) : nil
                     try withAuthority { try progressStore.save(value) }
                 }
@@ -234,6 +240,7 @@ actor BackgroundUpdateExecutor {
                 for definition in definitions {
                     let identity = definition.mapping.identity
                     var value = attempts[identity]!
+                    value.checkedAt = Date()
                     do {
                         try Task.checkCancellation()
                         let quote = try (results[identity] ?? .failure(.unavailable)).get().validated()
@@ -259,7 +266,7 @@ actor BackgroundUpdateExecutor {
         } catch { return .authorityRefused }
     }
 
-    func collectGmail(configuration: BackgroundScheduleConfiguration, manual: Bool) async -> Outcome {
+    func collectGmail(configuration: BackgroundScheduleConfiguration, manual: Bool, recoverInterrupted: Bool = false) async -> Outcome {
         do {
             guard let lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .gmailCollection) else { return .alreadyRunning }
             defer { withExtendedLifetime(lease) {} }
@@ -268,7 +275,7 @@ actor BackgroundUpdateExecutor {
             let stored = try withAuthority { try provider.gmailInboxRepo.storedAccounts() }
             let state = try stored.count == 1 ? provider.gmailInboxRepo.load(account: stored[0]) : nil
             let senders = Set(state?.configuredSenders.filter(\.isSelected).map(\.address) ?? [])
-            if !manual, try !simpleDue(.gmailCollection, slot: slot, nativeSuccess: state?.completedThrough(senders: senders)) { return .notDue }
+            if !manual, try !simpleDue(.gmailCollection, slot: slot, nativeSuccess: state?.completedThrough(senders: senders), recoverInterrupted: recoverInterrupted) { return .notDue }
             guard let claim = try withAuthority({ try provider.backgroundJobRepo.claim(.gmailCollection, activation: activation, origin: origin, now: now) }) else { return .alreadyRunning }
             guard let state, !senders.isEmpty, state.activeScan != nil || state.completedThrough(senders: senders) != nil else { return finish(claim, .refusedNoCoverage) }
             do {
@@ -288,9 +295,19 @@ actor BackgroundUpdateExecutor {
                 }
                 return finish(claim, .collectedNativeReceipts)
             } catch {
-                return finish(claim, (error as? GmailIntakeError) == .keychainUnavailable ? .refusedCredentialInteraction : .failedFinal)
+                return finish(claim, Self.gmailFailure(error))
             }
         } catch { return .authorityRefused }
+    }
+
+    /// Preserve a resumable network interruption without repeatedly retrying
+    /// credentials or treating every metadata reload as another opportunity.
+    nonisolated static func gmailFailure(_ error: Error) -> BackgroundJobCompletion {
+        switch error as? GmailIntakeError {
+        case .keychainUnavailable: .refusedCredentialInteraction
+        case .network, .timedOut: .retryPending
+        default: .failedFinal
+        }
     }
 
     func refreshISP(configuration: BackgroundScheduleConfiguration, manual: Bool, salaryCheck: Bool = false,

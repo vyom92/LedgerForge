@@ -18,7 +18,7 @@ struct DashboardNetWorthCard: View {
     @State private var showsBreakdown = false
     @Binding var showsZeroBalances: Bool
     @State private var failure: String?
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pendingChoice: (Bool, NetWorthMemberID, ProviderGenerationToken)?
 #endif
@@ -63,7 +63,7 @@ struct DashboardNetWorthCard: View {
             }
         }
         .onChange(of: selectedRow) { _, value in if value != nil { showsDetails = false } }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title,
                isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pendingChoice = nil } })) {
             Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) { approveChoice() }
@@ -80,7 +80,7 @@ struct DashboardNetWorthCard: View {
         report.targets.reduce(CGFloat(148)) { width, target in
             let amountWidth = ((target.amount?.display ?? "Unavailable") as NSString)
                 .size(withAttributes: [.font: theme.typography.nativeFont(.headlineMoney, tabularDigits: true)]).width
-            let titleWidth = (netWorthCurrencyName(target.currency) as NSString)
+            let titleWidth = (target.currency.rawValue as NSString)
                 .size(withAttributes: [.font: theme.typography.nativeFont(.caption)]).width
             return max(width, ceil(max(amountWidth, titleWidth)) + theme.spacing.small)
         }
@@ -127,18 +127,21 @@ struct DashboardNetWorthCard: View {
 
     private var totals: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: theme.spacing.controlGap) {
+            HStack(alignment: .top, spacing: 0) {
                 ForEach(report.targets) { target in
                     total(target)
-                        .frame(minWidth: minimumCurrencyColumnWidth, maxWidth: .infinity, alignment: .leading)
-                        .overlay(alignment: .leading) {
-                            if target.id != report.targets.first?.id {
-                                Rectangle().fill(theme.palette.divider).frame(width: 1)
-                                    .offset(x: -theme.spacing.controlGap / 2)
-                            }
+                        .fixedSize(horizontal: true, vertical: false)
+                    if target.id != report.targets.last?.id {
+                        HStack(spacing: 0) {
+                            Spacer(minLength: theme.spacing.valueGutter)
+                            Rectangle().fill(theme.palette.divider).frame(width: 1)
+                            Spacer(minLength: theme.spacing.valueGutter)
                         }
+                        .accessibilityHidden(true)
+                    }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
                 ForEach(report.targets) { target in
                     total(target).frame(maxWidth: .infinity, alignment: .leading)
@@ -151,22 +154,14 @@ struct DashboardNetWorthCard: View {
 
     private func total(_ target: NetWorthTarget) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.small) {
-            Text(netWorthCurrencyName(target.currency)).font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
             Text(target.amount?.display ?? "Unavailable")
                 .font(theme.typography.headlineMoney)
                 .monospacedDigit()
                 .fixedSize(horizontal: true, vertical: false)
-                .accessibilityLabel("Net worth \(target.currency.rawValue): \(target.amount?.display ?? "unavailable"). \(target.label)")
-            if let words = target.amount?.amountInWords {
-                Text(words)
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
-                    .accessibilityLabel("Amount in words: " + words)
-            }
-            if Set(report.targets.map(\.label)).count > 1 {
+                .accessibilityLabel("Net worth \(target.currency.rawValue): \(target.amount?.display ?? "unavailable")")
+            Text(target.currency.rawValue).font(theme.typography.caption)
+                .foregroundStyle(theme.palette.secondaryText)
+            if target.isPartial || target.isStale || target.arithmeticFailure || target.amount == nil {
                 supporting(target.label + (target.missingCount == 0 ? "" : " · \(target.missingCount) unavailable"))
             }
         }
@@ -336,7 +331,7 @@ struct DashboardNetWorthCard: View {
             try NetWorthMembershipCoordinator().setIncluded(included, member: member,
                 workspaceID: workspaceID, expectedGeneration: generation)
         } catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if case DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) = error {
                 challenge = value; pendingChoice = (included, member, generation); return
             }
@@ -348,7 +343,7 @@ struct DashboardNetWorthCard: View {
             }
         }
     }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func approveChoice() {
         guard let challenge, let pendingChoice else { return }
         self.challenge = nil; self.pendingChoice = nil

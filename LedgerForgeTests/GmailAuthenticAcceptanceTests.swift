@@ -4566,3 +4566,122 @@ private final class GmailQualificationStores {
             providerGeneration: provider.generationToken, participatesInLifecycleGate: false)
     }
 }
+
+
+extension GmailAuthenticAcceptanceTests {
+    /// Replay the owner's reported clean attachment from an approved native
+    /// pre-import backup. Exact retained bytes stay in RAM/the isolated database.
+    /// No confirmation, inferred mapping or financial-domain fixture is supplied.
+    @Test(.globalRuntimeStateIsolation)
+    func retainedReadyInvestmentImportsWithoutManualBatchAndDoesNotRepeatAfterRelaunch() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let priorURL = URL(fileURLWithPath: try #require(environment["LEDGERFORGE_AUTONOMOUS_EMAIL_BASELINE_DATABASE"]))
+        let sourceURL = URL(fileURLWithPath: try #require(environment["LEDGERFORGE_AUTONOMOUS_EMAIL_SOURCE_DATABASE"]))
+        let digest = try #require(environment["LEDGERFORGE_AUTONOMOUS_EMAIL_SOURCE_SHA256"])
+        let prior = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: priorURL)
+        let sourceProvider = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: sourceURL)
+        defer { prior.database.close(); sourceProvider.database.close() }
+        let sourceBefore = try NetWorthTestSupport.financialDigest(sourceProvider.database)
+        let priorBefore = try NetWorthTestSupport.financialDigest(prior.database)
+        let originalInboxes = try sourceProvider.gmailInboxRepo.storedAccounts().map { try sourceProvider.gmailInboxRepo.load(account: $0) }
+        let originalInbox = try #require(originalInboxes.first { $0.sources.values.contains { $0.sha256 == digest } })
+        let originals = originalInbox.sources.values.filter { $0.sha256 == digest }
+        let original = try #require(originals.first)
+        try #require(originals.count == 1 && original.family == .cbqInvestment && original.attention == .pending)
+        let bytes = try sourceProvider.gmailInboxRepo.original(sha256: digest, byteCount: original.expectedByteCount)
+        let originalVerified = GmailInboxSource.digest(bytes) == digest
+        #expect(originalVerified)
+        let expected = try sourceProvider.investmentRepo.snapshot(workspaceID: "default-workspace")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-automatic-email-\(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("qualification.sqlite").path
+        try prior.database.createBackup(at: path)
+        let sqlite = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing)
+        defer { sqlite.database.close() }
+        let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
+        let previous = DatabaseProvider.shared
+        DatabaseProvider.shared = provider
+        defer { DatabaseProvider.shared = previous }
+        let initiallyImported = try provider.importSessionRepo.successfulImportContainsFingerprint(
+            algorithm: DocumentFingerprintDTO.sourceBytesSHA256Algorithm, fingerprint: digest)
+        try #require(!initiallyImported)
+        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace")
+        let plans = try provider.fundingPlanRepo.scratchpads(workspaceId: "default-workspace")
+        var inbox = try provider.gmailInboxRepo.load(account: original.account)
+        try #require(inbox.sources[original.id] == nil)
+        inbox.sources[original.id] = original
+        if let receipt = originalInbox.messages[original.messageID] {
+            try #require(receipt.sourceIDs == [original.id])
+            inbox.messages[original.messageID] = receipt
+        }
+        _ = try provider.gmailInboxRepo.save(inbox, originals: [digest: bytes], expectedRevision: inbox.revision)
+        let hydrator = RepositoryStoreHydrator(databaseProvider: provider, workspaceId: "default-workspace", participatesInLifecycleGate: false)
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        let engine = ImportEngine(
+            sourceSnapshotAcquirer: { try GmailImportSource.acquireSnapshot(from: $0, repository: provider.gmailInboxRepo) },
+            importPersistenceCoordinator: DefaultImportPersistenceCoordinator(databaseProvider: provider),
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) }, rejectedAttemptHydration: {},
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(stateProvider: { nil }))
+        let coordinator = ImportCentreCoordinator<PreparedImport>.production(using: engine)
+        let owner = UUID(); coordinator.attachPresentationOwner(owner)
+        defer { coordinator.detachPresentationOwner(owner) }
+        let preferenceName = "LedgerForge.automatic-email-test.\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: preferenceName))
+        defer { preferences.removePersistentDomain(forName: preferenceName) }
+        let session = GmailIntakeSession(preferences: preferences, importCentre: coordinator)
+        if let nativeEvidencePath = environment["LEDGERFORGE_AUTONOMOUS_EMAIL_NATIVE_PREIMPORT"] {
+            try sqlite.database.createBackup(at: nativeEvidencePath)
+        }
+        session.bindImportCentre()
+        await session.reloadInbox()
+        let deadline = Date().addingTimeInterval(120)
+        while !coordinator.hasTerminalOutcomesForEntireBatch && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(coordinator.items.count == 1)
+        let item = try #require(coordinator.items.first)
+        try #require(item.completionDisposition == .committed,
+            "Automatic intake phase: \(String(describing: item.phase)); failure family: \(String(describing: item.preparationFailure?.family)); disposition: \(String(describing: item.completionDisposition)); retained newer holdings: \(item.retainedNewerHoldings)")
+        #expect(item.validationPassed && coordinator.batchSummary.committedCount == 1)
+        #expect(item.outcome?.persistenceStatus == "Persistence Succeeded")
+        let saved = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+        func cbqFacts(_ snapshot: InvestmentSnapshot) -> [[String]] {
+            snapshot.holdings.filter { $0.parserProfile == "cbq.investment-portfolio.pdf" }.map {
+                [$0.instrumentIdentity, $0.sourceAliases.sorted().joined(separator: "|"), $0.displayName,
+                 $0.units.sourceText, $0.currency, $0.averageCost?.sourceText ?? "", $0.totalCost?.sourceText ?? "",
+                 $0.averageCostLabel ?? "", $0.totalCostLabel ?? "", $0.costCurrency ?? "", $0.holdingsDate,
+                 $0.issueDate ?? "", $0.valuationDate ?? "", String($0.sourceOrdinal)]
+            }.sorted { $0.lexicographicallyPrecedes($1) }
+        }
+        let sameAcceptedFacts = !cbqFacts(saved).isEmpty && cbqFacts(saved) == cbqFacts(expected)
+        #expect(sameAcceptedFacts)
+        let unrelatedUnchanged = try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace") == transactions
+            && provider.fundingPlanRepo.scratchpads(workspaceId: "default-workspace") == plans
+        #expect(unrelatedUnchanged)
+        await session.reloadInbox()
+        #expect(session.importedSourceIDs.contains(original.id) && session.automaticSources.isEmpty)
+        let acceptedDigest = try NetWorthTestSupport.financialDigest(sqlite.database)
+        // Another inbox session/window opening must not re-queue the imported source.
+        let reopenedCoordinator = ImportCentreCoordinator<PreparedImport>.production(using: engine)
+        let reopenedOwner = UUID(); reopenedCoordinator.attachPresentationOwner(reopenedOwner)
+        defer { reopenedCoordinator.detachPresentationOwner(reopenedOwner) }
+        let reopened = GmailIntakeSession(preferences: preferences, importCentre: reopenedCoordinator)
+        reopened.bindImportCentre(); await reopened.reloadInbox()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(reopenedCoordinator.items.isEmpty && reopened.importedSourceIDs.contains(original.id))
+        let noDuplicateResidue = try NetWorthTestSupport.financialDigest(sqlite.database) == acceptedDigest
+        #expect(noDuplicateResidue)
+        let sourcesPreserved = try NetWorthTestSupport.financialDigest(prior.database) == priorBefore
+            && NetWorthTestSupport.financialDigest(sourceProvider.database) == sourceBefore
+        #expect(sourcesPreserved)
+        try sqlite.database.checkpointAndClose()
+        let durable = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing)
+        defer { durable.database.close() }
+        let exactReopen = try durable.investmentRepo.snapshot(workspaceID: "default-workspace") == saved
+            && durable.importSessionRepo.successfulImportContainsFingerprint(algorithm: DocumentFingerprintDTO.sourceBytesSHA256Algorithm, fingerprint: digest)
+        #expect(exactReopen)
+    }
+}

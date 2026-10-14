@@ -429,6 +429,7 @@ nonisolated private struct InvestmentHoldingSort: SortComparator {
 
 struct InvestmentHoldingInlineDetails: View {
     @Environment(\.lfTheme) private var theme
+    @ObservedObject private var backgroundUpdates = BackgroundUpdatesSession.shared
     let holding: InvestmentHolding
     let valuation: InvestmentValuation?
     let container: InvestmentContainer?
@@ -497,7 +498,11 @@ struct InvestmentHoldingInlineDetails: View {
                         detailLine("Price kind", quote.mapping.priceKind ?? "Unavailable")
                         detailLine("Date basis", quote.dateBasis.label)
                         if let text = quote.valuationText { detailLine("Provider date / time", text) }
-                        detailLine("Fetched successfully", AppDateDisplay.timestamp(quote.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
+                        detailLine("Quote fetched", AppDateDisplay.timestamp(quote.fetchedAt, zone: TimeZone(secondsFromGMT: 0)!))
+                        detailLine("Checked", backgroundUpdates.publicProgress[quote.mapping.identity]?.checkedAt.map {
+                            InvestmentPriceDates.fetchInstant($0)
+                        } ?? "Not recorded")
+                        detailLine("Observation", backgroundUpdates.observationStatus(identity: quote.mapping.identity))
                         detailLine("Source qualification", quote.qualification)
                     }
                 }.padding(.top, theme.spacing.small)

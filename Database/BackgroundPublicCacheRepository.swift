@@ -27,11 +27,8 @@ nonisolated final class SQLiteBackgroundPublicCacheRepository: BackgroundPublicC
     func snapshot(now: Date) throws -> BackgroundPublicCacheSnapshot {
         try database.withExclusiveAccess {
             let legs = try database.query(sql: "SELECT currency,raw_token,fetched_at FROM background_al_dar_reference_cache;") { row -> (AlDarCurrency, AlDarUnitReference)? in
-                guard let currency = row.string(at: 0).flatMap(AlDarCurrency.init(rawValue:)),
-                      let raw = row.string(at: 1), let fetched = row.string(at: 2),
-                      let reference = try? AlDarUnitReference(currency: currency, rawToken: raw, fetchedAtISO: fetched),
-                      reference.fetchedAt <= now else { return nil }
-                return (currency, reference)
+                guard let reference = Self.reference(currency: row.string(at: 0), raw: row.string(at: 1), fetched: row.string(at: 2), now: now) else { return nil }
+                return (reference.currency, reference)
             }
             let quotes = try database.query(sql: "SELECT identity,quote_json FROM background_investment_quote_cache;") { row -> (String, InvestmentQuote)? in
                 guard let identity = row.string(at: 0), let data = row.data(at: 1),
@@ -45,6 +42,22 @@ nonisolated final class SQLiteBackgroundPublicCacheRepository: BackgroundPublicC
             return BackgroundPublicCacheSnapshot(alDarLegs: Dictionary(uniqueKeysWithValues: legs.compactMap { $0 }),
                                                  investmentQuotes: Dictionary(uniqueKeysWithValues: quotes.compactMap { $0 }))
         }
+    }
+
+    /// Same validation as snapshot(now:), restricted to the monthly INR dependency.
+    func planningINRReference(now: Date) throws -> AlDarUnitReference? {
+        try database.withExclusiveAccess {
+            try database.query(sql: "SELECT currency,raw_token,fetched_at FROM background_al_dar_reference_cache WHERE currency=?;", params: [AlDarCurrency.inr.rawValue]) { row -> AlDarUnitReference? in
+                Self.reference(currency: row.string(at: 0), raw: row.string(at: 1), fetched: row.string(at: 2), now: now)
+            }.compactMap { $0 }.first
+        }
+    }
+
+    private static func reference(currency: String?, raw: String?, fetched: String?, now: Date) -> AlDarUnitReference? {
+        guard let currency = currency.flatMap(AlDarCurrency.init(rawValue:)), let raw, let fetched,
+              let reference = try? AlDarUnitReference(currency: currency, rawToken: raw, fetchedAtISO: fetched),
+              reference.fetchedAt <= now else { return nil }
+        return reference
     }
 
     /// Explicit foreground binding may carry the legacy in-process cache into

@@ -235,6 +235,13 @@ intentional test memory. The repository-owned Run script passes only
 Debug memory before any default SQLite bootstrap. Both markers are compile-time
 inactive in Release.
 
+The app target defines `LEDGERFORGE_DEVELOPER_TOOLS` in Debug and Release for
+the owner-selected Developer Mode controls. That flag does not enable Debug
+test-host/run-host selectors or fault injection. Release Current Database
+continues to use the adopted personal `ledgerforge.sqlite`; the development
+profiles use their separate lifecycle-owned identities. Current remains
+ineligible for profile reset. The helper does not receive this flag.
+
 The script inspects the local `/usr/bin/open` contract for process-local
 `--env` support before launch. It does not mutate the global launch environment.
 

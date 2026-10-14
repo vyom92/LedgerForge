@@ -72,6 +72,8 @@ final class AlDarReferenceSessionTests: XCTestCase {
         XCTAssertEqual(session.refreshing, [.usd])
         XCTAssertEqual(session.legs[.usd], old)
         XCTAssertEqual(session.oldestFetch(for: .usdINR), old.fetchedAt)
+        XCTAssertEqual(session.checkedAt[.usd], clock.now())
+        XCTAssertNotEqual(session.checkedAt[.usd], old.fetchedAt)
         XCTAssertTrue(session.isStale(.usdINR))
         XCTAssertFalse(session.isStale(.qarINR))
         XCTAssertEqual(AlDarReferenceCachePreferences(defaults: defaults).load(now: clock.now())[.usd], old)
@@ -103,6 +105,7 @@ final class AlDarReferenceSessionTests: XCTestCase {
         AlDarReferenceCachePreferences(defaults: defaults).save(legs)
         let session = AlDarReferenceSession(defaults: defaults, now: { clock.now() }, sleep: { try await sleep.wait($0) }, fetch: { try await transport.fetch($0) })
         XCTAssertEqual(session.legs, legs)
+        XCTAssertTrue(session.checkedAt.isEmpty, "Loading cached rates must not manufacture a check")
         session.opened(); session.opened()
         try await until { session.requestCount == 2 }
         XCTAssertEqual(session.legs, legs)
@@ -124,6 +127,7 @@ final class AlDarReferenceSessionTests: XCTestCase {
         XCTAssertEqual(session.legs[.inr]?.returned.rawToken, old.returned.rawToken)
         XCTAssertEqual(session.legs[.inr]?.fetchedAt, clock.now())
         XCTAssertFalse(session.isStale(.qarINR))
+        XCTAssertEqual(session.checkedAt[.inr], clock.now())
         session.stop(); await sleep.finish()
     }
 

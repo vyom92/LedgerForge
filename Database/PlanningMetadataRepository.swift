@@ -23,16 +23,22 @@ extension SQLiteFinancialIntelligenceRepository {
             guard value.transactionID == row.string(at: 0), value.workspaceID == workspace else { throw FinancialIntelligenceError.invalidRecord }
             return value
         }
-        snapshot.preferences = try db.query(sql: "SELECT preferences_json FROM intelligence_preferences WHERE workspace_id=?;", params: [workspace]) { row in
-            let value: IntelligencePreferences = try Self.decode(row.string(at: 0))
-            guard value.workspaceID == workspace else { throw FinancialIntelligenceError.invalidRecord }
-            return value
-        }.first
+        snapshot.preferences = try planningPreferences(workspaceID: workspace)
         snapshot.plans = try db.query(sql: "SELECT a.plan_month,a.assistance_json,p.id FROM plan_assistance a LEFT JOIN funding_plans p ON p.workspace_id=a.workspace_id AND p.plan_month=a.plan_month WHERE a.workspace_id=? ORDER BY a.plan_month;", params: [workspace]) { row in
             let value: PlanAssistance = try Self.decode(row.string(at: 1))
             guard value.month == row.string(at: 0), value.workspaceID == workspace, row.string(at: 2) != nil else { throw FinancialIntelligenceError.invalidRecord }
             return value
         }
+    }
+
+    /// Fresh workspace policy only; full financial validation remains on its
+    /// ordinary repository/hydration boundaries.
+    func planningPreferences(workspaceID workspace: String) throws -> IntelligencePreferences? {
+        try db.query(sql: "SELECT preferences_json FROM intelligence_preferences WHERE workspace_id=?;", params: [workspace]) { row in
+            let value: IntelligencePreferences = try Self.decode(row.string(at: 0))
+            guard value.workspaceID == workspace else { throw FinancialIntelligenceError.invalidRecord }
+            return value
+        }.first
     }
 
     func validatePlanning(_ snapshot: FinancialIntelligenceSnapshot, replacingPlan: FundingPlanDTO? = nil) throws {

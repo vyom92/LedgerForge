@@ -46,6 +46,8 @@ final class AlDarReferenceSession: ObservableObject {
     @Published private(set) var refreshing: Set<AlDarCurrency> = []
     @Published private(set) var requestCount = 0
     @Published private(set) var refreshFeedback: RefreshFeedback?
+    @Published private(set) var checkedAt: [AlDarCurrency: Date] = [:]
+    @Published private(set) var networkAvailable: Bool?
     private let cache: AlDarReferenceCachePreferences
     private let fetch: Fetch
     private let sleep: Sleep
@@ -60,9 +62,17 @@ final class AlDarReferenceSession: ObservableObject {
     var sharedRefresh: ((Bool) -> Void)?
     var sharedRefreshAll: ((Bool) -> Void)?
 
+    var observationStatus: String {
+        PublicObservationPresentation.cacheStatus(networkAvailable: networkAvailable, failed: !failures.isEmpty)
+    }
+
+    func setNetworkAvailable(_ available: Bool) { networkAvailable = available }
+
     func installShared(_ values: [AlDarCurrency: AlDarUnitReference], failures: Set<AlDarCurrency>, busy: Bool,
-                       busyCurrencies: Set<AlDarCurrency>? = nil) {
+                       busyCurrencies: Set<AlDarCurrency>? = nil,
+                       checkedAt: [AlDarCurrency: Date] = [:], networkAvailable: Bool? = nil) {
         legs = values; self.failures = failures
+        self.checkedAt = checkedAt; self.networkAvailable = networkAvailable
         refreshing = busy ? busyCurrencies ?? Set(AlDarCurrency.allCases) : []
         cache.save(values)
         if manualRefreshBaseline != nil, !busy { finishManualRefreshIfNeeded() }
@@ -150,6 +160,7 @@ final class AlDarReferenceSession: ObservableObject {
     }
     private func succeeded(_ value: AlDarUnitReference, expected: AlDarCurrency, token: UUID) {
         guard tokens[expected] == token else { return }
+        checkedAt[expected] = now()
         guard value.currency == expected, value.fetchedAt <= now() else {
             failed(expected, token: token, reason: "Al Dar returned an unusable rate.", final: true); return
         }
@@ -159,6 +170,7 @@ final class AlDarReferenceSession: ObservableObject {
     }
     private func failed(_ currency: AlDarCurrency, token: UUID, reason: String, final: Bool) {
         guard tokens[currency] == token else { return }
+        checkedAt[currency] = now()
         failures.insert(currency); failureReasons[currency] = reason
         if final { requests[currency] = nil; tokens[currency] = nil; refreshing.remove(currency) }
         if manualRefreshBaseline != nil {

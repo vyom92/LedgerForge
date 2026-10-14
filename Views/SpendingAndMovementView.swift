@@ -9,6 +9,7 @@ import Combine
 struct SpendingAndMovementView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject private var store = FinancialIntelligenceStore.shared
+    @ObservedObject private var categoryStore = CategoryStore.shared
     private let reconciliation = CategoryReconciliationGate.shared
     @ObservedObject var model: SpendingAnalysisModel
     let generation: ProviderGenerationToken?
@@ -39,7 +40,7 @@ struct SpendingAndMovementView: View {
     @State private var showsComparisonDetails = false
     @State private var reviewLimit = 40
     @State private var contentWidth: CGFloat = 1000
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var pending: (() -> Void)?
 #endif
@@ -73,7 +74,13 @@ struct SpendingAndMovementView: View {
                         Button("Reload saved decisions") { perform { try FinancialIntelligenceCoordinator().retryRefresh(workspaceID: store.snapshot!.workspaceID, generation: generation) } }
                     }
                     if model.isWorking { ProgressView("Reading recorded activity…").frame(maxWidth: .infinity, minHeight: 200) }
-                    else if let projection = model.projection {
+                    else if let error = model.errorMessage {
+                        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                            Text("Spending could not be calculated").font(theme.typography.rowTitle)
+                            Text(error).foregroundStyle(LFTheme.warning).textSelection(.enabled)
+                            Button("Reload analysis", action: refresh).lfSecondaryAction()
+                        }.accessibilityIdentifier("spending.analysisError")
+                    } else if let projection = model.projection {
                         if section == "Spending" { spending(projection) }
                         else { movements(projection) }
                     }
@@ -88,6 +95,7 @@ struct SpendingAndMovementView: View {
         .onDisappear { model.cancel() }
         .onChange(of: isActive) { _, _ in refresh() }
         .onChange(of: store.revision) { _, _ in refresh() }
+        .onChange(of: categoryStore.revision) { _, _ in refresh() }
         .onChange(of: availability) { _, _ in selection = nil; refresh() }
         .onChange(of: generation) { _, _ in selection = nil; refresh() }
         .onChange(of: currency) { _, _ in accountID = ""; refresh() }
@@ -96,7 +104,7 @@ struct SpendingAndMovementView: View {
             MovementReviewEditor(draft: draft, rows: model.sourceRows, generation: generation, sources: store.sources,
                 historyScope: relationshipHistoryScope)
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil; pending = nil } })) {
             Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
@@ -244,6 +252,7 @@ struct SpendingAndMovementView: View {
         } else {
             recordedHistory(value)
         }
+        refundDrilldown(value)
     }
 
     @ViewBuilder private func recordedHistory(_ value: SpendingProjection) -> some View {
@@ -256,7 +265,10 @@ struct SpendingAndMovementView: View {
         LFPanel {
             let layout = contentWidth >= 1000 ? AnyLayout(HStackLayout(alignment: .top, spacing: 30)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
             layout {
-                total("Recorded spending", value.spending).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 10) {
+                    total("Net recorded spending", value.spending)
+                    refundTotals(value.amounts)
+                }.frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .leading, spacing: 12) {
                     total("Recorded income", value.income)
                     Text("Interpretation and coverage may be incomplete.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
@@ -324,7 +336,10 @@ struct SpendingAndMovementView: View {
                         Button { onTransactions(period.transactionIDs) } label: {
                             HStack {
                                 Text(period.title).frame(width: 80, alignment: .leading)
-                                Text(period.transactionIDs.isEmpty ? "No observed activity" : "\(amount(period.income)) income · \(amount(period.spending)) spending")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(period.transactionIDs.isEmpty ? "No observed activity" : "\(amount(period.income)) income · \(amount(period.spending)) net spending")
+                                    if !period.transactionIDs.isEmpty { refundTotals(period.amounts) }
+                                }
                                 Spacer()
                                 Text(period.incompleteAccounts.isEmpty && period.unresolvedIDs.isEmpty ? "Covered" : "\(period.unresolvedIDs.count) unresolved · \(period.incompleteAccounts.count) accounts with gaps")
                             }.font(theme.typography.formCaption).padding(.vertical, 4)
@@ -361,7 +376,10 @@ struct SpendingAndMovementView: View {
                         .accessibilityIdentifier("spending.categoryChart")
                     ForEach(value.categories) { item in
                         Button { onTransactions(item.transactionIDs) } label: {
-                            HStack { Text(item.title); Spacer(); Text(amount(item.amount)).monospacedDigit(); Image(systemName: "chevron.right") }
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) { Text(item.title); refundTotals(item.amounts) }
+                                Spacer(); Text(amount(item.amount)).monospacedDigit(); Image(systemName: "chevron.right")
+                            }
                                 .padding(.vertical, 5)
                         }.buttonStyle(.plain).help("Open the \(item.transactionIDs.count) transactions behind this category total")
                     }
@@ -374,6 +392,103 @@ struct SpendingAndMovementView: View {
             Text(title).foregroundStyle(theme.palette.secondaryText).font(theme.typography.secondary)
             Text(amount(number)).font(theme.typography.headlineMoney).monospacedDigit().fixedSize(horizontal: true, vertical: false)
         }
+    }
+
+    private func nativeAmount(_ money: Money) -> String {
+        money.currency.code + " " + ((try? money.canonicalDecimalString()) ?? "Unavailable")
+    }
+
+    private func refundTotals(_ amounts: SpendingAmounts) -> some View {
+        Text("Gross " + nativeAmount(amounts.gross) + " · Allocated refunds " + nativeAmount(amounts.allocatedRefund) + " · Net " + nativeAmount(amounts.net))
+            .font(theme.typography.secondary).monospacedDigit().foregroundStyle(theme.palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private func refundDrilldown(_ value: SpendingProjection) -> some View {
+        let visibleIDs = Set(value.rows.map(\.id))
+        let events = store.snapshot?.movements.filter {
+            $0.decision == .confirmed && $0.kind == .refund && !visibleIDs.isDisjoint(with: $0.transactionIDs)
+        } ?? []
+        if !events.isEmpty {
+            LFPanel(title: "Refund allocations") {
+                Text("Allocated refunds reduce the original purchase month and its current category. Credits keep their actual dates, including credits outside the selected period.")
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                ForEach(events) { event in refundEventDetails(event) }
+            }
+        }
+    }
+
+    private func refundEventDetails(_ event: MovementEvent) -> some View {
+        let rows = model.sourceRows.filter { event.transactionIDs.contains($0.id) }
+        let purchase = rows.first { $0.id == event.refundAllocations?.first?.purchaseTransactionID }
+            ?? rows.first { $0.isBankOut || $0.isCardIncrease }
+        let legs = rows.map { row in
+            MovementRefundValidation.Leg(transactionID: row.id, accountID: row.accountID, domain: row.domain,
+                direction: row.isBankOut ? "debit" : row.isBankIn ? "credit" : row.isCardIncrease ? "card_increase_owed" : row.isCardDecrease ? "card_decrease_owed" : "",
+                money: row.transaction.money)
+        }
+        let resolved = try? MovementRefundValidation.resolve(event, legs: legs)
+        let validDates = purchase?.date.map { date in rows.allSatisfy { !$0.isLoanOrEMI && ($0.date.map { $0 >= date } ?? false) } } ?? false
+        return DisclosureGroup {
+            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                if let purchase {
+                    Text("Original purchase · " + (purchase.date.map { String($0.canonical.prefix(7)) } ?? "month unavailable") + " · " + purchase.categoryName)
+                        .font(theme.typography.formSection)
+                    sourceRow(purchase)
+                    if isOutsideAppliedPeriod(purchase.date) {
+                        Text("The original purchase is outside this period. Its refund adjustment belongs to that original month.")
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    }
+                }
+                if let resolved, validDates {
+                    refundTotals(.init(gross: resolved.gross, allocatedRefund: resolved.allocated, net: resolved.net))
+                } else {
+                    Text(event.refundAllocations == nil
+                         ? "This saved refund has no reviewed allocation. The credit remains unresolved until its original purchase and amount are confirmed."
+                         : "This allocation needs review. Its source dates or spending eligibility could not be verified, so no refund adjustment is applied.")
+                        .foregroundStyle(LFTheme.warning)
+                }
+                ForEach(event.refundAllocations ?? [], id: \.creditTransactionID) { allocation in
+                    Divider()
+                    if let credit = rows.first(where: { $0.id == allocation.creditTransactionID }) {
+                        Text("Refund credit" + (isOutsideAppliedPeriod(credit.date) ? " · outside selected period" : ""))
+                            .font(theme.typography.formSection)
+                        sourceRow(credit)
+                        Text("Allocated " + nativeAmount(allocation.amount)).font(theme.typography.tableMoney).monospacedDigit()
+                        if let residual = resolved?.residualByCredit[credit.id] {
+                            Text("Unallocated " + nativeAmount(residual) + (residual.amount > 0 ? " · Needs review" : ""))
+                                .font(theme.typography.secondary).foregroundStyle(residual.amount > 0 ? LFTheme.warning : theme.palette.secondaryText)
+                        }
+                    }
+                }
+                HStack(spacing: theme.spacing.controlGap) {
+                    Button("Inspect purchase and credits") { onTransactions(Set(event.transactionIDs)) }.lfSecondaryAction()
+                    Button("Edit allocation…") { selection = .init(event: event, suggested: nil, selectedIDs: Set(event.transactionIDs), kind: .refund) }.lfSecondaryAction()
+                }
+                DisclosureGroup("Source transaction IDs") {
+                    Text(event.transactionIDs.joined(separator: "\n")).font(theme.typography.formCaption).textSelection(.enabled)
+                }.font(theme.typography.secondary)
+            }.padding(.top, theme.spacing.controlGap)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(purchase?.transaction.description ?? "Refund awaiting an original purchase")
+                    .font(theme.typography.rowTitle).lineLimit(2).help(purchase?.transaction.description ?? "")
+                Text((purchase?.date?.presentation ?? "Purchase date unavailable") + " · " + (purchase?.categoryName ?? "Category unavailable"))
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            }
+        }.accessibilityIdentifier("spending.refund.\(event.id)")
+    }
+
+    private func isOutsideAppliedPeriod(_ date: StatementDate?) -> Bool {
+        guard let date else { return false }
+        return (!appliedStart.isEmpty && date.canonical < appliedStart) || (!appliedEnd.isEmpty && date.canonical > appliedEnd)
+    }
+
+    private func reviewDraft(for row: SpendingReviewRow) -> MovementReviewDraft {
+        if let event = store.snapshot?.confirmedByTransaction[row.id] {
+            return .init(event: event, suggested: nil, selectedIDs: Set(event.transactionIDs), kind: event.kind)
+        }
+        return .init(event: nil, suggested: nil, selectedIDs: [row.id], kind: row.source.isBankIn ? .income : .expense)
     }
     private func comparisonView(_ value: SpendingComparison) -> some View {
         let hasBothPeriods = !value.analysis.report.rows.isEmpty && !value.baseline.report.rows.isEmpty
@@ -408,7 +523,7 @@ struct SpendingAndMovementView: View {
                             difference("Recorded spending difference", value.spendingChange, baseline: value.baseline.report.spending,
                                 ids: spendingIDs(value.analysis.report).union(spendingIDs(value.baseline.report)))
                         }
-                        Text("Same \(currency) accounts and recognition rules in both periods. Source transaction dates are used where available; otherwise the labelled financial date. Purchases count once on their original dates. Refunds and charges are separate; loan and EMI entries are excluded.")
+                        Text("Same \(currency) accounts and recognition rules in both periods. Source transaction dates are used where available; otherwise the labelled financial date. Allocated refunds reduce the original purchase month and category. Credits keep their actual dates. Loan and EMI entries are excluded.")
                             .foregroundStyle(theme.palette.secondaryText)
                     }.padding(.top, theme.spacing.controlGap)
                 }.font(theme.typography.body).accessibilityIdentifier("spending.comparisonDetails")
@@ -419,8 +534,9 @@ struct SpendingAndMovementView: View {
     private func comparisonPrimary(_ value: SpendingComparison) -> some View {
         LFPanel(title: periodName(value.analysis)) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Recorded spending").font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                Text("Net recorded spending").font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
                 Text(amount(value.analysis.report.spending)).font(theme.typography.headlineMoney).monospacedDigit()
+                refundTotals(value.analysis.report.amounts)
                 Text(spendingChangeSummary(value)).font(theme.typography.rowTitle).monospacedDigit()
                     .foregroundStyle(value.spendingChange > 0 ? LFTheme.warning : theme.palette.primaryText)
                 Text("Compared with " + periodName(value.baseline)).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
@@ -437,7 +553,7 @@ struct SpendingAndMovementView: View {
     }
 
     private func comparisonReview(_ value: SpendingComparison) -> some View {
-        let ids = Set(value.analysis.report.rows.filter { $0.treatment == .unresolved }.map(\.id))
+        let ids = Set(value.analysis.report.rows.filter { $0.treatment == .unresolved || $0.refundNeedsReview }.map(\.id))
         return LFPanel(contentSpacing: 18) {
             Text(ids.isEmpty ? "Review status" : "Needs review").font(theme.typography.secondary).foregroundStyle(ids.isEmpty ? theme.palette.secondaryText : LFTheme.warning)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -477,7 +593,7 @@ struct SpendingAndMovementView: View {
 
     private func comparisonChart(_ value: SpendingComparison) -> some View {
         // Shared numeric domain, derived only from the two existing exact projections.
-        // Negative recorded spending (for example refunds) retains a signed axis.
+        // The exact projection determines the displayed numeric domain.
         let lower = min(Decimal.zero, value.analysis.report.spending, value.baseline.report.spending)
         let upper = max(Decimal.zero, value.analysis.report.spending, value.baseline.report.spending)
         let domain = geometry(lower)...(lower == upper ? geometry(upper) + 1 : geometry(upper))
@@ -562,9 +678,10 @@ struct SpendingAndMovementView: View {
             Button("\(value.purchaseIDs.count) purchases · average " + (value.averagePurchase.map(averageAmount) ?? "unavailable")) { onTransactions(value.purchaseIDs) }
                 .buttonStyle(.borderless).disabled(value.purchaseIDs.isEmpty)
             Button("Fees / interest " + amount(value.chargeAmount)) { onTransactions(value.chargeIDs) }.buttonStyle(.borderless).disabled(value.chargeIDs.isEmpty)
-            let refunds = value.report.rows.filter { $0.treatment == .refund }
-            Button("Refunds " + amount(refunds.reduce(0) { $0 + $1.spending })) { onTransactions(Set(refunds.map(\.id))) }.buttonStyle(.borderless).disabled(refunds.isEmpty)
-            let unresolved = value.report.rows.filter { $0.treatment == .unresolved }
+            refundTotals(value.report.amounts)
+            let refundIDs = Set(value.report.rows.filter { $0.treatment == .expense && !$0.refundDetails.isEmpty }.flatMap { [$0.id] + Array($0.supportingTransactionIDs) })
+            Button("Inspect allocated refunds") { onTransactions(refundIDs) }.buttonStyle(.borderless).disabled(refundIDs.isEmpty)
+            let unresolved = value.report.rows.filter { $0.treatment == .unresolved || $0.refundNeedsReview }
             Button("\(unresolved.count) need review · " + amount(unresolved.reduce(0) { $0 + $1.source.amount }) + " before offsets") {
                 onTransactions(Set(unresolved.map(\.id)))
             }.buttonStyle(.borderless).disabled(unresolved.isEmpty)
@@ -596,7 +713,7 @@ struct SpendingAndMovementView: View {
         }.font(theme.typography.formCaption)
     }
     private func recognizedIDs(_ value: SpendingProjection, treatment: SpendingTreatment) -> Set<String> { Set(value.rows.filter { $0.treatment == treatment }.map(\.id)) }
-    private func spendingIDs(_ value: SpendingProjection) -> Set<String> { Set(value.rows.filter { $0.treatment == .expense || $0.treatment == .refund }.map(\.id)) }
+    private func spendingIDs(_ value: SpendingProjection) -> Set<String> { Set(value.rows.filter { $0.treatment == .expense }.map(\.id)) }
     private func exact(_ value: Decimal) -> String {
         currency + " " + value.formatted(.number.precision(.fractionLength(2...8)).locale(Locale(identifier: currency == "INR" ? "en_IN" : "en_US")))
     }
@@ -644,17 +761,20 @@ struct SpendingAndMovementView: View {
             }
             if groups.count > reviewLimit { Button("Show more decisions") { reviewLimit += 40 }.lfSecondaryAction() }
         } else if reviewKind == "Needs review" {
-            let unresolved = value.rows.filter { $0.treatment == .unresolved }
+            let unresolved = value.rows.filter { $0.treatment == .unresolved || $0.refundNeedsReview }
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(unresolved.prefix(reviewLimit)) { row in
                     LFPanel(contentSpacing: 12) {
                         HStack {
                             Text("Needs review").font(theme.typography.rowTitle)
                             Spacer()
-                            Button("Review") { selection = .init(event: nil, suggested: nil, selectedIDs: [row.id], kind: row.source.isBankIn ? .income : .expense) }.lfSecondaryAction()
+                            Button("Review") { selection = reviewDraft(for: row) }.lfSecondaryAction()
                         }
                         sourceRow(row.source)
                         Text(row.explanation).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        if let residual = row.refundResidual {
+                            Text("Unallocated credit: " + nativeAmount(residual)).font(theme.typography.tableMoney).monospacedDigit()
+                        }
                     }
                 }
             }
@@ -662,9 +782,9 @@ struct SpendingAndMovementView: View {
             if unresolved.count > reviewLimit { Button("Show more entries") { reviewLimit += 40 }.lfSecondaryAction() }
         } else {
             let hiddenHistoryRows = Set(model.sourceRows.filter { !relationshipHistoryScope.includes($0.accountID) }.map(\.id))
-            let events = store.snapshot?.movements.filter { $0.decision == (reviewKind == "Confirmed" ? .confirmed : .rejected)
-                && $0.transactionIDs.contains(where: Set(value.rows.map(\.id)).contains)
-                && $0.transactionIDs.allSatisfy { !hiddenHistoryRows.contains($0) } } ?? []
+            let events = store.snapshot?.movements.filter { event in event.decision == (reviewKind == "Confirmed" ? .confirmed : .rejected)
+                && event.transactionIDs.contains(where: Set(value.rows.map(\.id)).contains)
+                && (event.kind == .refund || event.transactionIDs.allSatisfy { !hiddenHistoryRows.contains($0) }) } ?? []
             if events.isEmpty { Text("No \(reviewKind.lowercased()) relationships in this selection.").foregroundStyle(theme.palette.secondaryText) }
             ForEach(events) { event in
                 LFPanel(contentSpacing: 12) {
@@ -680,6 +800,10 @@ struct SpendingAndMovementView: View {
                     }
                     legs(event.transactionIDs)
                     Text(event.explanation).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                    if event.kind == .refund && event.refundAllocations == nil {
+                        Text("This saved refund has no reviewed allocation. Edit it to choose the original purchase and the amount from each credit.")
+                            .foregroundStyle(LFTheme.warning)
+                    }
                     if let conflict = SpendingIntelligence.contradiction(event, rows: model.sourceRows, sources: store.sources) {
                         Text(conflict).foregroundStyle(LFTheme.warning)
                     }
@@ -801,7 +925,7 @@ struct SpendingAndMovementView: View {
     }
     private func perform(_ action: () throws -> Void) { do { try action(); message = nil } catch { message = error.localizedDescription } }
     private func request(_ action: @escaping () -> Void) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do { if let generation { try DevelopmentProfileAcknowledgementGate.shared.requireAuthorization(for: .financialIntelligenceMutation, providerGeneration: generation) } }
         catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) { challenge = value; pending = action; return }
         catch { message = error.localizedDescription; return }
@@ -821,6 +945,7 @@ private struct MovementReviewDraft: Identifiable {
 private struct MovementReviewEditor: View {
     @Environment(\.lfTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var store = FinancialIntelligenceStore.shared
     let draft: MovementReviewDraft
     let rows: [SpendingSourceRow]
     let generation: ProviderGenerationToken?
@@ -832,59 +957,154 @@ private struct MovementReviewEditor: View {
     @State private var search = ""
     @State private var message: String?
     @State private var acknowledgement = false
-#if DEBUG
+    @State private var openedMetadata: FinancialIntelligenceSnapshot?
+    @State private var allocationText: [String: String] = [:]
+    @State private var newEventID = UUID().uuidString
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
     private var selected: [SpendingSourceRow] { rows.filter { ids.contains($0.id) } }
+    private var purchases: [SpendingSourceRow] { selected.filter { $0.isBankOut || $0.isCardIncrease } }
+    private var credits: [SpendingSourceRow] { selected.filter { $0.isBankIn || $0.isCardDecrease } }
+    private var refundPreview: MovementRefundValidation.Result? { try? reviewedRefund().result }
+    private var refundError: String? {
+        guard kind == .refund else { return nil }
+        do { _ = try reviewedRefund(); return nil } catch { return error.localizedDescription }
+    }
+    private var ownershipError: String? {
+        do { _ = try replacementEvent(); return nil } catch { return error.localizedDescription }
+    }
+    private var canSave: Bool {
+        acknowledgement && !ids.isEmpty && !explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            ownershipError == nil && (kind != .refund || refundError == nil)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("Review financial meaning").font(theme.typography.formTitle); Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
-            Picker("Meaning", selection: $kind) { ForEach(MovementKind.allCases.filter(\.isInScope), id: \.self) { Text($0.title).tag($0) } }.frame(maxWidth: 380)
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            HStack {
+                Text("Review financial meaning").font(theme.typography.formTitle)
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            Picker("Meaning", selection: $kind) {
+                ForEach(MovementKind.allCases.filter(\.isInScope), id: \.self) { Text($0.title).tag($0) }
+            }.frame(maxWidth: 380)
             Text(meaning).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(selected) { row in
-                        HStack(alignment: .top) {
-                            Button { ids.remove(row.id) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).help("Remove this leg from the review")
-                            rowLabel(row)
-                        }
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    if selected.isEmpty {
+                        Text(kind == .refund ? "Find and select the original purchase, then add its refund credits." : "Find and select the original entries below.")
+                            .foregroundStyle(theme.palette.secondaryText)
                     }
+                    ForEach(selected) { row in selectedRow(row) }
                     if let warning { Text(warning).foregroundStyle(LFTheme.warning) }
                     if let ratio { Text(ratio).font(theme.typography.formCaption) }
+                    if kind == .refund {
+                        if let refundError { Text(refundError).foregroundStyle(LFTheme.warning).accessibilityIdentifier("movements.refundError") }
+                        if let preview = refundPreview { refundSummary(preview) }
+                        if let previous = try? replacementEvent(), previous.kind == .expense {
+                            Text("This replaces the existing spending interpretation for the original purchase and keeps its saved relationship.")
+                                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                        }
+                    } else if let ownershipError { Text(ownershipError).foregroundStyle(LFTheme.warning) }
                 }
-            }.frame(minHeight: 90, maxHeight: 230)
-            TextField("Reason for this interpretation", text: $explanation, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
+            }.frame(minHeight: 130, maxHeight: 330)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Reason for this interpretation").font(theme.typography.formSection)
+                TextField("Describe the source evidence you checked", text: $explanation, axis: .vertical)
+                    .lineLimit(2...4).textFieldStyle(.roundedBorder)
+            }
             Divider()
-            TextField("Find an original entry by narration, reference or account", text: $search).textFieldStyle(.roundedBorder)
-            if !search.trimmingCharacters(in: .whitespaces).isEmpty {
-                ScrollView { LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(matches.prefix(80)) { row in
-                        HStack { Button { ids.insert(row.id) } label: { Image(systemName: "plus.circle") }.buttonStyle(.borderless).disabled(ids.contains(row.id)); rowLabel(row) }
+            TextField("Find an original entry by narration, reference or account", text: $search)
+                .textFieldStyle(.roundedBorder).accessibilityLabel("Find an original transaction")
+            if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                        ForEach(matches.prefix(80)) { row in
+                            HStack(alignment: .top) {
+                                Button { ids.insert(row.id) } label: { Image(systemName: "plus.circle") }
+                                    .buttonStyle(.borderless).disabled(ids.contains(row.id))
+                                    .help("Add this original entry").accessibilityLabel("Add original entry")
+                                rowLabel(row)
+                            }
+                        }
+                        if matches.isEmpty { Text("No original entries match this search.").foregroundStyle(theme.palette.secondaryText) }
+                        if matches.count > 80 { Text("Narrow the search to see more specific entries.").foregroundStyle(theme.palette.secondaryText) }
                     }
-                    if matches.count > 80 { Text("Narrow the search to see more specific entries.").foregroundStyle(theme.palette.secondaryText) }
-                } }.frame(minHeight: 100, maxHeight: 230)
+                }.frame(minHeight: 100, maxHeight: 210)
             }
             Toggle("I have checked the source entries and their financial meaning", isOn: $acknowledgement).toggleStyle(.checkbox)
-            if let message { Text(message).foregroundStyle(LFTheme.warning) }
-            HStack { Spacer(); Button("Confirm interpretation", action: requestSave).buttonStyle(.borderedProminent).disabled(!acknowledgement || ids.isEmpty || explanation.trimmingCharacters(in: .whitespaces).isEmpty) }
+            if let message { Text(message).foregroundStyle(LFTheme.warning).textSelection(.enabled) }
+            HStack {
+                Spacer()
+                Button(kind == .refund ? "Confirm refund allocation" : "Confirm interpretation", action: requestSave)
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(!canSave)
+                    .accessibilityIdentifier("movements.confirm")
+            }
         }
-        .padding(24).frame(minWidth: 850, idealWidth: 1100, minHeight: 500, idealHeight: 700)
+        .padding(theme.spacing.pagePadding).frame(minWidth: 760, idealWidth: 1000, minHeight: 560, idealHeight: 760)
         .foregroundStyle(theme.palette.primaryText).background(theme.palette.contentSurface)
-        .onAppear { ids = draft.selectedIDs; kind = draft.kind; explanation = draft.event?.explanation ?? draft.suggested?.explanation ?? "" }
-        .onChange(of: kind) { _, _ in acknowledgement = false }
-        .onChange(of: ids) { _, _ in acknowledgement = false }
-#if DEBUG
+        .onAppear(perform: loadDraft)
+        .onChange(of: kind) { _, _ in acknowledgement = false; message = nil; seedValidDefaults() }
+        .onChange(of: ids) { _, _ in acknowledgement = false; message = nil; seedValidDefaults() }
+        .onChange(of: allocationText) { _, _ in acknowledgement = false; message = nil }
+        .onChange(of: explanation) { _, _ in acknowledgement = false }
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title, isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil } })) {
             Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) { if let challenge { _ = DevelopmentProfileAcknowledgementGate.shared.acknowledge(challenge) }; challenge = nil; save() }
             Button("Cancel", role: .cancel) { challenge = nil }
         } message: { Text(DevelopmentProfileAcknowledgementPresentation.message) }
 #endif
     }
+
+    private func selectedRow(_ row: SpendingSourceRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                Button { ids.remove(row.id); allocationText.removeValue(forKey: row.id) } label: { Image(systemName: "minus.circle") }
+                    .buttonStyle(.borderless).help("Remove this entry from the review").accessibilityLabel("Remove original entry")
+                VStack(alignment: .leading, spacing: 5) {
+                    if kind == .refund {
+                        Text(row.isBankOut || row.isCardIncrease ? "Original purchase" : "Refund credit").font(theme.typography.formSection)
+                    }
+                    rowLabel(row)
+                }
+            }
+            if kind == .refund && (row.isBankIn || row.isCardDecrease) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("Allocate " + row.currency).font(theme.typography.formSection)
+                    TextField("Amount", text: Binding(get: { allocationText[row.id] ?? "" }, set: { allocationText[row.id] = $0 }))
+                        .textFieldStyle(.roundedBorder).frame(width: 170).monospacedDigit()
+                        .accessibilityLabel("Amount allocated from credit on " + (row.date?.presentation ?? "unknown date"))
+                        .accessibilityIdentifier("movements.refundAmount.\(row.id)")
+                    if let remaining = refundPreview?.residualByCredit[row.id] {
+                        Text("Unallocated " + nativeAmount(remaining) + (remaining.amount > 0 ? " · Needs review" : ""))
+                            .font(theme.typography.formCaption).foregroundStyle(remaining.amount > 0 ? LFTheme.warning : theme.palette.secondaryText)
+                    }
+                }.padding(.leading, 24)
+                if let error = amountError(for: row) {
+                    Text(error).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning).padding(.leading, 24)
+                }
+            }
+            Divider()
+        }
+    }
+
+    private func refundSummary(_ result: MovementRefundValidation.Result) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Gross " + nativeAmount(result.gross) + " · Allocated refunds " + nativeAmount(result.allocated) + " · Net " + nativeAmount(result.net))
+                .font(theme.typography.rowTitle).monospacedDigit().fixedSize(horizontal: false, vertical: true)
+            if let purchase = purchases.first {
+                Text("Spending month " + (purchase.date.map { String($0.canonical.prefix(7)) } ?? "unavailable") + " · " + purchase.categoryName)
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }.accessibilityIdentifier("movements.refundPreview")
+    }
+
     private var meaning: String {
         switch kind {
         case .ownTransfer: "Both bank entries remain. Neither is income or spending; cross-currency amounts keep their original currencies."
         case .cardPayment: "Bank cash pays down the card liability. This is a cash commitment, not another purchase."
-        case .refund: "The credit reduces spending on its source date. Select the original purchase too when its identity is established."
+        case .refund: "Select one original purchase and one or more refund credits from the same account and currency. Enter the amount from each credit. The allocation reduces the original purchase month and category; each credit keeps its actual date."
         case .reversal: "These equal, opposite entries cancel one another. Separate fees still count as spending."
         case .borrowing, .emiConversion: "Loan and EMI analysis is outside the selected scope."
         case .expense: "This one original outgoing entry is spending, separate from its category."
@@ -901,18 +1121,156 @@ private struct MovementReviewEditor: View {
         return "Observed legs: 1 \(out.currency) to \((incoming.amount / out.amount).formatted(.number.precision(.fractionLength(4)))) \(incoming.currency). This ratio does not separate exchange rate and fees."
     }
     private var matches: [SpendingSourceRow] {
-        let words = search.uppercased().split(separator: " ")
-        return rows.filter { row in let text = row.text + " " + row.accountTitle.uppercased(); return historyScope.includes(row.accountID) && !row.isLoanOrEMI && words.allSatisfy { text.contains($0) } }.sorted { ($0.date?.canonical ?? "", $0.id) > ($1.date?.canonical ?? "", $1.id) }
+        let words = search.uppercased().split(whereSeparator: \.isWhitespace)
+        return rows.filter { row in
+            let text = row.text + " " + row.accountTitle.uppercased()
+            return (kind == .refund || historyScope.includes(row.accountID)) && !row.isLoanOrEMI && words.allSatisfy { text.contains($0) }
+        }.sorted { ($0.date?.canonical ?? "", $0.id) > ($1.date?.canonical ?? "", $1.id) }
     }
     private func rowLabel(_ row: SpendingSourceRow) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack { Text(sources.accounts.first { $0.id == row.accountID }?.title ?? row.accountTitle); Text(row.date?.presentation ?? "Date unavailable"); Text(row.exactAmount).monospacedDigit() }.font(theme.typography.formSection)
+            HStack(alignment: .firstTextBaseline) {
+                Text(sources.accounts.first { $0.id == row.accountID }?.title ?? row.accountTitle)
+                Text(row.date?.presentation ?? "Date unavailable")
+                Text(row.exactAmount).monospacedDigit()
+            }.font(theme.typography.formSection)
             Text(row.transaction.description).font(theme.typography.formCaption).textSelection(.enabled)
-            Text(row.dateRole + (row.transaction.reference.map { " · Reference " + $0 } ?? "")).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            Text(row.dateRole + (row.transaction.reference.map { " · Reference " + $0 } ?? ""))
+                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            if let owner = openedMetadata?.confirmedByTransaction[row.id] {
+                Text("Saved interpretation: " + owner.kind.title).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+            }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    private func loadDraft() {
+        openedMetadata = store.snapshot
+        ids = draft.selectedIDs; kind = draft.kind
+        newEventID = draft.event?.id ?? draft.suggested?.id ?? newEventID
+        explanation = draft.event?.explanation ?? draft.suggested?.explanation ?? ""
+        for allocation in draft.event?.refundAllocations ?? [] {
+            allocationText[allocation.creditTransactionID] = inputText(allocation.amount)
+        }
+        seedValidDefaults()
+    }
+
+    private func replacementEvent() throws -> MovementEvent? {
+        guard let metadata = openedMetadata else { throw FinancialIntelligenceError.unavailable }
+        let owners = metadata.movements.filter { $0.decision == .confirmed && !ids.isDisjoint(with: $0.transactionIDs) }
+        if let previous = draft.event {
+            guard metadata.movements.first(where: { $0.id == previous.id }) == previous else { throw FinancialIntelligenceError.staleReview }
+            guard owners.allSatisfy({ $0.id == previous.id }) else {
+                throw MovementReviewInputError("An entry belongs to another saved interpretation. Edit or unlink that relationship before adding this entry.")
+            }
+            if kind == .refund && previous.decision == .confirmed {
+                guard previous.kind == .refund || (previous.kind == .expense && previous.transactionIDs.count == 1) else {
+                    throw MovementReviewInputError("This saved interpretation cannot become a refund. Review its current relationship first.")
+                }
+                let priorPurchase = previous.refundAllocations?.first?.purchaseTransactionID ?? (previous.kind == .expense ? previous.transactionIDs.first : nil)
+                if let priorPurchase, purchases.count == 1, purchases.first?.id != priorPurchase {
+                    throw MovementReviewInputError("Keep the original purchase when editing this refund. Review a different purchase in its own relationship.")
+                }
+            }
+            return previous
+        }
+        guard !owners.isEmpty else { return nil }
+        guard kind == .refund, owners.count == 1, let owner = owners.first,
+              purchases.count == 1, let purchase = purchases.first else {
+            throw MovementReviewInputError("A selected entry already belongs to a saved interpretation. Open that interpretation to edit it.")
+        }
+        if owner.kind == .expense, owner.transactionIDs == [purchase.id] { return owner }
+        if owner.kind == .refund, owner.refundAllocations?.first?.purchaseTransactionID == purchase.id {
+            guard Set(owner.transactionIDs).isSubset(of: ids) else {
+                throw MovementReviewInputError("This purchase already has a refund allocation. Open it from Confirmed to review all linked credits.")
+            }
+            return owner
+        }
+        throw MovementReviewInputError("These entries have an incompatible saved relationship. Review that interpretation before allocating a refund.")
+    }
+
+    private func reviewedRefund(text: [String: String]? = nil) throws -> (allocations: [MovementRefundAllocation], result: MovementRefundValidation.Result) {
+        guard purchases.count == 1, let purchase = purchases.first, !credits.isEmpty,
+              selected.count == credits.count + 1, selected.count == ids.count else {
+            throw MovementReviewInputError("Select exactly one original purchase and at least one refund credit.")
+        }
+        guard !selected.contains(where: \.isLoanOrEMI) else { throw FinancialIntelligenceError.outsideScope }
+        guard let purchaseDate = purchase.date, credits.allSatisfy({ $0.date.map { $0 >= purchaseDate } ?? false }) else {
+            throw MovementReviewInputError("Every entry needs a source date, and each credit must be dated on or after the original purchase. Review the original entries.")
+        }
+        let previous = try replacementEvent()
+        guard let metadata = openedMetadata else { throw FinancialIntelligenceError.unavailable }
+        let values = text ?? allocationText
+        let allocations = try credits.map { credit in
+            MovementRefundAllocation(purchaseTransactionID: purchase.id, creditTransactionID: credit.id,
+                amount: try inputMoney(values[credit.id] ?? "", currency: credit.currency))
+        }
+        let event = MovementEvent(id: previous?.id ?? newEventID, workspaceID: metadata.workspaceID, kind: .refund, decision: .confirmed,
+            transactionIDs: ids.sorted(), explanation: explanation, reviewedAtISO: "", refundAllocations: allocations)
+        let legs = selected.map { row in
+            MovementRefundValidation.Leg(transactionID: row.id, accountID: row.accountID, domain: row.domain,
+                direction: row.isBankOut ? "debit" : row.isBankIn ? "credit" : row.isCardIncrease ? "card_increase_owed" : row.isCardDecrease ? "card_decrease_owed" : "",
+                money: row.transaction.money)
+        }
+        do { return (allocations, try MovementRefundValidation.resolve(event, legs: legs)) }
+        catch FinancialIntelligenceError.invalidLegs {
+            throw MovementReviewInputError("Use credits from the purchase's account and currency. Each allocation must fit its credit, and all allocations together must not exceed the original purchase.")
+        }
+    }
+
+    private func seedValidDefaults() {
+        guard kind == .refund else { return }
+        var proposed = allocationText
+        var newIDs: [String] = []
+        // Retained partial allocations remain exact when the purchase's
+        // existing relationship is opened through a selected transaction.
+        if let previous = try? replacementEvent() {
+            for allocation in previous.refundAllocations ?? [] where ids.contains(allocation.creditTransactionID) && proposed[allocation.creditTransactionID] == nil {
+                proposed[allocation.creditTransactionID] = inputText(allocation.amount)
+                newIDs.append(allocation.creditTransactionID)
+            }
+        }
+        for credit in credits where proposed[credit.id] == nil {
+            guard let magnitude = try? Money(amount: credit.amount, currency: credit.currency) else { return }
+            proposed[credit.id] = inputText(magnitude); newIDs.append(credit.id)
+        }
+        guard !newIDs.isEmpty, (try? reviewedRefund(text: proposed)) != nil else { return }
+        for id in newIDs { allocationText[id] = proposed[id] }
+    }
+
+    private func amountError(for credit: SpendingSourceRow) -> String? {
+        let text = allocationText[credit.id] ?? ""
+        guard !text.isEmpty else { return "Enter the amount to allocate from this credit." }
+        do {
+            let value = try inputMoney(text, currency: credit.currency)
+            guard value.amount <= credit.amount else { return "The allocation exceeds this credit's actual amount." }
+            return nil
+        } catch { return error.localizedDescription }
+    }
+
+    private func inputMoney(_ text: String, currency: String) throws -> Money {
+        let scale = try CurrencyCatalog.shared.definition(for: currency).fractionDigits
+        let separator = Locale.current.decimalSeparator ?? "."
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.components(separatedBy: separator)
+        let whole = parts.first ?? ""
+        let fraction = parts.count == 2 ? parts[1] : ""
+        let digits: (String) -> Bool = { $0.unicodeScalars.allSatisfy { (48...57).contains($0.value) } }
+        guard parts.count <= 2, !whole.isEmpty, digits(whole), digits(fraction), fraction.count <= scale,
+              !(scale == 0 && parts.count == 2), trimmed.count <= 80,
+              let minor = Int64(whole + fraction + String(repeating: "0", count: scale - fraction.count)), minor > 0 else {
+            throw MovementReviewInputError("Enter a positive \(currency) amount with at most \(scale) decimal places, using \(separator) as the decimal separator and no grouping separators.")
+        }
+        return try Money.fromMinorUnits(minor, currency: currency)
+    }
+    private func inputText(_ money: Money) -> String {
+        ((try? money.canonicalDecimalString()) ?? "").replacingOccurrences(of: ".", with: Locale.current.decimalSeparator ?? ".")
+    }
+    private func nativeAmount(_ money: Money) -> String {
+        money.currency.code + " " + ((try? money.canonicalDecimalString()) ?? "Unavailable")
+    }
+
     private func requestSave() {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do { if let generation { try DevelopmentProfileAcknowledgementGate.shared.requireAuthorization(for: .financialIntelligenceMutation, providerGeneration: generation) } }
         catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let value) { challenge = value; return }
         catch { message = error.localizedDescription; return }
@@ -921,13 +1279,28 @@ private struct MovementReviewEditor: View {
     }
     private func save() {
         do {
-            guard kind.isInScope, !selected.contains(where: \.isLoanOrEMI) else { throw FinancialIntelligenceError.outsideScope }
-            guard let generation, let metadata = FinancialIntelligenceStore.shared.snapshot else { throw FinancialIntelligenceError.unavailable }
-            let event = MovementEvent(id: draft.event?.id ?? draft.suggested?.id ?? UUID().uuidString, workspaceID: metadata.workspaceID,
+            guard canSave, kind.isInScope, !selected.contains(where: \.isLoanOrEMI) else { throw FinancialIntelligenceError.outsideScope }
+            guard let generation, generation == store.generation, let metadata = store.snapshot,
+                  let openedMetadata, metadata.workspaceID == openedMetadata.workspaceID else { throw FinancialIntelligenceError.unavailable }
+            let previous = try replacementEvent()
+            let expectedIDs = ids.union(previous?.transactionIDs ?? [])
+            guard expectedIDs.allSatisfy({ metadata.confirmedByTransaction[$0] == openedMetadata.confirmedByTransaction[$0] }),
+                  previous.map({ prior in metadata.movements.first(where: { $0.id == prior.id }) == prior }) ?? true else {
+                throw FinancialIntelligenceError.staleReview
+            }
+            let allocations = kind == .refund ? try reviewedRefund().allocations : nil
+            let event = MovementEvent(id: previous?.id ?? newEventID, workspaceID: metadata.workspaceID,
                 kind: kind, decision: .confirmed, transactionIDs: ids.sorted(), explanation: explanation,
-                reviewedAtISO: ISO8601DateFormatter().string(from: Date()))
-            try FinancialIntelligenceCoordinator().saveMovement(event, replacing: draft.event, generation: generation)
+                reviewedAtISO: ISO8601DateFormatter().string(from: Date()),
+                consumptionTransactionIDs: previous?.consumptionTransactionIDs ?? [], refundAllocations: allocations)
+            try FinancialIntelligenceCoordinator().saveMovement(event, replacing: previous, generation: generation)
             dismiss()
         } catch { message = error.localizedDescription }
     }
+}
+
+private struct MovementReviewInputError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
 }

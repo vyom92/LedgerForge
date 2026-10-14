@@ -36,7 +36,7 @@ struct EmailStatementsSettingsView: View {
             }
             VStack(alignment: .leading, spacing: theme.spacing.small) {
                 Text("Removing a sender keeps saved originals.")
-                Text("Collection retrieves originals; review and import them in Import Centre.")
+                Text("Ready attachments import automatically while LedgerForge is open. Import Centre shows anything that needs your review.")
                 DisclosureGroup("Collection and storage details") {
                     Text("Originals and intake receipts are retained with your ledger and included in LedgerForge backups. Gmail messages and labels are unchanged. IBKR and Zurich ISP use their existing separate paths.")
                         .fixedSize(horizontal: false, vertical: true)

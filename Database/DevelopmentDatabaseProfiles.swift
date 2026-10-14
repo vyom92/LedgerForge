@@ -1,7 +1,7 @@
 // LedgerForge
 // DevelopmentDatabaseProfiles.swift
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
 import Foundation
 
 enum DevelopmentDatabaseProfileKind: String, CaseIterable, Equatable, Hashable {

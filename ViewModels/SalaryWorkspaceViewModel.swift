@@ -31,6 +31,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     @Published private(set) var saveState: SaveState = .ready
     enum SaveState: Equatable { case ready, saving, saved, failed, retentionFailed, committedNeedsRefresh, committedToPreviousProvider, providerChanged, canonicalChanged }
     private let locale: Locale
+    // Paired retained strings keep their sender's locale; absent history stays unknown.
+    private var defaultInputLocaleIdentifier: String?
+    private var knownLocaleIdentifiers: [String: String] = [:]
+    private var baseLocaleIdentifiers: [String: String] = [:]
+    private var retainedLocaleIdentifiers: [String: String] = [:]
     private var baseGeneration: ProviderGenerationToken
     private var baseCanonical: FundingPlan?
     private var isRebasing = false
@@ -55,6 +60,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private let requiresApplicationAvailability: Bool
     private var sharedINRReference: AlDarUnitReference?
     private var hasOpenedPlanner = false
+    // A saved month follows the owner's edits, not automatic carry-forward,
+    // captured-balance refreshes, or recurring-payment discovery while browsing.
+    private var hasUserEditToRemember = false
     /// Retained value before a reduction. The one-month exception can be
     /// selected either before or after editing the remaining bill.
     private var preReductionBasis: [String: Money] = [:]
@@ -69,6 +77,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         let baseRaw: [String: String]
         let basePlan: FundingPlan?
         let dirty: Bool
+        let hasUserEditToRemember: Bool
         var saveState: SaveState
         let error: String?
         let committed: FundingPlan?
@@ -76,7 +85,39 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         let excludedRecurringOccurrenceIDs: Set<String>
         let retainedScratchpad: MonthlyPlanScratchpad?
         let retentionPending: Bool
+        let defaultInputLocaleIdentifier: String?
+        let knownLocaleIdentifiers: [String: String]
+        let baseLocaleIdentifiers: [String: String]
+        let retainedLocaleIdentifiers: [String: String]
+        // Retained only for an exact companion bootstrap; ordinary Mac month
+        // navigation keeps its existing current-account filter reset behavior.
+        let companionSelectedHistoryAccountIDs: Set<String>
     }
+    private var capturedMonthDraftState: MonthDraftState {
+        MonthDraftState(plan: plan, raw: rawText, errors: fieldErrors, untouched: untouchedZeroFields,
+            unavailable: unavailableCurrentBalanceAccountIDs, generation: baseGeneration, canonical: baseCanonical,
+            baseRaw: baseRawText, basePlan: baseDraftPlan, dirty: isDirty, hasUserEditToRemember: hasUserEditToRemember,
+            saveState: saveState, error: errorMessage, committed: committedCandidate,
+            preReductionBasis: preReductionBasis, excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs,
+            retainedScratchpad: retainedScratchpad, retentionPending: retentionPending,
+            defaultInputLocaleIdentifier: defaultInputLocaleIdentifier, knownLocaleIdentifiers: knownLocaleIdentifiers,
+            baseLocaleIdentifiers: baseLocaleIdentifiers, retainedLocaleIdentifiers: retainedLocaleIdentifiers,
+            companionSelectedHistoryAccountIDs: selectedHistoryAccountIDs)
+    }
+    private func restoreMonthDraftState(_ state: MonthDraftState) {
+        plan = state.plan; rawText = state.raw; fieldErrors = state.errors; untouchedZeroFields = state.untouched
+        unavailableCurrentBalanceAccountIDs = state.unavailable; baseGeneration = state.generation; baseCanonical = state.canonical
+        baseRawText = state.baseRaw; baseDraftPlan = state.basePlan; isDirty = state.dirty; saveState = state.saveState
+        hasUserEditToRemember = state.hasUserEditToRemember
+        errorMessage = state.error; committedCandidate = state.committed
+        preReductionBasis = state.preReductionBasis
+        excludedRecurringOccurrenceIDs = state.excludedRecurringOccurrenceIDs
+        retainedScratchpad = state.retainedScratchpad; retentionPending = state.retentionPending
+        defaultInputLocaleIdentifier = state.defaultInputLocaleIdentifier
+        knownLocaleIdentifiers = state.knownLocaleIdentifiers; baseLocaleIdentifiers = state.baseLocaleIdentifiers
+        retainedLocaleIdentifiers = state.retainedLocaleIdentifiers
+    }
+
     private var monthDrafts: [SelectedStatementMonth: MonthDraftState] = [:]
     static let firstPlanningMonth = try! SelectedStatementMonth(year: 2026, month: 9)
     static let planningMonths = firstPlanningMonth...(try! SelectedStatementMonth(year: 2099, month: 12))
@@ -92,6 +133,14 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         try! SelectedStatementMonth(year: month.month == 12 ? month.year + 1 : month.year, month: month.month == 12 ? 1 : month.month + 1)
     }
 
+    func planningMonth(offsetBy offset: Int) -> SelectedStatementMonth? {
+        let index = month.year * 12 + month.month - 1 + offset
+        guard index >= 0,
+              let target = try? SelectedStatementMonth(year: index / 12, month: index % 12 + 1),
+              Self.planningMonths.contains(target) || fundingPlanStore.plan(for: target, workspaceID: workspaceID) != nil else { return nil }
+        return target
+    }
+
     func switchMonth(to target: SelectedStatementMonth) {
         guard target != month, Self.planningMonths.contains(target) || fundingPlanStore.plan(for: target, workspaceID: workspaceID) != nil,
               saveState != .saving, saveState != .committedNeedsRefresh else { return }
@@ -99,22 +148,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         guard saveState != .saving && saveState != .committedNeedsRefresh && !retentionPending else { return }
         hasOpenedPlanner = true
         recurringTask?.cancel()
-        monthDrafts[month] = MonthDraftState(plan: plan, raw: rawText, errors: fieldErrors, untouched: untouchedZeroFields,
-            unavailable: unavailableCurrentBalanceAccountIDs, generation: baseGeneration, canonical: baseCanonical,
-            baseRaw: baseRawText, basePlan: baseDraftPlan, dirty: isDirty, saveState: saveState, error: errorMessage, committed: committedCandidate,
-            preReductionBasis: preReductionBasis, excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs,
-            retainedScratchpad: retainedScratchpad, retentionPending: retentionPending)
+        monthDrafts[month] = capturedMonthDraftState
         month = target
         selectedHistoryAccountIDs = []
-        selectionDefaults?.set(target.canonical, forKey: Self.selectedMonthKey(workspaceID: workspaceID))
         if let state = monthDrafts.removeValue(forKey: target) {
-            plan = state.plan; rawText = state.raw; fieldErrors = state.errors; untouchedZeroFields = state.untouched
-            unavailableCurrentBalanceAccountIDs = state.unavailable; baseGeneration = state.generation; baseCanonical = state.canonical
-            baseRawText = state.baseRaw; baseDraftPlan = state.basePlan; isDirty = state.dirty; saveState = state.saveState
-            errorMessage = state.error; committedCandidate = state.committed
-            preReductionBasis = state.preReductionBasis
-            excludedRecurringOccurrenceIDs = state.excludedRecurringOccurrenceIDs
-            retainedScratchpad = state.retainedScratchpad; retentionPending = state.retentionPending
+            restoreMonthDraftState(state)
             canonicalDidPublish(); recalculate()
         } else {
             rebaseFromPublishedPlan(generation: provider().generationToken)
@@ -155,6 +193,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         guard canEdit, plan.calculationVersion == .budgetV1 else { return }
         let row = FundingPlanDeduction(id: UUID().uuidString, label: "", money: Self.zeroQAR, recurs: true)
         plan.deductions.append(row); rawText["deduction.label.\(row.id)"] = ""; rawText["deduction.amount.\(row.id)"] = "0"
+        recordInputLocale("deduction.amount.\(row.id)")
         untouchedZeroFields.insert("deduction.amount.\(row.id)"); fieldErrors["deduction.label.\(row.id)"] = "Enter a name"
         markEdited(); recalculate()
     }
@@ -167,7 +206,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             plan.deductions[index].label = label
         }
         if let amount {
-            let key = "deduction.amount.\(id)"; rawText[key] = amount; untouchedZeroFields.remove(key)
+            let key = "deduction.amount.\(id)"; recordInputLocale(key)
+            rawText[key] = amount; untouchedZeroFields.remove(key)
             if let money = try? PlannerInputCodec.money(amount, currency: "QAR", locale: locale), money.amount >= 0 {
                 plan.deductions[index].money = money; fieldErrors[key] = nil
             } else { fieldErrors[key] = "Enter a deduction of zero or greater" }
@@ -196,6 +236,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 if let basis = rows[index].temporaryCarryBasis {
                     rows[index].money = basis
                     rawText["amount.\(id)"] = (try? basis.canonicalDecimalString()).map(localized) ?? ""
+                    recordInputLocale("amount.\(id)")
                     fieldErrors["amount.\(id)"] = nil
                 }
                 rows[index].temporaryCarryBasis = nil
@@ -206,8 +247,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         markEdited(); recalculate()
     }
 
-    private static func seed(_ previous: FundingPlan, for month: SelectedStatementMonth) -> FundingPlan {
-        var result = emptyPlan(month: month, workspaceID: previous.workspaceID)
+    private static func seed(_ previous: FundingPlan, for month: SelectedStatementMonth, planID: String = UUID().uuidString) -> FundingPlan {
+        var result = emptyPlan(month: month, workspaceID: previous.workspaceID, planID: planID)
         result.assistance?.salaryCycle = SalaryFundingCycle.expected(month: month, day: previous.assistance?.salaryCycle?.expectedDay ?? 25)
         if let prior = previous.assistance?.salaryCycle,
            String(prior.payday.prefix(7)) == String(result.assistance?.salaryCycle?.previousPayday.prefix(7) ?? "") {
@@ -268,17 +309,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
     }
     var hasValidCalculation: Bool {
-        let hidden = excludedHistoryAccountIDs
-        let hiddenBills = Set((plan.qatarCommitments + plan.indiaCommitments).filter {
-            !$0.isInAccountScope(excluding: hidden, fundingOverrides: plan.assistance?.billFundingAccounts)
-        }.map(\.id))
-        return fieldErrors.keys.allSatisfy { key in
-            if key.hasPrefix("balance.") { return hidden.contains(String(key.dropFirst("balance.".count))) }
-            for prefix in ["amount.", "label."] where key.hasPrefix(prefix) {
-                return hiddenBills.contains(String(key.dropFirst(prefix.count)))
-            }
-            return false
-        }
+        PlannerInputValidity.hasValidCalculation(plan: plan, fieldErrors: fieldErrors,
+                                                excludedHistoryAccountIDs: excludedHistoryAccountIDs)
     }
 
     enum RetainedPlanPresentation {
@@ -333,8 +365,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private let workspaceID: String
     private let selectionDefaults: UserDefaults?
 
-    private static func selectedMonthKey(workspaceID: String) -> String {
-        "LedgerForge.planning.selectedMonth.v1.\(workspaceID)"
+    private static func lastSavedMonthKey(workspaceID: String) -> String {
+        "LedgerForge.planning.lastSavedMonth.v1.\(workspaceID)"
     }
     private let provider: () -> DatabaseProvider
     private let accountStore: AccountStore
@@ -358,7 +390,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         refresh: ((DatabaseProvider) throws -> Void)? = nil
     ) {
         let current = Self.currentMonth(now: now())
-        let retainedMonth = selectionDefaults?.string(forKey: Self.selectedMonthKey(workspaceID: workspaceID))
+        // The legacy selectedMonth preference recorded views, so it cannot
+        // establish which month the owner last saved.
+        let retainedMonth = selectionDefaults?.string(forKey: Self.lastSavedMonthKey(workspaceID: workspaceID))
             .flatMap { try? SelectedStatementMonth(canonical: $0) }
         let resolvedMonth = month ?? retainedMonth ?? current
         self.now = now
@@ -372,6 +406,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         self.provider = provider ?? { DatabaseProvider.shared }
         self.requiresApplicationAvailability = provider == nil && fundingPlanStore == nil
         self.locale = locale
+        self.defaultInputLocaleIdentifier = locale.identifier
         self.baseGeneration = (provider?() ?? DatabaseProvider.shared).generationToken
         self.refresh = refresh ?? { active in _ = try RepositoryStoreHydrator(databaseProvider: active).hydrateIfNeeded(forceRefresh: true) }
         self.accountStore = resolvedAccountStore
@@ -418,7 +453,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         refreshCalendarMonth()
         hasOpenedPlanner = true
         canonicalDidPublish()
-        if baseCanonical == nil && !isDirty && canRollover { rolloverFromPreviousPlan() }
+        if baseCanonical == nil && !isDirty && canRollover { rolloverFromPreviousPlan(userInitiated: false) }
         refreshCapturedAccountBalances()
         scheduleRecurringInclusion()
         if isDirty { scheduleRetention() }
@@ -543,11 +578,33 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return untouchedZeroFields.contains(key) && text == "0" ? "" : text
     }
 
+    /// An empty amount is temporary while typing. Resolve only the field whose
+    /// focus ended, in the month that owned that edit; rates and dates are not amounts.
+    func finishEditingAmount(_ key: String, in editingMonth: SelectedStatementMonth) {
+        guard editingMonth == month, canEdit, rawText[key] == "" else { return }
+        if let field = MoneyField(rawValue: key) {
+            _ = updateMoney(field, text: "0")
+        } else if key.hasPrefix("deduction.amount.") {
+            editDeduction(id: String(key.dropFirst("deduction.amount.".count)), amount: "0")
+        } else if key.hasPrefix("balance.") {
+            let id = String(key.dropFirst("balance.".count))
+            if let account = retainedBalanceAccount(id: id) { setManualBalance(account, text: "0") }
+        } else if key.hasPrefix("amount.") {
+            let id = String(key.dropFirst("amount.".count))
+            if plan.qatarCommitments.contains(where: { $0.id == id }) {
+                editCommitment(region: "qatar", id: id, field: "amount", text: "0")
+            } else if plan.indiaCommitments.contains(where: { $0.id == id }) {
+                editCommitment(region: "india", id: id, field: "amount", text: "0")
+            }
+        }
+    }
+
     @discardableResult
     func updateMoney(_ field: MoneyField, text: String) -> Bool {
         guard canEdit else { return false }
         guard plan.calculationVersion == .legacy || ![MoneyField.deductions, .investment].contains(field) else { return false }
         untouchedZeroFields.remove(field.rawValue)
+        recordInputLocale(field.rawValue)
         rawText[field.rawValue] = text
         markEdited()
         guard let value = validatedMoney(field, text: text) else { return false }
@@ -563,8 +620,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return true
     }
 
-    func setFX(rateText: String, dateText: String) {
-        guard canEdit else { return }
+    func setFX(rateText: String, dateText: String, rateWasEdited: Bool = true) {
+        guard canEdit, rateWasEdited || rateText == (rawText["fx.rate"] ?? "") else { return }
+        if rateWasEdited { recordInputLocale("fx.rate") }
+        let savedRateWithoutLocale = inputLocale(for: "fx.rate") == nil ? plan.planningFX?.inrPerQAR : nil
+        let savedRateErrorWithoutLocale = inputLocale(for: "fx.rate") == nil ? fieldErrors["fx.rate"] : nil
         plan.referenceMode = .manual; plan.effectiveAlDarReference = nil
         plan.alDarReference = nil
         plan.planningFX = nil
@@ -576,11 +636,12 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             if plan.calculationVersion == .budgetV1 { fieldErrors["fx.rate"] = "Enter a positive rate or choose Use Al Dar" }
             recalculate(); return
         }
-        let rate = try? PlannerInputCodec.rate(rateText, locale: locale)
+        let rate = inputLocale(for: "fx.rate").flatMap { try? PlannerInputCodec.rate(rateText, locale: $0) } ?? savedRateWithoutLocale
         let date = try? StatementDate(canonical: dateText)
         if rate == nil { fieldErrors["fx.rate"] = "Enter a complete positive INR-per-QAR rate" }
+        if let savedRateErrorWithoutLocale { fieldErrors["fx.rate"] = savedRateErrorWithoutLocale }
         if date == nil { fieldErrors["fx.date"] = "Enter the observation date as YYYY-MM-DD" }
-        guard let rate, let date, let fx = try? FundingPlanFX(inrPerQAR: rate, observationDate: date) else { recalculate(); return }
+        guard fieldErrors["fx.rate"] == nil, let rate, let date, let fx = try? FundingPlanFX(inrPerQAR: rate, observationDate: date) else { recalculate(); return }
         plan.planningFX = fx
         recalculate()
     }
@@ -605,7 +666,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         let parts = calendar.dateComponents([.year, .month, .day], from: selection)
         guard let year = parts.year, let month = parts.month, let day = parts.day,
               let date = try? StatementDate(year: year, month: month, day: day) else { return }
-        setFX(rateText: rawText["fx.rate"] ?? "", dateText: date.canonical)
+        setFX(rateText: rawText["fx.rate"] ?? "", dateText: date.canonical, rateWasEdited: false)
     }
 
     var historyScopeAccounts: [Account] {
@@ -671,7 +732,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             // does not create an unsaved change merely from reopening a tab.
             guard existing?.money != balance.money else { continue }
             // Automatic draft refresh is not the owner's explicit date capture.
-            captureAccountBalance(account, money: balance.money, financialDate: nil, capturedAt: capturedAt)
+            captureAccountBalance(account, money: balance.money, financialDate: nil, capturedAt: capturedAt, userInitiated: false)
             changed = true
         }
         if changed { recalculate() }
@@ -696,11 +757,12 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return (account.currentBalanceMoney, date)
     }
 
-    private func captureAccountBalance(_ account: Account, money: Money, financialDate: StatementDate?, capturedAt: String) {
+    private func captureAccountBalance(_ account: Account, money: Money, financialDate: StatementDate?, capturedAt: String, userInitiated: Bool = true) {
         guard let id = account.repositoryAccountId else { return }
         unavailableCurrentBalanceAccountIDs.remove(id)
-        markEdited()
+        markEdited(userInitiated: userInitiated)
         rawText["balance.\(id)"] = (try? money.canonicalDecimalString()).map(localized) ?? ""
+        recordInputLocale("balance.\(id)")
         fieldErrors["balance.\(id)"] = nil
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].money = money
@@ -717,6 +779,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         guard !account.isHistoryOnly || selectedHistoryAccountIDs.contains(id) else { return }
         unavailableCurrentBalanceAccountIDs.remove(id)
         let key = "balance.\(id)"
+        recordInputLocale(key)
         untouchedZeroFields.remove(key)
         rawText[key] = text
         markEdited()
@@ -743,6 +806,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         let value = FundingPlanCommitment(id: UUID().uuidString, label: "New commitment", money: zero, included: true, fundingAccountID: nil, provenance: .manual)
         rawText["label.\(value.id)"] = value.label
         rawText["amount.\(value.id)"] = localized("0.00")
+        recordInputLocale("amount.\(value.id)")
         untouchedZeroFields.insert("amount.\(value.id)")
         if region == "qatar" { plan.qatarCommitments.append(value) }
         else { plan.indiaCommitments.append(value) }
@@ -751,15 +815,18 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func updateCommitment(region: String, id: String, label: String, amountText: String, included: Bool, fundingAccountID: String?, amountWasEdited: Bool = true) {
         guard canEdit else { return }
-        if amountWasEdited { untouchedZeroFields.remove("amount.\(id)") }
+        if amountWasEdited { untouchedZeroFields.remove("amount.\(id)"); recordInputLocale("amount.\(id)") }
         let currency = region == "qatar" ? "QAR" : "INR"
         rawText["label.\(id)"] = label; rawText["amount.\(id)"] = amountText
         markEdited()
         fieldErrors["label.\(id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a label of 1–240 characters" : nil
-        let money = try? PlannerInputCodec.money(amountText, currency: currency, locale: locale)
-        fieldErrors["amount.\(id)"] = money == nil ? "Enter an exact \(currency) amount" : nil
         var values = region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments
         guard let index = values.firstIndex(where: { $0.id == id }) else { return }
+        let preservesUnknownAmount = !amountWasEdited && inputLocale(for: "amount.\(id)") == nil
+        let money = preservesUnknownAmount
+            ? (fieldErrors["amount.\(id)"] == nil ? values[index].money : nil)
+            : inputLocale(for: "amount.\(id)").flatMap { try? PlannerInputCodec.money(amountText, currency: currency, locale: $0) }
+        if !preservesUnknownAmount { fieldErrors["amount.\(id)"] = money == nil ? "Enter an exact \(currency) amount" : nil }
         if plan.calculationVersion == .budgetV1, let money,
            money.amount < 0 || (values[index].temporaryCarryBasis.map { money.amount > $0.amount } ?? false) {
             fieldErrors["amount.\(id)"] = "Enter a nonnegative remaining amount no greater than the recurring estimate"
@@ -859,7 +926,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         markEdited(); recalculate()
     }
 
-    func rolloverFromPreviousPlan(discardingDraft: Bool = false) {
+    func rolloverFromPreviousPlan(discardingDraft: Bool = false, retainingPlanID: String? = nil, userInitiated: Bool = true) {
         guard canEdit else { return }
         guard !isDirty || discardingDraft else { errorMessage = "Choose whether to discard the unsaved draft before copying the previous plan."; return }
         guard fundingPlanStore.plan(for: month, workspaceID: workspaceID) == nil,
@@ -867,9 +934,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             errorMessage = "No earlier editable plan is available to roll forward, or this month already exists."
             return
         }
-        plan = Self.seed(previous, for: month)
+        plan = Self.seed(previous, for: month, planID: retainingPlanID ?? UUID().uuidString)
         syncDraft()
-        markEdited()
+        markEdited(userInitiated: userInitiated)
         recalculate()
     }
 
@@ -892,8 +959,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         do {
             var scratch = currentScratchpad
             scratch.canonical = plan
-            _ = try active.fundingPlanRepo.savePlan(try Self.dto(from: plan), retaining: scratch.dto())
-            retainedScratchpad = scratch; retentionPending = false
+            try CompanionMacCoordinator.saveLocal(scratch, canonical: plan, provider: active,
+                knownLocaleIdentifiers: currentKnownLocaleIdentifiers, selectedHistoryAccountIDs: selectedHistoryAccountIDs)
+            retainedScratchpad = scratch; retainedLocaleIdentifiers = currentKnownLocaleIdentifiers; retentionPending = false
         } catch {
             saveState = .failed
             let failure = RuntimeDiagnostic.failure(error, operation: "plan save", stage: "repository transaction")
@@ -901,6 +969,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             RuntimeDiagnostic.record(failure, category: .database)
             return
         }
+        rememberSavedMonthIfUserEdited()
         committedCandidate = plan
         isDirty = false
         saveState = .committedNeedsRefresh
@@ -931,34 +1000,48 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func discardAndReload() {
         let active = provider()
+        let previous = capturedMonthDraftState
         isRebasing = true
         defer { isRebasing = false }
         do {
             try refresh(active)
             guard provider().generationToken == active.generationToken, fundingPlanStore.generation == active.generationToken else { throw RepositoryError.staleProviderGeneration }
             let sameOwner = active.generationToken == baseGeneration
-            if sameOwner { try active.fundingPlanRepo.removeScratchpad(workspaceId: workspaceID, month: month.canonical) }
-            rebaseFromPublishedPlan(generation: active.generationToken, restoringScratchpad: !sameOwner)
+            let paired = try sameOwner && CompanionMacCoordinator.isPaired(workspaceID: workspaceID, month: month, provider: active)
+            if paired {
+                rebaseFromPublishedPlan(generation: active.generationToken, restoringScratchpad: false, retainingPlanID: previous.plan.id)
+                let replacement = currentScratchpad
+                try CompanionMacCoordinator.saveLocal(replacement, canonical: nil, provider: active,
+                    knownLocaleIdentifiers: currentKnownLocaleIdentifiers, selectedHistoryAccountIDs: selectedHistoryAccountIDs)
+                retainedScratchpad = replacement; retainedLocaleIdentifiers = currentKnownLocaleIdentifiers; retentionPending = false
+            } else {
+                if sameOwner { try active.fundingPlanRepo.removeScratchpad(workspaceId: workspaceID, month: month.canonical) }
+                rebaseFromPublishedPlan(generation: active.generationToken, restoringScratchpad: !sameOwner)
+            }
         } catch {
+            retentionTask?.cancel(); commitTask?.cancel(); recurringTask?.cancel()
+            restoreMonthDraftState(previous)
             errorMessage = "Canonical data could not be reloaded. Your draft is retained."
             saveState = .providerChanged
         }
     }
 
-    private func rebaseFromPublishedPlan(generation: ProviderGenerationToken, restoringScratchpad: Bool = true) {
+    private func rebaseFromPublishedPlan(generation: ProviderGenerationToken, restoringScratchpad: Bool = true, retainingPlanID: String? = nil) {
         retentionTask?.cancel(); commitTask?.cancel(); recurringTask?.cancel()
         retainedScratchpad = nil; retentionPending = false; excludedRecurringOccurrenceIDs = []
+        knownLocaleIdentifiers = [:]; baseLocaleIdentifiers = [:]; retainedLocaleIdentifiers = [:]
+        defaultInputLocaleIdentifier = locale.identifier
         preReductionBasis = [:]
         baseGeneration = generation
         baseCanonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
-        plan = baseCanonical ?? Self.emptyPlan(month: month, workspaceID: workspaceID)
+        plan = baseCanonical ?? Self.emptyPlan(month: month, workspaceID: workspaceID, planID: retainingPlanID ?? UUID().uuidString)
         isDirty = false; saveState = .ready; errorMessage = nil
         syncDraft(); captureDraftBase()
         if restoringScratchpad, restoreRetainedEntries() { return }
         // Seed a new month before attaching shared FX evidence. The reference
         // itself changes the draft and would otherwise block carry-forward.
         if hasOpenedPlanner, baseCanonical == nil, canRollover {
-            rolloverFromPreviousPlan()
+            rolloverFromPreviousPlan(retainingPlanID: retainingPlanID, userInitiated: false)
         } else {
             recalculate()
         }
@@ -969,8 +1052,19 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         for key in Array(monthDrafts.keys) {
             guard var state = monthDrafts[key] else { continue }
             let changed = state.generation != provider().generationToken || fundingPlanStore.generation != state.generation
-            if changed || fundingPlanStore.plan(for: key, workspaceID: workspaceID) != state.canonical {
-                if state.dirty { state.saveState = changed ? .providerChanged : .canonicalChanged; monthDrafts[key] = state }
+            let incoming = fundingPlanStore.scratchpads.first { $0.plan.workspaceID == workspaceID && $0.plan.month == key }
+            let fullyRetained = !state.retentionPending && state.retainedScratchpad == MonthlyPlanScratchpad(
+                plan: state.plan, canonical: state.canonical, rawText: state.raw, fieldErrors: state.errors,
+                untouchedZeroFields: state.untouched, unavailableBalanceAccountIDs: state.unavailable,
+                preReductionBasis: state.preReductionBasis, excludedRecurringOccurrenceIDs: state.excludedRecurringOccurrenceIDs)
+                && state.knownLocaleIdentifiers.filter { state.raw[$0.key] != nil && Self.isNumericInputKey($0.key) } == state.retainedLocaleIdentifiers
+            let paired = !changed && (try? CompanionMacCoordinator.isPaired(workspaceID: workspaceID, month: key, provider: provider())) == true
+            let retainedContext = paired ? try? CompanionMacCoordinator.retainedEditorContext(workspaceID: workspaceID, month: key, provider: provider()) : nil
+            let incomingLexical = retainedContext?.lexicalContext
+            let lexicalChanged = incomingLexical.map { $0.defaultLocaleIdentifier != state.defaultInputLocaleIdentifier || $0.localeIdentifiersByField != state.retainedLocaleIdentifiers } ?? false
+            let received = paired && incoming != nil && incoming == retainedContext?.scratchpad && (incoming != state.retainedScratchpad || lexicalChanged) && incoming?.canonical == fundingPlanStore.plan(for: key, workspaceID: workspaceID)
+            if changed || fundingPlanStore.plan(for: key, workspaceID: workspaceID) != state.canonical || received {
+                if state.dirty && !(received && fullyRetained) { state.saveState = changed ? .providerChanged : .canonicalChanged; monthDrafts[key] = state }
                 else { monthDrafts[key] = nil }
             }
         }
@@ -983,21 +1077,40 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             return
         }
         let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
-        guard changedProvider || canonical != baseCanonical || fundingPlanStore.generation != baseGeneration else { return }
-        if isDirty { saveState = changedProvider ? .providerChanged : .canonicalChanged }
+        let incoming = fundingPlanStore.scratchpads.first { $0.plan.workspaceID == workspaceID && $0.plan.month == month }
+        let fullyRetained = !retentionPending && currentScratchpad == retainedScratchpad && currentKnownLocaleIdentifiers == retainedLocaleIdentifiers
+        let paired = !changedProvider && (try? CompanionMacCoordinator.isPaired(workspaceID: workspaceID, month: month, provider: provider())) == true
+        let retainedContext = paired ? try? CompanionMacCoordinator.retainedEditorContext(workspaceID: workspaceID, month: month, provider: provider()) : nil
+        let incomingLexical = retainedContext?.lexicalContext
+        let lexicalChanged = incomingLexical.map { $0.defaultLocaleIdentifier != defaultInputLocaleIdentifier || $0.localeIdentifiersByField != retainedLocaleIdentifiers } ?? false
+        let received = paired && incoming != nil && incoming == retainedContext?.scratchpad && (incoming != retainedScratchpad || lexicalChanged) && incoming?.canonical == canonical
+        guard changedProvider || canonical != baseCanonical || fundingPlanStore.generation != baseGeneration || received else { return }
+        if received && fullyRetained && fundingPlanStore.generation == baseGeneration {
+            rebaseFromPublishedPlan(generation: baseGeneration)
+        } else if isDirty { saveState = changedProvider ? .providerChanged : .canonicalChanged }
         else if fundingPlanStore.generation == provider().generationToken {
             rebaseFromPublishedPlan(generation: provider().generationToken)
         } else { saveState = .providerChanged }
     }
 
-    private func captureDraftBase() { baseRawText = rawText; baseDraftPlan = plan; isDirty = false; preReductionBasis = [:] }
+    private func captureDraftBase() {
+        baseRawText = rawText; baseDraftPlan = plan; baseLocaleIdentifiers = currentKnownLocaleIdentifiers
+        isDirty = false; preReductionBasis = [:]; hasUserEditToRemember = false
+    }
 
-    private func markEdited() {
+    private func markEdited(userInitiated: Bool = true) {
+        if userInitiated { hasUserEditToRemember = true }
         isDirty = hasEntryChanges
         if [.ready, .saved, .failed].contains(saveState) { saveState = .ready }
         errorMessage = nil
         hasOpenedPlanner = true
         scheduleRetention()
+    }
+
+    private func rememberSavedMonthIfUserEdited() {
+        guard hasUserEditToRemember else { return }
+        selectionDefaults?.set(month.canonical, forKey: Self.lastSavedMonthKey(workspaceID: workspaceID))
+        hasUserEditToRemember = false
     }
 
     private var hasEntryChanges: Bool {
@@ -1009,7 +1122,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
            baseline.referenceMode == .alDar, plan.referenceMode == .alDar {
             baseline.effectiveAlDarReference = plan.effectiveAlDarReference
         }
-        return rawText != baseRawText || plan != baseline
+        return rawText != baseRawText || plan != baseline || currentKnownLocaleIdentifiers != baseLocaleIdentifiers
     }
 
     private var currentScratchpad: MonthlyPlanScratchpad {
@@ -1030,6 +1143,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         preReductionBasis = scratch.preReductionBasis
         excludedRecurringOccurrenceIDs = scratch.excludedRecurringOccurrenceIDs
         retainedScratchpad = scratch; retentionPending = false
+        guard reloadRetainedLexicalContext() else { return true }
+        retainedLocaleIdentifiers = currentKnownLocaleIdentifiers; baseLocaleIdentifiers = currentKnownLocaleIdentifiers
         let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
         baseCanonical = scratch.canonical
         if canonical != scratch.canonical {
@@ -1044,9 +1159,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private func completeCanonicalCommit(_ canonical: FundingPlan) {
         plan = canonical; baseCanonical = canonical
         // Publishing a valid plan must never normalize a focused or retained string.
-        baseDraftPlan = canonical; baseRawText = rawText; isDirty = false
+        baseDraftPlan = canonical; baseRawText = rawText; baseLocaleIdentifiers = currentKnownLocaleIdentifiers; isDirty = false
         committedCandidate = nil; saveState = .saved; errorMessage = nil
         retentionPending = false; retainedScratchpad = currentScratchpad
+        retainedLocaleIdentifiers = currentKnownLocaleIdentifiers
         scheduleRecurringInclusion()
     }
 
@@ -1082,12 +1198,13 @@ final class SalaryWorkspaceViewModel: ObservableObject {
            retainedEntries?.plan.referenceMode == .alDar, snapshot.plan.referenceMode == .alDar {
             retainedEntries?.plan.effectiveAlDarReference = snapshot.plan.effectiveAlDarReference
         }
-        guard snapshot != retainedEntries else { retentionPending = false; return }
+        guard snapshot != retainedEntries || currentKnownLocaleIdentifiers != retainedLocaleIdentifiers else { retentionPending = false; return }
         do {
             let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
             defer { lease.finish() }
-            try provider().fundingPlanRepo.saveScratchpad(snapshot.dto())
-            retainedScratchpad = snapshot; retentionPending = false
+            try CompanionMacCoordinator.saveLocal(snapshot, canonical: nil, provider: provider(),
+                knownLocaleIdentifiers: currentKnownLocaleIdentifiers, selectedHistoryAccountIDs: selectedHistoryAccountIDs)
+            retainedScratchpad = snapshot; retainedLocaleIdentifiers = currentKnownLocaleIdentifiers; retentionPending = false
             if saveState == .retentionFailed { saveState = .ready; errorMessage = nil }
         } catch {
             retentionPending = true; saveState = .retentionFailed
@@ -1104,6 +1221,42 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         guard hasOpenedPlanner else { return }
         if retentionPending || (isDirty && currentScratchpad != retainedScratchpad) { retainCurrentEntries() }
         publishValidEntries()
+    }
+
+    /// The runtime registry supplies actual open/cached editor choices. An absent
+    /// editor returns nil; disagreement between open editors requires review.
+    static func initialCompanionContext(workspaceID: String, month: SelectedStatementMonth,
+                                        provider active: DatabaseProvider) throws ->
+        (knownLocaleIdentifiers: [String: String], selectedHistoryAccountIDs: Set<String>)? {
+        var result: (knownLocaleIdentifiers: [String: String], selectedHistoryAccountIDs: Set<String>)?
+        for workspace in openWorkspaces.allObjects where workspace.workspaceID == workspaceID
+            && workspace.provider().generationToken == active.generationToken {
+            let candidate: (knownLocaleIdentifiers: [String: String], selectedHistoryAccountIDs: Set<String>)
+            if workspace.month == month, workspace.baseGeneration == active.generationToken {
+                candidate = (workspace.currentKnownLocaleIdentifiers, workspace.selectedHistoryAccountIDs)
+            } else if let state = workspace.monthDrafts[month], state.generation == active.generationToken {
+                candidate = (state.knownLocaleIdentifiers.filter { state.raw[$0.key] != nil && Self.isNumericInputKey($0.key) },
+                             state.companionSelectedHistoryAccountIDs)
+            } else { continue }
+            if let result, result.knownLocaleIdentifiers != candidate.knownLocaleIdentifiers
+                || result.selectedHistoryAccountIDs != candidate.selectedHistoryAccountIDs {
+                throw CompanionPacketError.invalid("Open monthly editors have different input or account context. Review them on the Mac before pairing.")
+            }
+            result = candidate
+        }
+        return result
+    }
+
+    static func prepareForCompanionReceive(provider active: DatabaseProvider) -> Bool {
+        for workspace in openWorkspaces.allObjects where workspace.provider().generationToken == active.generationToken && workspace.hasOpenedPlanner {
+            guard workspace.baseGeneration == active.generationToken else { return false }
+            workspace.flushPendingEntries()
+            guard !workspace.retentionPending,
+                  ![SaveState.saving, .failed, .retentionFailed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(workspace.saveState),
+                  !workspace.isDirty || (workspace.currentScratchpad == workspace.retainedScratchpad && workspace.currentKnownLocaleIdentifiers == workspace.retainedLocaleIdentifiers),
+                  !workspace.monthDrafts.values.contains(where: { $0.retentionPending }) else { return false }
+        }
+        return true
     }
 
     /// Runs before the app agrees to quit, while its repository is still open.
@@ -1123,7 +1276,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private func publishValidEntries() {
         guard !retentionPending, isDirty, canSave else { return }
         if plan == baseCanonical {
-            baseRawText = rawText; baseDraftPlan = plan; isDirty = false; saveState = .saved
+            baseRawText = rawText; baseDraftPlan = plan; baseLocaleIdentifiers = currentKnownLocaleIdentifiers; isDirty = false; saveState = .saved
+            rememberSavedMonthIfUserEdited()
             return
         }
         save()
@@ -1191,11 +1345,41 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 let eligible = Set(self.eligibleAccounts.compactMap(\.repositoryAccountId))
                 let additions = payments.filter { !($0.isExcludedFromPlan) && eligible.contains($0.definition.accountID) &&
                     self.plan.assistance?.appliedRecurringIDs[$0.id] == nil && !exclusions.contains($0.id) }
-                if !additions.isEmpty { self.applyRecurring(additions) }
+                if !additions.isEmpty { self.applyRecurring(additions, userInitiated: false) }
             } catch is CancellationError { }
             catch {
                 self?.errorMessage = "Confirmed recurring payments could not be loaded. Your monthly entries are retained."
             }
+        }
+    }
+
+    private static func isNumericInputKey(_ key: String) -> Bool {
+        MoneyField.allCases.contains { $0.rawValue == key } || key == "fx.rate"
+            || key.hasPrefix("deduction.amount.") || key.hasPrefix("amount.") || key.hasPrefix("balance.")
+    }
+    private var currentKnownLocaleIdentifiers: [String: String] {
+        knownLocaleIdentifiers.filter { rawText[$0.key] != nil && Self.isNumericInputKey($0.key) }
+    }
+    private func inputLocale(for key: String) -> Locale? {
+        (knownLocaleIdentifiers[key] ?? defaultInputLocaleIdentifier).map { Locale(identifier: $0) }
+    }
+    private func recordInputLocale(_ key: String) { knownLocaleIdentifiers[key] = locale.identifier }
+    @discardableResult
+    private func reloadRetainedLexicalContext() -> Bool {
+        do {
+            if let context = try CompanionMacCoordinator.lexicalContext(workspaceID: workspaceID, month: month, provider: provider()) {
+                defaultInputLocaleIdentifier = context.defaultLocaleIdentifier
+                knownLocaleIdentifiers = context.localeIdentifiersByField
+            } else {
+                defaultInputLocaleIdentifier = locale.identifier
+                knownLocaleIdentifiers = [:]
+            }
+            return true
+        } catch {
+            defaultInputLocaleIdentifier = nil; knownLocaleIdentifiers = [:]
+            saveState = .providerChanged
+            errorMessage = "Retained input details could not be loaded. Reopen this monthly plan before editing."
+            return false
         }
     }
 
@@ -1205,6 +1389,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return compact.replacingOccurrences(of: ".", with: locale.decimalSeparator ?? ".")
     }
     private func syncDraft() {
+        knownLocaleIdentifiers = [:]
         rawText = [:]; fieldErrors = [:]
         untouchedZeroFields = []
         for field in MoneyField.allCases { rawText[field.rawValue] = localized(moneyText(field)) }
@@ -1222,11 +1407,13 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             rawText["label.\(value.id)"] = value.label
             rawText["amount.\(value.id)"] = (try? value.money.canonicalDecimalString()).map(localized) ?? ""
         }
+        for key in rawText.keys where Self.isNumericInputKey(key) { recordInputLocale(key) }
     }
 
     /// Editing and final Save must apply the same field-specific constraints.
     private func validatedMoney(_ field: MoneyField, text: String) -> Money? {
-        guard let value = try? PlannerInputCodec.money(text, currency: "QAR", locale: locale) else {
+        guard let fieldLocale = inputLocale(for: field.rawValue) else { return nil }
+        guard let value = try? PlannerInputCodec.money(text, currency: "QAR", locale: fieldLocale) else {
             fieldErrors[field.rawValue] = "Enter an exact QAR amount with up to two decimals"
             return nil
         }
@@ -1245,14 +1432,17 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         for row in plan.deductions {
             let label = rawText["deduction.label.\(row.id)"] ?? ""
             fieldErrors["deduction.label.\(row.id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a deduction name" : nil
-            let value = try? PlannerInputCodec.money(rawText["deduction.amount.\(row.id)"] ?? "", currency: "QAR", locale: locale)
-            fieldErrors["deduction.amount.\(row.id)"] = value.map { $0.amount >= 0 } == true ? nil : "Enter a nonnegative deduction"
+            if let fieldLocale = inputLocale(for: "deduction.amount.\(row.id)") {
+                let value = try? PlannerInputCodec.money(rawText["deduction.amount.\(row.id)"] ?? "", currency: "QAR", locale: fieldLocale)
+                fieldErrors["deduction.amount.\(row.id)"] = value.map { $0.amount >= 0 } == true ? nil : "Enter a nonnegative deduction"
+            }
         }
         // FX has no separate commit state; both fields were parsed together on every edit.
         for account in eligibleAccounts {
-            if let id = account.repositoryAccountId, let text = rawText["balance.\(id)"], !text.isEmpty {
+            if let id = account.repositoryAccountId, let text = rawText["balance.\(id)"], !text.isEmpty,
+               let fieldLocale = inputLocale(for: "balance.\(id)") {
                 // Validation must not turn a captured or carried balance into a manual value.
-                fieldErrors["balance.\(id)"] = (try? PlannerInputCodec.money(text, currency: account.nativeCurrency.code, locale: locale)) == nil ? "Enter an exact balance" : nil
+                fieldErrors["balance.\(id)"] = (try? PlannerInputCodec.money(text, currency: account.nativeCurrency.code, locale: fieldLocale)) == nil ? "Enter an exact balance" : nil
             }
         }
         for (region, values) in [("qatar", plan.qatarCommitments), ("india", plan.indiaCommitments)] {
@@ -1260,7 +1450,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 let label = rawText["label.\(value.id)"] ?? ""
                 fieldErrors["label.\(value.id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a label of 1–240 characters" : nil
                 let amount = rawText["amount.\(value.id)"] ?? ""
-                let parsed = try? PlannerInputCodec.money(amount, currency: region == "qatar" ? "QAR" : "INR", locale: locale)
+                guard let fieldLocale = inputLocale(for: "amount.\(value.id)") else { continue }
+                let parsed = try? PlannerInputCodec.money(amount, currency: region == "qatar" ? "QAR" : "INR", locale: fieldLocale)
                 let valid = parsed.map { money in
                     plan.calculationVersion == .legacy || (money.amount >= 0 && (value.temporaryCarryBasis.map { money.amount <= $0.amount } ?? true))
                 } ?? false
@@ -1318,7 +1509,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     /// Apply monthly amounts without changing the confirmed recurring template.
-    func applyRecurring(_ payments: [RecurringPaymentProjection]) {
+    func applyRecurring(_ payments: [RecurringPaymentProjection], userInitiated: Bool = true) {
         guard canEdit else { return }
         var assistance = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: month.canonical)
         for payment in payments where plan.includesRecurring(payment.date) && !excludedPlanningAccountIDs.contains(payment.definition.accountID) {
@@ -1337,9 +1528,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             assistance.appliedRecurringPaid?[payment.id] = try? PlanningAmount(Money(amount: payment.paid, currency: payment.currency))
             rawText["label.\(id)"] = row.label
             rawText["amount.\(id)"] = (try? money.canonicalDecimalString()).map(localized) ?? ""
+            recordInputLocale("amount.\(id)")
         }
         plan.assistance = assistance
-        markEdited(); recalculate()
+        markEdited(userInitiated: userInitiated); recalculate()
     }
 
     /// Received net pay is cash already recorded, never another forecast income.
@@ -1373,10 +1565,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
                 }
             }
         }
-        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil }
+        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil; recordInputLocale(field.rawValue) }
         for key in Array(rawText.keys) where key.hasPrefix("deduction.") { rawText[key] = nil; fieldErrors[key] = nil }
         if let balance = plan.balances.first(where: { $0.accountID == source.accountID }) {
             rawText["balance.\(source.accountID)"] = (try? balance.money?.canonicalDecimalString()).map(localized) ?? ""
+            recordInputLocale("balance.\(source.accountID)")
         }
         markEdited(); recalculate()
     }
@@ -1399,7 +1592,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         plan.expectedFixedProvenance = .manual; plan.expectedVariableProvenance = .manual; plan.expectedDeductionsProvenance = .manual
         if !plan.balances.contains(where: { $0.accountID == accountID }) { captureAccountBalance(account) }
         if let index = plan.balances.firstIndex(where: { $0.accountID == accountID }) { plan.balances[index].included = true }
-        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil }
+        for field in [MoneyField.fixed, .variable, .deductions] { rawText[field.rawValue] = localized("0.00"); fieldErrors[field.rawValue] = nil; recordInputLocale(field.rawValue) }
         for key in Array(rawText.keys) where key.hasPrefix("deduction.") { rawText[key] = nil; fieldErrors[key] = nil }
         markEdited(); recalculate()
         return true
@@ -1432,7 +1625,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
         calculation = FundingPlanCalculator.calculate(plan, excludingAccounts: excludedPlanningAccountIDs,
             historyOnlyAccountIDs: excludedHistoryAccountIDs, salaryReceipt: payslipReceiptState)
-        if saveState != .committedNeedsRefresh { isDirty = hasEntryChanges }
+        if saveState != .committedNeedsRefresh {
+            isDirty = hasEntryChanges
+            if !isDirty { hasUserEditToRemember = false }
+        }
         if hasOpenedPlanner, !isRebasing, canEdit, isDirty, currentScratchpad != retainedScratchpad { scheduleRetention() }
     }
 
@@ -1441,10 +1637,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return try! SelectedStatementMonth(year: parts.year!, month: parts.month!)
     }
 
-    private static func emptyPlan(month: SelectedStatementMonth, workspaceID: String) -> FundingPlan {
+    private static func emptyPlan(month: SelectedStatementMonth, workspaceID: String, planID: String = UUID().uuidString) -> FundingPlan {
         let zero = try! Money(canonicalDecimal: "0.00", currency: "QAR")
         let fee = zero
-        return FundingPlan(id: UUID().uuidString, workspaceID: workspaceID, month: month, rolloverSourcePlanID: nil,
+        return FundingPlan(id: planID, workspaceID: workspaceID, month: month, rolloverSourcePlanID: nil,
                            expectedFixedEarnings: zero, expectedFixedProvenance: .manual,
                            expectedVariableEarnings: zero, expectedVariableProvenance: .manual,
                            expectedDeductions: zero, expectedDeductionsProvenance: .manual,
@@ -1479,10 +1675,12 @@ final class PlanningAnalysisModel: ObservableObject {
     private var sequence = 0
     private var cachedGeneration: ProviderGenerationToken?
     private var cachedRevision: UInt64?
+    private var cachedCategoryRevision: UUID?
 
     private struct Query: Equatable {
         let generation: ProviderGenerationToken
         let revision: UInt64
+        let categoryRevision: UUID
         let plan: FundingPlan
         let scenario: PlanningScenario
         let today: StatementDate
@@ -1504,12 +1702,13 @@ final class PlanningAnalysisModel: ObservableObject {
             cancel(); query = nil; projection = nil; rows = []; return
         }
         let today = FinancialCalendar.statement(Date())!
-        let requested = Query(generation: generation, revision: store.revision, plan: plan, scenario: scenario, today: today,
+        let categoryRevision = CategoryStore.shared.revision
+        let requested = Query(generation: generation, revision: store.revision, categoryRevision: categoryRevision, plan: plan, scenario: scenario, today: today,
             selectedHistoryAccountIDs: selectedHistoryAccountIDs, retainedRecurringOccurrenceIDs: retainedRecurringOccurrenceIDs,
             excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs)
         guard query != requested || (projection == nil && !isWorking) else { return }
         cancel(); query = requested
-        if cachedGeneration != generation || cachedRevision != store.revision { projection = nil }
+        if cachedGeneration != generation || cachedRevision != store.revision || cachedCategoryRevision != categoryRevision { projection = nil }
         let revision = store.revision, source = store.sources, categories = CategoryStore.shared.snapshot, cards = CardStore.shared.snapshot
         let transactions = TransactionStore.shared.transactions
         let anchors = AccountStore.shared.accounts.compactMap { account -> PlanningAccountAnchor? in
@@ -1518,7 +1717,7 @@ final class PlanningAnalysisModel: ObservableObject {
             return .init(id: id, title: account.preferredDisplayName, currency: account.currencyCode, domain: account.type == .bank ? "bank" : "credit_card",
                 amount: date == nil ? nil : account.currentBalance, date: date, historyOnly: account.isHistoryOnly)
         }
-        let cached = cachedGeneration == generation && cachedRevision == revision ? rows : nil
+        let cached = cachedGeneration == generation && cachedRevision == revision && cachedCategoryRevision == categoryRevision ? rows : nil
         let request = sequence
         isWorking = true
         task = Task { [weak self] in
@@ -1527,11 +1726,12 @@ final class PlanningAnalysisModel: ObservableObject {
                 let rows = try cached ?? SpendingIntelligence.rows(transactions: transactions, sources: source, cards: cards, categories: categories, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
                 return (rows, try PlanningIntelligence.project(plan: plan, anchors: anchors, rows: rows, metadata: metadata, sources: source, cards: cards, today: today, scenario: scenario,
                     selectedHistoryAccountIDs: selectedHistoryAccountIDs, retainedRecurringOccurrenceIDs: retainedRecurringOccurrenceIDs,
-                    excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs))
+                    excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs,
+                    spendingIntents: categories.automation?.spendingIntents ?? [:]))
             }
             guard let (rows, projection) = try? await withTaskCancellationHandler(operation: { try await work.value }, onCancel: { work.cancel() }) else { return }
-            guard let self, !Task.isCancelled, self.sequence == request, store.generation == generation, store.revision == revision else { return }
-            self.cachedGeneration = generation; self.cachedRevision = revision
+            guard let self, !Task.isCancelled, self.sequence == request, store.generation == generation, store.revision == revision, CategoryStore.shared.revision == categoryRevision else { return }
+            self.cachedGeneration = generation; self.cachedRevision = revision; self.cachedCategoryRevision = categoryRevision
             self.rows = rows; self.projection = projection; self.isWorking = false
         }
     }

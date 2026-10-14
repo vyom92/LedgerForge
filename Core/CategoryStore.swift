@@ -11,6 +11,8 @@ final class CategoryStore: ObservableObject {
 
     let objectWillChange = ObservableObjectPublisher()
     @ObserverAtomicPublished private(set) var snapshot: CategorySnapshot = .empty
+    private(set) var revision = UUID()
+    private(set) var sourceWitness: CategorySourceWitness?
 
     init() {}
 
@@ -38,8 +40,10 @@ final class CategoryStore: ObservableObject {
 
 
     @MainActor
-    func installSnapshotWithoutObservation(_ snapshot: CategorySnapshot) {
+    func installSnapshotWithoutObservation(_ snapshot: CategorySnapshot, sourceWitness: CategorySourceWitness? = nil) {
         _snapshot.installWithoutObservation(snapshot)
+        self.sourceWitness = sourceWitness
+        revision = UUID()
     }
 
     @MainActor

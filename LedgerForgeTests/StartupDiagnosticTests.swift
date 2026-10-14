@@ -46,6 +46,33 @@ struct StartupDiagnosticTests {
         let unknown = RuntimeDiagnostic.failure(Unknown(), operation: "plan save", stage: "repository transaction")
         #expect(unknown.code == "operation.unknown")
         #expect(unknown.metadata["effect"] == "durable outcome not established")
+        #expect(unknown.metadata["error_type_name"] == "Unknown")
+        #expect(unknown.nextAction == "Keep the retained draft and review Diagnostics before attempting recovery.")
+    }
+
+    @Test func planSaveFailureReportsFinancialAndAccessTypesWithoutErrorPayload() {
+        let cases: [(any Error, String, String)] = [
+            (FinancialIntelligenceError.invalidRecord, "financial_intelligence.invalid_record", "FinancialIntelligenceError"),
+            (FinancialIntelligenceError.staleReview, "financial_intelligence.stale_review", "FinancialIntelligenceError"),
+            (LedgerAccessError.staleActivation, "ledger_access.stale_activation", "LedgerAccessError"),
+            (LedgerAccessError.transitionPending, "ledger_access.transition_pending", "LedgerAccessError"),
+            (DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "private balance")), "serialization.decode_failed", "DecodingError")
+        ]
+        for (error, expectedCode, expectedType) in cases {
+            let failure = RuntimeDiagnostic.failure(error, operation: "plan save", stage: "plan assistance validation")
+            #expect(failure.code == expectedCode)
+            #expect(failure.metadata["error_type"] == expectedType)
+            #expect(failure.metadata["stage"] == "plan assistance validation")
+            #expect(failure.metadata["retry_eligible"] == "false")
+            #expect(!failure.metadata.values.contains { $0.contains("private balance") })
+            #expect(failure.nextAction == "Keep the retained draft and review Diagnostics before attempting recovery.")
+        }
+        let unsafe = DiagnosticPrivacy.metadata(["error_type_name": "personal@example.com", "stage": "unreviewed stage"])
+        #expect(unsafe?["error_type_name"] == "not captured")
+        #expect(unsafe?["stage"] == "not captured")
+        for name in ["Unknown\n", String(repeating: "A", count: 121), "Generic<Value>"] {
+            #expect(DiagnosticPrivacy.metadata(["error_type_name": name])?["error_type_name"] == "not captured")
+        }
     }
 
     @Test func memoryOrIncompleteStartupCanNeverPassDurableAcceptance() {

@@ -7,12 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C10002012610020000000001 /* LFSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10002002610020000000001 /* LFSettingsLayout.swift */; };
-		E10000022026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
-		E10000032026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
-		E10000042026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
-
 		009F33FAAF444AB6A8AF668D /* BackupRestoreSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */; };
+		02859D4509623C9692A15707 /* TransactionTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DC3072EC09007DA308 /* TransactionTags.swift */; };
+		09D94D1BFCC5662148D2EC53 /* TransactionTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DC3072EC09007DA308 /* TransactionTags.swift */; };
 		0A614FE65C3C309A9C072E97 /* PlanningEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538A81C295CEEE6CBCECD5E4 /* PlanningEditors.swift */; };
 		1068B853B5FEEE84604D020F /* CategoryAutomationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCDDA8542AE7AECDC97273B /* CategoryAutomationRepository.swift */; };
 		118E16D2233B5ACC6630C9D9 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
@@ -102,6 +99,94 @@
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
 		28D11EAA2FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */; };
 		28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */; };
+		28E299FD30725BBC00135713 /* PlannerDates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9030725B5E007DA308 /* PlannerDates.swift */; };
+		28E299FE30725BBC00135713 /* PlannerDates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9030725B5E007DA308 /* PlannerDates.swift */; };
+		28E299FF30725BBC00135713 /* PlannerDates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9030725B5E007DA308 /* PlannerDates.swift */; };
+		28E29A0030725BBC00135713 /* PlannerDates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9030725B5E007DA308 /* PlannerDates.swift */; };
+		28E29A0130725BD300135713 /* PlannerFX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8D30725B5E007DA308 /* PlannerFX.swift */; };
+		28E29A0230725BD300135713 /* PlannerFX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8D30725B5E007DA308 /* PlannerFX.swift */; };
+		28E29A0330725BD300135713 /* PlannerFX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8D30725B5E007DA308 /* PlannerFX.swift */; };
+		28E29A0430725BD300135713 /* PlannerFX.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8D30725B5E007DA308 /* PlannerFX.swift */; };
+		28E29A0530725BD600135713 /* PlannerValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8F30725B5E007DA308 /* PlannerValues.swift */; };
+		28E29A0630725BD600135713 /* PlannerValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8F30725B5E007DA308 /* PlannerValues.swift */; };
+		28E29A0730725BD600135713 /* PlannerValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8F30725B5E007DA308 /* PlannerValues.swift */; };
+		28E29A0830725BD600135713 /* PlannerValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8F30725B5E007DA308 /* PlannerValues.swift */; };
+		28E29A0930725BD900135713 /* PlannerAssistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */; };
+		28E29A0A30725BD900135713 /* PlannerAssistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */; };
+		28E29A0B30725BD900135713 /* PlannerAssistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */; };
+		28E29A0C30725BD900135713 /* PlannerAssistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */; };
+		28E29A0D30725BE300135713 /* PlannerCalculation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9130725B5E007DA308 /* PlannerCalculation.swift */; };
+		28E29A0E30725BE300135713 /* PlannerCalculation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9130725B5E007DA308 /* PlannerCalculation.swift */; };
+		28E29A0F30725BE700135713 /* PlannerInputValidity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */; };
+		28E29A1030725BE700135713 /* PlannerInputValidity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */; };
+		28E29A1130725BEA00135713 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
+		28E29A1230725BED00135713 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
+		28E29A1330725BF000135713 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
+		28E29A1530725DFF00135713 /* CompanionReadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */; };
+		28E29A1630725DFF00135713 /* CompanionReadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */; };
+		28E29A1730725DFF00135713 /* CompanionReadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */; };
+		28E29A1830725DFF00135713 /* CompanionReadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */; };
+		28E29A1A30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */; };
+		28E29A1B30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */; };
+		28E29A1C30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */; };
+		28E29A1D30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */; };
+		28E29A1F30725DFF00135713 /* CompanionMacProjectionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A1E30725DFF00135713 /* CompanionMacProjectionBuilder.swift */; };
+		28E29A2530725E0000135713 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2430725E0000135713 /* CompanionTransport.swift */; };
+		28E29A2630725E0000135713 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2430725E0000135713 /* CompanionTransport.swift */; };
+		28E29A2730725E0000135713 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2430725E0000135713 /* CompanionTransport.swift */; };
+		28E29A2830725E0000135713 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2430725E0000135713 /* CompanionTransport.swift */; };
+		28E29A2930725E3A00135713 /* PlannerCalculation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9130725B5E007DA308 /* PlannerCalculation.swift */; };
+		28E29A2A30725E3A00135713 /* PlannerCalculation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F9130725B5E007DA308 /* PlannerCalculation.swift */; };
+		28E29A2B30725E3D00135713 /* PlannerInputValidity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */; };
+		28E29A2C30725E3D00135713 /* PlannerInputValidity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */; };
+		28E29A2D30725E4000135713 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
+		28E29A2E30725E4000135713 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
+		28E29A3030725EAA00135713 /* CompanionMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2F30725EAA00135713 /* CompanionMerge.swift */; };
+		28E29A3130725EAA00135713 /* CompanionMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2F30725EAA00135713 /* CompanionMerge.swift */; };
+		28E29A3230725EAA00135713 /* CompanionMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2F30725EAA00135713 /* CompanionMerge.swift */; };
+		28E29A3330725EAA00135713 /* CompanionMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A2F30725EAA00135713 /* CompanionMerge.swift */; };
+		28E29A353072610C00135713 /* CompanionMacCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A343072610C00135713 /* CompanionMacCapture.swift */; };
+		28E29A373072610C00135713 /* InvestmentAllocationShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A363072610C00135713 /* InvestmentAllocationShare.swift */; };
+		28E29A393072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */; };
+		28E29A3A3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */; };
+		28E29A3B3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */; };
+		28E29A3C3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */; };
+		28E29A3E3072623E00135713 /* CompanionPackets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A3D3072623E00135713 /* CompanionPackets.swift */; };
+		28E29A3F3072623E00135713 /* CompanionPackets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A3D3072623E00135713 /* CompanionPackets.swift */; };
+		28E29A403072623E00135713 /* CompanionPackets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A3D3072623E00135713 /* CompanionPackets.swift */; };
+		28E29A413072623E00135713 /* CompanionPackets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A3D3072623E00135713 /* CompanionPackets.swift */; };
+		28E29A433072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */; };
+		28E29A443072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */; };
+		28E29A453072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */; };
+		28E29A463072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */; };
+		28E29A483072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */; };
+		28E29A493072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */; };
+		28E29A4A3072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */; };
+		28E29A4B3072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */; };
+		28E29A4D3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A4C3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift */; };
+		28E29A4E3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A4C3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift */; };
+		28E29A4F3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A4C3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift */; };
+		28E29A513072634500135713 /* CompanionSyncPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A503072634500135713 /* CompanionSyncPersistence.swift */; };
+		28E29A523072634500135713 /* CompanionSyncPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A503072634500135713 /* CompanionSyncPersistence.swift */; };
+		28E29A533072634500135713 /* CompanionSyncPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A503072634500135713 /* CompanionSyncPersistence.swift */; };
+		28E29A573072657700135713 /* CompanionMacSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A563072657700135713 /* CompanionMacSettingsView.swift */; };
+		28E29A593072661900135713 /* CompanionMacCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A583072661900135713 /* CompanionMacCoordinator.swift */; };
+		28E29A5B3072665C00135713 /* CompanionMacMonthContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A5A3072665C00135713 /* CompanionMacMonthContext.swift */; };
+		28E29A5F3072707500135713 /* CompanionMacLedgerRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A5E3072707500135713 /* CompanionMacLedgerRecoveryView.swift */; };
+		28E29A613072715C00135713 /* CompanionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A603072715C00135713 /* CompanionRecovery.swift */; };
+		28E29A623072715C00135713 /* CompanionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A603072715C00135713 /* CompanionRecovery.swift */; };
+		28E29A633072715C00135713 /* CompanionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A603072715C00135713 /* CompanionRecovery.swift */; };
+		28E29A643072715C00135713 /* CompanionRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A603072715C00135713 /* CompanionRecovery.swift */; };
+		28E29A683072726B00135713 /* CompanionMacMonthContextReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E29A673072726B00135713 /* CompanionMacMonthContextReader.swift */; };
+		28E768DD3072EC09007DA308 /* TransactionTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DC3072EC09007DA308 /* TransactionTags.swift */; };
+		28E768DF3072EC09007DA308 /* TransactionTagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DE3072EC09007DA308 /* TransactionTagRepository.swift */; };
+		28E768E03072EC09007DA308 /* TransactionTagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DE3072EC09007DA308 /* TransactionTagRepository.swift */; };
+		28E768E13072EC09007DA308 /* TransactionTagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DE3072EC09007DA308 /* TransactionTagRepository.swift */; };
+		28E768E33072EC09007DA308 /* TransactionTagStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768E23072EC09007DA308 /* TransactionTagStore.swift */; };
+		28E768E53072EC09007DA308 /* TransactionTagCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768E43072EC09007DA308 /* TransactionTagCoordinator.swift */; };
+		28E76A113072EE02007DA308 /* MoneyFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E76A103072EE02007DA308 /* MoneyFlow.swift */; };
+		28E76A133072EE02007DA308 /* DashboardMoneyFlowCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E76A123072EE02007DA308 /* DashboardMoneyFlowCard.swift */; };
+		28E76A153072EE02007DA308 /* TransactionTagEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E76A143072EE02007DA308 /* TransactionTagEditor.swift */; };
 		28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */; };
 		28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */; };
 		2A272E3D2F2C766AE1F295BC /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -324,6 +409,7 @@
 		B83000043083000000000001 /* ImportCentreBatchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000033083000000000001 /* ImportCentreBatchViews.swift */; };
 		BBE5BB715905420892D07A48 /* BankStatementSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86107B2D4AB431B96FEC225 /* BankStatementSections.swift */; };
 		BC45C39D97B3C72EAF888B17 /* FinancialIntelligenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0E61359D62CF443983CEDE /* FinancialIntelligenceStore.swift */; };
+		C10002012610020000000001 /* LFSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10002002610020000000001 /* LFSettingsLayout.swift */; };
 		C18123BC232C5503C92DEDAE /* ZurichISP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000009 /* ZurichISP.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 		C6376E9A5D26A7B8D5F8AE6D /* BackgroundWorker/BackgroundActivityBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B342BE11901B13EB448FDB7 /* BackgroundWorker/BackgroundActivityBridge.c */; };
@@ -363,6 +449,9 @@
 		DE09FB8CA8F68226E878A2C4 /* PlanningIntelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37683672DFC895F322F1F16 /* PlanningIntelligence.swift */; };
 		DF7E292FD459483154D6D4B8 /* GmailIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98000000000000000000001 /* GmailIntake.swift */; };
 		DF9ABFBC5112846A3361458B /* LedgerAccessCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A980C0013050000000000001 /* LedgerAccessCoordinator.swift */; };
+		E10000022026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
+		E10000032026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
+		E10000042026100200000001 /* CardInstrumentLineage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000012026100200000001 /* CardInstrumentLineage.swift */; };
 		E1C5986DEB2D40C6BC356EE4 /* AlDarCurrentReferenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */; };
 		E335D177296BE6F768987708 /* FinancialIntelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891033BEAF952174ECFE631F /* FinancialIntelligence.swift */; };
 		E69DF30383227FD8823D94C6 /* SpendingAndMovementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */; };
@@ -445,8 +534,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		C10002002610020000000001 /* LFSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSettingsLayout.swift; sourceTree = "<group>"; };
-		E10000012026100200000001 /* CardInstrumentLineage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInstrumentLineage.swift; sourceTree = "<group>"; };
 		041CBF52CAC0F55B8849EE45 /* BackgroundWorker/BackgroundActivityBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BackgroundWorker/BackgroundActivityBridge.h; sourceTree = "<group>"; };
 		05FCB90FD46EAAA328488D62 /* BackgroundWorker/RepositoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWorker/RepositoryDiagnostics.swift; sourceTree = "<group>"; };
 		07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingAndMovementView.swift; sourceTree = "<group>"; };
@@ -545,6 +632,39 @@
 		28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryStoreHydrator.swift; sourceTree = "<group>"; };
 		28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_AND_PROJECT_CONVENTIONS.md; sourceTree = "<group>"; };
 		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
+		28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionReadSnapshot.swift; sourceTree = "<group>"; };
+		28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableMonthlyPlanEditor.swift; sourceTree = "<group>"; };
+		28E29A1E30725DFF00135713 /* CompanionMacProjectionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacProjectionBuilder.swift; sourceTree = "<group>"; };
+		28E29A2430725E0000135713 /* CompanionTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTransport.swift; sourceTree = "<group>"; };
+		28E29A2F30725EAA00135713 /* CompanionMerge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMerge.swift; sourceTree = "<group>"; };
+		28E29A343072610C00135713 /* CompanionMacCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacCapture.swift; sourceTree = "<group>"; };
+		28E29A363072610C00135713 /* InvestmentAllocationShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentAllocationShare.swift; sourceTree = "<group>"; };
+		28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyPlanSyncAdapter.swift; sourceTree = "<group>"; };
+		28E29A3D3072623E00135713 /* CompanionPackets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPackets.swift; sourceTree = "<group>"; };
+		28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonthlyPlanSyncAdapter+Lexical.swift"; sourceTree = "<group>"; };
+		28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonthlyPlanSyncAdapter+Receipt.swift"; sourceTree = "<group>"; };
+		28E29A4C3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonthlyPlanSyncAdapter+Accounts.swift"; sourceTree = "<group>"; };
+		28E29A503072634500135713 /* CompanionSyncPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSyncPersistence.swift; sourceTree = "<group>"; };
+		28E29A563072657700135713 /* CompanionMacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacSettingsView.swift; sourceTree = "<group>"; };
+		28E29A583072661900135713 /* CompanionMacCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacCoordinator.swift; sourceTree = "<group>"; };
+		28E29A5A3072665C00135713 /* CompanionMacMonthContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacMonthContext.swift; sourceTree = "<group>"; };
+		28E29A5E3072707500135713 /* CompanionMacLedgerRecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacLedgerRecoveryView.swift; sourceTree = "<group>"; };
+		28E29A603072715C00135713 /* CompanionRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionRecovery.swift; sourceTree = "<group>"; };
+		28E29A673072726B00135713 /* CompanionMacMonthContextReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacMonthContextReader.swift; sourceTree = "<group>"; };
+		28E75F8030725B40007DA308 /* LedgerForgeCompanion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForgeCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerAssistance.swift; sourceTree = "<group>"; };
+		28E75F8D30725B5E007DA308 /* PlannerFX.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerFX.swift; sourceTree = "<group>"; };
+		28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputValidity.swift; sourceTree = "<group>"; };
+		28E75F8F30725B5E007DA308 /* PlannerValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerValues.swift; sourceTree = "<group>"; };
+		28E75F9030725B5E007DA308 /* PlannerDates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerDates.swift; sourceTree = "<group>"; };
+		28E75F9130725B5E007DA308 /* PlannerCalculation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerCalculation.swift; sourceTree = "<group>"; };
+		28E768DC3072EC09007DA308 /* TransactionTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTags.swift; sourceTree = "<group>"; };
+		28E768DE3072EC09007DA308 /* TransactionTagRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTagRepository.swift; sourceTree = "<group>"; };
+		28E768E23072EC09007DA308 /* TransactionTagStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTagStore.swift; sourceTree = "<group>"; };
+		28E768E43072EC09007DA308 /* TransactionTagCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTagCoordinator.swift; sourceTree = "<group>"; };
+		28E76A103072EE02007DA308 /* MoneyFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFlow.swift; sourceTree = "<group>"; };
+		28E76A123072EE02007DA308 /* DashboardMoneyFlowCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMoneyFlowCard.swift; sourceTree = "<group>"; };
+		28E76A143072EE02007DA308 /* TransactionTagEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionTagEditor.swift; sourceTree = "<group>"; };
 		28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceMapper.swift; sourceTree = "<group>"; };
 		28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceCoordinator.swift; sourceTree = "<group>"; };
 		36A6D490D0908652CE5CB2C1 /* NetWorthReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthReport.swift; sourceTree = "<group>"; };
@@ -686,6 +806,7 @@
 		B83000033083000000000001 /* ImportCentreBatchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreBatchViews.swift; sourceTree = "<group>"; };
 		BBFAD991F589145701FDAA68 /* CategoryAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryAutomation.swift; sourceTree = "<group>"; };
 		BF0E61359D62CF443983CEDE /* FinancialIntelligenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialIntelligenceStore.swift; sourceTree = "<group>"; };
+		C10002002610020000000001 /* LFSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSettingsLayout.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 		C88000013088000000000001 /* AppShellPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellPresentation.swift; sourceTree = "<group>"; };
 		C88000033088000000000001 /* AppDestinationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationContainer.swift; sourceTree = "<group>"; };
@@ -707,6 +828,7 @@
 		DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDatabaseProfileViewModel.swift; sourceTree = "<group>"; };
 		DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDatabaseProfileWarningView.swift; sourceTree = "<group>"; };
 		DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentProfileAcknowledgementGate.swift; sourceTree = "<group>"; };
+		E10000012026100200000001 /* CardInstrumentLineage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInstrumentLineage.swift; sourceTree = "<group>"; };
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 		F7CEEBF0FC99AE82D81FBBAF /* PlanningMetadataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningMetadataRepository.swift; sourceTree = "<group>"; };
@@ -741,6 +863,11 @@
 			path = .github;
 			sourceTree = "<group>";
 		};
+		28E75F8130725B40007DA308 /* LedgerForgeCompanion */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LedgerForgeCompanion;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -761,6 +888,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		288EB0C12FF7955300F09BC9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		28E75F7D30725B40007DA308 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -921,6 +1055,7 @@
 				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
 				B60000123050000000000001 /* SubprocessProbe */,
 				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
+				28E75F8130725B40007DA308 /* LedgerForgeCompanion */,
 				288EB0AE2FF7955200F09BC9 /* Products */,
 				288EB0DD2FF7A3D000F09BC9 /* Core */,
 				288EB0DE2FF7A3D100F09BC9 /* Services */,
@@ -940,6 +1075,7 @@
 				288EB0EF2FF7B12000F09BC9 /* Analyzers */,
 				281BB1642FFC4C73006E7424 /* Import */,
 				28632CE2305AEA7C005BB476 /* Recovered References */,
+				28E75F8B30725B5E007DA308 /* CompanionShared */,
 			);
 			sourceTree = "<group>";
 		};
@@ -950,6 +1086,7 @@
 				288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */,
 				288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */,
 				B60000103050000000000001 /* LedgerForgeSubprocessProbe */,
+				28E75F8030725B40007DA308 /* LedgerForgeCompanion.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -989,6 +1126,9 @@
 				A97000000000000000000009 /* ZurichISP.swift */,
 				B100F0000000000000000001 /* IBKRFlex.swift */,
 				A96000000000000000000001 /* Investment.swift */,
+				28E29A363072610C00135713 /* InvestmentAllocationShare.swift */,
+				28E768DC3072EC09007DA308 /* TransactionTags.swift */,
+				28E76A103072EE02007DA308 /* MoneyFlow.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1012,6 +1152,7 @@
 				28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */,
 				2899799C30038670009B3870 /* LFConsoleButton.swift */,
 				A96000000000000000000004 /* InvestmentStore.swift */,
+				28E768E23072EC09007DA308 /* TransactionTagStore.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -1058,6 +1199,12 @@
 				B100F0000000000000000004 /* IBKRFlexCredentialStore.swift */,
 				A9700000000000000000000B /* ZurichISPClient.swift */,
 				B100F0000000000000000003 /* IBKRFlexClient.swift */,
+				28E29A1E30725DFF00135713 /* CompanionMacProjectionBuilder.swift */,
+				28E29A343072610C00135713 /* CompanionMacCapture.swift */,
+				28E29A583072661900135713 /* CompanionMacCoordinator.swift */,
+				28E29A5A3072665C00135713 /* CompanionMacMonthContext.swift */,
+				28E29A673072726B00135713 /* CompanionMacMonthContextReader.swift */,
+				28E768E43072EC09007DA308 /* TransactionTagCoordinator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1149,6 +1296,10 @@
 				A96000000000000000000008 /* InvestmentListView.swift */,
 				A96000000000000000000009 /* InvestmentImportReviewView.swift */,
 				28877C6F306BB00800619089 /* SalaryHistoryView.swift */,
+				28E29A563072657700135713 /* CompanionMacSettingsView.swift */,
+				28E29A5E3072707500135713 /* CompanionMacLedgerRecoveryView.swift */,
+				28E76A123072EE02007DA308 /* DashboardMoneyFlowCard.swift */,
+				28E76A143072EE02007DA308 /* TransactionTagEditor.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1181,6 +1332,9 @@
 				B100F0000000000000000002 /* IBKRFlexHoldingsPersistence.swift */,
 				A96000000000000000000002 /* InvestmentPersistence.swift */,
 				A96000000000000000000003 /* SQLiteInvestmentRepository.swift */,
+				28E29A4C3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift */,
+				28E29A503072634500135713 /* CompanionSyncPersistence.swift */,
+				28E768DE3072EC09007DA308 /* TransactionTagRepository.swift */,
 			);
 			path = Database;
 			sourceTree = "<group>";
@@ -1251,6 +1405,28 @@
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
 			);
 			path = "Project documents";
+			sourceTree = "<group>";
+		};
+		28E75F8B30725B5E007DA308 /* CompanionShared */ = {
+			isa = PBXGroup;
+			children = (
+				28E75F8C30725B5E007DA308 /* PlannerAssistance.swift */,
+				28E75F8D30725B5E007DA308 /* PlannerFX.swift */,
+				28E75F8E30725B5E007DA308 /* PlannerInputValidity.swift */,
+				28E75F8F30725B5E007DA308 /* PlannerValues.swift */,
+				28E75F9030725B5E007DA308 /* PlannerDates.swift */,
+				28E75F9130725B5E007DA308 /* PlannerCalculation.swift */,
+				28E29A1430725DFF00135713 /* CompanionReadSnapshot.swift */,
+				28E29A1930725DFF00135713 /* PortableMonthlyPlanEditor.swift */,
+				28E29A2430725E0000135713 /* CompanionTransport.swift */,
+				28E29A2F30725EAA00135713 /* CompanionMerge.swift */,
+				28E29A383072623D00135713 /* MonthlyPlanSyncAdapter.swift */,
+				28E29A3D3072623E00135713 /* CompanionPackets.swift */,
+				28E29A423072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift */,
+				28E29A473072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift */,
+				28E29A603072715C00135713 /* CompanionRecovery.swift */,
+			);
+			path = CompanionShared;
 			sourceTree = "<group>";
 		};
 		B60000123050000000000001 /* SubprocessProbe */ = {
@@ -1352,6 +1528,28 @@
 			productReference = 288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		28E75F7F30725B40007DA308 /* LedgerForgeCompanion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28E75F8830725B41007DA308 /* Build configuration list for PBXNativeTarget "LedgerForgeCompanion" */;
+			buildPhases = (
+				28E75F7C30725B40007DA308 /* Sources */,
+				28E75F7D30725B40007DA308 /* Frameworks */,
+				28E75F7E30725B40007DA308 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				28E75F8130725B40007DA308 /* LedgerForgeCompanion */,
+			);
+			name = LedgerForgeCompanion;
+			packageProductDependencies = (
+			);
+			productName = LedgerForgeCompanion;
+			productReference = 28E75F8030725B40007DA308 /* LedgerForgeCompanion.app */;
+			productType = "com.apple.product-type.application";
+		};
 		B60000133050000000000001 /* LedgerForgeSubprocessProbe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B60000423050000000000001 /* Build configuration list for PBXNativeTarget "LedgerForgeSubprocessProbe" */;
@@ -1391,7 +1589,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2660;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					288EB0AC2FF7955200F09BC9 = {
@@ -1404,6 +1602,9 @@
 					288EB0C32FF7955300F09BC9 = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = 288EB0AC2FF7955200F09BC9;
+					};
+					28E75F7F30725B40007DA308 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -1430,6 +1631,7 @@
 				288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */,
 				B60000133050000000000001 /* LedgerForgeSubprocessProbe */,
 				C90003013099000000000001 /* LedgerForgeBackgroundWorker */,
+				28E75F7F30725B40007DA308 /* LedgerForgeCompanion */,
 			);
 		};
 /* End PBXProject section */
@@ -1451,6 +1653,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		288EB0C22FF7955300F09BC9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		28E75F7E30725B40007DA308 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1503,16 +1712,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				28E29A4A3072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */,
 				FD09E7AFC30A1ADA44BDB34D /* DashboardNetWorthCard.swift in Sources */,
 				E69DF30383227FD8823D94C6 /* SpendingAndMovementView.swift in Sources */,
 				393F314666192B2EC0FDC09B /* PlanningFundingEditor.swift in Sources */,
 				0A614FE65C3C309A9C072E97 /* PlanningEditors.swift in Sources */,
+				28E768DD3072EC09007DA308 /* TransactionTags.swift in Sources */,
 				54B7ACB81C27E713994E459A /* PlanningInsightsView.swift in Sources */,
 				6919DAA73CACB012DA2E8ED5 /* NetWorthReport.swift in Sources */,
 				937DA9DBCA4424A66EF88ADA /* SpendingIntelligence.swift in Sources */,
 				193C7D66C58A68FA391A9ACA /* PlanningProjection.swift in Sources */,
 				D0E50E3042A2DDBF2F4A1476 /* ReportingCurrencyPreferences.swift in Sources */,
 				F8AF02332ECB084D758A438E /* NetWorthMembershipCoordinator.swift in Sources */,
+				28E29A1A30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */,
 				B2263365EE33570ADFD78920 /* FinancialIntelligenceCoordinator.swift in Sources */,
 				765672B1D217E5D8FF2B1DC8 /* NetWorthMembershipStore.swift in Sources */,
 				BC45C39D97B3C72EAF888B17 /* FinancialIntelligenceStore.swift in Sources */,
@@ -1524,18 +1736,23 @@
 				CB5885EE221E44941E942874 /* NetWorthMembership.swift in Sources */,
 				A1695317A71872E3321B494C /* FinancialIntelligence.swift in Sources */,
 				8612B5A694770668A599B27D /* PlanningIntelligence.swift in Sources */,
+				28E29A5F3072707500135713 /* CompanionMacLedgerRecoveryView.swift in Sources */,
+				28E29A463072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */,
 				32092400E2AA8446C9D41205 /* Services/BackgroundWakePlan.swift in Sources */,
 				689E5C36A642E619C7BCCB61 /* Views/BackgroundUpdatesSettingsView.swift in Sources */,
 				B023CB87655A8AC295BA947F /* Services/BackgroundUpdatesSession.swift in Sources */,
 				C90100013099000000000001 /* Services/BackgroundWorkerControl.swift in Sources */,
 				8DA74DEB35CDE020CF512BFC /* Database/BackgroundPublicProgress.swift in Sources */,
 				937027C8A7A62843F610AB82 /* Services/BackgroundEnrollment.swift in Sources */,
+				28E76A153072EE02007DA308 /* TransactionTagEditor.swift in Sources */,
 				22A14B8789D19D48389F7CDB /* Services/BackgroundCredentialPolicy.swift in Sources */,
 				39E9FAFCF2D86395203A80E4 /* Services/BackgroundGmailRepository.swift in Sources */,
 				A9801000000000000000000A /* GmailOAuthAuthorization.swift in Sources */,
+				28E768E33072EC09007DA308 /* TransactionTagStore.swift in Sources */,
 				A99010013099000000000001 /* Models/BackgroundSchedule.swift in Sources */,
 				A99010023099000000000001 /* Database/BackgroundJobRepository.swift in Sources */,
 				A99010033099000000000001 /* Services/BackgroundUpdateExecutor.swift in Sources */,
+				28E29A683072726B00135713 /* CompanionMacMonthContextReader.swift in Sources */,
 				A99010043099000000000001 /* Database/BackgroundPublicCacheRepository.swift in Sources */,
 				A99010053099000000000001 /* Database/BackgroundScheduleRepository.swift in Sources */,
 				C90000013099000000000001 /* Services/BackgroundWorkerService.swift in Sources */,
@@ -1550,12 +1767,14 @@
 				A98010000000000000000001 /* GmailIntake.swift in Sources */,
 				A98010000000000000000002 /* GmailClient.swift in Sources */,
 				A96010000000000000000009 /* InvestmentImportReviewView.swift in Sources */,
+				28E29A3130725EAA00135713 /* CompanionMerge.swift in Sources */,
 				A96010000000000000000008 /* InvestmentListView.swift in Sources */,
 				A96010000000000000000007 /* FundCurrentHoldingsParsers.swift in Sources */,
 				A96010000000000000000006 /* IBKRCurrentHoldingsParser.swift in Sources */,
 				A96010000000000000000005 /* InvestmentStatementParser.swift in Sources */,
 				A96010000000000000000004 /* InvestmentStore.swift in Sources */,
 				A96010000000000000000003 /* SQLiteInvestmentRepository.swift in Sources */,
+				28E29A5B3072665C00135713 /* CompanionMacMonthContext.swift in Sources */,
 				A96010000000000000000002 /* InvestmentPersistence.swift in Sources */,
 				A97010000000000000000001 /* InvestmentValuation.swift in Sources */,
 				A97010000000000000000002 /* InvestmentPriceRegistry.swift in Sources */,
@@ -1565,8 +1784,10 @@
 				A97010000000000000000006 /* OnlineRefreshCoordinator.swift in Sources */,
 				A97010000000000000000007 /* InvestmentOverview.swift in Sources */,
 				A97010000000000000000008 /* InvestmentOverviewView.swift in Sources */,
+				28E768E53072EC09007DA308 /* TransactionTagCoordinator.swift in Sources */,
 				A97010000000000000000012 /* DashboardInvestmentSnapshotCard.swift in Sources */,
 				A97010000000000000000011 /* ImportBatchRunView.swift in Sources */,
+				28E29A0130725BD300135713 /* PlannerFX.swift in Sources */,
 				A9701000000000000000000E /* ZurichISPSettingsView.swift in Sources */,
 				B100A0000000000000000006 /* IBKRFlexSettingsView.swift in Sources */,
 				A9701000000000000000000D /* ZurichISPSyncSession.swift in Sources */,
@@ -1575,6 +1796,7 @@
 				B100A0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */,
 				A9701000000000000000000B /* ZurichISPClient.swift in Sources */,
 				B100A0000000000000000003 /* IBKRFlexClient.swift in Sources */,
+				28E29A3A3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */,
 				A9701000000000000000000A /* ZurichISPHoldingsPersistence.swift in Sources */,
 				B100A0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
 				A97010000000000000000009 /* ZurichISP.swift in Sources */,
@@ -1616,6 +1838,8 @@
 				740000023074000000000001 /* CBQCurrentAccountXLSParser.swift in Sources */,
 				720000023072000000000001 /* HDFCBankAccountXLSNormalizer.swift in Sources */,
 				720000033072000000000001 /* HDFCBankAccountXLSParser.swift in Sources */,
+				28E29A0530725BD600135713 /* PlannerValues.swift in Sources */,
+				28E29A3F3072623E00135713 /* CompanionPackets.swift in Sources */,
 				730000013073000000000001 /* HDFCBankAccountPDFNormalizer.swift in Sources */,
 				D0DDB588E75D41F99EB88E8C /* BankRelationshipPDFNormalizer.swift in Sources */,
 				730000023073000000000001 /* HDFCBankAccountPDFParser.swift in Sources */,
@@ -1627,6 +1851,7 @@
 				650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */,
 				28877C70306BB00800619089 /* SalaryHistoryView.swift in Sources */,
 				DBB00002305E000000000001 /* DeveloperDatabaseProfileViewModel.swift in Sources */,
+				28E76A113072EE02007DA308 /* MoneyFlow.swift in Sources */,
 				DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */,
 				DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */,
 				DBA00002305D000000000001 /* DevelopmentDatabaseProfiles.swift in Sources */,
@@ -1638,6 +1863,7 @@
 				1F8E540A4F77F83661BA6080 /* SalaryAssistanceSession.swift in Sources */,
 				D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */,
 				2D5EA0DB579C85C284D09CBF /* CategoryRulesView.swift in Sources */,
+				28E768E13072EC09007DA308 /* TransactionTagRepository.swift in Sources */,
 				D57000143057000000000001 /* CategoryManagementView.swift in Sources */,
 				3A4400043004000000000001 /* MoneyFormatting.swift in Sources */,
 				E10000022026100200000001 /* CardInstrumentLineage.swift in Sources */,
@@ -1650,6 +1876,8 @@
 				28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */,
 				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
 				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
+				28E299FD30725BBC00135713 /* PlannerDates.swift in Sources */,
+				28E29A0D30725BE300135713 /* PlannerCalculation.swift in Sources */,
 				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,
 				285D459F3057E43F00A83ED8 /* ImportInstantFormatting.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
@@ -1660,12 +1888,15 @@
 				281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */,
 				28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */,
 				C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */,
+				28E29A4D3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */,
 				A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */,
 				286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */,
+				28E29A0930725BD900135713 /* PlannerAssistance.swift in Sources */,
 				2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */,
 				286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */,
 				286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */,
 				286D68FD2FFFF6C20078AAC5 /* LFInfoRow.swift in Sources */,
+				28E29A533072634500135713 /* CompanionSyncPersistence.swift in Sources */,
 				C10002012610020000000001 /* LFSettingsLayout.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
 				286D68FF2FFFF6E60078AAC5 /* LFEmptyState.swift in Sources */,
@@ -1676,10 +1907,12 @@
 				ACD0D3B3FCCB4B909B807A5C /* BackupRestoreCoordinator.swift in Sources */,
 				656EE4F70E86495BBBC96038 /* DatabaseActivityGate.swift in Sources */,
 				B547E5BD0F5240849B20BDCB /* RestoreOperation.swift in Sources */,
+				28E29A1F30725DFF00135713 /* CompanionMacProjectionBuilder.swift in Sources */,
 				A69C100189964B7F80F52710 /* BackupPackage.swift in Sources */,
 				37A100012FFDA6CB00C12A68 /* ImportSessionStore.swift in Sources */,
 				37A100112FFDA6CB00C12A68 /* AccountMetadataCoordinator.swift in Sources */,
 				37A100212FFDA6CB00C12A68 /* AccountsViewModel.swift in Sources */,
+				28E29A2830725E0000135713 /* CompanionTransport.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* StatementParser.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
@@ -1696,6 +1929,7 @@
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* StatementParserRegistry.swift in Sources */,
+				28E29A573072657700135713 /* CompanionMacSettingsView.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
 				28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */,
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
@@ -1711,16 +1945,20 @@
 				B50000013050000000000001 /* ConfirmedImport.swift in Sources */,
 				A980B0023050000000000001 /* BankImport.swift in Sources */,
 				A980C0023050000000000001 /* LedgerAccessCoordinator.swift in Sources */,
+				28E29A353072610C00135713 /* CompanionMacCapture.swift in Sources */,
 				B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */,
 				B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
 				A10000300000000000000002 /* PeriodOverviewComponents.swift in Sources */,
+				28E29A373072610C00135713 /* InvestmentAllocationShare.swift in Sources */,
 				281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */,
 				2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* DirectionResolver.swift in Sources */,
+				28E29A1630725DFF00135713 /* CompanionReadSnapshot.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
 				286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */,
+				28E29A633072715C00135713 /* CompanionRecovery.swift in Sources */,
 				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */,
 				BBE5BB715905420892D07A48 /* BankStatementSections.swift in Sources */,
@@ -1729,7 +1967,9 @@
 				281BB1822FFC4D40006E7424 /* ImportResult.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
 				28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */,
+				28E29A593072661900135713 /* CompanionMacCoordinator.swift in Sources */,
 				281BB1862FFC4D40006E7424 /* ImportError.swift in Sources */,
+				28E76A133072EE02007DA308 /* DashboardMoneyFlowCard.swift in Sources */,
 				281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */,
 				286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */,
 				F99000210000000000000002 /* LFPasswordField.swift in Sources */,
@@ -1741,6 +1981,7 @@
 				2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */,
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* ImportEngine.swift in Sources */,
+				28E29A0F30725BE700135713 /* PlannerInputValidity.swift in Sources */,
 				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
 				2899799D30038670009B3870 /* LFConsoleButton.swift in Sources */,
 				286D69052FFFF87B0078AAC5 /* LFInlineBadge.swift in Sources */,
@@ -1762,19 +2003,51 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		28E75F7C30725B40007DA308 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28E29A623072715C00135713 /* CompanionRecovery.swift in Sources */,
+				28E29A493072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */,
+				28E29A1330725BF000135713 /* MoneyFormatting.swift in Sources */,
+				28E29A0C30725BD900135713 /* PlannerAssistance.swift in Sources */,
+				28E29A1830725DFF00135713 /* CompanionReadSnapshot.swift in Sources */,
+				28E29A0430725BD300135713 /* PlannerFX.swift in Sources */,
+				28E29A2630725E0000135713 /* CompanionTransport.swift in Sources */,
+				28E29A393072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */,
+				28E29A1D30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */,
+				28E29A433072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */,
+				28E29A3230725EAA00135713 /* CompanionMerge.swift in Sources */,
+				28E29A0030725BBC00135713 /* PlannerDates.swift in Sources */,
+				28E29A1130725BEA00135713 /* Money.swift in Sources */,
+				28E29A1030725BE700135713 /* PlannerInputValidity.swift in Sources */,
+				28E29A0E30725BE300135713 /* PlannerCalculation.swift in Sources */,
+				28E29A1230725BED00135713 /* PlannerInputCodec.swift in Sources */,
+				28E29A0830725BD600135713 /* PlannerValues.swift in Sources */,
+				28E29A3E3072623E00135713 /* CompanionPackets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B60000143050000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				09D94D1BFCC5662148D2EC53 /* TransactionTags.swift in Sources */,
 				ED3F8EFFC4CE6353F0F3F035 /* CategoryAutomationRepository.swift in Sources */,
 				4239DD616EB3ED3A699AB431 /* NetWorthMembershipRepository.swift in Sources */,
+				28E29A2B30725E3D00135713 /* PlannerInputValidity.swift in Sources */,
 				D8739D2EB1AB3040419973C3 /* FinancialIntelligenceRepository.swift in Sources */,
+				28E29A2730725E0000135713 /* CompanionTransport.swift in Sources */,
 				2EEC2189829734891BF41203 /* PlanningMetadataRepository.swift in Sources */,
+				28E299FE30725BBC00135713 /* PlannerDates.swift in Sources */,
 				667B3681F71C221F79EFAB5E /* CategoryAutomation.swift in Sources */,
 				6E3E5CFFA72627FD918B40FA /* NetWorthMembership.swift in Sources */,
 				E335D177296BE6F768987708 /* FinancialIntelligence.swift in Sources */,
 				46EC0CC22591CA1433C1206C /* PlanningIntelligence.swift in Sources */,
+				28E29A413072623E00135713 /* CompanionPackets.swift in Sources */,
 				6F4203286173587760AC854E /* Database/BackgroundPublicProgress.swift in Sources */,
+				28E29A3030725EAA00135713 /* CompanionMerge.swift in Sources */,
+				28E29A0630725BD600135713 /* PlannerValues.swift in Sources */,
 				9968CFD7D98BDE8F0482D23E /* Services/BackgroundEnrollment.swift in Sources */,
 				9F233E631FF6914276F707F1 /* Services/BackgroundCredentialPolicy.swift in Sources */,
 				C90007013099000000000001 /* Models/BackgroundSchedule.swift in Sources */,
@@ -1789,24 +2062,34 @@
 				A96020000000000000000002 /* InvestmentPersistence.swift in Sources */,
 				A96020000000000000000001 /* Investment.swift in Sources */,
 				A9702000000000000000000B /* ZurichISPClient.swift in Sources */,
+				28E29A1730725DFF00135713 /* CompanionReadSnapshot.swift in Sources */,
 				A9702000000000000000000A /* ZurichISPHoldingsPersistence.swift in Sources */,
 				B100C0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
 				A97020000000000000000009 /* ZurichISP.swift in Sources */,
+				28E29A483072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */,
 				B100C0000000000000000001 /* IBKRFlex.swift in Sources */,
 				A97020000000000000000003 /* InvestmentPriceClient.swift in Sources */,
 				A97020000000000000000002 /* InvestmentPriceRegistry.swift in Sources */,
 				A97020000000000000000001 /* InvestmentValuation.swift in Sources */,
 				A99029000000000000000001 /* ImportInstantFormatting.swift in Sources */,
+				28E768E03072EC09007DA308 /* TransactionTagRepository.swift in Sources */,
+				28E29A0230725BD300135713 /* PlannerFX.swift in Sources */,
 				A10030000000000000000003 /* FundingPlan.swift in Sources */,
 				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
 				A94000000000000000000003 /* AlDarReference.swift in Sources */,
 				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
 				B60000013050000000000001 /* main.swift in Sources */,
+				28E29A1C30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */,
 				B60000023050000000000001 /* Repository.swift in Sources */,
+				28E29A4F3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */,
 				B60000033050000000000001 /* SQLiteDatabase.swift in Sources */,
 				B60000043050000000000001 /* SQLiteRepositoryProvider.swift in Sources */,
 				B60000053050000000000001 /* Migrations.swift in Sources */,
+				28E29A2930725E3A00135713 /* PlannerCalculation.swift in Sources */,
+				28E29A2D30725E4000135713 /* PlannerInputCodec.swift in Sources */,
+				28E29A613072715C00135713 /* CompanionRecovery.swift in Sources */,
 				B60000063050000000000001 /* DTOs.swift in Sources */,
+				28E29A443072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */,
 				B60000073050000000000001 /* ConfirmedImport.swift in Sources */,
 				A980B0033050000000000001 /* BankImport.swift in Sources */,
 				A980C0033050000000000001 /* LedgerAccessCoordinator.swift in Sources */,
@@ -1815,10 +2098,13 @@
 				B600000A3050000000000001 /* TransactionEventIdentity.swift in Sources */,
 				B600000B3050000000000001 /* Transaction.swift in Sources */,
 				B600000C3050000000000001 /* Money.swift in Sources */,
+				28E29A3B3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */,
+				28E29A513072634500135713 /* CompanionSyncPersistence.swift in Sources */,
 				B600000D3050000000000001 /* MoneyFormatting.swift in Sources */,
 				E10000032026100200000001 /* CardInstrumentLineage.swift in Sources */,
 				B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */,
 				B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */,
+				28E29A0A30725BD900135713 /* PlannerAssistance.swift in Sources */,
 				A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1827,22 +2113,33 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02859D4509623C9692A15707 /* TransactionTags.swift in Sources */,
 				5A0FD94952068FC0B6956980 /* CategoryAutomationRepository.swift in Sources */,
 				1A674BAC606280AE725B7867 /* NetWorthMembershipRepository.swift in Sources */,
 				92BBF2D641FC305FD9BF3B9F /* FinancialIntelligenceRepository.swift in Sources */,
+				28E29A0B30725BD900135713 /* PlannerAssistance.swift in Sources */,
+				28E29A2530725E0000135713 /* CompanionTransport.swift in Sources */,
 				B35DBEA7C5FE493BC1300CB2 /* PlanningMetadataRepository.swift in Sources */,
 				2A6C8BDEBBB3957BBE6E3B52 /* CategoryAutomation.swift in Sources */,
+				28E29A3330725EAA00135713 /* CompanionMerge.swift in Sources */,
 				172FA719B75F8A343DA8211B /* NetWorthMembership.swift in Sources */,
+				28E29A523072634500135713 /* CompanionSyncPersistence.swift in Sources */,
 				26EC195465C34B2A22E9F352 /* FinancialIntelligence.swift in Sources */,
 				DE09FB8CA8F68226E878A2C4 /* PlanningIntelligence.swift in Sources */,
 				C6376E9A5D26A7B8D5F8AE6D /* BackgroundWorker/BackgroundActivityBridge.c in Sources */,
+				28E29A403072623E00135713 /* CompanionPackets.swift in Sources */,
 				EBF3F4748B5914125CA1CAE0 /* Services/BackgroundWakePlan.swift in Sources */,
 				83779F014D23EF0B673B6F92 /* Database/BackgroundPublicProgress.swift in Sources */,
+				28E29A1B30725DFF00135713 /* PortableMonthlyPlanEditor.swift in Sources */,
 				96F536767922378203D3EA61 /* Services/BackgroundEnrollment.swift in Sources */,
 				AF8DE57D0C475D86AB1AB8B9 /* Services/BackgroundCredentialPolicy.swift in Sources */,
+				28E29A2E30725E4000135713 /* PlannerInputCodec.swift in Sources */,
 				6493D886ECEB6CB27B2C8080 /* Services/BackgroundGmailRepository.swift in Sources */,
 				1E214E20E5264215B3AF1760 /* BackgroundWorker/RepositoryDiagnostics.swift in Sources */,
 				1A9CF83D0D08817DAF95C7E2 /* Models/BackgroundSchedule.swift in Sources */,
+				28E29A2C30725E3D00135713 /* PlannerInputValidity.swift in Sources */,
+				28E29A4E3072634500135713 /* MonthlyPlanSyncAdapter+Accounts.swift in Sources */,
+				28E29A453072634500135713 /* MonthlyPlanSyncAdapter+Lexical.swift in Sources */,
 				72AA8A19EEE502A9964DC4FA /* Database/BackgroundJobRepository.swift in Sources */,
 				8A89686293EA099B4A2B6A40 /* Database/BackgroundPublicCacheRepository.swift in Sources */,
 				688B1906D8E5F3FEC0ECCBCB /* Database/BackgroundScheduleRepository.swift in Sources */,
@@ -1856,7 +2153,9 @@
 				8FC9DDAD71E385AC53F0917A /* ZurichISPClient.swift in Sources */,
 				B100B0000000000000000003 /* IBKRFlexClient.swift in Sources */,
 				802C96D0047D95C210A422D2 /* ZurichISPHoldingsPersistence.swift in Sources */,
+				28E29A2A30725E3A00135713 /* PlannerCalculation.swift in Sources */,
 				B100B0000000000000000002 /* IBKRFlexHoldingsPersistence.swift in Sources */,
+				28E29A643072715C00135713 /* CompanionRecovery.swift in Sources */,
 				C18123BC232C5503C92DEDAE /* ZurichISP.swift in Sources */,
 				B100B0000000000000000001 /* IBKRFlex.swift in Sources */,
 				70CA715C2D0EC175E932857A /* InvestmentPriceClient.swift in Sources */,
@@ -1868,13 +2167,18 @@
 				2E6CDBB92B42F1C33413D425 /* AlDarReference.swift in Sources */,
 				6748758D24910F4CDD24EA32 /* SQLiteSalaryRepository.swift in Sources */,
 				7181C7A52D6B4602A0C5F198 /* Repository.swift in Sources */,
+				28E29A3C3072623D00135713 /* MonthlyPlanSyncAdapter.swift in Sources */,
 				5181EF3FF2825B6E2BD505E5 /* SQLiteDatabase.swift in Sources */,
+				28E29A0730725BD600135713 /* PlannerValues.swift in Sources */,
 				492140E0B60D2B028B6E9A80 /* SQLiteRepositoryProvider.swift in Sources */,
 				C920F5AB5409A8B90612A3C6 /* Migrations.swift in Sources */,
 				457FC7D7BF15A9072FAC34DD /* DTOs.swift in Sources */,
 				118E16D2233B5ACC6630C9D9 /* ConfirmedImport.swift in Sources */,
 				74FADE6EEC2E620E838E4B96 /* BankImport.swift in Sources */,
+				28E29A4B3072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */,
 				DF9ABFBC5112846A3361458B /* LedgerAccessCoordinator.swift in Sources */,
+				28E29A1530725DFF00135713 /* CompanionReadSnapshot.swift in Sources */,
+				28E299FF30725BBC00135713 /* PlannerDates.swift in Sources */,
 				2A272E3D2F2C766AE1F295BC /* IdentifierOwnershipMigrationV5.swift in Sources */,
 				603D4E694506B2260379B93D /* SQLiteConfirmedImportRepository.swift in Sources */,
 				26B750524624F16DB5FB323F /* TransactionEventIdentity.swift in Sources */,
@@ -1890,8 +2194,10 @@
 				F10DBB2391AE48044308C378 /* GmailCredentialStore.swift in Sources */,
 				3D91A86483E58266DFD146DC /* ZurichISPCredentialStore.swift in Sources */,
 				B100B0000000000000000004 /* IBKRFlexCredentialStore.swift in Sources */,
+				28E29A0330725BD300135713 /* PlannerFX.swift in Sources */,
 				E1C5986DEB2D40C6BC356EE4 /* AlDarCurrentReferenceProvider.swift in Sources */,
 				C90000023099000000000001 /* BackgroundWorker/BackgroundWorker.swift in Sources */,
+				28E768DF3072EC09007DA308 /* TransactionTagRepository.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2047,7 +2353,7 @@
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2085,13 +2391,14 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) LEDGERFORGE_DEVELOPER_TOOLS";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -2109,7 +2416,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2146,13 +2453,14 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) LEDGERFORGE_DEVELOPER_TOOLS";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -2264,6 +2572,90 @@
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_TARGET_NAME = LedgerForge;
 				XROS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
+		28E75F8930725B41007DA308 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeCompanion;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		28E75F8A30725B41007DA308 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeCompanion;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -2396,6 +2788,15 @@
 			buildConfigurations = (
 				288EB0D52FF7955300F09BC9 /* Debug */,
 				288EB0D62FF7955300F09BC9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		28E75F8830725B41007DA308 /* Build configuration list for PBXNativeTarget "LedgerForgeCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28E75F8930725B41007DA308 /* Debug */,
+				28E75F8A30725B41007DA308 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

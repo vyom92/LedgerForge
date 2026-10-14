@@ -77,6 +77,8 @@ private enum GlobalRuntimeStateCleanup {
         ImportSessionStore.shared.replaceImportSessions([])
         ImportAttemptStore.shared.replaceAttempts([])
         CategoryStore.shared.replaceSnapshot(.empty)
+        TransactionTagStore.shared.installWithoutObservation(nil, generation: nil)
+        TransactionTagStore.shared.notifyInstalledValue()
         InvestmentStore.shared.installWithoutObservation(.empty, generation: nil)
         InvestmentStore.shared.notifyInstalledValue()
         NetWorthMembershipStore.shared.installWithoutObservation(nil, generation: nil)

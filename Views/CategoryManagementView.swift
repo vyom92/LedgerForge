@@ -12,7 +12,7 @@ private enum CategoryMutationIntent {
     case setArchived(categoryID: String, isArchived: Bool)
     case delete(categoryID: String)
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     var protectedAction: DevelopmentProtectedAction {
         switch self {
         case .create: return .categoryCreate
@@ -28,7 +28,7 @@ struct CategoryManagementView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject private var categoryStore: CategoryStore
     private let coordinator: CategoryManaging
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
 
@@ -39,12 +39,12 @@ struct CategoryManagementView: View {
     @State private var categoryPendingDeletion: Category?
     @State private var message: String?
     @State private var categoryReconciliationRequired = false
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var pendingMutation: CategoryMutationIntent?
     @State private var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @MainActor
     init(
         categoryStore: CategoryStore? = nil,
@@ -142,7 +142,7 @@ struct CategoryManagementView: View {
         } message: {
             Text("Only unused categories can be deleted. Assigned transactions are never changed.")
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .confirmationDialog(
             DevelopmentProfileAcknowledgementPresentation.title,
             isPresented: Binding(
@@ -258,7 +258,7 @@ struct CategoryManagementView: View {
     }
 
     private func request(_ intent: CategoryMutationIntent) {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         switch acknowledgementGate.authorization(for: intent.protectedAction) {
         case .allowed:
             execute(intent)
@@ -290,7 +290,7 @@ struct CategoryManagementView: View {
             message = nil
             categoryReconciliationRequired = false
         } catch {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             if let coordinatorError = error as? CategoryManagementCoordinatorError {
                 switch coordinatorError {
                 case .acknowledgementRequired(let challenge):
@@ -317,7 +317,7 @@ struct CategoryManagementView: View {
         }
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func approveDevelopmentProfileAcknowledgement() {
         guard let challenge = acknowledgementChallenge,
               let intent = pendingMutation else { return }

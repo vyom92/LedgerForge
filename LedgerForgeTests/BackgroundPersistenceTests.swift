@@ -20,6 +20,141 @@ final class BackgroundPersistenceTests: XCTestCase {
         return root.appendingPathComponent("mechanics.sqlite")
     }
 
+    func testCheckTimeIsOptionalForOldReceiptsAndSurvivesReopenWithoutChangingSchedule() throws {
+        let oldJSON = Data(#"{"identity":"mechanical-leg","slot":100,"attempts":1,"succeeded":false}"#.utf8)
+        var progress = try JSONDecoder().decode(BackgroundPublicLegProgress.self, from: oldJSON)
+        XCTAssertNil(progress.checkedAt, "A scheduled slot is not evidence of an actual check time")
+        let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
+        let configuration = try provider.backgroundScheduleRepo.configuration()
+        let checked = Date(timeIntervalSinceReferenceDate: 200)
+        progress.checkedAt = checked
+        try BackgroundPublicProgressStore(database: provider.database).save(progress)
+        try provider.database.checkpointAndClose()
+        let reopened = try SQLiteRepositoryProvider(path: url.path)
+        defer { reopened.database.close() }
+        let restored = try XCTUnwrap(BackgroundPublicProgressStore(database: reopened.database).load()[progress.identity])
+        XCTAssertEqual(restored, progress)
+        XCTAssertEqual(restored.slot, Date(timeIntervalSinceReferenceDate: 100))
+        XCTAssertEqual(restored.checkedAt, checked)
+        XCTAssertEqual(try reopened.backgroundScheduleRepo.configuration(), configuration)
+        let oldReaderFields = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
+        XCTAssertEqual(oldReaderFields["attempts"] as? Int, 1)
+        XCTAssertEqual(oldReaderFields["succeeded"] as? Bool, false)
+    }
+
+    func testCachedObservationNeverImpliesOnlineOrSuccessfulRefresh() {
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: nil, failed: false), "Cached observation")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: false, failed: false), "Offline · cached")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: true, failed: true), "Refresh failed · cached")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: false, failed: true), "Offline · cached")
+    }
+
+    func testCachedFailureIsLimitedToTheDisplayedObservationIdentities() {
+        let slot = Date(timeIntervalSinceReferenceDate: 100)
+        var failed = BackgroundPublicLegProgress(identity: "failed-leg", slot: slot)
+        failed.failure = "Unavailable"
+        var succeeded = BackgroundPublicLegProgress(identity: "successful-leg", slot: slot)
+        succeeded.succeeded = true
+        let progress = [failed.identity: failed, succeeded.identity: succeeded]
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: true,
+            identities: [succeeded.identity], progress: progress), "Cached observation")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: true,
+            identities: [failed.identity, succeeded.identity], progress: progress), "Refresh failed · cached")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: true,
+            identities: ["no-recorded-check"], progress: progress), "Cached observation")
+        XCTAssertEqual(PublicObservationPresentation.cacheStatus(networkAvailable: false,
+            identities: [succeeded.identity], progress: progress), "Offline · cached")
+    }
+
+    func testLifecycleOpportunityRecoversHelperWithoutReenrollingOrChangingSchedules() throws {
+        let url = try location()
+        let provider = try SQLiteRepositoryProvider(path: url.path)
+        defer { provider.database.close() }
+        let configuration = BackgroundScheduleConfiguration(enabled: true)
+        try provider.backgroundScheduleRepo.saveConfiguration(configuration)
+        let enrollment = BackgroundEnrollmentStore(url: url.deletingLastPathComponent().appendingPathComponent("enrollment.json"))
+        let enrolled = BackgroundEnrollment(revision: UUID(), databasePath: url.path, workspaceID: "default-workspace",
+            activation: try provider.database.validatedActivationStamp(), enabled: true)
+        try enrollment.save(enrolled)
+        let gate = DatabaseActivityGate.shared
+        let wasUnavailable = gate.isUnavailable
+        XCTAssertTrue(gate.beginExclusive(allowUnavailable: true))
+        let previous = DatabaseProvider.shared
+        defer {
+            DatabaseProvider.shared = previous
+            if wasUnavailable { gate.enterUnavailable() }
+            else { gate.finishExclusive(providerChanged: false) }
+        }
+        DatabaseProvider.shared = .verifiedSQLite(provider)
+        var service: BackgroundWorkerService.Status = .enabled
+        let session = BackgroundUpdatesSession(networkEnabled: false, enrollmentStore: enrollment, serviceStatus: { service })
+        session.reload()
+        XCTAssertTrue(session.activeSchedule)
+        session.helperBecameUnavailable(after: session.helperRecoveryGeneration)
+        session.reload()
+        XCTAssertFalse(session.activeSchedule, "An ordinary receipt reload must not retry a failed helper in a loop")
+        session.resumeAfterInterruption()
+        session.reload()
+        XCTAssertTrue(session.activeSchedule, "Wake or activation must not retain a permanent unavailable latch")
+        let interruptedGeneration = session.helperRecoveryGeneration
+        session.resumeAfterInterruption()
+        session.helperBecameUnavailable(after: interruptedGeneration)
+        session.reload()
+        XCTAssertTrue(session.activeSchedule, "A delayed failure cannot undo a newer recovery opportunity")
+        session.helperBecameUnavailable(after: session.helperRecoveryGeneration)
+        session.networkPathChanged(available: false)
+        session.reload()
+        XCTAssertFalse(session.activeSchedule)
+        session.networkPathChanged(available: true)
+        session.reload()
+        XCTAssertTrue(session.activeSchedule)
+        session.helperBecameUnavailable(after: session.helperRecoveryGeneration)
+        session.networkPathChanged(available: true)
+        session.reload()
+        XCTAssertFalse(session.activeSchedule, "An unchanged network path is not a fresh recovery event")
+        service = .requiresApproval
+        session.resumeAfterInterruption()
+        session.reload()
+        XCTAssertFalse(session.activeSchedule, "Recovery must not bypass OS approval")
+        XCTAssertEqual(try enrollment.load(), enrolled)
+        service = .enabled
+        let other = BackgroundEnrollment(revision: UUID(), databasePath: url.path, workspaceID: "default-workspace",
+            activation: .init(epoch: UUID(), device: enrolled.activation.device, inode: enrolled.activation.inode,
+                schemaVersion: enrolled.activation.schemaVersion, compatibilityVersion: enrolled.activation.compatibilityVersion,
+                transitioning: false), enabled: true)
+        try enrollment.save(other)
+        session.resumeAfterInterruption()
+        session.reload()
+        XCTAssertFalse(session.activeSchedule, "A recovery event cannot authorize a different ledger activation")
+        XCTAssertEqual(try enrollment.load(), other)
+        XCTAssertEqual(try provider.backgroundScheduleRepo.configuration(), configuration)
+        for kind in BackgroundJobKind.allCases { XCTAssertNil(try provider.backgroundJobRepo.jobRecord(kind)) }
+    }
+
+    func testOnlyInterruptedGmailCanRetryAtARecoveryOpportunity() async throws {
+        let url = try location()
+        let provider = try SQLiteRepositoryProvider(path: url.path)
+        defer { provider.database.close() }
+        let activation = try provider.database.validatedActivationStamp()
+        let executor = BackgroundUpdateExecutor(provider: provider, activation: activation, workspaceID: "default-workspace")
+        let configuration = BackgroundScheduleConfiguration(enabled: true)
+        for outcome in [BackgroundJobCompletion.failedFinal, .refusedCredentialInteraction, .retryPending] {
+            let claim = try XCTUnwrap(provider.backgroundJobRepo.claim(.gmailCollection, activation: activation,
+                origin: outcome == .refusedCredentialInteraction ? .foreground : .helper, now: Date()))
+            try provider.backgroundJobRepo.finish(claim, outcome: outcome, now: Date())
+            let ordinary = await executor.collectGmail(configuration: configuration, manual: false)
+            XCTAssertEqual(ordinary, .notDue)
+            let recovered = await executor.collectGmail(configuration: configuration, manual: false, recoverInterrupted: true)
+            // This empty operational database has no source inbox: admission is
+            // proven without fabricating a message or touching credentials.
+            XCTAssertEqual(recovered, outcome == .retryPending ? .completed(.refusedNoCoverage) : .notDue)
+        }
+        XCTAssertEqual(BackgroundUpdateExecutor.gmailFailure(GmailIntakeError.network), .retryPending)
+        XCTAssertEqual(BackgroundUpdateExecutor.gmailFailure(GmailIntakeError.timedOut), .retryPending)
+        XCTAssertEqual(BackgroundUpdateExecutor.gmailFailure(GmailIntakeError.unauthorized), .failedFinal)
+        XCTAssertEqual(BackgroundUpdateExecutor.gmailFailure(GmailIntakeError.keychainUnavailable), .refusedCredentialInteraction)
+    }
+
     func testControlRequestsCoalesceRepeatedAndAdditionalScopes() throws {
         var queue = BackgroundPublicControlQueue()
         XCTAssertEqual(queue.enqueue(scopes: .rates, manual: true), .accepted)

@@ -60,7 +60,7 @@ enum CategoryReconciliationRetryResult: Equatable {
 }
 
 enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     case acknowledgementRequired(DevelopmentProfileAcknowledgementChallenge)
     case staleDevelopmentProfile
 #endif
@@ -74,7 +74,7 @@ enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         case .acknowledgementRequired:
             return "Acknowledge the active development database profile before changing categories."
         case .staleDevelopmentProfile:
@@ -113,7 +113,8 @@ protocol CategoryManaging: AnyObject {
     @discardableResult func rename(categoryID: String, name: String) throws -> Bool
     @discardableResult func setArchived(categoryID: String, isArchived: Bool) throws -> Bool
     func deleteUnused(categoryID: String) throws
-    @discardableResult func setCategory(categoryID: String?, transactionID: String) throws -> Bool
+    @discardableResult func setCategory(categoryID: String?, transactionID: String) async throws -> Bool
+    func applyCategoryBatch(_ review: CategoryBatchReview, expectedGeneration: ProviderGenerationToken) async throws -> CategoryBatchReceipt
     func retryCanonicalHydration() throws -> CategoryReconciliationRetryResult
 }
 
@@ -126,11 +127,11 @@ final class CategoryManagementCoordinator: CategoryManaging {
     private let categoryStore: CategoryStore
     private let reconciliationGate: CategoryReconciliationGate
     private let forcedHydration: (DatabaseProvider, CategoryStore, String) throws -> RepositoryStoreHydrationResult
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     init(
         provider: (() -> DatabaseProvider)? = nil,
         workspaceID: String = "default-workspace",
@@ -199,7 +200,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
             ))
             return true
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         return try mutate(protectedAction: .categoryCreate, operation)
 #else
         return try mutate(operation)
@@ -216,7 +217,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
                 updatedAtISO: now
             )
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         return try mutate(protectedAction: .categoryRename, operation)
 #else
         return try mutate(operation)
@@ -233,7 +234,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
                 updatedAtISO: now
             )
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         return try mutate(
             protectedAction: isArchived ? .categoryArchive : .categoryRestore,
             operation
@@ -248,7 +249,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
             try provider.categoryRepo.deleteUnusedCategory(id: categoryID, workspaceId: self.workspaceID)
             return true
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         _ = try mutate(protectedAction: .categoryDelete, operation)
 #else
         _ = try mutate(operation)
@@ -256,22 +257,76 @@ final class CategoryManagementCoordinator: CategoryManaging {
     }
 
     @discardableResult
-    func setCategory(categoryID: String?, transactionID: String) throws -> Bool {
-        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
-            try provider.categoryRepo.setCategory(
-                categoryId: categoryID,
-                transactionId: transactionID,
-                workspaceId: self.workspaceID
-            )
-        }
+    func setCategory(categoryID: String?, transactionID: String) async throws -> Bool {
 #if DEBUG
-        return try mutate(
-            protectedAction: categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment,
-            operation
-        )
-#else
-        return try mutate(operation)
+        let timing = GmailQualificationTiming.begin(.categoryOverrideMutation)
+        defer { GmailQualificationTiming.end(.categoryOverrideMutation, started: timing) }
 #endif
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+        let lease: DevelopmentDatabaseActivityLease
+        do { lease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite) }
+        catch { throw CategoryManagementCoordinatorError.lifecycleUnavailable }
+        defer { lease.finish() }
+        let currentProvider = provider()
+        do {
+            try acknowledgementGate.requireAuthorization(
+                for: categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment,
+                providerGeneration: currentProvider.generationToken)
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
+            throw CategoryManagementCoordinatorError.acknowledgementRequired(challenge)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            throw CategoryManagementCoordinatorError.staleDevelopmentProfile
+        } catch { throw CategoryManagementCoordinatorError.persistenceUnavailable }
+#else
+        let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
+        defer { lease.finish() }
+        let currentProvider = provider()
+#endif
+        let changed = try saveMutation(using: currentProvider) { provider, _ in
+            try provider.categoryRepo.setCategory(categoryId: categoryID, transactionId: transactionID, workspaceId: self.workspaceID)
+        }
+        guard changed else { return false }
+        try await reconcileSavedCategoryMetadata(using: currentProvider)
+        return true
+    }
+
+    func applyCategoryBatch(_ review: CategoryBatchReview, expectedGeneration: ProviderGenerationToken) async throws -> CategoryBatchReceipt {
+#if DEBUG
+        let timing = GmailQualificationTiming.begin(.categoryOverrideMutation)
+        defer { GmailQualificationTiming.end(.categoryOverrideMutation, started: timing) }
+#endif
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+        let lease: DevelopmentDatabaseActivityLease
+        do { lease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite) }
+        catch { throw CategoryManagementCoordinatorError.lifecycleUnavailable }
+        defer { lease.finish() }
+        let currentProvider = provider()
+        do {
+            try acknowledgementGate.requireAuthorization(
+                for: review.categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment,
+                providerGeneration: currentProvider.generationToken)
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
+            throw CategoryManagementCoordinatorError.acknowledgementRequired(challenge)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            throw CategoryManagementCoordinatorError.staleDevelopmentProfile
+        } catch { throw CategoryManagementCoordinatorError.persistenceUnavailable }
+#else
+        let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
+        defer { lease.finish() }
+        let currentProvider = provider()
+#endif
+        var receipt: CategoryBatchReceipt?
+        let changed = try saveMutation(using: currentProvider) { provider, _ in
+            guard provider.generationToken == expectedGeneration, review.workspaceID == self.workspaceID else {
+                throw CategoryAutomationError.stalePreview
+            }
+            let result = try provider.categoryRepo.applyCategoryBatch(review)
+            receipt = result
+            return !result.changedIDs.isEmpty
+        }
+        if changed { try await reconcileSavedCategoryMetadata(using: currentProvider) }
+        guard let receipt else { throw CategoryManagementCoordinatorError.saveFailed }
+        return receipt
     }
 
     func saveRule(_ rule: CategoryRule, previousVersion: Int?, expectedGeneration: ProviderGenerationToken) throws {
@@ -280,10 +335,25 @@ final class CategoryManagementCoordinator: CategoryManaging {
             try provider.categoryRepo.saveRule(rule, previousVersion: previousVersion)
             return true
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         _ = try mutate(protectedAction: .categoryCreate, operation)
 #else
         _ = try mutate(operation)
+#endif
+    }
+
+    @discardableResult
+    func setSpendingSuppressed(_ suppressed: Bool, transactionID: String,
+                               expected: TransactionSpendingIntent?, expectedGeneration: ProviderGenerationToken) throws -> Bool {
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
+            guard provider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
+            return try provider.categoryRepo.setSpendingSuppressed(suppressed, transactionID: transactionID,
+                workspaceId: self.workspaceID, expected: expected)
+        }
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+        return try mutate(protectedAction: .transactionCategoryAssignment, operation)
+#else
+        return try mutate(operation)
 #endif
     }
 
@@ -293,7 +363,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
             try provider.categoryRepo.deleteRule(id: rule.id, workspaceId: self.workspaceID, version: rule.version)
             return true
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         _ = try mutate(protectedAction: .categoryDelete, operation)
 #else
         _ = try mutate(operation)
@@ -301,16 +371,94 @@ final class CategoryManagementCoordinator: CategoryManaging {
     }
 
     @discardableResult
-    func applyEvaluation(_ evaluation: CategoryEvaluation, historical: Bool, expectedGeneration: ProviderGenerationToken) throws -> Bool {
-        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
-            guard provider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
-            return try provider.categoryRepo.applyCategoryEvaluation(evaluation, workspaceId: self.workspaceID, historical: historical) > 0
-        }
+    func applyEvaluation(_ evaluation: CategoryEvaluation, historical: Bool, expectedGeneration: ProviderGenerationToken) async throws -> Bool {
+        try await applyEvaluationOutcome(evaluation, historical: historical, expectedGeneration: expectedGeneration).changed
+    }
+
+    func applyReviewedEvaluation(_ preview: CategoryHistoricalPreview, expectedGeneration: ProviderGenerationToken) async throws -> CategoryApplyReceipt {
+        let outcome = try await applyEvaluationOutcome(preview.evaluation, historical: true,
+            expectedGeneration: expectedGeneration, review: preview)
+        guard let receipt = outcome.receipt else { throw CategoryManagementCoordinatorError.saveFailed }
+        return receipt
+    }
+
+    private func applyEvaluationOutcome(_ evaluation: CategoryEvaluation, historical: Bool,
+        expectedGeneration: ProviderGenerationToken, review: CategoryHistoricalPreview? = nil) async throws -> (changed: Bool, receipt: CategoryApplyReceipt?) {
 #if DEBUG
-        return try mutate(protectedAction: .transactionCategoryAssignment, operation)
-#else
-        return try mutate(operation)
+        let timing = GmailQualificationTiming.begin(.categoryApplyMutation, count: evaluation.decisions.count)
+        defer { GmailQualificationTiming.end(.categoryApplyMutation, started: timing, count: evaluation.decisions.count) }
 #endif
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
+        let lease: DevelopmentDatabaseActivityLease
+        do { lease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite) }
+        catch { throw CategoryManagementCoordinatorError.lifecycleUnavailable }
+        defer { lease.finish() }
+        let currentProvider = provider()
+        do {
+            try acknowledgementGate.requireAuthorization(for: .transactionCategoryAssignment,
+                providerGeneration: currentProvider.generationToken)
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
+            throw CategoryManagementCoordinatorError.acknowledgementRequired(challenge)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            throw CategoryManagementCoordinatorError.staleDevelopmentProfile
+        } catch { throw CategoryManagementCoordinatorError.persistenceUnavailable }
+#else
+        let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
+        defer { lease.finish() }
+        let currentProvider = provider()
+#endif
+        try requireSavePreconditions(using: currentProvider)
+        let changed: Bool
+        var receipt: CategoryApplyReceipt?
+        do {
+            guard currentProvider.generationToken == expectedGeneration else { throw CategoryAutomationError.stalePreview }
+            let hydrator = RepositoryStoreHydrator(databaseProvider: currentProvider, categoryStore: categoryStore,
+                workspaceId: workspaceID, categoryReconciliationGate: reconciliationGate)
+            if let context = try hydrator.categoryOverrideContextIfCurrent(),
+               let request = currentProvider.categoryApplyWriteRequest(workspaceID: workspaceID),
+               request.read.binding == context.request.binding {
+                let expected = context.witness, canonical = categoryStore.snapshot
+                let worker = Task.detached(priority: .userInitiated) {
+                    let prepared = try await request.read.prepare(expected: expected)
+                    return try request.applyWithReceipt(evaluation, historical: historical, prepared: prepared,
+                        expected: expected, canonical: canonical, review: review)
+                }
+                let result = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
+                receipt = result; changed = !result.changedIDs.isEmpty
+            } else {
+                // Custom/historical contexts retain the existing repository path.
+#if DEBUG
+                let timing = GmailQualificationTiming.begin(.categoryApply, count: evaluation.decisions.count)
+                defer { GmailQualificationTiming.end(.categoryApply, started: timing, count: evaluation.decisions.count) }
+#endif
+                if let review {
+                    let result = try currentProvider.categoryRepo.applyReviewedCategoryEvaluation(review, workspaceId: workspaceID)
+                    receipt = result; changed = !result.changedIDs.isEmpty
+                } else {
+                    changed = try currentProvider.categoryRepo.applyCategoryEvaluation(evaluation, workspaceId: workspaceID, historical: historical) > 0
+                }
+            }
+        } catch let error as CategoryAutomationError {
+            throw CategoryManagementCoordinatorError.automation(error)
+        } catch let error as CategoryRepositoryError {
+            throw CategoryManagementCoordinatorError.repository(error)
+        } catch { throw CategoryManagementCoordinatorError.saveFailed }
+        if changed { try await reconcileSavedCategoryMetadata(using: currentProvider) }
+        return (changed, receipt)
+    }
+
+    private func reconcileSavedCategoryMetadata(using currentProvider: DatabaseProvider) async throws {
+        do {
+            let hydrator = RepositoryStoreHydrator(databaseProvider: currentProvider, categoryStore: categoryStore,
+                workspaceId: workspaceID, categoryReconciliationGate: reconciliationGate)
+            if try await hydrator.refreshCategoryOverrideIfCurrent() == false {
+                _ = try forcedHydration(currentProvider, categoryStore, workspaceID)
+                reconciliationGate.clearAfterCanonicalHydration(for: currentProvider.generationToken)
+            }
+        } catch {
+            reconciliationGate.requireReconciliation(for: currentProvider.generationToken)
+            throw CategoryManagementCoordinatorError.savedButRefreshFailed
+        }
     }
 
     func retryCanonicalHydration() throws -> CategoryReconciliationRetryResult {
@@ -337,7 +485,7 @@ final class CategoryManagementCoordinator: CategoryManaging {
         }
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private func mutate(
         protectedAction: DevelopmentProtectedAction,
         _ operation: (DatabaseProvider, String) throws -> Bool
@@ -375,20 +523,21 @@ final class CategoryManagementCoordinator: CategoryManaging {
     }
 #endif
 
-    private func performMutation(
-        using currentProvider: DatabaseProvider,
-        _ operation: (DatabaseProvider, String) throws -> Bool
-    ) throws -> Bool {
+    private func requireSavePreconditions(using currentProvider: DatabaseProvider) throws {
         guard currentProvider.persistenceState.isUsable else {
             throw CategoryManagementCoordinatorError.persistenceUnavailable
         }
         guard !reconciliationGate.isBlocked(for: currentProvider.generationToken) else {
             throw CategoryManagementCoordinatorError.reconciliationRequired
         }
+    }
 
-        let changed: Bool
+    private func saveMutation(using currentProvider: DatabaseProvider,
+                              _ operation: (DatabaseProvider, String) throws -> Bool) throws -> Bool {
+        try requireSavePreconditions(using: currentProvider)
+
         do {
-            changed = try operation(currentProvider, Self.timestamp())
+            return try operation(currentProvider, Self.timestamp())
         } catch let error as CategoryAutomationError {
             throw CategoryManagementCoordinatorError.automation(error)
         } catch let error as CategoryRepositoryError {
@@ -396,6 +545,13 @@ final class CategoryManagementCoordinator: CategoryManaging {
         } catch {
             throw CategoryManagementCoordinatorError.saveFailed
         }
+    }
+
+    private func performMutation(
+        using currentProvider: DatabaseProvider,
+        _ operation: (DatabaseProvider, String) throws -> Bool
+    ) throws -> Bool {
+        let changed = try saveMutation(using: currentProvider, operation)
         guard changed else { return false }
 
         do {

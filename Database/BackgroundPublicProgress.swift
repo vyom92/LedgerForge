@@ -11,9 +11,25 @@ nonisolated struct BackgroundPublicLegProgress: Codable, Equatable, Sendable {
     // single retry must survive helper exit without enabling future slots.
     // Optional preserves decoding of the earlier operational JSON shape.
     var manuallyRequested: Bool? = nil
+    // Actual completion of this leg's check, independent of the scheduled slot
+    // and the last successful observation. Older receipts have no check time.
+    var checkedAt: Date? = nil
 
     var pendingManualRetry: Bool {
         manuallyRequested == true && !succeeded && attempts < 2 && retryAt != nil
+    }
+}
+
+nonisolated enum PublicObservationPresentation {
+    static func cacheStatus(networkAvailable: Bool?, identities: Set<String>,
+                            progress: [String: BackgroundPublicLegProgress]) -> String {
+        cacheStatus(networkAvailable: networkAvailable,
+                    failed: identities.contains { progress[$0]?.failure != nil })
+    }
+
+    static func cacheStatus(networkAvailable: Bool?, failed: Bool) -> String {
+        if networkAvailable == false { return "Offline · cached" }
+        return failed ? "Refresh failed · cached" : "Cached observation"
     }
 }
 

@@ -8,6 +8,62 @@ import Testing
 struct DashboardViewModelTests {
 
     @Test(.globalRuntimeStateIsolation)
+    func moneyFlowInspectionKeepsExactPeriodInterpretationsAndSupportingRoles() throws {
+        let context = try dashboardCurrentDatabaseContext()
+        try context.provider.database.execute(sql: "BEGIN DEFERRED TRANSACTION;")
+        defer { try? context.provider.database.execute(sql: "ROLLBACK;") }
+        let snapshot = try RepositoryStoreHydrator(
+            databaseProvider: .verifiedSQLite(context.provider, protectsGeneration: false),
+            workspaceId: context.workspaceID, participatesInLifecycleGate: false
+        ).stageHydration()
+        let metadata = try #require(snapshot.intelligence)
+        let rows = try SpendingIntelligence.rows(transactions: snapshot.transactions,
+            sources: snapshot.financialSources, cards: snapshot.cardSnapshot,
+            categories: snapshot.categorySnapshot, salaryRuleIDs: metadata.preferences?.salaryRuleIDs ?? [])
+        let lastDate = try #require(rows.compactMap(\.date).max())
+        let month = try SelectedStatementMonth(canonical: String(lastDate.canonical.prefix(7)))
+        let observed = try MoneyFlowAuthenticAssertions.check(rows: rows, metadata: metadata,
+            sources: snapshot.financialSources, currentMonth: month) { month, currency in
+            let spending = try SpendingIntelligence.project(rows: rows, metadata: metadata,
+                sources: snapshot.financialSources, currency: currency,
+                accountIDs: Set(rows.map(\.accountID)),
+                start: StatementDate(year: month.year, month: month.month, day: 1),
+                end: FinancialCalendar.lastDay(month), allSuggestions: [],
+                spendingIntents: snapshot.categorySnapshot.automation?.spendingIntents ?? [:])
+            let flow = try MoneyFlow.project(rows: rows, metadata: metadata, sources: snapshot.financialSources,
+                month: month, currency: currency, spending: spending)
+            let exactIDs = Set(flow.reviewRows.keys) == Set(spending.rows.map(\.id))
+            #expect(exactIDs)
+            for expected in spending.rows {
+                let actual = try #require(flow.reviewRows[expected.id])
+                let exactMeaning = actual.source.categoryID == expected.source.categoryID &&
+                    actual.source.categoryName == expected.source.categoryName && actual.treatment == expected.treatment &&
+                    actual.explanation == expected.explanation && actual.refundResidual == expected.refundResidual &&
+                    actual.amounts == expected.amounts && actual.source.transaction.money == expected.source.transaction.money
+                #expect(exactMeaning)
+            }
+            for graph in [flow.actual, flow.adjusted] {
+                for link in graph.links {
+                    let supports = link.supportingIDs.subtracting(link.transactionIDs)
+                    let all = link.transactionIDs.union(supports)
+                    let inspection = flow.inspection(ids: all, supportingIDs: supports)
+                    let exactDrilldown = inspection.transactionIDs == link.transactionIDs &&
+                        inspection.supportingIDs == supports && inspection.allTransactionIDs == all &&
+                        Set(inspection.reviewRows.keys) == Set(flow.reviewRows.keys).intersection(all) &&
+                        inspection.unknownDirectionIDs == flow.unknownDirectionIDs.intersection(all)
+                    #expect(exactDrilldown)
+                }
+            }
+            let undated = flow.inspection(ids: flow.undatedTransactionIDs)
+            #expect(undated.transactionIDs == flow.undatedTransactionIDs && undated.supportingIDs.isEmpty)
+            return spending
+        }
+        #expect(observed.contains(.unresolvedRecord))
+        #expect(observed.contains(.confirmedPair))
+        #expect(observed.contains(.refundSupportingCredit))
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func currentDatabaseProjectionMatchesIndependentOracleAndDoesNotMutateReadOnlyFiles() throws {
         let context = try dashboardCurrentDatabaseContext()
         let before = try databaseFiles(context)

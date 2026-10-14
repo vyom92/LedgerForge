@@ -2664,6 +2664,12 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 <a id="adr-035"></a>
 
 # ADR-035 — Development Database Lifecycle and Recoverable Reset
+## Owner-approved Release tooling alignment — 2026-10-04
+
+The owner explicitly selects [all existing Developer Mode controls in Release](SCOPE_DECISIONS.md#background-recovery-release-developer-tools-20261004). The app target includes these controls and their profile, warning, acknowledgement and lifecycle backend under `LEDGERFORGE_DEVELOPER_TOOLS` in Debug and optimized Release. Debug-only test environment selectors, probes and fault injection remain Debug-only; the helper gains no development-tooling flag.
+
+Current Database resolves to the existing build-specific canonical identity: Debug development storage or the adopted personal `ledgerforge.sqlite` in Release. Persistent Debug, Temporary Session and Migration Sandbox remain distinct development identities. Current cannot be reset or cleaned up by profile controls; ordinary launch still chooses Current, and disabling Developer Mode returns to Current through the existing lifecycle coordinator. No migration is added or rewritten. This owner decision supersedes the Release-absence clauses in the dated July alignment below; those clauses retain their historical meaning. Implementation verification and acceptance are recorded separately in PROJECT_STATE.
+
 ## Implementation Alignment — 2026-09-09
 
 The accepted startup package completed one owner-authorized recreation of the disposable Debug Current Database as a one-time maintenance exception. It does not establish automatic recovery, general reset authority or an adopted-database upgrade path. Ordinary startup still selects Current Database. Verification directly launched the resolved Xcode Debug product and established canonical SQLite activation, complete hydration, clean quit and same-database relaunch. The explicit guarded schema-experiment command and independent accepted-migration lock support prevention; they do not change lifecycle authority. V1–V17 definitions remain unchanged, with no migration or new architecture decision.
@@ -6344,6 +6350,17 @@ ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-
 
 # ADR-047 — Verified User Backup and Receipt-Owned Restore
 
+<a id="category-spending-tags-backup-20261004"></a>
+## Owner-approved isolated category/spending/tag metadata alignment — 2026-10-04
+
+The [selected implementation instruction](SCOPE_DECISIONS.md#category-spending-refund-tags-sankey-20261004) authorizes V34 after the coordinated companion V33 tail. Independent schema review precedes integration. V34 adds only workspace-validated `transaction_spending_intent`, `tag_definitions` and `transaction_tag_memberships`, their three indexes and five identity/parent guards. Exact trusted transaction parents and unique tag membership remain authoritative. Earlier migration identities and all canonical financial/source records remain unchanged. Rule payloads gain the explicit narration-exclusion operator and optional outgoing-bank expense action; movement payloads gain optional one-purchase/multiple-credit allocation metadata. Missing legacy fields remain decodable, while the newer schema boundary prevents an older reader from silently omitting new meaning.
+
+Format 1 remains the same sealed `ledger.sqlite` plus `manifest.json` package. Supported V17–V33 packages validate their own exact history/inventory and upgrade only in an operation-owned destination. V34 validation includes workspace/parent/provenance checks for category and spending metadata, exact source-qualified allocation budgets and ownership, and tag definitions/memberships before coherent hydration. New spending/tag metadata starts empty on migration; historical treatment is not inferred or backfilled. Configured metadata survives the ordinary native backup/restore path. App, helper and probe targets share the required model/repository validation; the companion's existing snapshot scope is not expanded with mobile category or flow editing.
+
+This records the owner's bounded compatibility authorization and isolated implementation. Executed candidate proof and remaining gates belong to [current state](PROJECT_STATE.md#category-spending-refund-tags-sankey-20261004) and its external packet. It is not live migration, installation, owner technical acceptance or publication authority.
+
+**13 October operational alignment:** the subsequent owner-authorized combined update is installed as v1.1 (2) with V34. Native pre/post-review backups, unchanged schema history, exact approved metadata, source/planning preservation and normal reopen were verified within the [current closeout's stated limits](PROJECT_STATE.md#combined-v11-closeout-20261013). The [later publication decision](SCOPE_DECISIONS.md#combined-v11-publication-20261013) supersedes the isolated phase's publication restriction. This adds no migration, backup format, financial interpretation default or companion snapshot scope, and does not erase the earlier checkpoint or remaining qualification limits.
+
 ## Accepted Sprint-99 implementation alignment — 2026-09-29
 
 [Accepted Sprint 99](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) closes the approved V27–V29 contracts below after accepted Sprint-98 V26. The actual chain is V1–V29; identities are immutable and no closeout migration is allocated. Exact two-member format-1 backup semantics remain. The retained populated native V29 restore/reopen reconciles 80 tables and all 416 original BLOB hashes, with only the already-specified public-quote JSON equivalence and activation-scoped operational resets. Later settlement-focused backup/reopen covers the pending-allocation observation semantics without a storage change. Original checkpoint approval/qualification statements below remain historical, not present acceptance blockers.
@@ -6435,6 +6452,18 @@ No sync, scheduling, workspace switching, archive dependency, retention UI, encr
 
 <a id="adr-048"></a>
 # ADR-048 — Enrolled Background Worker and Shared Ledger Activation Authority
+
+## Owner correction — ready foreground email imports, 2026-10-13
+
+The [owner's clarified autonomy decision](SCOPE_DECISIONS.md#foreground-ready-email-autonomy-20261013) removes the initial manual batch-start action for pending retained supported email sources while an ordinary app window owns Import Centre. The foreground session reconciles original-byte identities with accepted imports, preserves active queues and existing holds, and enters the unchanged confirmed-batch pipeline. Only that pipeline may establish review-free acceptance and perform its existing independent atomic commits. Password, account identity, unsupported/uncertain content, validation, duplicate/equivalence and partial-import decisions still stop for owner attention. Cancelled/skipped sources are not automatically retried. Retained accepted receipts prevent reimport after reopening.
+
+The app-closed helper still only collects original attachments; its financial-write restriction, schedules, credential scopes and namespace ownership remain unchanged. The earlier explicit-manual-start wording below is historical for this bounded foreground case. This correction adds no schema or financial semantics.
+
+## Interruption-recovery alignment — 2026-10-04
+
+The owner-authorized repair re-evaluates the same enrollment after wake, application activation, timezone change or a transition to an available network path. A temporary failed or uncertain helper exchange cannot permanently latch foreground fallback. Replies from before a newer recovery opportunity cannot undo that opportunity. Ordinary receipt reloads do not themselves create repeated recovery attempts. Service approval, enrollment revision, ledger activation, job leases and existing public-update retry rules remain authoritative.
+
+Gmail transport interruption uses the existing retry-pending receipt outcome. A later lifecycle/connectivity opportunity may resume it within the same schedule slot; ordinary reloads, final failures and revoked authorization do not start a retry loop. The foreground app may reopen its existing saved read-only Gmail connection with noninteractive Keychain access after launch or recovery. This does not start OAuth, collect a new manual interval or import financial data. UTC schedules and credential scope remain unchanged, with no migration or recurring authentication retry cadence added. Real travel/sleep/network conditions remain bounded by the observations recorded in PROJECT_STATE.
 
 ## Accepted implementation alignment — 2026-09-29
 

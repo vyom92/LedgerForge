@@ -18,13 +18,15 @@ public final class InMemoryRepositoryProvider {
     public let gmailInboxRepo: any GmailInboxRepository
     public let netWorthMembershipRepo: any NetWorthMembershipRepository
     public let intelligenceRepo: any FinancialIntelligenceRepository
+    public let tagRepo: any TransactionTagRepository
     let backgroundJobRepo: any BackgroundJobRepository
     let backgroundPublicCacheRepo: any BackgroundPublicCacheRepository
     let backgroundScheduleRepo: any BackgroundScheduleRepository
 
     private let state = InMemoryRepositoryState()
 
-    public init() {
+    public init(companionActivationEpoch: String = UUID().uuidString) {
+        state.companionActivationEpoch = companionActivationEpoch
         let generationToken = ProviderGenerationToken()
         self.generationToken = generationToken
         self.workspaceRepo = InMemoryWorkspaceRepo(state: state)
@@ -40,6 +42,7 @@ public final class InMemoryRepositoryProvider {
         self.gmailInboxRepo = InMemoryGmailInboxRepository()
         self.netWorthMembershipRepo = InMemoryNetWorthMembershipRepository(state: state)
         self.intelligenceRepo = InMemoryFinancialIntelligenceRepository(state: state)
+        self.tagRepo = InMemoryTransactionTagRepository(state: state)
         self.backgroundJobRepo = UnavailableBackgroundJobRepository()
         self.backgroundPublicCacheRepo = UnavailableBackgroundPublicCacheRepository()
         self.backgroundScheduleRepo = UnavailableBackgroundScheduleRepository()
@@ -121,6 +124,9 @@ final class InMemoryRepositoryState {
     }
     var categoryRules: [String: CategoryRule] = [:]
     var categoryIntents: [String: CategoryIntent] = [:]
+    var spendingIntents: [String: TransactionSpendingIntent] = [:]
+    var tagDefinitions: [String: TransactionTagDefinition] = [:]
+    var tagMemberships: Set<TransactionTagMembership> = []
     var categoryWork: [String: CategoryImportWork] = [:]
     var categories: [String: CategoryDTO] = [:]
     var categoryAssignments: [String: TransactionCategoryAssignmentDTO] = [:]
@@ -162,6 +168,9 @@ final class InMemoryRepositoryState {
     var salaryStatements: [String: SalaryStatementDTO] = [:]
     var fundingPlans: [String: FundingPlanDTO] = [:]
     var monthlyScratchpads: [String: MonthlyPlanScratchpadDTO] = [:]
+    var companionActivationEpoch = UUID().uuidString
+    var companionSessions: [String: CompanionSyncSessionDTO] = [:]
+    var companionMonths: [String: CompanionMonthSyncDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
 }
@@ -418,6 +427,96 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     private let state: InMemoryRepositoryState
     init(state: InMemoryRepositoryState) { self.state = state }
 
+    private func monthKey(sessionID: String, month: String) -> String { sessionID + ":" + month }
+    private func refuseLegacyWrite(workspaceID: String, month: String) throws {
+        let paired = state.companionMonths.values.contains { value in
+            guard value.month == month, let session = state.companionSessions[value.sessionID] else { return false }
+            return session.workspaceID == workspaceID && session.disposition == "active"
+        }
+        guard !paired else { throw CompanionSyncRepositoryError.pairedMonthRequiresAtomicWrite }
+    }
+    func companionActivationEpoch() throws -> String {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try CompanionSyncValidation.uuid(state.companionActivationEpoch)
+        return state.companionActivationEpoch
+    }
+    func companionSessions(workspaceID: String) throws -> [CompanionSyncSessionDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let values = state.companionSessions.values.filter { $0.workspaceID == workspaceID }.sorted { $0.sessionID < $1.sessionID }
+        for value in values { try value.validate() }
+        return values
+    }
+    func createCompanionSession(_ value: CompanionSyncSessionDTO) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try value.validate()
+        guard value.disposition == "active", value.activationEpoch == (try companionActivationEpoch()) else {
+            throw CompanionSyncRepositoryError.staleActivation
+        }
+        guard state.workspaces[value.workspaceID] != nil else { throw CompanionSyncRepositoryError.invalidSession }
+        if let existing = state.companionSessions[value.sessionID] {
+            guard existing == value else { throw CompanionSyncRepositoryError.sessionCollision }
+            return
+        }
+        guard !state.companionSessions.values.contains(where: { $0.workspaceID == value.workspaceID && $0.disposition == "active" }) else {
+            throw CompanionSyncRepositoryError.sessionCollision
+        }
+        state.companionSessions[value.sessionID] = value
+    }
+    func holdCompanionSession(id: String, workspaceID: String) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let value = state.companionSessions[id], value.workspaceID == workspaceID else { throw CompanionSyncRepositoryError.invalidSession }
+        try value.validate()
+        state.companionSessions[id] = .init(sessionID: value.sessionID, workspaceID: value.workspaceID,
+            activationEpoch: value.activationEpoch, phoneID: value.phoneID, protocolVersion: value.protocolVersion, disposition: "held")
+    }
+    func reconcileCompanionActivation() throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let epoch = try companionActivationEpoch()
+        let held = state.companionSessions.values.filter { $0.disposition == "active" && $0.activationEpoch != epoch }
+        for value in held { try value.validate() }
+        // All validation precedes the first mutation, matching SQLite rollback semantics.
+        for value in held {
+            state.companionSessions[value.sessionID] = .init(sessionID: value.sessionID, workspaceID: value.workspaceID,
+                activationEpoch: value.activationEpoch, phoneID: value.phoneID, protocolVersion: value.protocolVersion, disposition: "held")
+        }
+    }
+    func companionMonth(sessionID: String, workspaceID: String, month: String) throws -> CompanionMonthSyncDTO? {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let session = state.companionSessions[sessionID], session.workspaceID == workspaceID else { throw CompanionSyncRepositoryError.invalidSession }
+        try session.validate(); try CompanionSyncValidation.month(month)
+        let value = state.companionMonths[monthKey(sessionID: sessionID, month: month)]
+        if let value { _ = try value.decoded(session: session) }
+        return value
+    }
+    func commitCompanionMonth(_ request: CompanionMonthCommitRequest) throws -> CompanionMonthCommitResult {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let session = state.companionSessions[request.sessionID], session.workspaceID == request.workspaceID else {
+            throw CompanionSyncRepositoryError.invalidSession
+        }
+        let key = monthKey(sessionID: request.sessionID, month: request.month)
+        let scratchpadKey = request.workspaceID + ":" + request.month
+        let prepared = try CompanionSyncValidation.prepare(request, session: session,
+            existing: state.companionMonths[key], scratchpad: state.monthlyScratchpads[scratchpadKey],
+            activationEpoch: companionActivationEpoch())
+        if prepared.isReplay { return prepared.result }
+        let durableCanonical = state.fundingPlans.values.first { $0.workspaceId == request.workspaceID && $0.planMonthISO == request.month }
+        guard try request.binding.baselineScratchpad.canonical?.persistenceDTO() == durableCanonical else {
+            throw CompanionSyncRepositoryError.staleScratchpad
+        }
+        try request.currentAnchor.binding(for: session.scope(month: request.month)).validateAccounts(
+            state.accounts.values.filter { $0.workspaceId == request.workspaceID },
+            editor: MonthlyPlanScratchpad.decode(request.editor))
+        let editorPlan = try MonthlyPlanScratchpad.decode(request.editor).plan.persistenceDTO()
+        try validatePlanRelationships(editorPlan)
+        // Every throwing check/encoding happens before the first dictionary publication.
+        // persistPlan itself completes validation before mutating; nothing below it throws.
+        if let canonical = request.canonical {
+            _ = try persistPlan(canonical, scratchpad: request.editor, companionWrite: true)
+        } else { state.monthlyScratchpads[scratchpadKey] = request.editor }
+        state.companionMonths[key] = prepared.result.stored
+        return prepared.result
+    }
+
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         return state.monthlyScratchpads.values.filter { $0.workspaceID == workspaceId }.sorted { $0.month < $1.month }
@@ -426,6 +525,7 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
         let scratch = try MonthlyPlanScratchpad.decode(value)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try refuseLegacyWrite(workspaceID: value.workspaceID, month: value.month)
         guard state.workspaces[value.workspaceID] != nil || value.workspaceID == "default-workspace" else {
             throw RepositoryError.relationshipViolation("Monthly scratchpad workspace is invalid.")
         }
@@ -437,6 +537,7 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
 
     func removeScratchpad(workspaceId: String, month: String) throws {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try refuseLegacyWrite(workspaceID: workspaceId, month: month)
         state.monthlyScratchpads[workspaceId + ":" + month] = nil
     }
 
@@ -458,9 +559,20 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
         try persistPlan(plan, scratchpad: nil)
     }
 
-    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?) throws -> FundingPlanDTO {
+    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?, companionWrite: Bool = false) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        if !companionWrite { try refuseLegacyWrite(workspaceID: plan.workspaceId, month: plan.planMonthISO) }
+        try validatePlanRelationships(plan)
+        if state.workspaces[plan.workspaceId] == nil {
+            state.workspaces[plan.workspaceId] = WorkspaceDTO(id: plan.workspaceId, name: "Default Workspace", createdAtISO: plan.updatedAtISO)
+        }
+        for id in plan.assistance?.appliedSalaryIDs ?? [] { state.salaryAssistance[id]?.draftState = .consumed }
+        state.fundingPlans[plan.id] = plan
+        if let scratchpad { state.monthlyScratchpads[plan.workspaceId + ":" + plan.planMonthISO] = scratchpad }
+        return plan
+    }
+    private func validatePlanRelationships(_ plan: FundingPlanDTO) throws {
         try SalaryPersistenceDTOValidator.validateRowLineage(plan: plan, existing: Array(state.fundingPlans.values))
         guard state.workspaces[plan.workspaceId] != nil || plan.workspaceId == "default-workspace",
               state.fundingPlans.values.first(where: { $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO && $0.id != plan.id }) == nil,
@@ -479,14 +591,8 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
                   return account.workspaceId == plan.workspaceId && account.nativeCurrency == commitment.amountCurrency
               }) else { throw RepositoryError.relationshipViolation("Funding plan relationships are invalid.") }
         try InMemoryFinancialIntelligenceRepository(state: state).validatePlanAssistance(plan)
-        if state.workspaces[plan.workspaceId] == nil {
-            state.workspaces[plan.workspaceId] = WorkspaceDTO(id: plan.workspaceId, name: "Default Workspace", createdAtISO: plan.updatedAtISO)
-        }
-        for id in plan.assistance?.appliedSalaryIDs ?? [] { state.salaryAssistance[id]?.draftState = .consumed }
-        state.fundingPlans[plan.id] = plan
-        if let scratchpad { state.monthlyScratchpads[plan.workspaceId + ":" + plan.planMonthISO] = scratchpad }
-        return plan
     }
+
 }
 
 private final class InMemoryCardRepo: CardRepository {
@@ -649,6 +755,41 @@ final class InMemoryCategoryRepo: CategoryRepository {
 
     func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return try setCategoryLocked(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId)
+    }
+
+    func applyCategoryBatch(_ review: CategoryBatchReview) throws -> CategoryBatchReceipt {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        try review.validate()
+        try Task.checkCancellation()
+        if let id = review.categoryID {
+            guard let target = state.categories[id] else { throw CategoryRepositoryError.categoryNotFound }
+            guard target.workspaceId == review.workspaceID else { throw CategoryRepositoryError.workspaceMismatch }
+            guard !target.isArchived else { throw CategoryRepositoryError.categoryArchived }
+        }
+        for item in review.items {
+            guard let transaction = state.transactions[item.transactionID], transaction.isTrusted,
+                  transaction.workspaceId == review.workspaceID, transaction.accountId == item.accountID,
+                  state.categoryAssignments[item.transactionID]?.categoryId == item.categoryID,
+                  state.categoryIntents[item.transactionID] == item.intent else { throw CategoryAutomationError.stalePreview }
+        }
+        let assignments = state.categoryAssignments, intents = state.categoryIntents, work = state.categoryWork
+        do {
+            var changed: Set<String> = []
+            for id in review.changedIDs.sorted() {
+                try Task.checkCancellation()
+                if try setCategoryLocked(categoryId: review.categoryID, transactionId: id, workspaceId: review.workspaceID) { changed.insert(id) }
+            }
+            guard changed == review.changedIDs else { throw CategoryAutomationError.stalePreview }
+            try Task.checkCancellation()
+            return CategoryBatchReceipt(reviewedIDs: review.transactionIDs, changedIDs: changed, protectedIDs: review.protectedIDs)
+        } catch {
+            state.categoryAssignments = assignments; state.categoryIntents = intents; state.categoryWork = work
+            throw error
+        }
+    }
+
+    private func setCategoryLocked(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
         guard let transaction = state.transactions[transactionId], transaction.isTrusted else {
             throw CategoryRepositoryError.transactionNotFound
         }
@@ -662,7 +803,7 @@ final class InMemoryCategoryRepo: CategoryRepository {
                                     categoryID: categoryId, matches: [])
         let changed = state.categoryIntents[transactionId] != intent || state.categoryAssignments[transactionId]?.categoryId != categoryId
         state.categoryIntents[transactionId] = intent
-        if let work = state.categoryWork[transactionId] {
+        if let work = state.categoryWork[transactionId], work.outcome != .pending, work.outcome != .retryable {
             state.categoryWork[transactionId] = CategoryImportWork(transactionID: transactionId,
                 importSessionID: work.importSessionID, outcome: .protected,
                 explanation: categoryId == nil ? "You deliberately cleared this category." : "Your category choice is protected.", origin: work.origin)

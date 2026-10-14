@@ -64,7 +64,7 @@ struct LiveFXSettingsView: View {
                         columnHeading("Pair")
                         columnHeading("Rate")
                         columnHeading("Status")
-                        columnHeading("Successful update · UTC")
+                        columnHeading("Fetched / checked · UTC")
                         Color.clear.frame(width: 112, height: 1).accessibilityHidden(true)
                     }
                     ForEach(AlDarCurrency.allCases, id: \.self) { currency in
@@ -115,7 +115,7 @@ struct LiveFXSettingsView: View {
                         GridRow {
                             columnHeading("Source")
                             columnHeading("Linked prices available")
-                            columnHeading("Successful update · UTC")
+                            columnHeading("Fetched / checked · UTC")
                             Color.clear.frame(width: 112, height: 1).accessibilityHidden(true)
                         }
                         ForEach(prices.configuredProviders, id: \.self) { provider in
@@ -180,8 +180,11 @@ struct LiveFXSettingsView: View {
     }
 
     @ViewBuilder private func currencyTime(_ currency: AlDarCurrency) -> some View {
-        if let date = rates.legs[currency]?.fetchedAt { successTime(date) }
-        else { Text("No successful update").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText) }
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            if let date = rates.legs[currency]?.fetchedAt { successTime(date, label: "FX fetched") }
+            else { Text("No successful fetch").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText) }
+            checkTime(rates.checkedAt[currency])
+        }
     }
 
     private func currencyRefresh(_ currency: AlDarCurrency) -> some View {
@@ -208,9 +211,10 @@ struct LiveFXSettingsView: View {
         let hasErrors = mappings.contains { prices.failures[$0.identity] != nil }
         let isRefreshing = prices.refreshing.contains(provider)
         let complete = cached.count == mappings.count && !cached.isEmpty && !hasErrors && !isRefreshing
-        let status = isRefreshing ? "Refreshing…" : hasErrors
+        let status = isRefreshing ? "Checking…" : prices.networkAvailable == false && !cached.isEmpty
+            ? "Offline · cached · \(cached.count) / \(mappings.count)" : hasErrors
             ? (cached.isEmpty ? "Couldn’t update" : "Couldn’t update · previous prices retained")
-            : cached.isEmpty ? "No successful price yet" : "\(cached.count) / \(mappings.count)"
+            : cached.isEmpty ? "No successful price yet" : "Cached · \(cached.count) / \(mappings.count)"
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(status)
                 .font(theme.typography.rowTitle).monospacedDigit()
@@ -228,8 +232,12 @@ struct LiveFXSettingsView: View {
     @ViewBuilder private func providerTime(_ provider: String) -> some View {
         let dates = prices.configuredMappings.filter { $0.provider == provider }
             .compactMap { prices.quotes[$0.identity]?.fetchedAt }
-        if let fetched = dates.max() { successTime(fetched) }
-        else { Text("No successful update").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText) }
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            if let fetched = dates.min() { successTime(fetched, label: "Oldest quote fetched") }
+            else { Text("No successful fetch").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText) }
+            let checks = prices.configuredMappings.filter { $0.provider == provider }.compactMap { prices.checkedAt[$0.identity] }
+            checkTime(checks.max())
+        }
     }
 
     @ViewBuilder private func providerErrors(_ provider: String) -> some View {
@@ -253,10 +261,11 @@ struct LiveFXSettingsView: View {
 
     private func currencyStatus(_ currency: AlDarCurrency) -> String {
         if rates.refreshing.contains(currency) { return "Refreshing…" }
+        if rates.networkAvailable == false, rates.legs[currency] != nil { return "Offline · cached" }
         if rates.failures.contains(currency) {
             return rates.legs[currency] == nil ? "Couldn’t update" : "Couldn’t update · previous rate retained"
         }
-        return rates.legs[currency] == nil ? "No successful rate yet" : "Available"
+        return rates.legs[currency] == nil ? "No successful rate yet" : "Cached observation"
     }
 
     private func refreshButton(busy: Bool, label: String, identifier: String,
@@ -268,10 +277,16 @@ struct LiveFXSettingsView: View {
         .accessibilityLabel(label).accessibilityIdentifier(identifier).help(label)
     }
 
-    private func successTime(_ date: Date) -> some View {
-        Text(InvestmentPriceDates.fetchInstant(date))
+    private func successTime(_ date: Date, label: String) -> some View {
+        Text(label + ": " + InvestmentPriceDates.fetchInstant(date))
             .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel("Last successful update \(InvestmentPriceDates.fetchInstant(date))")
+            .accessibilityLabel(label + " " + InvestmentPriceDates.fetchInstant(date))
+    }
+
+    private func checkTime(_ date: Date?) -> some View {
+        Text(date.map { "Checked: " + InvestmentPriceDates.fetchInstant($0) } ?? "Check time not recorded")
+            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

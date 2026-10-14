@@ -13,6 +13,18 @@ nonisolated enum AccountDisplayText {
         value.replacingOccurrences(of: "Commercial Bank of Qatar", with: "CBQ", options: .caseInsensitive)
     }
 
+    static func preferredName(nickname: String?, name: String, sourceProductName: String?, institution: String) -> String {
+        if let nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nickname }
+        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
+        return shortened(sourceProductName ?? institution + " account")
+    }
+
+    static func selectionContext(numberLabel: String?, identities: [AccountIdentitySummary],
+                                 sourceLabel: String?, currency: CurrencyCode, historyOnly: Bool) -> String {
+        let identity = numberLabel ?? identities.first?.redactedValue ?? sourceLabel
+        return ([identity, currency.code, historyOnly ? "History only" : nil].compactMap { $0 }).joined(separator: " · ")
+    }
+
     /// Display only. An unknown trailing digit stays unknown; this never
     /// establishes account identity or removes masking to fill missing digits.
     static func maskedNumber(_ value: String) -> String? {
@@ -117,14 +129,12 @@ struct Account: Identifiable, Codable {
     nonisolated var institutionDisplayName: String { AccountDisplayText.shortened(institution) }
 
     nonisolated var preferredDisplayName: String {
-        if let nickname, !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nickname }
-        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
-        return AccountDisplayText.shortened(sourceProductName ?? institution + " account")
+        AccountDisplayText.preferredName(nickname: nickname, name: name, sourceProductName: sourceProductName, institution: institution)
     }
 
     nonisolated var selectionContext: String {
-        let identity = sourceAccountNumberLabel ?? identitySummaries.first?.redactedValue ?? sourceAccountLabel
-        return ([identity, nativeCurrency.code, isHistoryOnly ? "History only" : nil].compactMap { $0 }).joined(separator: " · ")
+        AccountDisplayText.selectionContext(numberLabel: sourceAccountNumberLabel, identities: identitySummaries,
+                                            sourceLabel: sourceAccountLabel, currency: nativeCurrency, historyOnly: isHistoryOnly)
     }
 
     nonisolated var selectionTitle: String { preferredDisplayName + " · " + selectionContext }

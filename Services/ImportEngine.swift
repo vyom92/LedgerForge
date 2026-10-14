@@ -84,7 +84,7 @@ struct ImportEngineResult: Equatable {
     let accountOutcome: ImportAccountOutcome
     let recoveryRoute: ConfirmedImportRecoveryRoute
     let bankSections: [BankImportReceiptDTO.Section]
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private(set) var developmentProtectedActionOutcome: DevelopmentProtectedActionOutcome?
 #endif
 
@@ -132,7 +132,7 @@ struct ImportEngineResult: Equatable {
         self.accountOutcome = accountOutcome
         self.recoveryRoute = recoveryRoute
         self.bankSections = bankSections
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         self.developmentProtectedActionOutcome = nil
 #endif
     }
@@ -154,7 +154,7 @@ struct ImportEngineResult: Equatable {
         recoveryRoute == .retryCanonicalReconciliation
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     func settingDevelopmentProtectedActionOutcome(
         _ outcome: DevelopmentProtectedActionOutcome
     ) -> ImportEngineResult {
@@ -338,7 +338,7 @@ final class ImportEngine {
     private let rejectedAttemptHydration: () throws -> Void
     private let reconciliationGate: ConfirmedImportReconciliationGate
     private let developerConsole: DeveloperConsole
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
     private let committedPreparedImportLock = NSLock()
@@ -350,7 +350,7 @@ final class ImportEngine {
 
     private var livePreparedImports: [UUID: LivePreparedImport] = [:]
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     init(
         importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
             readerRegistry: DefaultReaderRegistry(),
@@ -494,7 +494,7 @@ final class ImportEngine {
         progress: @escaping (ImportProgress) -> Void = { _ in }
     ) async throws -> PreparedImport {
         let preparationGeneration = providerGenerationProvider()
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         try developmentProfileAcknowledgementGate.requireAuthorization(
             for: .importPreparation,
             providerGeneration: preparationGeneration
@@ -785,7 +785,7 @@ final class ImportEngine {
             developerConsole.warning(.validation, "Validation rejection could not be recorded")
             return unrecordedResult
         }
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do {
             try developmentProfileAcknowledgementGate.requireAuthorization(
                 for: .importConfirmation,
@@ -900,7 +900,7 @@ final class ImportEngine {
         accountChoice: ImportAccountChoice?,
         reviewedPartialPlan: ReviewedPartialImportPlanDTO? = nil
     ) async -> ImportEngineResult {
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         do {
             try developmentProfileAcknowledgementGate.requireAuthorization(
                 for: .importConfirmation,
@@ -1361,7 +1361,7 @@ final class ImportEngine {
         livePreparedImports.removeValue(forKey: preparedImport.id)?.lifecycleLease.finish()
     }
 
-#if DEBUG
+#if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     /// Consumes only prepared-awaiting-confirmation objects while the lifecycle
     /// gate's exclusive-pending barrier prevents new provider work.
     func invalidatePreparedImportsForProfileSwitch(
