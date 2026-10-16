@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import LedgerForge
@@ -14,10 +15,14 @@ struct SourceSnapshotPersistenceBindingTests {
             persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
             providerGenerationProvider: { ProviderGenerationToken() }
         )
-        let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
-        )
+        let source = try MechanicsTestSupport.axisBankCSV()
+        let sourceBytes = try Data(contentsOf: source)
+        let expectedText = try CSVReader().read(from: source)
+        let prepared = try await engine.prepareImport(from: source)
         defer { engine.cancelPreparedImport(prepared) }
+        #expect(prepared.validation.passed)
+        #expect(prepared.rawContents == expectedText)
+        #expect(prepared.fingerprint == ExactStatementFingerprint(text: expectedText))
         let plan = try ImportPersistenceMapper().confirmedImportPlan(
             financialDocument: prepared.financialDocument,
             importSession: prepared.importSession,
@@ -30,6 +35,14 @@ struct SourceSnapshotPersistenceBindingTests {
         )
 
         let rows = plan.historyTemplate.fingerprints
+        let sourceFingerprint = try #require(prepared.fingerprintSet.fingerprints.first {
+            $0.algorithm == DocumentFingerprintDTO.sourceBytesSHA256Algorithm
+        })
+        #expect(sourceFingerprint.digest == SHA256.hash(data: sourceBytes).map { String(format: "%02x", $0) }.joined())
+        #expect(sourceFingerprint.byteCount == sourceBytes.count)
+        #expect(prepared.financialDocument.metadata.fileFormat == .csv)
+        #expect(plan.historyTemplate.document.mimeType == "text/csv")
+        #expect(try Data(contentsOf: source) == sourceBytes)
         #expect(rows.map(\.algorithm) == [
             DocumentFingerprintDTO.rawTextSHA256Algorithm,
             DocumentFingerprintDTO.sourceBytesSHA256Algorithm
@@ -58,7 +71,7 @@ struct SourceSnapshotPersistenceBindingTests {
             providerGenerationProvider: { ProviderGenerationToken() }
         )
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
         let folder = FileManager.default.temporaryDirectory
@@ -85,6 +98,8 @@ struct SourceSnapshotPersistenceBindingTests {
             ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "", $0.bool(at: 2), $0.string(at: 3) ?? "", $0.string(at: 4) ?? "")
         }
         #expect(stored.count == 2)
+        #expect(stored.count == sqlitePlan.historyTemplate.fingerprints.count)
+        #expect(stored.filter { $0.2 }.count == 1)
         #expect(stored.map { $0.0 } == prepared.fingerprintSet.fingerprints.map(\.algorithm))
         #expect(stored.map { $0.1 } == prepared.fingerprintSet.fingerprints.map(\.digest))
         #expect(stored.map { $0.2 } == prepared.fingerprintSet.fingerprints.map(\.isDuplicateAuthority))

@@ -8,7 +8,7 @@ struct SourceSnapshotConfirmationTests {
     @Test(.globalRuntimeStateIsolation)
     func preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let source = try MechanicsTestSupport.axisBankCSV()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("source-snapshot-delete-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
@@ -40,7 +40,7 @@ struct SourceSnapshotConfirmationTests {
         let persistence = ConfirmationPersistenceProbe()
         let engine = confirmationEngine(persistence: persistence)
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         let context = ConcurrentConfirmationContext(engine: engine, prepared: prepared)
         let startGate = ConcurrentConfirmationStartGate(participantCount: 2)
@@ -88,7 +88,7 @@ struct SourceSnapshotConfirmationTests {
         let persistence = ConfirmationPersistenceProbe()
         let engine = confirmationEngine(persistence: persistence)
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         prepared.sourceSnapshot.invalidate()
 
@@ -105,7 +105,7 @@ struct SourceSnapshotConfirmationTests {
     @Test(.globalRuntimeStateIsolation)
     func previewCancellationAndHydrationFailureBothInvalidate() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let source = try MechanicsTestSupport.axisBankCSV()
 
         let cancelledPersistence = ConfirmationPersistenceProbe()
         let cancelledEngine = confirmationEngine(persistence: cancelledPersistence)

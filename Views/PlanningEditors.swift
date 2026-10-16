@@ -191,7 +191,7 @@ struct PlanningEditorView: View {
                     Picker("Field", selection: $predicates[index].field) { Text("Narration").tag(CategoryTextPredicate.Field.narration); Text("Reference").tag(CategoryTextPredicate.Field.reference) }.labelsHidden().frame(width: 125)
                     Picker("Match", selection: $predicates[index].match) { Text("Contains").tag(CategoryTextPredicate.Match.contains); Text("Exactly").tag(CategoryTextPredicate.Match.exact) }.labelsHidden().frame(width: 100)
                     TextField("Original source text", text: $predicates[index].text).textFieldStyle(.roundedBorder)
-                    Button("Remove") { predicates.remove(at: index) }.buttonStyle(.borderless)
+                    Button("Remove") { predicates.remove(at: index) }.lfSecondaryAction()
                 }
             }
             Button("Add source clue") { predicates.append(.init(field: .narration, match: .contains, text: "")) }.lfSecondaryAction()
@@ -338,7 +338,7 @@ struct PlanningEditorView: View {
                 HStack {
                     Text("\(value.date) · \(value.title) · \(value.amount.decimal) \(value.amount.currency)")
                     Spacer()
-                    Button("Remove") { var result = budget!; result.datedAdjustments.removeAll { $0.id == value.id }; onAssistance(result) }.buttonStyle(.borderless)
+                    Button("Remove") { var result = budget!; result.datedAdjustments.removeAll { $0.id == value.id }; onAssistance(result) }.lfSecondaryAction()
                 }
             }
         }

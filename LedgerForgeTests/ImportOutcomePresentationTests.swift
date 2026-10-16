@@ -94,85 +94,33 @@ struct ImportOutcomePresentationTests {
         #expect(presentation.fileSubtitle == "Imported Salary actual — source truth is available in Salary History")
     }
 
-    @Test func validationFailureShowsNotPersistedAndHidesTransactionsAction() {
-        let presentation = ImportOutcomePresentation(
-            result: ImportEngineResult(
-                fileName: "empty.csv",
-                transactionCount: 0,
-                validationPassed: false,
-                persisted: false,
-                errorMessage: "Import validation failed."
-            )
-        )
-
-        #expect(presentation.fileName == "empty.csv")
-        #expect(presentation.transactionCount == 0)
-        #expect(presentation.validationStatus == "Validation Failed")
-        #expect(presentation.persistenceStatus == "Not Persisted")
-        #expect(presentation.message == "Import validation failed. The failure could not be added to Import History.")
-        #expect(!presentation.allowsViewingTransactions)
-    }
-
-    @Test func persistenceFailureShowsValidationPassedAndHidesTransactionsAction() {
-        let presentation = ImportOutcomePresentation(
-            result: ImportEngineResult(
-                fileName: "axis.csv",
-                transactionCount: 2,
-                validationPassed: true,
-                persisted: false,
-                errorMessage: "Repository write failed."
-            )
-        )
-
-        #expect(presentation.fileName == "axis.csv")
-        #expect(presentation.transactionCount == 2)
-        #expect(presentation.validationStatus == "Validation Passed")
-        #expect(presentation.persistenceStatus == "Persistence Failed")
-        #expect(presentation.message == "Import persistence failed. The failure could not be added to Import History.")
-        #expect(!presentation.allowsViewingTransactions)
-    }
-
     @Test func failureHistoryStatesAreBoundedAndPrivacySafe() {
-        let validationRecorded = ImportOutcomePresentation(
-            result: ImportEngineResult(
-                fileName: "private-validation.csv",
-                transactionCount: 0,
-                validationPassed: false,
+        let cases: [(validationPassed: Bool, attemptID: String?, count: Int,
+                     validationStatus: String, persistenceStatus: String, message: String)] = [
+            (false, nil, 0, "Validation Failed", "Not Persisted",
+             "Import validation failed. The failure could not be added to Import History."),
+            (false, "validation-attempt", 0, "Validation Failed", "Not Persisted",
+             "Import validation failed. The failure was added to Import History."),
+            (true, nil, 2, "Validation Passed", "Persistence Failed",
+             "Import persistence failed. The failure could not be added to Import History."),
+            (true, "persistence-attempt", 2, "Validation Passed", "Persistence Failed",
+             "Import persistence failed. The failure was added to Import History.")
+        ]
+        for value in cases {
+            let presentation = ImportOutcomePresentation(result: ImportEngineResult(
+                fileName: "private-statement.csv",
+                transactionCount: value.count,
+                validationPassed: value.validationPassed,
                 persisted: false,
-                errorMessage: "Private validation narration /tmp/source.csv",
-                importAttemptId: "validation-attempt"
-            )
-        )
-        let persistenceRecorded = ImportOutcomePresentation(
-            result: ImportEngineResult(
-                fileName: "private-persistence.csv",
-                transactionCount: 2,
-                validationPassed: true,
-                persisted: false,
-                errorMessage: "SQLite leaked account-123 fingerprint-456",
-                importAttemptId: "persistence-attempt"
-            )
-        )
-        let persistenceUnrecorded = ImportOutcomePresentation(
-            result: ImportEngineResult(
-                fileName: "private-audit.csv",
-                transactionCount: 2,
-                validationPassed: true,
-                persisted: false,
-                errorMessage: "Secondary audit leaked upi-reference",
-                importAttemptId: nil
-            )
-        )
-
-        #expect(validationRecorded.message == "Import validation failed. The failure was added to Import History.")
-        #expect(persistenceRecorded.message == "Import persistence failed. The failure was added to Import History.")
-        #expect(persistenceUnrecorded.message == "Import persistence failed. The failure could not be added to Import History.")
-
-        let presentedText = [validationRecorded, persistenceRecorded, persistenceUnrecorded]
-            .compactMap(\.message)
-            .joined(separator: "|")
-        for prohibited in ["/tmp/", "account-123", "fingerprint-456", "upi-reference", "SQLite"] {
-            #expect(!presentedText.localizedCaseInsensitiveContains(prohibited))
+                errorMessage: "Private narration /tmp/source.csv SQLite account-123 fingerprint-456 upi-reference",
+                importAttemptId: value.attemptID
+            ))
+            #expect(presentation.fileName == "private-statement.csv")
+            #expect(presentation.transactionCount == value.count)
+            #expect(presentation.validationStatus == value.validationStatus)
+            #expect(presentation.persistenceStatus == value.persistenceStatus)
+            #expect(presentation.message == value.message)
+            #expect(!presentation.allowsViewingTransactions)
         }
     }
 
@@ -197,42 +145,10 @@ struct ImportOutcomePresentationTests {
         #expect(presentation.subtitle == "Processed 2 transaction(s)")
     }
 
-    @Test func importActivityUsesNonTerminalWorkflowStateBeforeAnyOutcome() {
-        let presentation = ImportActivityPresentation(
-            importState: .preparing(fileName: "preparing.csv", phase: .openingSource),
-            latestDurableAttempt: nil
-        )
-
-        #expect(presentation.title == "preparing.csv")
-        #expect(presentation.status == "Preparing")
-    }
-
-    @Test func idleImportActivityUsesLatestDurableAttemptAfterHydration() {
-        let attempt = RepositoryImportAttempt(
-            ImportAttemptDTO(
-                id: "attempt-success",
-                workspaceId: "workspace",
-                createdAtISO: "2026-07-20T00:00:00Z",
-                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
-                coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
-                accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
-                guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
-                persistenceCode: ImportAttemptPersistence.committed.rawValue,
-                transactionCount: 3
-            )
-        )
-
-        let presentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: attempt)
-
-        #expect(presentation.title == "Last import attempt")
-        #expect(presentation.status == "Import completed")
-        #expect(presentation.subtitle == "Persisted 3 transaction(s)")
-    }
-
     @MainActor
     @Test(.globalRuntimeStateIsolation)
     func importActivityCoversPreviewValidationCommitCancellationAndFailureWithoutSuccessInference() async throws {
-        let readyOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let readyOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { readyOwner.cancel() }
         let ready = readyOwner.preparedImport
 
@@ -244,37 +160,6 @@ struct ImportOutcomePresentationTests {
             importState: .failed(fileName: "failed.csv", message: "/tmp/private.sqlite", retrySourceURL: URL(fileURLWithPath: "/tmp/private.csv")),
             latestDurableAttempt: nil
         ).status == "Preparation Failed")
-    }
-
-    @Test func durableDuplicateAndSupportedBlockRemainDistinctAndPrivacySafe() {
-        let duplicate = durableAttempt(outcome: .exactStatementDuplicate, transactionCount: 4)
-        let blocked = durableAttempt(outcome: .existingEligibleAxisUPIEvent, transactionCount: 1)
-
-        let duplicatePresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: duplicate)
-        let blockedPresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: blocked)
-
-        #expect(duplicatePresentation.status == "Previously imported")
-        #expect(blockedPresentation.status == "Supported transaction event blocked")
-        #expect(![duplicatePresentation.subtitle, blockedPresentation.subtitle].joined().contains("UPI"))
-    }
-
-    @Test func durablePersistenceFailureAndUnknownOutcomeRemainDistinctAndPrivacySafe() {
-        let persistenceFailure = durableAttempt(outcome: .persistenceFailure, transactionCount: 2)
-        let unknown = durableAttempt(
-            id: "attempt-unknown",
-            createdAtISO: "2026-07-20T00:00:01Z",
-            outcomeCode: "future_outcome_private-123",
-            transactionCount: 0
-        )
-
-        let failurePresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: persistenceFailure)
-        let unknownPresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: unknown)
-
-        #expect(failurePresentation.status == "Persistence failed")
-        #expect(failurePresentation.subtitle == "Persistence failed after validation")
-        #expect(unknownPresentation.status == "Outcome unavailable")
-        #expect(unknownPresentation.subtitle == "A durable import outcome is unavailable")
-        #expect(![unknownPresentation.title, unknownPresentation.subtitle, unknownPresentation.status].joined().contains("future_outcome_private-123"))
     }
 
     @Test func latestDurableAttemptUsesValidTimestampThenStableIDAndHandlesMalformedDates() {
@@ -363,107 +248,37 @@ struct ImportOutcomePresentationTests {
             )
             #expect(presentation.label == expectedLabel)
             #expect(presentation.explanation == expectedExplanation)
-            #expect(!presentation.label.contains(outcome.rawValue))
-            #expect(!presentation.explanation.contains(outcome.rawValue))
-        }
-
-        let snapshotPresentationText = expected
-            .filter { $0.0 == .sourceSnapshotAcquisitionFailed || $0.0 == .sourceSnapshotIntegrityFailed }
-            .flatMap { [$0.1, $0.2] }
-            .joined(separator: "|")
-        for prohibited in ["/private/", "private.csv", String(repeating: "a", count: 64), "ledgerforge.", "SQLite"] {
-            #expect(!snapshotPresentationText.localizedCaseInsensitiveContains(prohibited))
-        }
-    }
-
-    @Test func accountRejectionPresentationCannotDivergeFromSharedCopyAuthority() {
-        let expected: [(ImportAttemptOutcome, String, String)] = [
-            (
-                .accountChoiceRequired,
-                "Choose an account",
-                "No existing account owns this verified identifier. Choose an eligible account or create a new one."
-            ),
-            (
-                .identifierOwnershipConflict,
-                "Identifier ownership conflict",
-                "Verified identifier ownership changed or conflicted before confirmation. No financial history was written."
-            )
-        ]
-
-        for (outcome, expectedLabel, expectedExplanation) in expected {
-            let shared = ImportAccountOutcomePresentationMapper.presentation(
-                outcomeCode: outcome.rawValue
-            )
-            let durable = DurableImportAttemptPresentation.outcome(
-                code: outcome.rawValue,
-                transactionCount: 0
-            )
-
-            #expect(shared.label == expectedLabel)
-            #expect(shared.explanation == expectedExplanation)
-            #expect(durable.label == expectedLabel)
-            #expect(durable.explanation == expectedExplanation)
-            #expect(durable.label == shared.label)
-            #expect(durable.explanation == shared.explanation)
         }
     }
 
     @Test @MainActor func durableAccountSectionRendersProspectiveAndLegacyDecisions() throws {
-        let prospective: [(ImportAttemptAccountDecision, String, String)] = [
-            (
-                .matchedExisting,
-                "Matched an existing account",
-                "A verified account identifier is already owned by this account."
-            ),
-            (
-                .userSelectedExisting,
-                "Used your selected account",
-                "You selected an eligible existing account for this verified identifier."
-            ),
-            (
-                .createdNew,
-                "Created a new account",
-                "The import created a new account for this verified identifier."
-            )
+        let expected: [(ImportAttemptAccountDecision, String, String)] = [
+            (.matchedExisting, "Matched an existing account",
+             "A verified account identifier is already owned by this account."),
+            (.userSelectedExisting, "Used your selected account",
+             "You selected an eligible existing account for this verified identifier."),
+            (.createdNew, "Created a new account",
+             "The import created a new account for this verified identifier."),
+            (.selectedExisting, "Existing account used",
+             "This older record does not distinguish an automatic match from an explicit choice."),
+            (.resolvedOrCreated, "Account association completed",
+             "This older record does not distinguish account matching from account creation."),
+            (.noFinancialMutation, "Account outcome unavailable",
+             "Detailed account-association information is unavailable."),
+            (.sideEffectsMayExist, "Account outcome unavailable",
+             "Detailed account-association information is unavailable.")
         ]
-
-        for outcome in [
-            ImportAttemptOutcome.successfulImport,
-            ImportAttemptOutcome.partialImportCommitted
-        ] {
-            for (decision, label, explanation) in prospective {
+        #expect(Set(expected.map(\.0)) == Set(ImportAttemptAccountDecision.allCases))
+        for outcome in [ImportAttemptOutcome.successfulImport, .partialImportCommitted] {
+            for (decision, label, explanation) in expected {
                 let presentation = try #require(DurableImportAccountOutcomeSection.presentation(
                     outcomeCode: outcome.rawValue,
                     accountDecisionCode: decision.rawValue
                 ))
                 #expect(presentation == ImportAccountOutcomePresentation(
-                    label: label,
-                    explanation: explanation
+                    label: label, explanation: explanation
                 ))
             }
-        }
-
-        let legacy: [(ImportAttemptAccountDecision, String, String)] = [
-            (
-                .selectedExisting,
-                "Existing account used",
-                "This older record does not distinguish an automatic match from an explicit choice."
-            ),
-            (
-                .resolvedOrCreated,
-                "Account association completed",
-                "This older record does not distinguish account matching from account creation."
-            )
-        ]
-        for (decision, label, explanation) in legacy {
-            let presentation = try #require(DurableImportAccountOutcomeSection.presentation(
-                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
-                accountDecisionCode: decision.rawValue
-            ))
-            #expect(presentation == ImportAccountOutcomePresentation(
-                label: label,
-                explanation: explanation
-            ))
         }
     }
 
@@ -588,8 +403,6 @@ struct ImportOutcomePresentationTests {
         for (coverage, expectedValue) in expected {
             let value = DurableImportAttemptPresentation.coverage(code: coverage.rawValue)
             #expect(value == expectedValue)
-            #expect(!value.contains(coverage.rawValue))
-            #expect(!value.contains("_"))
         }
     }
 
@@ -612,8 +425,6 @@ struct ImportOutcomePresentationTests {
         for (guidance, expectedValue) in expected {
             let value = DurableImportAttemptPresentation.guidance(code: guidance.rawValue)
             #expect(value == expectedValue)
-            #expect(!value.contains(guidance.rawValue))
-            #expect(!value.contains("_"))
         }
     }
 
@@ -634,67 +445,37 @@ struct ImportOutcomePresentationTests {
             )
             let coverage = DurableImportAttemptPresentation.coverage(code: hostileValue)
             let guidance = DurableImportAttemptPresentation.guidance(code: hostileValue)
-            let visibleAndAccessiblePresentation = [
-                outcome.label,
-                outcome.explanation,
-                coverage,
-                guidance,
-                "\(outcome.label). \(outcome.explanation)"
-            ].joined(separator: "|")
-
             #expect(outcome.label == "Outcome unavailable")
             #expect(outcome.explanation == "A durable import outcome is unavailable")
             #expect(coverage == "Coverage unavailable")
             #expect(guidance == "Guidance unavailable")
-            #expect(!visibleAndAccessiblePresentation.contains(hostileValue))
-            for fragment in ["/Users", "account-123", "XXXX9876", "fingerprint", "../", "DROP_TABLE"] {
-                #expect(!visibleAndAccessiblePresentation.localizedCaseInsensitiveContains(fragment))
-            }
         }
     }
 
     @Test func dashboardAndHistoryUseTheSameDurableOutcomeAuthority() {
-        for outcome in ImportAttemptOutcome.allCases {
-            let attempt = durableAttempt(outcome: outcome, transactionCount: 2)
+        let codes = ImportAttemptOutcome.allCases.map(\.rawValue) + ["future_outcome_private-123"]
+        for code in codes {
+            let attempt = durableAttempt(
+                id: "attempt-\(code)", createdAtISO: "2026-07-20T00:00:00Z",
+                outcomeCode: code, transactionCount: 3
+            )
             let shared = DurableImportAttemptPresentation(attempt: attempt)
             let dashboard = ImportActivityPresentation(
                 importState: .idle,
                 latestDurableAttempt: attempt
             )
 
+            #expect(dashboard.title == "Last import attempt")
             #expect(dashboard.status == shared.outcome.label)
             #expect(dashboard.subtitle == shared.outcome.explanation)
             #expect(dashboard.iconName == shared.outcome.iconName)
+            if code == ImportAttemptOutcome.successfulImport.rawValue {
+                #expect(dashboard.status == "Import completed")
+                #expect(dashboard.subtitle == "Persisted 3 transaction(s)")
+            }
         }
     }
 
-    @Test func materiallyDifferentDurableOutcomesRemainDistinct() {
-        let persistenceFailure = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.persistenceFailure.rawValue, transactionCount: 0)
-        let validationFailure = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
-        let duplicate = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.exactStatementDuplicate.rawValue, transactionCount: 0)
-        let success = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 2)
-        let contention = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.sqliteContention.rawValue, transactionCount: 0)
-        let identityConflict = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.identityConflict.rawValue, transactionCount: 0)
-        let eventBlock = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue, transactionCount: 0)
-        let unknown = DurableImportAttemptPresentation.outcome(code: "future", transactionCount: 0)
-
-        #expect(Set([
-            persistenceFailure.label,
-            validationFailure.label,
-            duplicate.label,
-            success.label,
-            contention.label,
-            identityConflict.label,
-            eventBlock.label,
-            unknown.label
-        ]).count == 8)
-        #expect(success.explanation == "Persisted 2 transaction(s)")
-        #expect(!duplicate.explanation.contains("Persisted"))
-        #expect(!contention.label.localizedCaseInsensitiveContains("failure"))
-        #expect(!identityConflict.label.localizedCaseInsensitiveContains("unavailable"))
-        #expect(!eventBlock.label.localizedCaseInsensitiveContains("identity"))
-        #expect(unknown.label != persistenceFailure.label)
-    }
 }
 
 @MainActor

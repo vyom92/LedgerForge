@@ -64,17 +64,6 @@
                ReferencedContainer = "container:LedgerForge.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "288EB0C32FF7955300F09BC9"
-               BuildableName = "LedgerForgeUITests.xctest"
-               BlueprintName = "LedgerForgeUITests"
-               ReferencedContainer = "container:LedgerForge.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

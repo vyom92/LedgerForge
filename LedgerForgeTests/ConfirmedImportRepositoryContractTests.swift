@@ -3,9 +3,8 @@ import Testing
 import SQLite3
 @testable import LedgerForge
 
-/// Shared confirmed-import contract checks use either repository error values or
-/// one unchanged authentic source prepared through the ordinary engine. They do
-/// not author statement graphs or mutate financial facts to manufacture rejects.
+/// Shared confirmed-import contracts use repository error values and a small
+/// synthetic source prepared through the ordinary engine.
 @MainActor
 struct ConfirmedImportRepositoryContractTests {
     @Test
@@ -56,31 +55,7 @@ struct ConfirmedImportRepositoryContractTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func unchangedAuthenticPlanCommitsAndReplaysEquallyAcrossProviders() async throws {
-        let memory = InMemoryRepositoryProvider()
-        let memoryPlan = try await confirmedImportPlan(generationToken: memory.generationToken)
-
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("LedgerForge-ConfirmedContract-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let sqlite = try SQLiteRepositoryProvider(
-            path: folder.appendingPathComponent("contract.sqlite").path,
-            migrations: allMigrations
-        )
-        defer { sqlite.database.close() }
-        let sqlitePlan = try await confirmedImportPlan(generationToken: sqlite.generationToken)
-
-        #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .committed(receipt(for: memoryPlan)))
-        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .committed(receipt(for: sqlitePlan)))
-        #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .exactDuplicate)
-        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .exactDuplicate)
-        #expect(try memory.transactionRepo.trustedTransactions(workspaceId: memoryPlan.workspace.id).count == memoryPlan.transactionTemplates.count)
-        #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: sqlitePlan.workspace.id).count == sqlitePlan.transactionTemplates.count)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func authenticConfirmedImportNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
+    func confirmedImportNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-ConfirmedNamespace-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -99,26 +74,26 @@ struct ConfirmedImportRepositoryContractTests {
         #expect(try sqlite.importSessionRepo.importSession(id: plan.historyTemplate.importSession.id) == nil)
         #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: plan.workspace.id).isEmpty)
 
-        // The unchanged authentic plan is valid and remains usable after the
+        // The unchanged fixture plan is valid and remains usable after the
         // external lock leaves; contention must not consume or corrupt it.
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(plan) == .committed(receipt(for: plan)))
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(plan) == .exactDuplicate)
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func authenticStandaloneBankNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
+    func standaloneBankNamespaceContentionIsRetryableWithoutAcceptedResidue() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-BankNamespace-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let databasePath = folder.appendingPathComponent("contention.sqlite").path
         let sqlite = try SQLiteRepositoryProvider(path: databasePath)
         defer { sqlite.database.close() }
-        // Establish the account from the first unchanged registered original.
-        // The incoming plan comes from the other registered original period.
+        // Establish the account from the first fixture period.
+        // The incoming plan comes from the other fixture period.
         let accepted = try await confirmedImportPlan(generationToken: sqlite.generationToken)
         try #require(sqlite.confirmedImportRepo.commitConfirmedImport(accepted) == .committed(receipt(for: accepted)))
         let account = try #require(try sqlite.accountRepo.account(id: accepted.proposedAccount.id))
-        let owner = try await AuthenticSourceTestSupport.preparedAxisBankCSV(providerGeneration: sqlite.generationToken, alternatePeriod: true)
+        let owner = try await MechanicsTestSupport.preparedAxisBankCSV(providerGeneration: sqlite.generationToken, alternatePeriod: true)
         defer { owner.cancel() }
         let prepared = owner.preparedImport
         let plan = try ImportPersistenceMapper().standaloneBankImportPlan(
@@ -126,7 +101,7 @@ struct ConfirmedImportRepositoryContractTests {
             validation: prepared.validation, fingerprintSet: prepared.fingerprintSet,
             providerGeneration: sqlite.generationToken, account: account)
         guard case .ready(let reviewed) = sqlite.confirmedImportRepo.reviewBankImport(plan) else {
-            Issue.record("The unchanged alternate original did not produce a ready bank plan.")
+            Issue.record("The alternate fixture did not produce a ready bank plan.")
             return
         }
         let before = try SQLiteNamespaceContentionSnapshot(database: sqlite.database)

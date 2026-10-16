@@ -18,8 +18,8 @@ struct LegacyXLSDocumentReaderTests {
         #expect(LegacyXLSDocumentReader().supportedFileExtensions == ["xls"])
     }
 
-    @Test func readerCopiesAuthenticXLSBeforeSnapshotInvalidation() async throws {
-        let sourceURL = try authenticXLSURL()
+    @Test func readerCopiesXLSBeforeSnapshotInvalidation() async throws {
+        let sourceURL = try mechanicsXLSURL()
         let request = ImportRequest(fileURL: sourceURL)
         let snapshot = SourceContentSnapshot(bytes: try Data(contentsOf: sourceURL))
         let recorder = LegacyXLSEventRecorder()
@@ -47,7 +47,7 @@ struct LegacyXLSDocumentReaderTests {
     }
 
     @Test func distinctReadersSerializeTheWholeLibXLSLifetime() async throws {
-        let sourceURL = try authenticXLSURL()
+        let sourceURL = try mechanicsXLSURL()
         let request = ImportRequest(fileURL: sourceURL)
         let recorder = LegacyXLSEventRecorder()
         let firstGate = LegacyXLSBoundedGate()
@@ -94,7 +94,7 @@ struct LegacyXLSDocumentReaderTests {
     }
 
     @Test func readerCancellationChecksAdmissionQueueAndCompletedCSpan() async throws {
-        let sourceURL = try authenticXLSURL()
+        let sourceURL = try mechanicsXLSURL()
         let request = ImportRequest(fileURL: sourceURL)
 
         let start = LegacyXLSBoundedGate()
@@ -310,10 +310,9 @@ struct LegacyXLSDocumentReaderTests {
         }
     }
 
-    private func authenticXLSURL() throws -> URL {
-        try AuthenticSourceTestSupport.axisBankCSV()
-            .deletingPathExtension()
-            .appendingPathExtension("xls")
+    private func mechanicsXLSURL() throws -> URL {
+        try #require(Bundle(for: LegacyXLSFixtureBundle.self)
+            .url(forResource: "reader-mechanics", withExtension: "xls"))
     }
 
     private func waitUntil(_ condition: () -> Bool) async throws {
@@ -400,3 +399,5 @@ private final class LegacyXLSBoundedGate: Sendable {
         releaseSignal.signal()
     }
 }
+
+private final class LegacyXLSFixtureBundle: NSObject {}

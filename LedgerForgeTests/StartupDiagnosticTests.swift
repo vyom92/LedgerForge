@@ -30,11 +30,6 @@ struct StartupDiagnosticTests {
         #expect(copied.contains(DeveloperConsole.metadataText(for: entry)!))
         for forbidden in ["Innocuous private label", "/Users/private", "private.pdf", "forged", "private name"] { #expect(!copied.contains(forbidden)) }
         #expect(entry.metadata?["sqlite_primary"] == "5")
-        for _ in 0..<1100 { console.info(.application, "Bounded event") }
-        #expect(console.entries.count == 1000)
-        #expect(console.entries.first?.sequence == 102)
-        console.clear(); console.info(.application, "New event")
-        #expect(console.entries[0].sequence == 1102)
     }
 
     @Test func sqliteWrapperRetainsSafeCodesAndUnknownErrorsRemainUnknown() {

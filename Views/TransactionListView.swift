@@ -237,6 +237,11 @@ struct TransactionListView: View {
     @State private var narrowDetailsVisible = false
     @State private var tableIsNarrow = false
     @State private var moreFiltersVisible = false
+    @State private var focusedAmountBound: String?
+    @State private var customDatePresented = false
+    @State private var draftDateStart = ""
+    @State private var draftDateEnd = ""
+    @State private var draftDateError: String?
     private struct OverviewSession: Identifiable {
         let id = UUID()
         let model: TransactionListViewModel
@@ -502,19 +507,25 @@ struct TransactionListView: View {
         .foregroundStyle(theme.palette.primaryText)
         .font(theme.typography.tableBody)
         .onAppear(perform: synchronizePresentation)
+        .onDisappear(perform: cancelCustomDateEditing)
+        .onChange(of: spendingPresented || overviewSession != nil) { _, hidden in
+            if hidden { cancelCustomDateEditing() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
             viewModel.refreshRelativePeriod(isOverview: isOverview)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).receive(on: RunLoop.main)) { _ in
             viewModel.refreshRelativePeriod(isOverview: isOverview)
         }
-        .onChange(of: generation) { _, _ in synchronizePresentation() }
+        .onChange(of: generation) { _, _ in cancelCustomDateEditing(); synchronizePresentation() }
         .onChange(of: availabilityState) { _, _ in synchronizePresentation() }
+        .onChange(of: viewModel.presentationFilter.accountIDs) { _, _ in cancelCustomDateEditing() }
+        .onChange(of: viewModel.presentationFilter.excludesAllAccounts) { _, _ in cancelCustomDateEditing() }
         .onChange(of: period) { _, _ in updatePeriod() }
-        .onChange(of: customStart) { _, _ in updatePeriod() }
-        .onChange(of: customEnd) { _, _ in updatePeriod() }
-        .onChange(of: minimumAmount) { _, _ in updateAmount() }
-        .onChange(of: maximumAmount) { _, _ in updateAmount() }
+        .onChange(of: minimumAmount) { _, _ in if focusedAmountBound == nil { updateAmount() } }
+        .onChange(of: maximumAmount) { _, _ in if focusedAmountBound == nil { updateAmount() } }
+        .onChange(of: focusedAmountBound) { previous, _ in if previous != nil { updateAmount() } }
+        .onChange(of: moreFiltersVisible) { _, visible in if !visible { focusedAmountBound = nil; updateAmount() } }
         .onChange(of: inputError) { _, newValue in
             if newValue != nil { viewModel.selectPresentationRow(id: nil) }
         }
@@ -636,7 +647,7 @@ struct TransactionListView: View {
                 .help(inputError ?? "Explore the current selection without changing these filters.")
             Button("Spending & movements") { spendingLoaded = true; spendingPresented = true }
                 .lfSecondaryAction().accessibilityIdentifier("transactions.spending")
-            Button("Category rules & history…") {
+            Button("Category rules & history") {
                 rulePresentation = RulePresentation(transactions: result.rows.map(\.transaction))
             }.lfSecondaryAction().accessibilityIdentifier("transactions.categoryRules")
             Menu("Tags") {
@@ -677,7 +688,10 @@ struct TransactionListView: View {
 
     private func periodAndDetails(narrow: Bool) -> some View {
         HStack(spacing: 12) {
-            Picker("Period", selection: $viewModel.presentationControls.period) {
+            Picker("Period", selection: Binding(get: { period }, set: { choice in
+                if choice == .custom { beginCustomDateEditing() }
+                else { cancelCustomDateEditing(); period = choice }
+            })) {
                 ForEach(TransactionPeriodChoice.allCases, id: \.self) { choice in
                     Text(choice.rawValue).tag(choice)
                 }
@@ -685,6 +699,7 @@ struct TransactionListView: View {
             .tint(theme.palette.primaryText)
             .frame(width: 225)
             .help("Filter by the date printed on each transaction.")
+            .popover(isPresented: $customDatePresented, arrowEdge: .bottom) { customDateEditor }
 
             detailsButton(narrow: narrow)
         }
@@ -725,7 +740,7 @@ struct TransactionListView: View {
                 HStack(spacing: 12) {
                     if let ids = viewModel.presentationFilter.canonicalTransactionIDs {
                         Text("Chart detail · \(ids.count) transactions").font(theme.typography.secondary)
-                        Button("Show all transactions") { viewModel.presentationFilter.canonicalTransactionIDs = nil }.buttonStyle(.borderless)
+                        Button("Show all transactions") { viewModel.presentationFilter.canonicalTransactionIDs = nil }.lfSecondaryAction()
                             .accessibilityIdentifier("transactions.clearChartDetail")
                     }
                     if activeCriteriaCount > 0 {
@@ -789,7 +804,7 @@ struct TransactionListView: View {
             ForEach(tagStore.snapshot?.definitions ?? []) { tag in
                 Button(tag.name) { viewModel.presentationFilter.tag = .tag(tag.id) }
             }
-        } label: { Text(viewModel.presentationFilter.tag == .all ? "Tag: All" : "Tag: \(tagFilterTitle)") }
+        } label: { filterLabel("Tag", value: viewModel.presentationFilter.tag == .all ? "All" : tagFilterTitle) }
         .lfMenuAction()
         .disabled(tagStore.generation != generation || tagStore.snapshot == nil)
         .accessibilityIdentifier("transactions.tagFilter")
@@ -885,27 +900,26 @@ struct TransactionListView: View {
                         .font(theme.typography.caption).foregroundStyle(secondary)
                     currencyMenu
                     HStack {
-                        TextField("Minimum", text: $viewModel.presentationControls.minimumAmount)
+                        TextField("Minimum", text: $viewModel.presentationControls.minimumAmount,
+                                  onEditingChanged: { focusedAmountBound = $0 ? "minimum" : nil })
                             .lfTextField()
                             .accessibilityLabel("Minimum amount")
-                        TextField("Maximum", text: $viewModel.presentationControls.maximumAmount)
+                        TextField("Maximum", text: $viewModel.presentationControls.maximumAmount,
+                                  onEditingChanged: { focusedAmountBound = $0 ? "maximum" : nil })
                             .lfTextField()
                             .accessibilityLabel("Maximum amount")
-                    }
+                    }.onSubmit { NSApp.keyWindow?.makeFirstResponder(nil); focusedAmountBound = nil; updateAmount() }
                     Text("Use a decimal point; leave a bound empty for no limit.")
                         .font(theme.typography.caption).foregroundStyle(secondary)
-                    if let message = amountInputError {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(LFTheme.warning)
-                    } else if viewModel.presentationFilter.amountRange != nil && viewModel.presentationFilter.currencies.count != 1 {
-                        Text("Select exactly one currency to apply an amount range.")
-                            .foregroundStyle(LFTheme.warning)
-                    }
+                    LFNumericInputFeedback(isEditing: focusedAmountBound != nil,
+                        error: amountInputError ?? (viewModel.presentationFilter.amountRange != nil && viewModel.presentationFilter.currencies.count != 1
+                            ? "Select exactly one currency to apply an amount range." : nil),
+                        hint: "The amount filter updates when you finish editing.")
                     HStack {
                         Button("Clear amount") { minimumAmount = ""; maximumAmount = ""; updateAmount() }
                             .lfSecondaryAction()
                         Spacer()
-                        Button("Done") { moreFiltersVisible = false }
+                        Button("Done") { focusedAmountBound = nil; updateAmount(); moreFiltersVisible = false }
                             .lfPrimaryAction().keyboardShortcut(.defaultAction)
                     }
                 }
@@ -915,9 +929,17 @@ struct TransactionListView: View {
     }
 
     private func filterLabel(_ title: String, count: Int) -> some View {
-        Text(count == 0 ? "\(title): All" : "\(title): \(count)")
-            .font(theme.typography.secondary)
-            .padding(.vertical, 3)
+        filterLabel(title, value: count == 0 ? "All" : String(count))
+    }
+
+    private func filterLabel(_ title: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(verbatim: "\(title):")
+            Text(verbatim: value)
+        }
+        .font(theme.typography.button)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .combine)
     }
 
     private func membership<Value: Hashable>(
@@ -948,15 +970,73 @@ struct TransactionListView: View {
 
     private var customDateControls: some View {
         HStack(spacing: 12) {
-            Text("Source date").foregroundStyle(secondary)
-            TextField("From YYYY-MM-DD", text: $viewModel.presentationControls.customStart)
-                .lfTextField()
-                .accessibilityLabel("Source date from, year month day")
-            Text("to").foregroundStyle(secondary)
-            TextField("Through YYYY-MM-DD", text: $viewModel.presentationControls.customEnd)
-                .lfTextField()
-                .accessibilityLabel("Source date through, year month day")
+            let range = viewModel.presentationFilter.statementDateRange
+            Text("Source dates: \(range?.start?.presentation ?? "First recorded date") – \(range?.end?.presentation ?? "Last recorded date")")
+                .foregroundStyle(secondary)
             Text("Inclusive").font(theme.typography.caption).foregroundStyle(secondary)
+            Button("Edit dates", action: beginCustomDateEditing).lfSecondaryAction()
+        }
+    }
+
+    private var customDateEditor: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Custom range").font(theme.typography.formHeading)
+            TextField("From YYYY-MM-DD", text: $draftDateStart)
+                .lfTextField().accessibilityLabel("Source date from, year month day")
+            TextField("Through YYYY-MM-DD", text: $draftDateEnd)
+                .lfTextField().accessibilityLabel("Source date through, year month day")
+            Text("Both dates are included. Leave one empty for no limit.")
+                .font(theme.typography.caption).foregroundStyle(secondary)
+            if let draftDateError {
+                Text(draftDateError).font(theme.typography.caption).foregroundStyle(LFTheme.warning)
+            }
+            HStack {
+                Button("Cancel", action: cancelCustomDateEditing).lfSecondaryAction()
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Apply dates", action: applyCustomDates).lfPrimaryAction()
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 400)
+    }
+
+    private func beginCustomDateEditing() {
+        draftDateStart = viewModel.presentationFilter.statementDateRange?.start?.canonical ?? ""
+        draftDateEnd = viewModel.presentationFilter.statementDateRange?.end?.canonical ?? ""
+        draftDateError = nil
+        customDatePresented = true
+    }
+
+    private func cancelCustomDateEditing() {
+        customDatePresented = false
+        draftDateStart = ""; draftDateEnd = ""; draftDateError = nil
+    }
+
+    private func applyCustomDates() {
+        do {
+            let start = draftDateStart.isEmpty ? nil : try StatementDate(canonical: draftDateStart)
+            let end = draftDateEnd.isEmpty ? nil : try StatementDate(canonical: draftDateEnd)
+            guard start != nil || end != nil else {
+                draftDateError = "Enter at least one date in YYYY-MM-DD format."
+                return
+            }
+            let range = TransactionPresentationStatementDateRange(start: start, end: end)
+            guard range.isValid else {
+                draftDateError = "The start date must be on or before the end date."
+                return
+            }
+            var controls = viewModel.presentationControls
+            controls.period = .custom; controls.customStart = draftDateStart; controls.customEnd = draftDateEnd
+            controls.dateInputError = nil
+            viewModel.presentationControls = controls
+            if viewModel.presentationFilter.statementDateRange != range {
+                viewModel.presentationFilter.statementDateRange = range
+            }
+            cancelCustomDateEditing()
+        } catch {
+            draftDateError = "Use a valid date in YYYY-MM-DD format."
         }
     }
 
@@ -971,7 +1051,10 @@ struct TransactionListView: View {
                     dateInputError = "Enter at least one source date in YYYY-MM-DD format."
                     return
                 }
-                viewModel.presentationFilter.statementDateRange = .init(start: start, end: end)
+                let range = TransactionPresentationStatementDateRange(start: start, end: end)
+                if viewModel.presentationFilter.statementDateRange != range {
+                    viewModel.presentationFilter.statementDateRange = range
+                }
             } catch {
                 dateInputError = "Use a valid source date in YYYY-MM-DD format."
             }
@@ -1003,6 +1086,7 @@ struct TransactionListView: View {
     }
 
     private func clearFilters() {
+        cancelCustomDateEditing()
         period = .all
         customStart = ""; customEnd = ""
         minimumAmount = ""; maximumAmount = ""
@@ -1043,21 +1127,30 @@ struct TransactionListView: View {
 
     private func currencyTotals(_ currency: CurrencyCode) -> some View {
         LFPanel(contentSpacing: 10) {
+            let hasBankTotals = [TransactionPresentationEffect.credit, .debit].contains {
+                result.totals.partitions[TransactionPresentationTotalKey(currency: currency, domain: .bank, effect: $0)] != nil
+            }
+            let hasCardTotals = [TransactionPresentationEffect.decreasesAmountOwed, .increasesAmountOwed].contains {
+                result.totals.partitions[TransactionPresentationTotalKey(currency: currency, domain: .card, effect: $0)] != nil
+            }
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 16) {
                     Text(currency.code).font(theme.typography.rowTitle).frame(width: 50, alignment: .leading)
                     totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                    if hasBankTotals && hasCardTotals { Divider().overlay(theme.palette.border) }
                     totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
-                }.fixedSize(horizontal: true, vertical: false)
+                }.fixedSize(horizontal: true, vertical: true)
                 VStack(alignment: .leading, spacing: 10) {
                     Text(currency.code).font(theme.typography.rowTitle)
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 16) {
                             totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                            if hasBankTotals && hasCardTotals { Divider().overlay(theme.palette.border) }
                             totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
-                        }.fixedSize(horizontal: true, vertical: false)
+                        }.fixedSize(horizontal: true, vertical: true)
                         VStack(alignment: .leading, spacing: 14) {
                             totalDomain(currency, domain: .bank, title: "Bank movements", effects: [.credit, .debit])
+                            if hasBankTotals && hasCardTotals { Divider().overlay(theme.palette.border) }
                             totalDomain(currency, domain: .card, title: "Card liability", effects: [.decreasesAmountOwed, .increasesAmountOwed])
                         }
                     }
@@ -1307,7 +1400,7 @@ struct TransactionListView: View {
                 Button {
                     detailsVisible = false; narrowDetailsVisible = false
                 } label: { Image(systemName: "xmark") }
-                .buttonStyle(.borderless).accessibilityLabel("Close transaction details")
+                .lfIconAction().accessibilityLabel("Close transaction details")
             }
             ScrollView {
                 transactionDetailPanel
@@ -1320,7 +1413,8 @@ struct TransactionListView: View {
             if let selected = selectedTransaction {
                 let presentation = viewModel.detailPresentation(for: selected)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(presentation.description).font(theme.typography.rowTitle).lineLimit(2)
+                    Text(presentation.description).font(theme.typography.rowTitle)
+                        .fixedSize(horizontal: false, vertical: true)
                         .help(presentation.description)
                     Text(presentation.signedAmount).font(theme.typography.headlineMoney).monospacedDigit()
                         .foregroundStyle(selected.money.amount == 0 ? theme.palette.primaryText : theme.financialEffectColor(viewModel.selectedPresentationRow?.effect ?? .unknown))
@@ -1648,7 +1742,9 @@ private struct TransactionCategoryBatchSheet: View {
                 Text("Choose a category").tag("")
                 ForEach(selection.snapshot.activeCategories) { Text($0.name).tag($0.id) }
                 Text("Clear category deliberately").tag("clear")
-            }.accessibilityIdentifier("categoryBatch.category")
+            }
+            .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
+            .accessibilityIdentifier("categoryBatch.category")
             let protectedCount = items.filter(\.isProtected).count
             if protectedCount > 0 {
                 Toggle("Replace \(protectedCount) existing manual or deliberately cleared choices", isOn: $replaceProtected)
@@ -1682,18 +1778,18 @@ private struct TransactionCategoryBatchSheet: View {
             }.frame(minHeight: 180, maxHeight: .infinity)
             if let message { Text(message).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning) }
             HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(isApplying)
+                Button("Cancel") { dismiss() }.lfSecondaryAction().keyboardShortcut(.cancelAction).disabled(isApplying)
                 if needsRefresh {
                     Button("Reload saved categories") {
                         do {
                             if try coordinator.retryCanonicalHydration() != .failed { dismiss() }
                         } catch { message = CategoryManagementPresentation.message(for: error) }
-                    }
+                    }.lfSecondaryAction()
                 }
                 Spacer()
                 if isApplying { ProgressView().controlSize(.small) }
                 Button("Apply \(changedIDs.count) category choices", action: apply)
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction).lfPrimaryAction()
                     .accessibilityIdentifier("categoryBatch.apply")
                     .disabled(review == nil || changedIDs.isEmpty || isApplying || needsRefresh)
             }

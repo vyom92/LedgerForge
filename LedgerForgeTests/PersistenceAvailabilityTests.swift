@@ -231,7 +231,7 @@ struct PersistenceAvailabilityTests {
             persistenceStateProvider: { availabilityOwner.value }
         )
 
-        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        let prepared = try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV())
         availabilityOwner.value = .unavailable(.migrationIntegrityFailed)
         let result = await engine.commitPreparedImport(prepared)
 
@@ -254,7 +254,7 @@ struct PersistenceAvailabilityTests {
             developerConsole: DeveloperConsole(),
             persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
         )
-        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        let prepared = try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV())
 
         let result = await engine.commitPreparedImport(prepared)
 
@@ -299,7 +299,7 @@ struct PersistenceAvailabilityTests {
             providerGenerationProvider: { provider.generationToken },
             rejectedAttemptHydration: {}
         )
-        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        let prepared = try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV())
 
         let result = await engine.commitPreparedImport(prepared, accountChoice: .createNewAccount(displayName: "Imported review account"))
         let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)

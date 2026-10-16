@@ -22,10 +22,10 @@ struct BackgroundUpdatesSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
             LFSettingsPageHeader("Background Updates", subtitle: "Schedules stay in UTC when you travel.") {
-                Toggle("Enable helper for this ledger", isOn: $draft.enabled)
+                Toggle("Enable background updates for this ledger", isOn: $draft.enabled)
                     .toggleStyle(.switch)
                     .font(theme.typography.secondary)
-                    .accessibilityLabel("Enable background helper for this ledger")
+                    .accessibilityLabel("Enable background updates for this ledger")
             }
             runtimePanel
             LFSettingsColumns(availableWidth: availableWidth, minimumWidth: 1040) {
@@ -33,7 +33,7 @@ struct BackgroundUpdatesSettingsView: View {
             } trailing: {
                 emailPanel
             }
-            Text("New email originals wait in Import Centre for your batch action.")
+            Text("Ready email attachments can import automatically while LedgerForge is open. Items needing review stay in Import Centre.")
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             LFSettingsColumns(availableWidth: availableWidth, minimumWidth: 1040) {
                 ispPanel
@@ -64,7 +64,7 @@ struct BackgroundUpdatesSettingsView: View {
                 LFInfoRow(title: "Next opportunity", value: AppDateDisplay.timestamp(next, zone: TimeZone(secondsFromGMT: 0)!), textRole: .secondary)
             }
             if !session.configuration.enabled {
-                Text("When off, the existing foreground schedules apply. ISP holdings update on or after the fifth of the month in UTC.")
+                Text("When off, scheduled updates run while LedgerForge is open. ISP holdings update on or after the fifth of the month in UTC.")
                     .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             }
         }
@@ -96,7 +96,7 @@ struct BackgroundUpdatesSettingsView: View {
             }
             BackgroundClockEditor(draft: $gmailClock)
             DisclosureGroup("Collection details") {
-                Text("Collects the full missed delivery interval. New originals wait in Import Centre for your batch action.")
+                Text("Collects attachments from the full missed delivery period. Ready attachments can import automatically while LedgerForge is open; items needing review stay in Import Centre.")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     .padding(.top, theme.spacing.small)
             }
@@ -137,9 +137,9 @@ struct BackgroundUpdatesSettingsView: View {
             if let message = session.message {
                 Text(message).font(theme.typography.secondary).textSelection(.enabled)
             }
-            DisclosureGroup("Helper connection access") {
+            DisclosureGroup("Connection access") {
                 VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                    Button("Authorize saved connections for helper") {
+                    Button("Allow background use of saved connections") {
                         session.save(session.configuration, replacing: session.configuration, authorizeConnections: true)
                     }
                     .lfSecondaryAction().disabled(!session.configuration.enabled || isDirty || session.isSaving || !session.available)

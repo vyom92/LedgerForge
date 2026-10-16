@@ -7,14 +7,6 @@ import Testing
 @MainActor
 struct CSVDocumentReaderAdapterTests {
 
-    @Test func adapterAcceptsCSVInput() async throws {
-        let adapter = CSVDocumentReaderAdapter()
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/generic.csv"))
-
-        #expect(adapter.supportedFileExtensions == ["csv"])
-        #expect(adapter.supportedFileExtensions.contains(request.fileExtension))
-    }
-
     @Test func adapterRejectsUnsupportedFileTypes() async throws {
         let adapter = CSVDocumentReaderAdapter()
         let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
@@ -34,6 +26,8 @@ struct CSVDocumentReaderAdapterTests {
         let fixtureURL = try genericCSVFixtureURL()
         defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let request = ImportRequest(fileURL: fixtureURL)
+        #expect(adapter.supportedFileExtensions == ["csv"])
+        #expect(adapter.supportedFileExtensions.contains(request.fileExtension))
 
         let rawDocument = try await adapter.read(request: request, password: nil)
 
@@ -46,24 +40,9 @@ struct CSVDocumentReaderAdapterTests {
             return
         }
 
-        #expect(text == "Name,Value\nAlpha,1\nBeta,2\n")
-    }
-
-    @Test func adapterOutputMatchesLegacyCSVReaderForGenericInput() async throws {
-        let adapter = CSVDocumentReaderAdapter()
-        let fixtureURL = try genericCSVFixtureURL()
-        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
-        let request = ImportRequest(fileURL: fixtureURL)
-        let legacyText = try CSVReader().read(from: fixtureURL)
-
-        let rawDocument = try await adapter.read(request: request, password: nil)
-
-        guard case .text(let adapterText) = rawDocument.content else {
-            Issue.record("Expected CSV adapter to produce text RawDocument content.")
-            return
-        }
-
-        #expect(adapterText == legacyText)
+        let expectedText = "Name,Value\nAlpha,1\nBeta,2\n"
+        #expect(text == expectedText)
+        #expect(try CSVReader().read(from: fixtureURL) == expectedText)
     }
 
 }

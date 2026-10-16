@@ -214,7 +214,7 @@ struct LiveFXSettingsView: View {
         let status = isRefreshing ? "Checking…" : prices.networkAvailable == false && !cached.isEmpty
             ? "Offline · cached · \(cached.count) / \(mappings.count)" : hasErrors
             ? (cached.isEmpty ? "Couldn’t update" : "Couldn’t update · previous prices retained")
-            : cached.isEmpty ? "No successful price yet" : "Cached · \(cached.count) / \(mappings.count)"
+            : cached.isEmpty ? "No successful price yet" : "\(cached.count) / \(mappings.count)"
         return VStack(alignment: .leading, spacing: theme.spacing.micro) {
             Text(status)
                 .font(theme.typography.rowTitle).monospacedDigit()
@@ -265,7 +265,7 @@ struct LiveFXSettingsView: View {
         if rates.failures.contains(currency) {
             return rates.legs[currency] == nil ? "Couldn’t update" : "Couldn’t update · previous rate retained"
         }
-        return rates.legs[currency] == nil ? "No successful rate yet" : "Cached observation"
+        return rates.legs[currency] == nil ? "No successful rate yet" : ""
     }
 
     private func refreshButton(busy: Bool, label: String, identifier: String,

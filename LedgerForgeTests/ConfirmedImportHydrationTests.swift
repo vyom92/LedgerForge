@@ -19,7 +19,7 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
 
-        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { preparedOwner.cancel() }
         let result = await engine.commitPreparedImport(preparedOwner.preparedImport)
 
@@ -45,7 +45,7 @@ struct ConfirmedImportHydrationTests {
             },
             reconciliationGate: gate
         )
-        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { preparedOwner.cancel() }
         let committed = await engine.commitPreparedImport(preparedOwner.preparedImport)
         let presentation = try #require(
@@ -94,10 +94,10 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let committedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let committedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { committedOwner.cancel() }
         let committed = await engine.commitPreparedImport(committedOwner.preparedImport)
-        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let blockedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { blockedPreparedOwner.cancel() }
         let blockedPrepared = blockedPreparedOwner.preparedImport
         let blocked = await engine.commitPreparedImport(blockedPrepared)
@@ -112,7 +112,7 @@ struct ConfirmedImportHydrationTests {
         var freshPreview: PreparedImport?
 
         hydrationShouldFail = false
-        let requestedPreviewOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let requestedPreviewOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { requestedPreviewOwner.cancel() }
         let requestedPreview = requestedPreviewOwner.preparedImport
         let execution = await executor.execute(
@@ -159,10 +159,10 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let failedCommittedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let failedCommittedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { failedCommittedOwner.cancel() }
         _ = await engine.commitPreparedImport(failedCommittedOwner.preparedImport)
-        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let blockedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { blockedPreparedOwner.cancel() }
         let blockedPrepared = blockedPreparedOwner.preparedImport
         let blocked = await engine.commitPreparedImport(blockedPrepared)
@@ -216,12 +216,12 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let committedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let committedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { committedPreparedOwner.cancel() }
         let committedPrepared = committedPreparedOwner.preparedImport
         let committed = await engine.commitPreparedImport(committedPrepared)
         persistenceStateOwner.value = .unavailable(.databaseOpenFailed)
-        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let blockedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { blockedPreparedOwner.cancel() }
         let blocked = await engine.commitPreparedImport(blockedPreparedOwner.preparedImport)
 
@@ -247,7 +247,7 @@ struct ConfirmedImportHydrationTests {
         #expect(!consumedConfirmation.persisted)
         #expect(coordinator.persistCount == 1)
 
-        let nextPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let nextPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { nextPreparedOwner.cancel() }
         let next = await engine.commitPreparedImport(nextPreparedOwner.preparedImport)
         #expect(next.succeeded)
@@ -274,7 +274,7 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
 
-        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { preparedOwner.cancel() }
         let result = await engine.commitPreparedImport(preparedOwner.preparedImport)
 
@@ -299,10 +299,10 @@ struct ConfirmedImportHydrationTests {
             forcedHydration: { hydrationResult() }
         )
 
-        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let blockedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { blockedPreparedOwner.cancel() }
         let blocked = await blockedEngine.commitPreparedImport(blockedPreparedOwner.preparedImport)
-        let unrelatedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let unrelatedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { unrelatedPreparedOwner.cancel() }
         let unrelated = await unrelatedEngine.commitPreparedImport(unrelatedPreparedOwner.preparedImport)
 
@@ -328,7 +328,7 @@ struct ConfirmedImportHydrationTests {
             forcedHydration: { hydrationResult() },
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
-        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV(providerGeneration: first.generationToken)
+        let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV(providerGeneration: first.generationToken)
         defer { preparedOwner.cancel() }
         let prepared = preparedOwner.preparedImport
 

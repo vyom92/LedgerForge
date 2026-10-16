@@ -121,7 +121,7 @@ struct ZurichISPSettingsView: View {
                 if session.username == nil { session.connect(credentials) }
                 else { session.replaceCredentials(credentials) }
             }
-            .buttonStyle(LFActionButtonStyle(kind: .primary, wide: true))
+            .buttonStyle(LFActionButtonStyle(kind: .positive, wide: true))
             .disabled(session.isBusy || username.isEmpty || (session.username == nil && (password.isEmpty || memorablePIN.isEmpty)))
             if session.username == nil {
                 Button("Move saved Zurich connection", systemImage: "key") { session.usePilotConnection() }
@@ -158,7 +158,7 @@ struct ZurichISPSettingsView: View {
         Button("Replace password or PIN") { editsConnection.toggle() }.lfSecondaryAction().disabled(session.isBusy)
         Button("Rename") { credentialName = session.credentialLabel ?? ZurichISPCredentialStore.defaultLabel; editsName.toggle() }
             .lfSecondaryAction().disabled(session.isBusy)
-        Button("Disconnect") { session.disconnect() }.lfSecondaryAction().disabled(session.isBusy)
+        Button("Disconnect") { session.disconnect() }.lfDisconnectAction().disabled(session.isBusy)
     }
 }
 

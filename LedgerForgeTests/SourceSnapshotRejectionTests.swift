@@ -29,6 +29,7 @@ struct SourceSnapshotRejectionTests {
         let attempt = try #require(setup.provider.importSessionRepo.importAttempts(workspaceId: "default-workspace").only)
         assertSnapshotAttempt(attempt, outcome: .sourceSnapshotAcquisitionFailed)
         #expect(coordinator.invocationCount == 0)
+        #expect(SourceContentSnapshotError.acquisitionFailed.localizedDescription == "The selected source document could not be read.")
         #expect(!SourceContentSnapshotError.acquisitionFailed.localizedDescription.contains(privateURL.path))
         let diagnostics = console.entries.flatMap { entry in
             [entry.message] + (entry.metadata?.flatMap { [$0.key, $0.value] } ?? [])
@@ -50,7 +51,7 @@ struct SourceSnapshotRejectionTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         prepared.sourceSnapshot.invalidate()
 
@@ -77,7 +78,7 @@ struct SourceSnapshotRejectionTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         engine.cancelPreparedImport(prepared)
 

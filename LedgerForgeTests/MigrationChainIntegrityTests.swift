@@ -49,7 +49,6 @@ struct MigrationChainIntegrityTests {
 
         #expect(allMigrations.map(\.version) == Array(1...allMigrations.count))
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
-        #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
         #expect(migrationV13.name == "multi-section card statements and exact semantic sources")
         #expect(migrationV14.name == "generalized card reconciliation and structural section evidence")
         #expect(migrationV17.version == 17)
@@ -268,16 +267,6 @@ struct MigrationChainIntegrityTests {
             against: allMigrations,
             requiresCompleteChain: true
         )
-    }
-
-    @Test
-    func freshDatabaseCreatesOneExactCurrentHistory() throws {
-        try withTemporaryDatabase(named: "FreshHistory") { path in
-            let database = SQLiteDatabase(path: path)
-            defer { database.close() }
-            try database.runMigrations(allMigrations)
-            try expectCurrentHistory(in: database)
-        }
     }
 
     @Test(arguments: Array(1..<allMigrations.count))

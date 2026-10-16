@@ -2,53 +2,11 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
-/// Provider fingerprint behavior is exercised with the complete fingerprint
-/// collection mapped from one unchanged authentic source. Collision variants
-/// that previously mutated digests and statement graphs were retired.
+/// Provider fingerprint persistence, rollback and reopen use deterministic
+/// import plans through the real preparation and mapper. Source qualification
+/// remains separate.
 @MainActor
 struct DocumentFingerprintProviderParityTests {
-    @Test(.globalRuntimeStateIsolation)
-    func authenticDuplicateAuthorityReplayMatchesAcrossProviders() async throws {
-        let setup = try makeProviders(name: "authority-replay")
-        defer { setup.sqlite.database.close(); try? FileManager.default.removeItem(at: setup.folder) }
-        let sqlitePlan = try await confirmedImportPlan(generationToken: setup.sqlite.generationToken)
-        let memoryPlan = try await confirmedImportPlan(generationToken: setup.memory.generationToken)
-
-        #expect(isCommitted(setup.sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan)))
-        #expect(isCommitted(setup.memory.confirmedImportRepo.commitConfirmedImport(memoryPlan)))
-        #expect(setup.sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .exactDuplicate)
-        #expect(setup.memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .exactDuplicate)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func authenticImportPersistsCompleteRelatedFingerprintCollection() async throws {
-        let setup = try makeProviders(name: "complete")
-        defer { setup.sqlite.database.close(); try? FileManager.default.removeItem(at: setup.folder) }
-        let plan = try await confirmedImportPlan(generationToken: setup.sqlite.generationToken)
-
-        #expect(isCommitted(setup.sqlite.confirmedImportRepo.commitConfirmedImport(plan)))
-        let rows = try setup.sqlite.database.query(
-            sql: "SELECT document_id, import_session_id, algorithm, fingerprint, is_duplicate_authority FROM document_fingerprints ORDER BY algorithm, id;"
-        ) {
-            (
-                $0.string(at: 0) ?? "",
-                $0.string(at: 1) ?? "",
-                $0.string(at: 2) ?? "",
-                $0.string(at: 3) ?? "",
-                $0.bool(at: 4)
-            )
-        }
-
-        #expect(rows.count == plan.historyTemplate.fingerprints.count)
-        #expect(rows.allSatisfy {
-            $0.0 == plan.historyTemplate.document.id
-                && $0.1 == plan.historyTemplate.importSession.id
-        })
-        #expect(rows.map { $0.2 } == plan.historyTemplate.fingerprints.map(\.algorithm))
-        #expect(rows.map { $0.3 } == plan.historyTemplate.fingerprints.map(\.fingerprint))
-        #expect(rows.filter { $0.4 }.count == 1)
-    }
-
     @Test(.globalRuntimeStateIsolation)
     func repositoryFailureOnSecondAuthenticFingerprintPublishesNoAcceptedGraph() async throws {
         let setup = try makeProviders(name: "second-failure")

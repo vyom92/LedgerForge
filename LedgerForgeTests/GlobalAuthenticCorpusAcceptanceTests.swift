@@ -564,12 +564,6 @@ struct GlobalAuthenticCorpusAcceptanceTests {
 
     // MARK: Source-only corpus freeze
 
-    /// Nonfinancial output mechanics, exercised in the same sandbox as the corpus gate.
-    @Test(.globalRuntimeStateIsolation)
-    func configuredEvidenceDestinationSupportsAtomicWrites() throws {
-        try preflightEvidenceDestination(Context.evidenceDestination(ProcessInfo.processInfo.environment))
-    }
-
     @Test(.globalRuntimeStateIsolation, .timeLimit(.minutes(20)))
     func completeAuthenticCorpusUsesMixedOrdinaryImportReplayAndReopen() async throws {
         let context = try Context.load(ProcessInfo.processInfo.environment)

@@ -993,7 +993,7 @@ struct ImportCentreCoordinatorTests {
         let owner = UUID()
         coordinator.attachPresentationOwner(owner)
         defer { coordinator.detachPresentationOwner(owner) }
-        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
+        let sourceURL = try MechanicsTestSupport.axisBankCSV()
 
         #expect(coordinator.selectSource(sourceURL))
         try await waitUntilAuthentic(timeoutIterations: 2_000) {
@@ -1040,7 +1040,7 @@ struct ImportCentreCoordinatorTests {
         coordinator.attachPresentationOwner(owner)
         defer { coordinator.detachPresentationOwner(owner) }
 
-        #expect(coordinator.selectSource(try AuthenticSourceTestSupport.axisBankCSV()))
+        #expect(coordinator.selectSource(try MechanicsTestSupport.axisBankCSV()))
         try await waitUntilAuthentic(timeoutIterations: 2_000) {
             coordinator.currentItem?.phase == .awaitingConfirmation
         }

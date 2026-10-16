@@ -270,17 +270,17 @@ struct TransactionTagTests {
 #endif
 
     @Test(.globalRuntimeStateIsolation)
-    func authenticMembershipBatchFilteringAndDeletionHaveProviderParityWithoutFinancialChanges() async throws {
-        try await withAuthenticTagProviders { provider, sqlite in
+    func membershipBatchFilteringAndDeletionHaveProviderParityWithoutFinancialChanges() async throws {
+        try await withImportedTagProviders { provider, sqlite in
             let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
             guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
-                Issue.record("The registered authentic source must commit before tag membership is exercised.")
+                Issue.record("The synthetic source must commit before tag membership is exercised.")
                 return
             }
             let workspace = plan.workspace.id
             let factsBefore = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
             let selected = Set(factsBefore.prefix(2).map(\.id))
-            #expect(selected.count == 2, "This membership check requires two genuine imported transactions.")
+            #expect(selected.count == 2, "This membership check requires two fixture transactions.")
             guard selected.count == 2, let firstID = selected.sorted().first else { return }
             let categoriesBefore = try provider.categoryRepo.assignments(workspaceId: workspace)
             let automationBefore = try provider.categoryRepo.automationSnapshot(workspaceId: workspace)
@@ -356,17 +356,17 @@ struct TransactionTagTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func authenticTagFiltersComposeWithSearchCategoryAndHistoricalAccounts() async throws {
-        try await withAuthenticTagProviders { provider, _ in
+    func tagFiltersComposeWithSearchCategoryAndHistoricalAccounts() async throws {
+        try await withImportedTagProviders { provider, _ in
             let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
             guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
-                Issue.record("The registered authentic source must commit before tag filtering is exercised.")
+                Issue.record("The synthetic source must commit before tag filtering is exercised.")
                 return
             }
             let workspace = plan.workspace.id
             let facts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)
             guard facts.count >= 3 else {
-                Issue.record("Tag filtering requires at least three genuine imported transactions.")
+                Issue.record("Tag filtering requires at least three fixture transactions.")
                 return
             }
             let selected = Set(facts.prefix(2).map(\.id))
@@ -466,13 +466,13 @@ struct TransactionTagTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func authenticTagsSurviveCanonicalHydrationNativeBackupRestoreAndReopen() async throws {
+    func tagsSurviveCanonicalHydrationNativeBackupRestoreAndReopen() async throws {
         try await withAsyncTagDatabase { folder, path in
             let sqlite = try SQLiteRepositoryProvider(path: path)
             defer { sqlite.database.close() }
             let plan = try await confirmedImportPlan(generationToken: sqlite.generationToken)
             guard case .committed = sqlite.confirmedImportRepo.commitConfirmedImport(plan) else {
-                Issue.record("The registered authentic source must commit before tag recovery is exercised.")
+                Issue.record("The synthetic source must commit before tag recovery is exercised.")
                 return
             }
             let workspace = plan.workspace.id
@@ -570,7 +570,7 @@ private func withTagProviders(_ body: (DatabaseProvider, SQLiteRepositoryProvide
 }
 
 @MainActor
-private func withAuthenticTagProviders(_ body: (DatabaseProvider, SQLiteRepositoryProvider?) async throws -> Void) async throws {
+private func withImportedTagProviders(_ body: (DatabaseProvider, SQLiteRepositoryProvider?) async throws -> Void) async throws {
     try await body(DatabaseProvider(inMemory: true), nil)
     try await withAsyncTagDatabase { _, path in
         let sqlite = try SQLiteRepositoryProvider(path: path)

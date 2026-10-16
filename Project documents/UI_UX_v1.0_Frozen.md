@@ -2,6 +2,10 @@
 
 The frozen hierarchy remains the shared interface architecture. [R1 README](UI%20Assets/LF-UI-2026-09-R1/README.md) is the canonical package map for approved written design and its supporting/draft distinctions. [PROJECT_STATE](PROJECT_STATE.md) owns accepted behavior and WIP; [SCOPE_DECISIONS](SCOPE_DECISIONS.md) owns product decisions/rejections. Design approval is not native implementation or financial acceptance.
 
+## Current wide-window implementation alignment — 16 October 2026
+
+The owner-selected seven-page campaign is accepted for the isolated candidate and selected for v1.2 release. The [October outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-ui-release) records the implemented delta to inherited R1: wider split workspaces and independent inspectors, consistent readable actions, full icon/label/padded-row disclosure targets, simplified view wording, and the specifically approved retained-draft and custom-date behavior. This alignment governs the changed surfaces; untouched inherited requirements and exact financial/source qualifications remain. It does not claim comprehensive physical pointer, keyboard, live integration or restore coverage.
+
 ## Screen and shared-authority routing
 
 Order inherits [Guide rule H](Project_Guide.md#documentation-order): revision, then natural SC number/suffix. Detailed screen requirements have one written owner; untouched inherited behavior remains explicit.

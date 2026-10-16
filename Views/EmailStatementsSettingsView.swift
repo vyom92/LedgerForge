@@ -56,7 +56,9 @@ struct EmailStatementsSettingsView: View {
                 HStack {
                     Spacer()
                     Button("Cancel") { editingSender = false }.keyboardShortcut(.cancelAction)
+                        .lfSecondaryAction()
                     Button("Save", action: saveSender).keyboardShortcut(.defaultAction)
+                        .lfPrimaryAction()
                 }
             }
             .padding(theme.spacing.pagePadding).frame(width: 440)
@@ -126,12 +128,12 @@ struct EmailStatementsSettingsView: View {
                 Button("Select existing OAuth client…") { selectingClient = true }.lfSecondaryAction()
             } else if session.needsAuthorization {
                 Button("Reconnect in browser…") { session.connect(reauthorize: true) }
-                    .lfSecondaryAction().disabled(session.isChecking)
+                    .lfConnectAction().disabled(session.isChecking)
             } else {
                 Button(session.isConnected ? "Check connection" : "Use saved connection", systemImage: "link") {
                     session.connect()
                 }
-                .lfSecondaryAction().disabled(session.isChecking)
+                .buttonStyle(LFActionButtonStyle(kind: session.isConnected ? .secondary : .positive)).disabled(session.isChecking)
             }
         }
     }
@@ -289,20 +291,20 @@ struct EmailInboxQueueView: View {
                 Text(session.isReconciled
                      ? "\(session.sources.count) retained · \(session.batchSources.count) awaiting import"
                      : (session.reconciliationError == nil ? "Checking imported originals…" : "Import check unavailable"))
-                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             }
             if let error = session.reconciliationError {
-                Text(error).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                Text(error).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 Button("Retry import check") { Task { await session.reloadInbox() } }.lfSecondaryAction()
             }
             List(selection: $session.selectedSourceID) {
                 ForEach(session.sources) { source in
                     VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                        Text(source.displayName).font(theme.typography.secondary).lineLimit(2)
+                        Text(source.displayName).font(theme.typography.formBody.weight(.medium)).lineLimit(2)
                         Text("\(source.family.displayName) · \(session.status(for: source))")
-                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                         Text("Received \(AppDateDisplay.timestamp(Date(timeIntervalSince1970: Double(source.receivedMilliseconds) / 1_000)))")
-                            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, theme.spacing.small)

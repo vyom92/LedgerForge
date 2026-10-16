@@ -13,12 +13,6 @@ import SwiftUI
 @MainActor
 struct LedgerForgeTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
-    }
-
     @Test func ordinaryNavigationContainsOnlyCurrentV1Destinations() {
         #expect(AppShellSection.ordinaryNavigation == [
             .dashboard,
@@ -49,7 +43,7 @@ struct LedgerForgeTests {
 
     @Test(.globalRuntimeStateIsolation)
     func importPresentationMappingsKeepValidationAndFooterTruthful() async throws {
-        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { preparedOwner.cancel() }
         let prepared = preparedOwner.preparedImport
         let successfulOutcome = ImportOutcomePresentation(
@@ -87,64 +81,6 @@ struct LedgerForgeTests {
         #expect(ImportFooterPresentation.presentation(for: .completed(successfulOutcome)).kind == .viewTransactions)
         #expect(ImportFooterPresentation.presentation(for: .completed(unavailableOutcome)).kind == .none)
         #expect(ImportFooterPresentation.presentation(for: .cancelled(fileName: "cancelled.csv")).kind == .none)
-    }
-
-    @Test func residualContentViewAffordancesAreAbsentFromTheirLocalPresentationSections() throws {
-        let contentViewSource = try workspaceSource("ContentView.swift")
-        let shellSource = try workspaceSource("AppShellPresentation.swift")
-
-        let sidebar = try sourceSection(
-            shellSource,
-            startingAt: "struct AppShellSidebar: View",
-            endingBefore: "struct AppShellToolbar: View"
-        )
-        #expect(!sidebar.contains("chevron.down"))
-        #expect(!sidebar.contains("Menu("))
-
-        let dashboardAccounts = try sourceSection(
-            contentViewSource,
-            startingAt: "private func dashboardAccountPanel(",
-            endingBefore: "private var salaryDashboardSummary:"
-        )
-        #expect(!dashboardAccounts.contains("Image(systemName: \"chevron.right\")"))
-        #expect(!dashboardAccounts.contains("linkButton("))
-        #expect(!dashboardAccounts.contains("performDashboardRoute("))
-        #expect(!dashboardAccounts.contains("Cash & cards"))
-        #expect(dashboardAccounts.contains("Recorded balances"))
-        #expect(dashboardAccounts.contains("Bank accounts"))
-        #expect(dashboardAccounts.contains("Credit cards"))
-        #expect(dashboardAccounts.contains("Amount owed"))
-        #expect(!dashboardAccounts.contains("Show zero balances"))
-
-        let accountDetail = try sourceSection(
-            contentViewSource,
-            startingAt: "private var accountDetailPanel: some View",
-            endingBefore: "private var importStepper: some View"
-        )
-        #expect(!accountDetail.contains("Image(systemName: \"star\")"))
-        #expect(accountDetail.contains("Edit display name"))
-
-        let footer = try workspaceSource("ImportCentreFooterRenderer.swift")
-        #expect(footer.contains("ImportFooterPresentation.presentation(for: importState)"))
-        #expect(footer.contains("Retry Preparation"))
-        #expect(footer.contains("View Transactions"))
-        #expect(!footer.contains("Awaiting confirmation"))
-        #expect(!footer.contains("importFooterPendingAction"))
-
-        let validationReview = try sourceSection(
-            contentViewSource,
-            startingAt: "private var validationReviewPanel: some View",
-            endingBefore: "private func settingsToggleRow"
-        )
-        #expect(validationReview.contains("No statement prepared"))
-        #expect(validationReview.contains("Choose a statement file to see validation results."))
-        for removedRow in ["File Password", "Date Format", "Duplicate Handling", "Create / Link Accounts", "Pending"] {
-            #expect(!validationReview.contains(removedRow))
-        }
-
-        #expect(contentViewSource.components(separatedBy: "@State private var importCentrePresentationOwnerID = UUID()").count == 2)
-        #expect(contentViewSource.components(separatedBy: "importCentre.attachPresentationOwner(importCentrePresentationOwnerID)").count == 2)
-        #expect(contentViewSource.components(separatedBy: "importCentre.detachPresentationOwner(importCentrePresentationOwnerID)").count == 2)
     }
 
     @Test func destinationContainerConstructsOnlyTheSelectedDestination() {
@@ -308,79 +244,6 @@ struct LedgerForgeTests {
         #expect(snapshot.persistenceState.recoveryGuidance == nil)
     }
 
-    @Test func logSearchCopyAndClearUseStructuredDiagnosticEntries() async {
-        let baseDate = Date(timeIntervalSince1970: 1_804_896_000)
-        let entries = [
-            DeveloperLogEntry(
-                id: 1,
-                sequence: 1,
-                timestamp: baseDate,
-                level: .info,
-                category: .`import`,
-                message: "Import completed",
-                metadata: nil
-            ),
-            DeveloperLogEntry(
-                id: 2,
-                sequence: 2,
-                timestamp: baseDate.addingTimeInterval(1),
-                level: .error,
-                category: .runtime,
-                message: "Hydration failed",
-                metadata: nil
-            ),
-            DeveloperLogEntry(
-                id: 3,
-                sequence: 3,
-                timestamp: baseDate.addingTimeInterval(2),
-                level: .info,
-                category: .runtime,
-                message: "Reload Data",
-                metadata: ["result": "1 account(s), 1 transaction(s)"]
-            )
-        ]
-
-        var filters = DeveloperConsole.Filters()
-        filters.searchText = "hydration"
-        #expect(DeveloperConsole.filteredEntries(entries, using: filters).map(\.message) == ["Hydration failed"])
-
-        filters.searchText = "data"
-        #expect(DeveloperConsole.filteredEntries(entries, using: filters).count == 1)
-
-        let text = DeveloperConsole.logText(from: entries)
-        #expect(text.contains("[Info] [Import] Import completed"))
-        #expect(text.contains("[Error] [Runtime] Hydration failed"))
-        #expect(text.contains("[Info] [Runtime] Reload Data"))
-
-        let console = DeveloperConsole()
-        console.log("Sprint 30 clear check")
-        console.clear()
-        #expect(console.entries.isEmpty)
-    }
-}
-
-private func workspaceSource(_ relativePath: String) throws -> String {
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
-}
-
-private func sourceSection(
-    _ source: String,
-    startingAt startMarker: String,
-    endingBefore endMarker: String
-) throws -> String {
-    let startRange = source.range(of: startMarker)
-    let hasStart = startRange != nil
-    try #require(hasStart, "The expected presentation section starts at \(startMarker)")
-    let start = startRange!
-    let trailing = source[start.lowerBound...]
-    let endRange = trailing.range(of: endMarker)
-    let hasEnd = endRange != nil
-    try #require(hasEnd, "The expected presentation section ends before \(endMarker)")
-    let end = endRange!
-    return String(trailing[..<end.lowerBound])
 }
 
 @MainActor

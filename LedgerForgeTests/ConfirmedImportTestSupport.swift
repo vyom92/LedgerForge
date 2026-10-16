@@ -1,18 +1,33 @@
-// Shared authentic-source plan support for confirmed-import contract tests.
+// Shared plan support for confirmed-import mechanics and explicit source integration.
 
 import Foundation
 @testable import LedgerForge
 
-/// Produces a repository plan exclusively from an unchanged registered
-/// authentic source through ordinary preparation and the production mapper.
-/// This helper does not author or mutate source bytes, financial facts,
-/// identifiers, transactions, provenance, or statement controls.
+/// Uses a small deterministic source through the real preparation and mapper.
+/// The separate authentic entry point is reserved for source-oracle integration.
 @MainActor
 func confirmedImportPlan(
     generationToken: ProviderGenerationToken,
     alternatePeriod: Bool = false,
     accountChoice: ConfirmedImportAccountChoiceDTO = .createProposedAccount,
     selectedAccountID: String? = nil
+) async throws -> ConfirmedImportPlanDTO {
+    try await mappedImportPlan(
+        source: MechanicsTestSupport.axisBankCSV(alternatePeriod: alternatePeriod),
+        generationToken: generationToken, accountChoice: accountChoice, selectedAccountID: selectedAccountID
+    )
+}
+
+@MainActor
+func authenticConfirmedImportPlan(generationToken: ProviderGenerationToken) async throws -> ConfirmedImportPlanDTO {
+    try await mappedImportPlan(source: AuthenticSourceTestSupport.axisBankCSV(),
+        generationToken: generationToken, accountChoice: .createProposedAccount, selectedAccountID: nil)
+}
+
+@MainActor
+private func mappedImportPlan(
+    source: URL, generationToken: ProviderGenerationToken,
+    accountChoice: ConfirmedImportAccountChoiceDTO, selectedAccountID: String?
 ) async throws -> ConfirmedImportPlanDTO {
     let preparationProvider = DatabaseProvider(inMemory: true)
     let engine = ImportEngine(
@@ -21,7 +36,7 @@ func confirmedImportPlan(
         providerGenerationProvider: { generationToken }
     )
     let prepared = try await engine.prepareImport(
-        from: AuthenticSourceTestSupport.axisBankCSV(alternatePeriod: alternatePeriod)
+        from: source
     )
     defer { engine.cancelPreparedImport(prepared) }
     let accountID = selectedAccountID

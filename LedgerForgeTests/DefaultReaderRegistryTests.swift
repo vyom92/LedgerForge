@@ -7,15 +7,6 @@ import Testing
 @MainActor
 struct DefaultReaderRegistryTests {
 
-    @Test func registryResolvesCSVReaderAdapter() async throws {
-        let registry = DefaultReaderRegistry()
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/generic.csv"))
-
-        let reader = await registry.reader(for: request)
-
-        #expect(reader is CSVDocumentReaderAdapter)
-    }
-
     @Test func registryResolvesPDFDocumentReader() async throws {
         let registry = DefaultReaderRegistry()
         let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
@@ -45,6 +36,8 @@ struct DefaultReaderRegistryTests {
         let fixtureURL = try genericCSVFixtureURL()
         defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let request = ImportRequest(fileURL: fixtureURL)
+        let reader = await registry.reader(for: request)
+        #expect(reader is CSVDocumentReaderAdapter)
 
         let result = await coordinator.importDocument(request)
 

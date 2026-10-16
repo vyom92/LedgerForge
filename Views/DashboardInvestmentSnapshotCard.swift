@@ -63,7 +63,7 @@ struct DashboardInvestmentSnapshotCard: View {
 
     private func basisButton(now: Date) -> some View {
         Button("Details") { selectedRow = nil; showsBasis = true }
-            .buttonStyle(.link)
+            .lfSecondaryAction()
             .font(theme.typography.secondary)
             .accessibilityIdentifier("dashboard.investmentBasis")
             .popover(isPresented: $showsBasis) {
@@ -73,7 +73,8 @@ struct DashboardInvestmentSnapshotCard: View {
                             Text("Investment details").font(theme.typography.rowTitle)
                             Spacer()
                             Button("Close details", systemImage: "xmark") { showsBasis = false }
-                                .labelStyle(.iconOnly).buttonStyle(.borderless)
+                                .labelStyle(.iconOnly).lfSecondaryAction()
+                                .keyboardShortcut(.cancelAction)
                         }
                         Text("Allocation follows your net-worth inclusion choices. Performance and quote coverage summarize all investment holdings.")
                             .font(theme.typography.secondary)
@@ -83,7 +84,7 @@ struct DashboardInvestmentSnapshotCard: View {
                         if !scope.fxDates.isEmpty {
                             Text(fxAgeText(now: now)).font(theme.typography.secondary)
                         }
-                        Text("Source ownership and valuation dates remain unchanged by an FX refresh. Open a portfolio row for individual holdings and source dates.")
+                        Text("Refreshing exchange rates does not change holding or price dates. Open a portfolio row to see its holdings and source dates.")
                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }.padding(theme.spacing.panelPadding)
                 }.frame(width: 520, height: 380)
@@ -207,19 +208,20 @@ struct DashboardInvestmentSnapshotCard: View {
                 Text("No prices available.")
                     .foregroundStyle(theme.palette.secondaryText)
             } else {
-                Text(backgroundUpdates.observationStatus(identities: Set(scope.quotes.map(\.mapping.identity))))
+                let status = backgroundUpdates.observationStatus(identities: Set(scope.quotes.map(\.mapping.identity)))
+                if status != "Cached observation" { Text(status) }
                 Label(
                     "\(scope.priceCount)/\(scope.holdingCount) prices available · \(quoteAgeText(now: now))",
                     systemImage: "clock"
                 )
-                .foregroundStyle(freshnessColor(scope.quotes.map { $0.freshnessAge(at: now) }.max() ?? 0))
+                .foregroundStyle(FreshnessTint.publicationColor(scope.missedPricePublicationWindows(at: now), unknown: theme.palette.secondaryText))
             }
             if scope.fxMissing {
                 Label("Currency conversion unavailable for some totals", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(theme.palette.secondaryText)
             }
         }
-        .font(theme.typography.caption)
+        .font(theme.typography.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -240,7 +242,7 @@ struct DashboardInvestmentSnapshotCard: View {
     }
 
     private func quoteAgeText(now: Date) -> String {
-        ageText(quoteAge(now: now), noun: "oldest price date")
+        scope.oldestPriceDay.map { "oldest price date \(InvestmentPriceDates.display($0))" } ?? "price date unavailable"
     }
 
     private func fxAgeText(now: Date) -> String {

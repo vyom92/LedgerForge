@@ -19,6 +19,7 @@ private enum RuleAction {
 /// set is frozen when this sheet opens, so its counts and detail rows agree.
 struct CategoryRulesView: View {
     @Environment(\.lfTheme) private var theme
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var categories = CategoryStore.shared
     @ObservedObject private var accounts = AccountStore.shared
@@ -37,7 +38,8 @@ struct CategoryRulesView: View {
     @State private var showCategoryManagement = false
     @State private var newCategoryName = ""
     @State private var draftOwner = CategoryRuleDraftOwner()
-    @State private var confirmClose = false
+    private enum EditorNavigation { case close, newRule, rule(String) }
+    @State private var pendingNavigation: EditorNavigation?
     @State private var pendingDeletion: CategoryRule?
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
@@ -59,7 +61,8 @@ struct CategoryRulesView: View {
                         .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                 }
                 Spacer()
-                Button("Done") { if draftOwner.isDirty { confirmClose = true } else { dismiss() } }
+                Button("Done") { requestNavigation(.close) }
+                    .lfSecondaryAction()
                     .keyboardShortcut(.cancelAction)
                     .disabled(isApplying)
             }
@@ -74,13 +77,14 @@ struct CategoryRulesView: View {
                 .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             HStack(spacing: 12) {
                 Button("Preview rules on \(transactions.count) existing transactions", action: makePreview)
+                    .lfSecondaryAction()
                     .accessibilityIdentifier("categoryRules.previewHistory")
                     .disabled(isPreviewing || isApplying || categories.snapshot.automation == nil || transactions.isEmpty)
                 if isPreviewing || isApplying { ProgressView().controlSize(.small) }
                 Spacer()
                 if let preview {
                     Button("Apply reviewed results") { request(.transactionCategoryAssignment, action: applyPreview) }
-                        .buttonStyle(.borderedProminent)
+                        .lfPrimaryAction()
                         .accessibilityIdentifier("categoryRules.applyHistory")
                         .disabled(preview.receipt.changedIDs.isEmpty || isPreviewing || isApplying)
                 }
@@ -102,7 +106,7 @@ struct CategoryRulesView: View {
                 HStack {
                     Text(status).font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                     if !(categories.snapshot.automation?.pendingIDs.isEmpty ?? true) {
-                        Button("Retry rules") { session.retry() }.disabled(session.isWorking)
+                        Button("Retry rules") { session.retry() }.lfSecondaryAction().disabled(session.isWorking)
                     }
                 }
             }
@@ -111,6 +115,7 @@ struct CategoryRulesView: View {
         .frame(minWidth: 850, idealWidth: 1120, maxWidth: .infinity, minHeight: 590, idealHeight: 760, maxHeight: .infinity)
         .foregroundStyle(theme.palette.primaryText)
         .background(theme.palette.contentSurface)
+        .interactiveDismissDisabled(isApplying || draft != baseline)
         .onAppear {
             generation = categories.snapshot.providerGeneration
             resetEditor()
@@ -138,13 +143,15 @@ struct CategoryRulesView: View {
         }
         .sheet(isPresented: $showCategoryManagement) {
             VStack(alignment: .trailing) {
-                Button("Done") { showCategoryManagement = false }.keyboardShortcut(.cancelAction)
+                Button("Done") { showCategoryManagement = false }.lfSecondaryAction().keyboardShortcut(.cancelAction)
                 ScrollView { CategoryManagementView() }
             }.padding(20).frame(minWidth: 540, minHeight: 430)
         }
-        .confirmationDialog("Discard the unsaved rule?", isPresented: $confirmClose, titleVisibility: .visible) {
-            Button("Discard", role: .destructive) { dismiss() }
-            Button("Keep editing", role: .cancel) {}
+        .confirmationDialog("Discard the unsaved rule?", isPresented: Binding(
+            get: { pendingNavigation != nil }, set: { if !$0 { pendingNavigation = nil } }),
+            titleVisibility: .visible, presenting: pendingNavigation) { navigation in
+            Button("Discard", role: .destructive) { pendingNavigation = nil; navigate(navigation) }
+            Button("Keep editing", role: .cancel) { pendingNavigation = nil }
         }
         .confirmationDialog("Delete this rule?", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }), titleVisibility: .visible) {
             Button("Delete rule", role: .destructive) {
@@ -174,11 +181,16 @@ struct CategoryRulesView: View {
 
     private var ruleList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { Text("Saved rules").font(theme.typography.formHeading); Spacer(); Button { resetEditor() } label: { Image(systemName: "plus") }.help("New category rule") }
+            HStack {
+                Text("Saved rules").font(theme.typography.formHeading)
+                Spacer()
+                Button { requestNavigation(.newRule) } label: { Label("New rule", systemImage: "plus") }
+                    .lfSecondaryAction().help("New category rule")
+            }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(categories.snapshot.rulesForDisplay) { rule in
-                        Button { load(rule) } label: {
+                        Button { requestNavigation(.rule(rule.id)) } label: {
                             HStack(alignment: .top) {
                                 Image(systemName: rule.isEnabled ? "checkmark.circle.fill" : "pause.circle")
                                 VStack(alignment: .leading, spacing: 4) {
@@ -192,8 +204,10 @@ struct CategoryRulesView: View {
                                 }
                                 Spacer()
                             }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(draft.id == rule.id ? theme.palette.dataSelection : Color.clear)
-                        }.buttonStyle(.plain)
+                                .background(theme.interaction.dataRow(selected: draft.id == rule.id, active: appearsActive))
+                                .contentShape(Rectangle())
+                        }.buttonStyle(LFPlainActionStyle())
+                            .accessibilityAddTraits(draft.id == rule.id ? .isSelected : [])
                         Divider()
                     }
                     if categories.snapshot.rulesForDisplay.isEmpty {
@@ -202,7 +216,7 @@ struct CategoryRulesView: View {
                     }
                 }
             }
-            Button("Manage categories") { showCategoryManagement = true }
+            Button("Manage categories") { showCategoryManagement = true }.lfSecondaryAction()
         }.padding(.trailing, 14)
     }
 
@@ -214,10 +228,11 @@ struct CategoryRulesView: View {
                 Text("Choose a category").tag("")
                 ForEach(categories.activeCategories) { Text($0.name).tag($0.id) }
             }
+            .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
             if categories.activeCategories.isEmpty {
                 HStack {
                     TextField("New category", text: $newCategoryName).textFieldStyle(.roundedBorder)
-                    Button("Create") { request(.categoryCreate) { perform { _ = try CategoryManagementCoordinator().create(name: newCategoryName); newCategoryName = "" } } }
+                    Button("Create") { request(.categoryCreate) { perform { _ = try CategoryManagementCoordinator().create(name: newCategoryName); newCategoryName = "" } } }.lfSecondaryAction()
                 }
             }
             LFAccountPicker(label: "Account", placeholder: "Any account",
@@ -230,11 +245,13 @@ struct CategoryRulesView: View {
                     Text("Any").tag(String?.none)
                     ForEach(Array(Set(transactions.map(\.currency))).sorted(), id: \.self) { Text($0).tag(Optional($0)) }
                 }
+                .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
                 Picker("Direction", selection: $draft.direction) {
                     Text("Any").tag(String?.none)
                     Text("Bank debit").tag(Optional("debit")); Text("Bank credit").tag(Optional("credit"))
                     Text("Card charge").tag(Optional("card_increase_owed")); Text("Card credit").tag(Optional("card_decrease_owed"))
                 }
+                .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
             }
             if categories.snapshot.automation?.supportsSpendingIntent == true {
                 VStack(alignment: .leading, spacing: 5) {
@@ -255,6 +272,7 @@ struct CategoryRulesView: View {
                         Text("Reference").tag(CategoryTextPredicate.Field.reference)
                             .disabled(draft.predicates[index].match == .doesNotContain)
                     }.labelsHidden().frame(width: 120)
+                        .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
                     Picker("Match", selection: $draft.predicates[index].match) {
                         Text("Contains").tag(CategoryTextPredicate.Match.contains); Text("Is exactly").tag(CategoryTextPredicate.Match.exact)
                         if categories.snapshot.automation?.supportsSpendingIntent == true {
@@ -262,17 +280,21 @@ struct CategoryRulesView: View {
                                 .disabled(draft.predicates[index].field != .narration)
                         }
                     }.labelsHidden().frame(minWidth: 108, idealWidth: 150)
+                        .pickerStyle(.menu).tint(theme.palette.primaryText).font(theme.typography.button)
                     TextField("Source text", text: $draft.predicates[index].text).textFieldStyle(.roundedBorder)
                     Button { draft.predicates.remove(at: index) } label: { Image(systemName: "minus.circle") }
+                        .lfIconAction().accessibilityLabel("Remove condition")
                         .disabled(draft.predicates.count == 1).help("Remove condition")
                 }
             }
-            Button("Add condition") { draft.predicates.append(.init(field: .narration, match: .contains, text: "")) }.disabled(draft.predicates.count >= 12)
+            Button { draft.predicates.append(.init(field: .narration, match: .contains, text: "")) } label: {
+                Label("Add condition", systemImage: "plus")
+            }.lfSecondaryAction().disabled(draft.predicates.count >= 12)
             Text("All conditions must match, including exclusions. Keep a positive narration or reference condition. Saving changes future imports; preview before applying to history.")
                 .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             HStack {
-                Button("Save rule") { request(.categoryCreate, action: saveRule) }.buttonStyle(.borderedProminent)
-                if previousVersion != nil { Button("Delete rule", role: .destructive) { pendingDeletion = categories.snapshot.rulesForDisplay.first { $0.id == draft.id } } }
+                Button("Save rule") { request(.categoryCreate, action: saveRule) }.lfPrimaryAction()
+                if previousVersion != nil { Button("Delete rule", role: .destructive) { pendingDeletion = categories.snapshot.rulesForDisplay.first { $0.id == draft.id } }.lfSecondaryAction() }
                 Spacer()
             }
         }
@@ -329,6 +351,30 @@ struct CategoryRulesView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func requestNavigation(_ navigation: EditorNavigation) {
+        guard !isApplying else { return }
+        if case .rule(let id) = navigation, id == draft.id { return }
+        if draft != baseline { pendingNavigation = navigation }
+        else { navigate(navigation) }
+    }
+
+    private func navigate(_ navigation: EditorNavigation) {
+        switch navigation {
+        case .close: dismiss()
+        case .newRule: resetEditor()
+        case .rule(let id):
+            guard categories.snapshot.providerGeneration == generation else {
+                message = "The ledger changed. Close this editor and reopen it before saving."
+                return
+            }
+            guard let rule = categories.snapshot.rulesForDisplay.first(where: { $0.id == id }) else {
+                message = "That rule is no longer available. Your current entries are unchanged."
+                return
+            }
+            load(rule)
         }
     }
 

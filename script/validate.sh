@@ -6,6 +6,7 @@ readonly PROJECT_PATH="$ROOT_DIR/LedgerForge.xcodeproj"
 readonly SCHEME="LedgerForge"
 readonly DESTINATION="platform=macOS"
 readonly TEST_PLAN="TestPlan"
+readonly TEST_HOST_SUFFIX=".TestRun"
 
 ARTIFACT_ROOT=""
 DERIVED_DATA=""
@@ -207,7 +208,7 @@ merge_test_environment_into_xctestrun() {
     /bin/mv "$configured_xctestrun" "$XCTESTRUN_PATH" || fail "unable to install the configured xctestrun" 70
 }
 
-run_test_with_external_environment() {
+run_prepared_test() {
     local operation="$1"
     shift
     local status
@@ -218,12 +219,26 @@ run_test_with_external_environment() {
         -destination "$DESTINATION" \
         -derivedDataPath "$DERIVED_DATA" \
         -testPlan "$TEST_PLAN" \
+        "LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX=$TEST_HOST_SUFFIX" \
         build-for-testing
     status=$?
     [[ "$status" -eq 0 ]] || return "$status"
 
     derive_generated_xctestrun
-    merge_test_environment_into_xctestrun
+    if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
+        merge_test_environment_into_xctestrun
+    fi
+    if [[ "$operation" == "test-focused" ]]; then
+        # Explicit selectors may request an integration excluded by the ordinary
+        # plan. Remove only generated skip lists; preserve all other plan options.
+        /usr/bin/plutil -convert json -o - "$XCTESTRUN_PATH" \
+            | /usr/bin/jq '.TestConfigurations[].TestTargets[] |= del(.SkipTestIdentifiers, .SkipTestingIdentifiers)' \
+            | /usr/bin/plutil -convert xml1 -o "$ARTIFACT_ROOT/focused.xctestrun" - \
+            || fail "unable to configure focused test selection" 65
+        # __TESTROOT__ resolves relative to this file; retain its Products path.
+        /bin/mv "$ARTIFACT_ROOT/focused.xctestrun" "$XCTESTRUN_PATH" \
+            || fail "unable to install focused test selection" 70
+    fi
 
     run_xcodebuild "$operation" \
         -xctestrun "$XCTESTRUN_PATH" \
@@ -235,19 +250,39 @@ run_test_with_external_environment() {
 
 verify_result_contains_tests() {
     local operation="$1"
+    shift
     local summary
     local test_count
+    local selector
 
     summary="$(/usr/bin/xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact)" || {
         printf 'validate.sh: %s completed without a readable test result summary\n' "$operation" >&2
         return 65
     }
-    test_count="$(printf '%s' "$summary" | /usr/bin/sed -n 's/.*"totalTestCount"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
+    # totalTestCount also includes skipped definitions. A green empty/skip-only
+    # run is not evidence that the requested checks executed.
+    test_count="$(printf '%s' "$summary" | /usr/bin/jq -r '.passedTests // 0')"
     if [[ ! "$test_count" =~ ^[0-9]+$ || "$test_count" -eq 0 ]]; then
-        printf 'validate.sh: %s produced zero executed tests\n' "$operation" >&2
+        printf 'validate.sh: %s produced zero passing executed tests\n' "$operation" >&2
         return 65
     fi
-    printf 'Recorded executed tests: %s\n' "$test_count"
+    printf 'Recorded passing test definitions: %s\n' "$test_count"
+    [[ "$#" -gt 0 ]] || return 0
+
+    /usr/bin/xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE" --compact \
+        > "$ARTIFACT_ROOT/ExecutedTests.json" || return 65
+    for selector in "$@"; do
+        if ! /usr/bin/jq -e --arg selector "$selector" '
+            def canonical: sub("\\(\\)$"; "");
+            ($selector | canonical) as $requested
+            | [.. | objects | select(.nodeType? == "Test Case" and .result? == "Passed")
+               | .nodeIdentifierURL // "" | split("/") | .[4:] | join("/") | canonical] as $executed
+            | any($executed[]; . == $requested or startswith($requested + "/"))
+        ' "$ARTIFACT_ROOT/ExecutedTests.json" >/dev/null; then
+            printf 'validate.sh: requested selector did not execute: %s\n' "$selector" >&2
+            return 65
+        fi
+    done
 }
 
 run_focused_test() {
@@ -260,22 +295,10 @@ run_focused_test() {
         only_testing_arguments+=("-only-testing:$selector")
     done
 
-    if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
-        run_test_with_external_environment "test-focused" "${only_testing_arguments[@]}"
-    else
-        run_xcodebuild "test-focused" \
-            -project "$PROJECT_PATH" \
-            -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
-            -derivedDataPath "$DERIVED_DATA" \
-            -resultBundlePath "$RESULT_BUNDLE" \
-            -testPlan "$TEST_PLAN" \
-            "${only_testing_arguments[@]}" \
-            test
-    fi
+    run_prepared_test "test-focused" "${only_testing_arguments[@]}"
     status=$?
     [[ "$status" -eq 0 ]] || return "$status"
-    verify_result_contains_tests "test-focused"
+    verify_result_contains_tests "test-focused" "$@"
 }
 
 run_full_test() {
@@ -284,31 +307,71 @@ run_full_test() {
     local selector
     local -a skip_testing_arguments=()
 
-    # Xcode does not consistently apply Swift Testing exclusions from a plan.
-    # Forward the plan's same selection explicitly for both execution paths.
+    # Preserve the plan's exact selection for both XCTest and Swift Testing.
+    # Typed groups distinguish Swift suites/functions from XCTest classes/methods.
     excluded_selectors="$(/usr/bin/jq -r '
-        .testTargets[] | select(.enabled != false)
-        | .target.name as $target
-        | .skippedTests[]?
-        | if startswith($target + "/") then . else $target + "/" + . end
+        def require($condition; $message):
+            if $condition then . else error($message) end;
+        def nonempty_text:
+            if type == "string" then test("\\S") and (test("[\\r\\n]") | not)
+            else false end;
+        def allowed_keys($allowed):
+            require(type == "object"; "test exclusion group must be an object")
+            | require(((keys - $allowed) | length) == 0; "unknown test exclusion key");
+        def children($key):
+            if has($key) then
+                .[$key]
+                | require(type == "array"; "test exclusion children must be an array")
+                | require(length > 0; "empty test exclusion children")
+                | require(all(.[]; type == "object"); "test exclusion child must be an object")
+                | require(([.[].name] | length) == ([.[].name] | unique | length);
+                          "duplicate test exclusion group")
+                | .[]
+            else empty end;
+        def methods($key):
+            if has($key) then
+                .[$key]
+                | require(type == "array"; "test exclusion methods must be an array")
+                | require(length > 0 and all(.[]; nonempty_text); "empty test exclusion method")
+                | .[]
+            else empty end;
+        def group_identifiers($parent; $kind):
+            allowed_keys(if $kind == "suite" then ["name", "suites", "testFunctions"]
+                         else ["name", "xctestMethods"] end)
+            | require(.name | nonempty_text; "test exclusion group needs a name")
+            | require((.name | contains("/")) | not; "test exclusion name contains a path")
+            | ($parent + [.name]) as $path
+            | if keys == ["name"] then $path | join("/")
+              else
+                (methods(if $kind == "suite" then "testFunctions" else "xctestMethods" end)
+                    | ($path + [.]) | join("/")),
+                (children("suites") | group_identifiers($path; "suite"))
+              end;
+        def typed_identifiers:
+            allowed_keys(["suites", "xctestClasses"])
+            | require(length > 0; "empty test exclusion group")
+            | [(children("suites")), (children("xctestClasses"))] as $groups
+            | require(([$groups[].name] | length) == ([$groups[].name] | unique | length);
+                      "ambiguous suite or class exclusion")
+            | (children("suites") | group_identifiers([]; "suite")),
+              (children("xctestClasses") | group_identifiers([]; "class"));
+        [.testTargets[] | select(.enabled != false)
+         | .target.name as $target
+         | require($target | nonempty_text; "test exclusion target needs a name")
+         | .skippedTests
+         | if . == null then empty
+           elif type == "array" then .[] | require(nonempty_text; "invalid legacy test exclusion")
+           elif type == "object" then typed_identifiers
+           else error("unsupported test exclusion format") end
+         | if startswith($target + "/") then . else $target + "/" + . end]
+        | require(length == (unique | length); "duplicate test exclusion selector")
+        | .[]
     ' "$ROOT_DIR/$TEST_PLAN.xctestplan")" || fail "unable to read the test plan exclusions" 65
     while IFS= read -r selector; do
         [[ -n "$selector" ]] && skip_testing_arguments+=("-skip-testing:$selector")
     done <<< "$excluded_selectors"
 
-    if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
-        run_test_with_external_environment "test-full" "${skip_testing_arguments[@]}"
-    else
-        run_xcodebuild "test-full" \
-            -project "$PROJECT_PATH" \
-            -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
-            -derivedDataPath "$DERIVED_DATA" \
-            -resultBundlePath "$RESULT_BUNDLE" \
-            -testPlan "$TEST_PLAN" \
-            "${skip_testing_arguments[@]}" \
-            test
-    fi
+    run_prepared_test "test-full" "${skip_testing_arguments[@]}"
     status=$?
     [[ "$status" -eq 0 ]] || return "$status"
     verify_result_contains_tests "test-full"

@@ -26,116 +26,10 @@ struct GmailAuthenticAcceptanceTests {
         var expectedHoldLayout: String? = nil
         var relationshipBalanceObservations: [(ordinal: Int, date: String, balance: Decimal, zeroActivity: Bool)] = []
     }
-    /// A final namespace starts with the exact inbox state and original bytes
-    /// from a verified backup. Its new revision is local compare-and-swap
-    /// bookkeeping; collection provenance itself is not reconstructed here.
-    private struct CohortInboxSeed {
-        let state: GmailInboxState
-        let originals: [String: Data]
-    }
     private enum CampaignError: Error { case missingEnvironment, unsupportedSelection, sourceUnavailable, commitFailed, sourceMismatch, cohortDeadlineExceeded }
     private struct CASSourceObservation: Encodable {
         let sha256: String
         let pages: [String]
-    }
-
-    /// Diagnostic transport only: source/parsed text goes to an owner-selected
-    /// RAM FIFO, never XCTest logging, an oracle file or a statement derivative.
-    @Test func selectedRetainedOriginalsProvideRAMOnlyDecisionEvidence() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let path = environment["LEDGERFORGE_GMAIL_DECISION_PIPE"],
-              let selection = environment["LEDGERFORGE_GMAIL_DECISION_SHAS"] else { throw CampaignError.missingEnvironment }
-        var fileInfo = stat()
-        guard lstat(path, &fileInfo) == 0, fileInfo.st_mode & S_IFMT == S_IFIFO else { throw CampaignError.sourceUnavailable }
-        let selected = Set(selection.split(separator: ",").map(String.init))
-        var observed: Set<String> = []
-        var evidence: [[String: Any]] = []
-        let credentials = KeychainStatementPasswordCredentialStore()
-        var passwordsByScope: [String: [String]] = [:]
-        for family in GmailSourceFamily.allCases where family != .other {
-            for (source, bytes) in try historicalOriginals(family: family) {
-                let sha = try #require(source.sha256)
-                guard selected.contains(sha), observed.insert(sha).inserted else { continue }
-                guard let pdf = PDFDocument(data: bytes) else { throw CampaignError.sourceUnavailable }
-                var password = ""
-                var unlocked = !pdf.isLocked
-                if !unlocked {
-                    let scope: String
-                    switch family {
-                    case .amex: scope = Institution.amex.statementPasswordCredentialScope
-                    case .axisCard: scope = KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope
-                    case .axisBank: scope = Institution.axis.statementPasswordCredentialScope
-                    case .hdfcBank: scope = Institution.hdfc.statementPasswordCredentialScope
-                    case .consolidatedFunds: scope = GmailCASCredential.account
-                    default: scope = Institution.cbq.statementPasswordCredentialScope
-                    }
-                    if passwordsByScope[scope] == nil {
-                        passwordsByScope[scope] = family == .consolidatedFunds
-                            ? try await GmailCASCredential.read().map(\.value)
-                            : try await credentials.credentials(institutionCode: scope).map(\.value)
-                    }
-                    for candidate in passwordsByScope[scope] ?? [] where !unlocked {
-                        if pdf.unlock(withPassword: candidate) { password = candidate; unlocked = true }
-                    }
-                }
-                var item: [String: Any] = ["sha256": sha, "family": family.rawValue, "unlocked": unlocked]
-                if unlocked {
-                    // A page without native text is an explicit observation,
-                    // not a fabricated financial input or a layout verdict.
-                    let pages = try (0..<pdf.pageCount).map { try #require(pdf.page(at: $0)) }
-                    item["pages"] = pages.map { $0.string ?? "" }
-                    item["textUnavailablePages"] = pages.enumerated().compactMap { $0.element.string == nil ? $0.offset + 1 : nil }
-                    var footerGeometry: [[String: Any]] = []
-                    for pageIndex in 0..<pdf.pageCount {
-                        let page = try #require(pdf.page(at: pageIndex))
-                        let text = (page.string ?? "") as NSString
-                        for anchor in ["Balances shown do not include accrued interest.",
-                                       "This statement is issued pursuant to the terms and conditions"] {
-                            let range = text.range(of: anchor)
-                            if range.location != NSNotFound, let selection = page.selection(for: range) {
-                                let bounds = selection.bounds(for: page)
-                                footerGeometry.append(["page": pageIndex + 1, "anchor": anchor,
-                                    "x": bounds.minX, "y": bounds.minY, "width": bounds.width, "height": bounds.height])
-                            }
-                        }
-                    }
-                    item["footerGeometry"] = footerGeometry
-                    if environment["LEDGERFORGE_GMAIL_DECISION_RENDER"] == "1" {
-                        // Inspection only. Original pages are rendered directly
-                        // into the RAM pipe, never reserialized or saved as PDFs.
-                        item["pageImages"] = try pages.map { page in
-                            let size = page.bounds(for: .mediaBox).size
-                            let rendered = page.thumbnail(of: NSSize(width: size.width * 1.5, height: size.height * 1.5), for: .mediaBox)
-                            let bitmap = try #require(rendered.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
-                            return try #require(bitmap.representation(using: .png, properties: [:])).base64EncodedString()
-                        }
-                    }
-                    if environment["LEDGERFORGE_GMAIL_DECISION_PREPARE"] == "1" {
-                        let provider = DatabaseProvider(inMemory: true)
-                        var state = GmailInboxState(account: source.account)
-                        state.sources[source.id] = source
-                        _ = try provider.gmailInboxRepo.save(state, originals: [sha: bytes], expectedRevision: 0)
-                        let engine = makeEngine(provider: provider, password: password, stores: GmailQualificationStores())
-                        do {
-                            let prepared = try await engine.prepareImport(from: try #require(source.importURL))
-                            defer { engine.cancelPreparedImport(prepared) }
-                            item["preparedProfile"] = prepared.financialDocument.parserProfileID ?? "unavailable"
-                            item["validationPassed"] = prepared.validation.passed
-                            item["preparedRows"] = prepared.financialDocument.transactions.map {
-                                ["ordinal": $0.sourceProvenance.first?.sourceOrdinal ?? 0,
-                                 "page": $0.sourceProvenance.first?.sourcePage ?? 0,
-                                 "narration": $0.description] as [String: Any]
-                            }
-                        } catch { item["preparationError"] = safeFailureKind(error) }
-                    }
-                }
-                evidence.append(item)
-            }
-        }
-        guard observed == selected else { throw CampaignError.sourceUnavailable }
-        let pipe = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
-        defer { try? pipe.close() }
-        try pipe.write(contentsOf: JSONSerialization.data(withJSONObject: evidence))
     }
 
     @Test(arguments: ["amex_card", "axis_card_traditional", "cbq_bank", "cbq_card"])
@@ -1213,19 +1107,12 @@ struct GmailAuthenticAcceptanceTests {
             (source: original.0, bytes: original.1))
     }
 
-    /// Differential gate only: five already nominated/qualified initial Gmail
-    /// bank/card originals, not the wider 18- or 416-original Gmail corpus.
-    @Test(.globalRuntimeStateIsolation)
-    func boundedFiveOriginalCohortMatchesAcrossOneAndTwoPreparationSlots() async throws {
-        try await qualifyInitialBoundedCohort(includingCorrectedBank: false)
-    }
-
     @Test(.globalRuntimeStateIsolation)
     func correctedCBQHandoffMatchesAcrossOneAndTwoPreparationSlots() async throws {
-        try await qualifyInitialBoundedCohort(includingCorrectedBank: true)
+        try await qualifyInitialBoundedCohort()
     }
 
-    private func qualifyInitialBoundedCohort(includingCorrectedBank: Bool) async throws {
+    private func qualifyInitialBoundedCohort() async throws {
         let amex = try await loadBankAndCardCases(family: "amex_card")
         let axis = try await loadBankAndCardCases(family: "axis_card_traditional")
         let cbqCards = try await loadBankAndCardCases(family: "cbq_card")
@@ -1238,13 +1125,11 @@ struct GmailAuthenticAcceptanceTests {
         }
         let bank = try await bankAndCardCase(source: july.1, bytes: july.2, family: july.0.family)
         var cohort = amex + axis + cbqCards + [bank]
-        if includingCorrectedBank {
-            let corrected = try #require(historicalOriginals(family: .cbqBank).first {
-                $0.0.sha256 == "1f12183dcefdd5775f1d68c67902345628bea3c6c1ccc212763c7bd434215868"
-            })
-            cohort.append(try await bankAndCardCase(source: corrected.0, bytes: corrected.1, family: "cbq_bank"))
-        }
-        let expectedCount = includingCorrectedBank ? 6 : 5
+        let corrected = try #require(historicalOriginals(family: .cbqBank).first {
+            $0.0.sha256 == "1f12183dcefdd5775f1d68c67902345628bea3c6c1ccc212763c7bd434215868"
+        })
+        cohort.append(try await bankAndCardCase(source: corrected.0, bytes: corrected.1, family: "cbq_bank"))
+        let expectedCount = 6
         guard cohort.count == expectedCount,
               Set(cohort.compactMap { $0.source.sha256 }).count == expectedCount else {
             throw CampaignError.sourceUnavailable
@@ -1396,36 +1281,6 @@ struct GmailAuthenticAcceptanceTests {
             print("GMAIL_DISPOSITION \(sha) KNOWN_UNSUPPORTED_LAYOUT salary_one_time_payment both-providers-zero-residue-reopen")
         }
         print("Gmail salary source campaign: \(qualified.count) independently qualified originals; \(held.count) historical unsupported originals held.")
-    }
-
-    @Test(arguments: [GmailSourceFamily.amex, .axisCard, .cbqCard])
-    func allRetainedCardOriginalsUseIndependentComparisons(family: GmailSourceFamily) async throws {
-        let familyName: String
-        switch family {
-        case .amex: familyName = "amex_card"
-        case .axisCard: familyName = "axis_card_traditional"
-        case .cbqCard: familyName = "cbq_card"
-        default: throw CampaignError.unsupportedSelection
-        }
-        let originals = try historicalOriginals(family: family)
-        for (index, original) in originals.enumerated() {
-            var phase = "source comparison setup"
-            do {
-                let source = try await bankAndCardCase(source: original.0, bytes: original.1, family: familyName)
-                phase = "in-memory preparation/commit/comparison"
-                let memory = try await run(source, sqlite: false, index: index)
-                phase = "SQLite preparation/commit/reopen/comparison"
-                let durable = try await run(source, sqlite: true, index: index)
-                let parity = memory == durable
-                #expect(parity, "Historical Gmail card provider parity differs at index \(index).")
-            } catch {
-                Issue.record("Historical Gmail \(family.rawValue) source \(original.0.sha256?.prefix(12) ?? "unknown") is not qualified during \(phase): \(safeFailureKind(error)).")
-            }
-        }
-    }
-
-    @Test func retainedAxisCardDatesUseIndependentPrintedFields() async throws {
-        try await allRetainedCardOriginalsUseIndependentComparisons(family: .axisCard)
     }
 
     @Test func axisPrintedPrimaryCardRetainsConfirmedAccountAcrossStatements() async throws {
@@ -1619,10 +1474,6 @@ struct GmailAuthenticAcceptanceTests {
 
     @Test(.timeLimit(.minutes(20))) func completeRetainedCardCorpusHasSourceBoundedDispositions() async throws {
         try await qualifyRetainedCardCorpus(families: [.amex, .axisCard, .cbqCard])
-    }
-
-    @Test func retainedCBQCardCorpusHasSourceBoundedDispositions() async throws {
-        try await qualifyRetainedCardCorpus(families: [.cbqCard])
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -2130,16 +1981,11 @@ struct GmailAuthenticAcceptanceTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func ordinaryBackupRestoreReconcilesOriginalAgainstTheRestoredLedger() async throws {
-        try await qualifyGmailBackupRestore(completeHistoricalInbox: false)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
     func completeHistoricalInboxBackupRestorePreservesOriginalsAndReceipts() async throws {
-        try await qualifyGmailBackupRestore(completeHistoricalInbox: true)
+        try await qualifyGmailBackupRestore()
     }
 
-    private func qualifyGmailBackupRestore(completeHistoricalInbox: Bool) async throws {
+    private func qualifyGmailBackupRestore() async throws {
         let original = try #require(try await loadBankAndCardCases(family: "amex_card").first)
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Gmail-Recovery-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
@@ -2150,12 +1996,10 @@ struct GmailAuthenticAcceptanceTests {
         let previous = DatabaseProvider.shared
         DatabaseProvider.shared = provider
         defer { DatabaseProvider.shared = previous; sqlite.database.close() }
-        var inbox = GmailInboxState(account: original.source.account)
-        inbox.sources[original.source.id] = original.source
-        inbox.senderRules = [.init(address: original.source.sender, isSelected: true)]
+        var inbox: GmailInboxState
         let digest = try #require(original.source.sha256)
-        var originals = [digest: original.bytes]
-        if completeHistoricalInbox {
+        let originals: [String: Data]
+        do {
             guard let directory = ProcessInfo.processInfo.environment["LEDGERFORGE_GMAIL_HISTORY_DIRECTORY"] else {
                 throw CampaignError.missingEnvironment
             }
@@ -2180,7 +2024,7 @@ struct GmailAuthenticAcceptanceTests {
         defer { preferences.removePersistentDomain(forName: preferencesName) }
         let session = GmailIntakeSession(preferences: preferences)
         await session.reloadInbox()
-        if completeHistoricalInbox {
+        do {
             let candidates = savedInbox.orderedSources.filter { $0.id != original.source.id }
             let dismissed = try #require(candidates.first)
             let revisited = try #require(candidates.dropFirst().first)
@@ -3262,238 +3106,6 @@ struct GmailAuthenticAcceptanceTests {
         return cohort
     }
 
-    /// One explicitly authorized, one-time publication path for the final
-    /// adoption candidate. The older acquisition ledger remains the source
-    /// oracle for prepared comparisons; the newer verified backup is the sole
-    /// authority for the destination inbox, originals, receipts and coverage.
-    @Test(.globalRuntimeStateIsolation, .timeLimit(.minutes(30)))
-    func populateFinalAdoptionCandidateFromFrozenGmailCohort() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        let namespace = URL(fileURLWithPath: "/Users/vyom/Library/Containers/com.vyom.LedgerForge/Data/Library/Application Support/LedgerForge/Development/Namespaces/s98-adoption-candidate-01a0b713", isDirectory: true)
-        let destination = namespace.appendingPathComponent("ledgerforge-development.sqlite")
-        let backup = URL(fileURLWithPath: "/Users/vyom/.codex/tmp/ledgerforge-s98-01a0afcf/native-backup-20260920-r1/LedgerForge-2026-09-20T08-02-57Z-FD8166D7.ledgerforgebackup", isDirectory: true)
-        guard environment["LEDGERFORGE_S98_ADOPTION_CANDIDATE"] == "1",
-              environment["LEDGERFORGE_S98_ADOPTION_CANDIDATE_DIRECTORY"] == namespace.path,
-              !BackupFiles.exists(namespace), !BackupFiles.exists(destination) else {
-            throw CampaignError.missingEnvironment
-        }
-
-        let manifest = try BackupFiles.verifyPackage(backup)
-        guard manifest.database.sha256 == "59d233f650b2ffd3b4b8ce2cc29d89e281ac99cd6108d344fb6067336f9a6f78" else {
-            throw CampaignError.sourceUnavailable
-        }
-        let inboxDatabase = SQLiteDatabase(path: backup.appendingPathComponent("ledger.sqlite").path)
-        try inboxDatabase.open(access: .readOnlySnapshot)
-        defer { inboxDatabase.close() }
-        let inboxRepository = SQLiteGmailInboxRepository(database: inboxDatabase)
-        let account = try soleCampaignAccount(in: inboxRepository)
-        let inbox = try inboxRepository.load(account: account)
-        guard inbox.activeScan == nil, inbox.orderedSources.count == 416, inbox.messages.count == 557,
-              inbox.completedThrough == Date(timeIntervalSinceReferenceDate: 811_522_549.616777) else {
-            throw CampaignError.sourceUnavailable
-        }
-        let originals = try Dictionary(uniqueKeysWithValues: inbox.orderedSources.map { source in
-            let sha = try #require(source.sha256)
-            return (sha, try inboxRepository.original(sha256: sha, byteCount: source.expectedByteCount))
-        })
-        guard originals.count == 416 else { throw CampaignError.sourceUnavailable }
-
-        let oracleCohort = try await completeQualifiedHistoricalCases()
-        let sourceBySHA = Dictionary(uniqueKeysWithValues: try inbox.orderedSources.map { source in
-            (try #require(source.sha256), source)
-        })
-        let cohort = try oracleCohort.map { candidate -> SourceCase in
-            let sha = try #require(candidate.source.sha256)
-            guard let source = sourceBySHA[sha], source.importURL == candidate.source.importURL,
-                  let bytes = originals[sha], bytes == candidate.bytes else {
-                throw CampaignError.sourceMismatch
-            }
-            var replacement = SourceCase(source: source, bytes: bytes, password: candidate.password, compare: candidate.compare)
-            replacement.bankBalanceObservation = candidate.bankBalanceObservation
-            replacement.configure = candidate.configure
-            replacement.verifyStored = candidate.verifyStored
-            replacement.permitsUnresolvedInstrumentHold = candidate.permitsUnresolvedInstrumentHold
-            replacement.expectedPreparationHold = candidate.expectedPreparationHold
-            replacement.expectedHoldLayout = candidate.expectedHoldLayout
-            replacement.relationshipBalanceObservations = candidate.relationshipBalanceObservations
-            return replacement
-        }
-        guard cohort.count == 416, cohort.map(\.source.id) == inbox.orderedSources.map(\.id) else {
-            throw CampaignError.sourceMismatch
-        }
-        _ = try await runCompleteHistoricalCohort(cohort, preparationLimit: 2,
-            nativeSnapshot: destination, inboxSeed: .init(state: inbox, originals: originals),
-            sourceBackedAccountNames: true)
-        print("GMAIL_ADOPTION_CANDIDATE_READY originals=416 receipts=557 coverage_through=2026-09-19T14:55:49.616777Z; committed and held attention recorded through the ordinary inbox repository.")
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func prepareIsolatedNativeResponsivenessInbox() async throws {
-        try await prepareNativeInbox(prefixCount: nil)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func prepareIsolatedNativeTimingPrefix() async throws {
-        guard let value = ProcessInfo.processInfo.environment["LEDGERFORGE_GMAIL_NATIVE_PREFIX_COUNT"],
-              let count = Int(value), count > 0 else { throw CampaignError.missingEnvironment }
-        try await prepareNativeInbox(prefixCount: count)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func prepareIsolatedBackgroundQualificationInbox() throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let historyPath = environment["LEDGERFORGE_GMAIL_HISTORY_DIRECTORY"],
-              let targetPath = environment["LEDGERFORGE_BACKGROUND_QUALIFICATION_DIRECTORY"] else {
-            throw CampaignError.missingEnvironment
-        }
-        let target = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath()
-        guard target.lastPathComponent.hasPrefix("s98-background-live-"),
-              target.deletingLastPathComponent().lastPathComponent == "Namespaces",
-              target.path.contains("/LedgerForge/Development/Namespaces/"),
-              FileManager.default.fileExists(atPath: target.appendingPathComponent("ledgerforge-development.sqlite").path) else {
-            throw CampaignError.sourceUnavailable
-        }
-        // The native restore flow already installed the genuine qualified
-        // portfolio backup here. Add only the retained original inbox through
-        // its ordinary repository; never manufacture financial inputs/coverage.
-        let destination = try SQLiteRepositoryProvider(path: target.appendingPathComponent("ledgerforge-development.sqlite").path,
-            migrations: allMigrations, access: .existing)
-        defer { destination.database.close() }
-        try BackupCompatibility.verifyDatabase(destination.database)
-        try #require(destination.gmailInboxRepo.storedAccounts().isEmpty)
-        let before = try destination.investmentRepo.snapshot(workspaceID: "default-workspace")
-        let history = SQLiteDatabase(path: URL(fileURLWithPath: historyPath).appendingPathComponent("acquisition.sqlite").path)
-        try history.open(access: .readOnlySnapshot)
-        defer { history.close() }
-        let repository = SQLiteGmailInboxRepository(database: history)
-        var state = try repository.load(account: soleCampaignAccount(in: repository))
-        try #require(state.activeScan == nil && !state.completedIntervals.isEmpty)
-        let originals = try Dictionary(uniqueKeysWithValues: state.orderedSources.map { source in
-            let sha = try #require(source.sha256)
-            return (sha, try repository.original(sha256: sha, byteCount: source.expectedByteCount))
-        })
-        try #require(originals.count == 416)
-        // Only this new repository's compare-and-swap revision changes; retain
-        // authentic sender choices, receipt coverage, attention and timestamps.
-        state.revision = 0
-        let saved = try destination.gmailInboxRepo.save(state, originals: originals, expectedRevision: 0)
-        state.revision = saved.revision
-        let exactStateRetained = try destination.gmailInboxRepo.load(account: state.account) == state
-        let financialStateUnchanged = try destination.investmentRepo.snapshot(workspaceID: "default-workspace") == before
-        #expect(exactStateRetained && financialStateUnchanged)
-        for source in state.orderedSources {
-            let sha = try #require(source.sha256)
-            let exactBytesRetained = try destination.gmailInboxRepo.original(sha256: sha, byteCount: source.expectedByteCount) == originals[sha]
-            #expect(exactBytesRetained)
-        }
-        try BackupCompatibility.verifyDatabase(destination.database)
-        try destination.database.checkpointAndClose()
-        print("BACKGROUND_NATIVE_INBOX_READY originals=\(originals.count) receipts=\(state.messages.count); retained history, no network or financial import.")
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func prepareFinalNativeCacheReuseCheckpoint() throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let templatePath = environment["LEDGERFORGE_GMAIL_NATIVE_TEMPLATE_DIRECTORY"],
-              let destinationPath = environment["LEDGERFORGE_GMAIL_NATIVE_REVIEW_DIRECTORY"] else {
-            throw CampaignError.missingEnvironment
-        }
-        let template = URL(fileURLWithPath: templatePath).standardizedFileURL
-        let destination = URL(fileURLWithPath: destinationPath).standardizedFileURL
-        guard template.path.contains("/LedgerForge/Development/Namespaces/s98-gmail-native-"),
-              destination.path.contains("/LedgerForge/Development/Namespaces/s98-gmail-native-"),
-              template != destination, !FileManager.default.fileExists(atPath: destination.path) else {
-            throw CampaignError.sourceUnavailable
-        }
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        let name = "ledgerforge-development.sqlite"
-        let source = SQLiteDatabase(path: template.appendingPathComponent(name).path)
-        try source.open(access: .readOnlySnapshot)
-        defer { source.close() }
-        try source.createBackup(at: destination.appendingPathComponent(name).path)
-        let sqlite = try SQLiteRepositoryProvider(path: destination.appendingPathComponent(name).path)
-        defer { sqlite.database.close() }
-        var state = try sqlite.gmailInboxRepo.load(account: soleCampaignAccount(in: sqlite.gmailInboxRepo))
-        guard state.activeScan == nil, !state.sources.isEmpty else { throw CampaignError.sourceUnavailable }
-        let formatter = ISO8601DateFormatter()
-        // The final native measurement reuses the exact initial authorized
-        // interval and a populated qualification snapshot. The authoritative
-        // historical inbox and the template ledger are never written here.
-        let initialFrom: Date = try #require(formatter.date(from: "2026-08-01T00:00:00Z"))
-        state.activeScan = GmailInboxScan(interval: try .init(
-            from: initialFrom,
-            until: #require(formatter.date(from: "2026-09-17T11:13:18Z")),
-            timeZoneIdentifier: "UTC", senders: Set(state.configuredSenders.map(\.address))))
-        _ = try sqlite.gmailInboxRepo.save(state, originals: [:], expectedRevision: state.revision)
-        try BackupCompatibility.verifyDatabase(sqlite.database)
-        try sqlite.database.checkpointAndClose()
-        print("GMAIL_FINAL_NATIVE_CHECKPOINT_READY originals=\(state.sources.count); existing qualification ledger preserved, exact initial interval pending.")
-    }
-
-    private func prepareNativeInbox(prefixCount: Int?) async throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let destinationPath = environment["LEDGERFORGE_GMAIL_NATIVE_REVIEW_DIRECTORY"],
-              let historyPath = environment["LEDGERFORGE_GMAIL_HISTORY_DIRECTORY"] else { throw CampaignError.missingEnvironment }
-        let destination = URL(fileURLWithPath: destinationPath).standardizedFileURL
-        guard destination.path.contains("/LedgerForge/Development/Namespaces/s98-gmail-native-"),
-              !FileManager.default.fileExists(atPath: destination.path) else { throw CampaignError.sourceUnavailable }
-        let cohort = try await completeQualifiedHistoricalCases()
-        let selectedCohort = cohort.filter {
-            [.amex, .axisCard, .cbqCard, .cbqBank, .salary].contains($0.source.family)
-        }
-        let selection = Set(selectedCohort.map(\.source.id))
-        guard !selection.isEmpty else { throw CampaignError.sourceUnavailable }
-        if let prefixCount {
-            guard prefixCount < selectedCohort.count else { throw CampaignError.unsupportedSelection }
-            _ = try await runCompleteHistoricalCohort(Array(selectedCohort.prefix(prefixCount)), preparationLimit: 1,
-                nativeSnapshot: destination.appendingPathComponent("ledgerforge-development.sqlite"))
-        }
-        let history = SQLiteDatabase(path: URL(fileURLWithPath: historyPath).appendingPathComponent("acquisition.sqlite").path)
-        try history.open(access: .readOnlySnapshot)
-        defer { history.close() }
-        let repository = SQLiteGmailInboxRepository(database: history)
-        var state = try repository.load(account: try #require(cohort.first).source.account)
-        guard state.activeScan == nil, !state.completedIntervals.isEmpty else { throw CampaignError.sourceUnavailable }
-        state.revision = 0
-        state.senderRules = state.configuredSenders.map { .init(address: $0.address, isSelected: true) }
-        let retained = state.orderedSources
-        let originals = try Dictionary(uniqueKeysWithValues: retained.map { source in
-            let sha = try #require(source.sha256)
-            return (sha, try repository.original(sha256: sha, byteCount: source.expectedByteCount))
-        })
-        for source in retained {
-            // This is an explicit selection in a fresh native qualification
-            // namespace. The authoritative history inbox is read-only.
-            state.sources[source.id]?.dismissed = !selection.contains(source.id)
-            if selection.contains(source.id) { state.sources[source.id]?.attention = .pending }
-        }
-        let formatter = ISO8601DateFormatter()
-        let lower = try #require(formatter.date(from: "2026-08-01T00:00:00Z"))
-        let upper = try #require(formatter.date(from: "2026-09-17T11:13:18Z"))
-        // Native Resume exercises the already-authorized fixed initial interval
-        // with cached bytes. It neither changes the historical campaign window
-        // nor fabricates coverage, and it performs no financial import.
-        state.activeScan = GmailInboxScan(interval: try .init(from: lower, until: upper,
-            timeZoneIdentifier: "UTC", senders: Set(state.configuredSenders.map(\.address))))
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        let sqlite = try SQLiteRepositoryProvider(path: destination.appendingPathComponent("ledgerforge-development.sqlite").path)
-        defer { sqlite.database.close() }
-        let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
-        state.revision = try provider.gmailInboxRepo.load(account: state.account).revision
-        let saved = try provider.gmailInboxRepo.save(state, originals: originals, expectedRevision: state.revision)
-        let hydrated = try GmailQualificationStores().hydrator(provider).stageHydration()
-        guard hydrated.importSessions.count == (prefixCount ?? 0), hydrated.investments == .empty,
-              Set(saved.sources.values.filter { !$0.dismissed }.map(\.id)) == selection else { throw CampaignError.sourceMismatch }
-        if prefixCount == nil {
-            guard hydrated.transactions.isEmpty, hydrated.accounts.isEmpty, hydrated.salaryStatements.isEmpty else {
-                throw CampaignError.sourceMismatch
-            }
-        }
-        try BackupCompatibility.verifyDatabase(sqlite.database)
-        try sqlite.database.checkpointAndClose()
-        print("GMAIL_NATIVE_INBOX_READY originals=\(retained.count) selected=\(selection.count) qualified_prefix=\(prefixCount ?? 0) transactions=\(hydrated.transactions.count); fixed initial UTC interval retained for cache-reuse collection.")
-    }
-
     // Keep every per-prefix comparison for both runs, using the exact published
     // snapshot instead of repeating repository staging after each commit.
     // The expanded 416-source corpus takes about 16 minutes per complete pass;
@@ -3507,9 +3119,7 @@ struct GmailAuthenticAcceptanceTests {
         print("Gmail FULL_COHORT_EQUIVALENCE_PASS sources=\(cohort.count) slots=1,2; prepared fields, mapping outcomes, per-commit graphs, hydration and reopen equal.")
     }
 
-    private func runCompleteHistoricalCohort(_ cohort: [SourceCase], preparationLimit: Int,
-        nativeSnapshot: URL? = nil, inboxSeed: CohortInboxSeed? = nil,
-        sourceBackedAccountNames: Bool = false) async throws -> [[String]] {
+    private func runCompleteHistoricalCohort(_ cohort: [SourceCase], preparationLimit: Int) async throws -> [[String]] {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Gmail-Full-Cohort-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -3517,27 +3127,12 @@ struct GmailAuthenticAcceptanceTests {
         let sqlite = try SQLiteRepositoryProvider(path: path)
         defer { sqlite.database.close() }
         let provider = DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false)
-        var inbox: GmailInboxState
-        let bytes: [String: Data]
-        if let inboxSeed {
-            inbox = inboxSeed.state
-            inbox.revision = 0
-            bytes = inboxSeed.originals
-            guard inbox.orderedSources.map(\.id) == cohort.map(\.source.id),
-                  inbox.orderedSources.allSatisfy({ source in
-                      guard let sha = source.sha256,
-                            let original = cohort.first(where: { $0.source.id == source.id }) else { return false }
-                      return original.source == source && bytes[sha] == original.bytes
-                  }) else { throw CampaignError.sourceMismatch }
-        } else {
-            inbox = GmailInboxState(account: try #require(cohort.first).source.account)
-            var collected: [String: Data] = [:]
-            for original in cohort {
-                let sha = try #require(original.source.sha256)
-                inbox.sources[original.source.id] = original.source
-                collected[sha] = original.bytes
-            }
-            bytes = collected
+        var inbox = GmailInboxState(account: try #require(cohort.first).source.account)
+        var bytes: [String: Data] = [:]
+        for original in cohort {
+            let sha = try #require(original.source.sha256)
+            inbox.sources[original.source.id] = original.source
+            bytes[sha] = original.bytes
         }
         inbox = try provider.gmailInboxRepo.save(inbox, originals: bytes, expectedRevision: 0)
         guard inbox.orderedSources.map(\.id) == cohort.map(\.source.id) else { throw CampaignError.sourceMismatch }
@@ -3603,36 +3198,10 @@ struct GmailAuthenticAcceptanceTests {
         var latestValidatedGraph: [String]?
         func newAccountChoice(for prepared: PreparedImport, cardLiability: Bool,
                               legacyDisplayName: String = "Gmail cohort qualification") throws -> ImportAccountChoice {
-            let displayName: String
-            if sourceBackedAccountNames {
-                displayName = ImportPersistenceMapper.displayAccountName(
-                    institutionName: prepared.importSession.institution?.rawValue ?? "Unknown",
-                    documentType: prepared.importSession.documentType,
-                    currency: prepared.financialDocument.bookedCurrency?.code,
-                    fallbackFileName: prepared.importSession.fileName
-                )
-            } else {
-                displayName = legacyDisplayName
-            }
+            let displayName = legacyDisplayName
             return cardLiability
                 ? .createNewCardLiabilityAccountAndInstrument(displayName: displayName)
                 : .createNewAccount(displayName: displayName)
-        }
-        func selectedRelationshipChoices(for review: ImportIdentityReview) throws -> ImportAccountChoice? {
-            guard sourceBackedAccountNames else { return try relationshipChoices(review) }
-            guard case .bankSections(let sections) = review else { throw CampaignError.sourceMismatch }
-            var choices: [String: ImportBankSectionChoice] = [:]
-            for section in sections {
-                switch section.identityReview {
-                case .matchedExisting: break
-                case .choiceRequired:
-                    let label = section.sourceAccountLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !label.isEmpty else { throw CampaignError.sourceMismatch }
-                    choices[section.sectionID] = .createNewAccount(displayName: label)
-                default: throw CampaignError.sourceMismatch
-                }
-            }
-            return choices.isEmpty ? nil : .bankSections(choices)
         }
         let coordinator = observedProductionCoordinator(engine: engine, originalsByURL: byURL, observer: observer) { prepared, result in
             let source = try #require(byURL[prepared.sourceURL])
@@ -3826,7 +3395,7 @@ struct GmailAuthenticAcceptanceTests {
                                 for: #require(observer.preparedValuesBySource[sha]), cardLiability: false))
                         }
                     case .bankSections:
-                        coordinator.updateAccountChoice(try selectedRelationshipChoices(for: item.identityReview))
+                        coordinator.updateAccountChoice(try relationshipChoices(item.identityReview))
                     case .ambiguous, .conflict:
                         print("GMAIL_COHORT_ATTENTION queue=\(item.queuePosition) new-identity-authority-required")
                         throw CampaignError.commitFailed
@@ -3872,12 +3441,6 @@ struct GmailAuthenticAcceptanceTests {
             observer: observer, accountOrdinals: &accountOrdinals, instrumentOrdinals: &instrumentOrdinals)
         let finalCanonical = Dictionary(uniqueKeysWithValues: try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace").map { ($0.id, $0) })
         guard finalCanonical == priorCanonicalTransactions else { throw CampaignError.sourceMismatch }
-        if inboxSeed != nil {
-            try await replayOneCommittedSourcePerFamily(engine: engine, provider: provider, database: sqlite.database,
-                cohort: cohort, observer: observer)
-            inbox = try persistCohortTerminalAttention(provider: provider, coordinator: coordinator,
-                originalsByURL: byURL, observer: observer)
-        }
         let acceptedSessions = Set(try observer.resultBySource.compactMap { sha, result -> String? in
             if result.persisted {
                 guard let sessionID = observer.sessionBySource[sha] else { throw CampaignError.sourceMismatch }
@@ -3925,24 +3488,7 @@ struct GmailAuthenticAcceptanceTests {
                 throw CampaignError.sourceMismatch
             }
         }
-        if inboxSeed != nil {
-            guard try reopenedProvider.gmailInboxRepo.load(account: inbox.account) == inbox else {
-                throw CampaignError.sourceMismatch
-            }
-        }
         try BackupCompatibility.verifyDatabase(reopened.database)
-        if let nativeSnapshot {
-            let path = nativeSnapshot.standardizedFileURL.path
-            let isLegacyNativeReview = preparationLimit == 1
-                && path.contains("/LedgerForge/Development/Namespaces/s98-gmail-native-")
-            let isFinalAdoptionCandidate = inboxSeed != nil && preparationLimit == 2
-                && path == "/Users/vyom/Library/Containers/com.vyom.LedgerForge/Data/Library/Application Support/LedgerForge/Development/Namespaces/s98-adoption-candidate-01a0b713/ledgerforge-development.sqlite"
-            guard (isLegacyNativeReview || isFinalAdoptionCandidate), !BackupFiles.exists(nativeSnapshot) else {
-                throw CampaignError.sourceUnavailable
-            }
-            try FileManager.default.createDirectory(at: nativeSnapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try reopened.database.createBackup(at: nativeSnapshot.path)
-        }
         let receiptSectionsByID = Dictionary(uniqueKeysWithValues: try reopenedProvider.importSessionRepo
             .bankSectionSnapshot(workspaceId: "default-workspace").sections.map { ($0.id, $0) })
         var output: [[String]] = []
@@ -3986,119 +3532,6 @@ struct GmailAuthenticAcceptanceTests {
             print("GMAIL_COHORT_WORKER_LIFETIME slots=\(preparationLimit) sha=\(sha) milliseconds=\(lifetime)")
         }
         return output
-    }
-
-    /// The final candidate has one ordinary duplicate replay per source family,
-    /// selected only from actual committed sessions. It exercises the durable
-    /// duplicate path without turning the one-off population into a second
-    /// 416-source campaign.
-    private func replayOneCommittedSourcePerFamily(
-        engine: ImportEngine,
-        provider: DatabaseProvider,
-        database: SQLiteDatabase,
-        cohort: [SourceCase],
-        observer: BoundedCohortObserver
-    ) async throws {
-        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace")
-        let cards = try provider.cardRepo.snapshot(workspaceId: "default-workspace")
-        let sections = try provider.importSessionRepo.bankSectionSnapshot(workspaceId: "default-workspace")
-        let investments = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
-        let acceptedCount = try database.queryInt("SELECT count(*) FROM import_sessions;")
-        var families: Set<GmailSourceFamily> = []
-        let replaySources = try cohort.compactMap { original -> SourceCase? in
-            let sha = try #require(original.source.sha256)
-            guard let sessionID = observer.sessionBySource[sha], observer.resultBySource[sha]?.persisted == true,
-                  try provider.importSessionRepo.importSession(id: sessionID) != nil,
-                  families.insert(original.source.family).inserted else { return nil }
-            return original
-        }
-        guard !replaySources.isEmpty else { throw CampaignError.sourceMismatch }
-        for original in replaySources {
-            let replay = try await engine.prepareImport(from: try #require(original.source.importURL))
-            defer { engine.cancelPreparedImport(replay) }
-            let result = await engine.commitPreparedImport(replay)
-            guard result.previousImport != nil, !result.persisted else { throw CampaignError.sourceMismatch }
-        }
-        let unchanged = try provider.transactionRepo.trustedTransactions(workspaceId: "default-workspace") == transactions
-            && provider.cardRepo.snapshot(workspaceId: "default-workspace") == cards
-            && provider.importSessionRepo.bankSectionSnapshot(workspaceId: "default-workspace") == sections
-            && provider.investmentRepo.snapshot(workspaceID: "default-workspace") == investments
-            && database.queryInt("SELECT count(*) FROM import_sessions;") == acceptedCount
-        guard unchanged else { throw CampaignError.sourceMismatch }
-        print("GMAIL_ADOPTION_REPLAY families=\(replaySources.count) financial_unchanged=\(unchanged)")
-    }
-
-    /// The normal session owns this mapping in production. This isolated
-    /// coordinator has no session observer, so the one-off candidate records
-    /// the same terminal attention after every financial comparison has passed.
-    private func persistCohortTerminalAttention(
-        provider: DatabaseProvider,
-        coordinator: ImportCentreCoordinator<PreparedImport>,
-        originalsByURL: [URL: SourceCase],
-        observer: BoundedCohortObserver
-    ) throws -> GmailInboxState {
-        let repository = provider.gmailInboxRepo
-        let baseline = try repository.load(account: try soleCampaignAccount(in: repository))
-        var next = baseline
-        var seenSourceIDs: Set<String> = []
-        for item in coordinator.items {
-            let original = try #require(originalsByURL[item.sourceURL])
-            let sha = try #require(original.source.sha256)
-            guard seenSourceIDs.insert(original.source.id).inserted,
-                  next.sources[original.source.id] == original.source else { throw CampaignError.sourceMismatch }
-            let attention: GmailInboxSource.Attention
-            switch item.phase {
-            case .completed:
-                attention = item.completionDisposition == .rejected || item.completionDisposition == .transactionEventBlocked
-                    ? .review : .pending
-            case .skipped:
-                guard observer.heldMappingBySource[sha] != nil else { throw CampaignError.sourceMismatch }
-                attention = .skipped
-            case .validationFailed:
-                guard original.expectedPreparationHold == "KNOWN_UNSUPPORTED_LAYOUT",
-                      observer.heldPreparationBySource[sha] != nil else { throw CampaignError.sourceMismatch }
-                attention = .invalid
-            case .failed:
-                guard let expected = original.expectedPreparationHold,
-                      observer.heldPreparationBySource[sha] != nil else { throw CampaignError.sourceMismatch }
-                switch item.preparationFailure?.family {
-                case .unsupportedInput, .unsupportedStatement:
-                    guard expected == "KNOWN_UNSUPPORTED_LAYOUT" else { throw CampaignError.sourceMismatch }
-                    attention = .unsupported
-                case .credentials:
-                    guard expected == "SUPPORTED_BUT_HELD_PASSWORD" else { throw CampaignError.sourceMismatch }
-                    attention = .password
-                case .invalidDocument:
-                    guard expected == "KNOWN_UNSUPPORTED_LAYOUT" else { throw CampaignError.sourceMismatch }
-                    attention = .invalid
-                default:
-                    guard expected == "KNOWN_UNSUPPORTED_LAYOUT" else { throw CampaignError.sourceMismatch }
-                    attention = .failed
-                }
-            case .pending, .preparing, .awaitingReview, .awaitingConfirmation, .committing, .cancelled:
-                throw CampaignError.sourceMismatch
-            }
-            next.sources[original.source.id]?.attention = attention
-        }
-        guard seenSourceIDs == Set(next.sources.keys),
-              next.activeScan == baseline.activeScan,
-              next.completedIntervals == baseline.completedIntervals,
-              next.messages == baseline.messages,
-              next.senderRules == baseline.senderRules else { throw CampaignError.sourceMismatch }
-        let saved = try repository.save(next, originals: [:], expectedRevision: baseline.revision)
-        for (id, before) in baseline.sources {
-            guard let actual = saved.sources[id] else { throw CampaignError.sourceMismatch }
-            var expected = before
-            expected.attention = next.sources[id]?.attention ?? before.attention
-            guard actual == expected else { throw CampaignError.sourceMismatch }
-        }
-        guard saved.sources.values.filter({ $0.attention == .pending }).count == 333,
-              saved.sources.values.filter({ $0.attention == .skipped }).count == 24,
-              saved.sources.values.filter({ $0.attention == .password }).count == 8,
-              saved.sources.values.filter({ $0.attention == .unsupported || $0.attention == .invalid || $0.attention == .failed }).count == 51 else {
-            throw CampaignError.sourceMismatch
-        }
-        return saved
     }
 
     private func verifyCohortBankBalances(_ snapshot: RepositoryRuntimeSnapshot,

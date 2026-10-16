@@ -384,7 +384,7 @@ struct NetWorthReportTests {
                 #expect((item.amount != nil) == isAvailable)
             }
         }
-        let old = source.report(now: source.now.addingTimeInterval(5 * 86400))
+        let old = source.report(now: source.now.addingTimeInterval(12 * 86400))
         #expect(old.targets.allSatisfy { $0.isStale })
         #expect(old.members.flatMap(\.components) == initial.members.flatMap(\.components))
         #expect(old.targets.compactMap(\.amount) == initial.targets.compactMap(\.amount))

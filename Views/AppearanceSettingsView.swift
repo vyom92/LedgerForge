@@ -12,7 +12,7 @@ struct LFAppearanceIntroduction: View {
         }
     }
     private var restoreButton: some View {
-        Button("Restore approved defaults", action: appearance.restoreApprovedDefaults)
+        Button("Restore defaults", action: appearance.restoreApprovedDefaults)
             // Recovery stays legible even after an unhelpful custom text color.
             .lfSecondaryAction()
             .environment(\.lfTheme, LFTheme.dark)

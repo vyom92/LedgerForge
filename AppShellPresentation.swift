@@ -407,6 +407,7 @@ struct AppShellToolbar: View {
     let section: AppShellSection
     let subtitle: String
     var accessory: AnyView? = nil
+    var compact = false
 
     var body: some View {
         Group {
@@ -431,15 +432,17 @@ struct AppShellToolbar: View {
             }
         }
         .padding(.horizontal, theme.spacing.pagePadding)
-        .padding(.vertical, theme.spacing.pagePadding)
+        .padding(.vertical, compact ? theme.spacing.controlGap : theme.spacing.pagePadding)
     }
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(section.rawValue).font(theme.typography.pageTitle)
-            Text(subtitle)
-                .font(theme.typography.secondary)
-                .foregroundStyle(theme.palette.secondaryText)
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+            }
         }
     }
 }

@@ -22,16 +22,13 @@ struct RefundPayloadCompatibilityTests {
         let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         #expect(object["refundAllocations"] == nil)
         #expect(try JSONDecoder().decode(MovementEvent.self, from: encoded) == value)
-    }
 
-    @Test func explicitEmptyAndMissingAllocationMetadataStayDistinct() throws {
         var payload = legacyMetadata()
         payload["consumptionTransactionIDs"] = [String]()
         payload["refundAllocations"] = [Any]()
-        let value = try JSONDecoder().decode(MovementEvent.self, from: JSONSerialization.data(withJSONObject: payload))
-        #expect(value.refundAllocations == [])
-        let missing = try JSONDecoder().decode(MovementEvent.self, from: JSONSerialization.data(withJSONObject: legacyMetadata()))
-        #expect(value != missing)
+        let explicitEmpty = try JSONDecoder().decode(MovementEvent.self, from: JSONSerialization.data(withJSONObject: payload))
+        #expect(explicitEmpty.refundAllocations == [])
+        #expect(explicitEmpty != value)
     }
 
     @Test func malformedOptionalAllocationMetadataFailsDecoding() throws {

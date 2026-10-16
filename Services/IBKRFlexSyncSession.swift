@@ -9,6 +9,7 @@ final class IBKRFlexSyncSession: ObservableObject {
     @Published private(set) var isBusy = false
     @Published private(set) var canCancel = false
     @Published private(set) var message: String?
+    @Published private(set) var hasConnectionError = false
     @Published private(set) var lastSuccessfulFetch: Date?
     @Published private(set) var reportDate: String?
     @Published private(set) var positionCount = 0
@@ -57,6 +58,9 @@ final class IBKRFlexSyncSession: ObservableObject {
     }
     func notifyInstalledValue() {
         let source = snapshot.latestIBKRFlex
+        if let fetched = source?.fetchedAt, lastSuccessfulFetch.map({ fetched > $0 }) ?? true {
+            hasConnectionError = false
+        }
         lastSuccessfulFetch = source?.fetchedAt; reportDate = source?.reportDate
         positionCount = source?.positionCount ?? 0
     }
@@ -81,7 +85,7 @@ final class IBKRFlexSyncSession: ObservableObject {
             message = "The ledger is not available for an update."; return
         }
         let baseline = snapshot, client = client, keychain = keychain, token = UUID()
-        epoch = token; isBusy = true; canCancel = true; message = "Requesting the latest IBKR report…"
+        epoch = token; isBusy = true; canCancel = true; hasConnectionError = false; message = "Requesting the latest IBKR report…"
         operation = Task { [weak self] in
             defer {
                 if let self, self.epoch == token { self.operation = nil; self.isBusy = false; self.canCancel = false }
@@ -163,6 +167,7 @@ final class IBKRFlexSyncSession: ObservableObject {
             } catch {
                 guard let self, self.epoch == token else { return }
                 self.message = BackgroundUpdateExecutor.ibkrFailureMessage(error)
+                self.hasConnectionError = true
             }
         }
     }
@@ -189,6 +194,7 @@ final class IBKRFlexSyncSession: ObservableObject {
                 try await Task.detached { try keychain.disconnect() }.value
                 guard let self, self.epoch == token else { return }
                 self.accountID = nil; self.queryID = nil; self.expiry = nil
+                self.hasConnectionError = false
                 self.message = "Disconnected. Last fetched holdings are retained."
             } catch { self?.message = BackgroundUpdateExecutor.ibkrFailureMessage(error) }
         }

@@ -16,6 +16,7 @@ final class GmailIntakeSession: ObservableObject {
 
     @Published private(set) var account: String?
     @Published private(set) var isConnected = false
+    @Published private(set) var hasConnectionError = false
     @Published private(set) var isChecking = false
     @Published private(set) var isCollecting = false
     @Published private(set) var needsClientConfiguration = false
@@ -117,6 +118,7 @@ final class GmailIntakeSession: ObservableObject {
         try await connection.verifyAccount()
         try Task.checkCancellation()
         self.client = connection; self.account = selectedAccount; self.isConnected = true; self.needsClientConfiguration = false
+        self.hasConnectionError = false
         self.needsAuthorization = false
         self.preferences.set(selectedAccount, forKey: Self.savedAccountKey)
         self.message = "Connected with read-only Gmail access. Ready attachments import automatically while LedgerForge is open."
@@ -128,7 +130,7 @@ final class GmailIntakeSession: ObservableObject {
     @discardableResult
     func connect(operation: @escaping @MainActor () async throws -> Void) -> Task<Void, Never>? {
         guard !isChecking, !isCollecting else { return nil }
-        isChecking = true; message = nil
+        isChecking = true; message = nil; hasConnectionError = false
         task = Task { [weak self] in
             guard let self else { return }
             defer { isChecking = false; task = nil }
@@ -136,6 +138,7 @@ final class GmailIntakeSession: ObservableObject {
                 try await operation()
             } catch {
                 isConnected = false
+                hasConnectionError = true
                 let intakeError = error as? GmailIntakeError
                 needsClientConfiguration = intakeError == .configurationRequired
                 needsAuthorization = intakeError == .unauthorized || intakeError == .authorizationFailed

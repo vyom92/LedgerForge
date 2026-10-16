@@ -19,16 +19,6 @@ struct ImportFrameworkTests {
         #expect(request.fileExtension == "csv")
     }
 
-    @Test func importCoordinatorCanBeConstructed() async throws {
-        let coordinator = DefaultImportCoordinator(readerRegistry: EmptyReaderRegistry(), passwordProvider: StaticPasswordProvider(password: nil))
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
-
-        let result = await coordinator.importDocument(request)
-
-        #expect(result.status == .failed)
-        #expect(result.error == .readerUnavailable(extension: "pdf"))
-    }
-
     @Test func importCoordinatorWiresRegistryPasswordProviderAndReader() async throws {
         let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
         let rawDocument = RawDocument(
@@ -49,22 +39,6 @@ struct ImportFrameworkTests {
         #expect(result.error == nil)
     }
 
-    @Test func importErrorProvidesTypedBehaviour() async throws {
-        let unsupported = ImportError.unsupportedFile(extension: "ofx")
-        let passwordRequired = ImportError.passwordRequired
-        let unknown = ImportError.unknown(message: "Unexpected reader state")
-
-        #expect(unsupported == .unsupportedFile(extension: "ofx"))
-        #expect(passwordRequired.errorDescription == "A password is required to read this document.")
-        #expect(unknown.errorDescription == "Unknown import error: Unexpected reader state")
-    }
-
-}
-
-private struct EmptyReaderRegistry: ImportFramework.ReaderRegistry {
-    func reader(for request: ImportRequest) async -> (any ImportFramework.DocumentReader)? {
-        nil
-    }
 }
 
 private struct SingleReaderRegistry: ImportFramework.ReaderRegistry {

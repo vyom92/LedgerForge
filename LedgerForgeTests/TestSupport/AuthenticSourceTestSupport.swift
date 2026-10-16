@@ -3,16 +3,15 @@ import Darwin
 import Testing
 @testable import LedgerForge
 
-/// An authentic carrier for source-snapshot and orchestration boundary tests.
-/// Financial source support is established by the separate complete-corpus
-/// oracle campaigns, never by these single-carrier transport checks.
+/// Explicit authentic-source and populated-ledger integration prerequisites.
+/// Ordinary mechanics use MechanicsTestSupport instead.
 enum AuthenticSourceTestSupport {
-    /// Independent private nominations are streamed from RAM, never loaded from
-    /// a derived financial evidence file. FileHandle supports the FIFO carrier.
+    /// Explicit integration nominations may use a regular file or the retained
+    /// FIFO transport. Neither transport is a routine test prerequisite.
     static func ramNomination(_ environmentKey: String) throws -> Data {
         let path = try #require(ProcessInfo.processInfo.environment[environmentKey])
         var metadata = stat()
-        try #require(lstat(path, &metadata) == 0 && metadata.st_mode & S_IFMT == S_IFIFO)
+        try #require(lstat(path, &metadata) == 0 && [S_IFIFO, S_IFREG].contains(metadata.st_mode & S_IFMT))
         let input = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
         defer { try? input.close() }
         let data = try #require(try input.readToEnd())
@@ -25,25 +24,18 @@ enum AuthenticSourceTestSupport {
     /// It is read-only below and must not resolve to the Current database.
     @MainActor
     static func presentationDatabaseURL() throws -> URL {
-        let environment = ProcessInfo.processInfo.environment
-        let identity = try DevelopmentDatabaseIdentity.applicationOwned(environment: environment)
-        if let path = environment["LEDGERFORGE_PRESENTATION_DATABASE"] {
-            let selected = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
-            let current = try DevelopmentDatabaseIdentity.applicationOwned(environment: [:]).canonicalDevelopmentURL
-                .resolvingSymlinksInPath().standardizedFileURL
-            guard selected != current, FileManager.default.fileExists(atPath: selected.path) else {
-                throw RepositoryError.persistenceUnavailable
-            }
-            return selected
+        let path = try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_PRESENTATION_DATABASE"],
+            "Select an isolated presentation database explicitly for integration qualification.")
+        let selected = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+        let current = try DevelopmentDatabaseIdentity.applicationOwned(environment: [:]).canonicalDevelopmentURL
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard selected != current, FileManager.default.fileExists(atPath: selected.path) else {
+            throw RepositoryError.persistenceUnavailable
         }
-        let current = identity.canonicalDevelopmentURL
-        guard !identity.isIsolatedCanonicalNamespace,
-              identity.authorizesCurrentDatabaseIdentity(at: current),
-              FileManager.default.fileExists(atPath: current.path) else { throw RepositoryError.persistenceUnavailable }
-        return current
+        return selected
     }
 
-    /// Presentation checks read the accepted Current schema without attempting
+    /// Presentation checks read the nominated schema without attempting
     /// a candidate migration. Its complete registered prefix is verified first;
     /// both connections enforce read-only access before any repository exists.
     @MainActor
@@ -55,41 +47,6 @@ enum AuthenticSourceTestSupport {
         guard !history.isEmpty else { throw RepositoryError.persistenceUnavailable }
         return try SQLiteRepositoryProvider(path: url.path,
             migrations: Array(allMigrations.prefix(history.count)), access: .readOnlySnapshot)
-    }
-
-    @MainActor
-    struct PreparedImportOwner {
-        let preparedImport: PreparedImport
-        private let engine: ImportEngine
-
-        fileprivate init(preparedImport: PreparedImport, engine: ImportEngine) {
-            self.preparedImport = preparedImport
-            self.engine = engine
-        }
-
-        func cancel() {
-            engine.cancelPreparedImport(preparedImport)
-        }
-    }
-
-    /// Full ordinary preparation of a registered source for transport and UI
-    /// mechanics. The returned owner must remain alive through use and receive
-    /// `cancel()` on scope exit. No financial fields, source bytes, or validation
-    /// are authored.
-    @MainActor
-    static func preparedAxisBankCSV(
-        providerGeneration: ProviderGenerationToken? = nil,
-        alternatePeriod: Bool = false
-    ) async throws -> PreparedImportOwner {
-        let resolvedGeneration = providerGeneration ?? DatabaseProvider.shared.generationToken
-        let provider = DatabaseProvider(inMemory: true)
-        let engine = ImportEngine(
-            importPersistenceCoordinator: DefaultImportPersistenceCoordinator(databaseProvider: provider),
-            persistenceStateProvider: { provider.persistenceState },
-            providerGenerationProvider: { resolvedGeneration }
-        )
-        let preparedImport = try await engine.prepareImport(from: axisBankCSV(alternatePeriod: alternatePeriod))
-        return PreparedImportOwner(preparedImport: preparedImport, engine: engine)
     }
 
     static func axisBankCSV(alternatePeriod: Bool = false) throws -> URL {

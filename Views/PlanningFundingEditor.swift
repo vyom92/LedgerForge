@@ -27,6 +27,8 @@ struct PlanningFundingEditor: View {
     @State private var selected: Set<String> = []
     @State private var search = ""
     @State private var message: String?
+    @FocusState private var editingTransferAmount: Bool
+    @State private var transferPresentation = LFEditingPresentation<String>()
 
     private var scopedDraft: PlanAssistance? {
         draft?.excludingHistoryAccounts(excludedHistoryAccountIDs, reserves: metadata?.reserves ?? [])
@@ -60,6 +62,10 @@ struct PlanningFundingEditor: View {
             }
             if let message { Text(message).foregroundStyle(LFTheme.warning) }
         }.onAppear { draft = plan.assistance ?? .init(workspaceID: plan.workspaceID, month: plan.month.canonical) }
+            .onChange(of: editingTransferAmount) { _, editing in
+                if editing { transferPresentation.begin(receivedText) }
+                else { transferPresentation.end() }
+            }
     }
     private var billFunding: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -127,8 +133,12 @@ struct PlanningFundingEditor: View {
                     .init(id: $0.id, title: $0.title, detail: $0.selectionContext)
                 })
             TextField("Amount needed in receiving bank’s currency", text: $receivedText).textFieldStyle(.roundedBorder)
+                .focused($editingTransferAmount)
+                .onSubmit { editingTransferAmount = false }
+            Text("The funding preview updates when you finish editing the amount.")
+                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             TextField("Funding date · YYYY-MM-DD", text: $transferDate).textFieldStyle(.roundedBorder)
-            if let preview = try? transferPreview() {
+            if let preview = try? transferPreview(amountText: transferPresentation.value(or: receivedText)) {
                 Text("Planned principal: " + MoneyFormatting.display(preview.sent) + " → " + MoneyFormatting.display(preview.received))
                 if preview.sent.currency != preview.received.currency { Text("Plus the one configured fee: " + MoneyFormatting.display(plan.configuredTransferFee)).font(theme.typography.secondary) }
             }
@@ -148,7 +158,7 @@ struct PlanningFundingEditor: View {
                     Text("\(value.date) · \(value.sent.decimal) \(value.sent.currency) → \(value.received.decimal) \(value.received.currency)")
                     Spacer()
                     Button("Match actuals") { matchingID = value.id; matchesTransfer = true; selected = Set(value.transactionIDs ?? []); search = "" }.lfSecondaryAction()
-                    Button("Remove") { draft?.transfers?.removeAll { $0.id == value.id } }.buttonStyle(.borderless)
+                    Button("Remove") { draft?.transfers?.removeAll { $0.id == value.id } }.lfSecondaryAction()
                 }
             }
         }
@@ -161,7 +171,7 @@ struct PlanningFundingEditor: View {
                     Text("\(value.date) · \(value.title) · \(value.amount.decimal) \(value.amount.currency)")
                     Spacer()
                     Button("Match actuals") { matchingID = value.id; matchesTransfer = false; selected = Set(value.transactionIDs ?? []); search = "" }.lfSecondaryAction()
-                    Button("Remove") { draft?.datedAdjustments.removeAll { $0.id == value.id } }.buttonStyle(.borderless)
+                    Button("Remove") { draft?.datedAdjustments.removeAll { $0.id == value.id } }.lfSecondaryAction()
                 }
             }
         }
@@ -195,10 +205,10 @@ struct PlanningFundingEditor: View {
             Button("Back without changing matches") { matchingID = nil }.lfSecondaryAction()
         }
     }
-    private func transferPreview() throws -> (sent: Money, received: Money) {
+    private func transferPreview(amountText: String? = nil) throws -> (sent: Money, received: Money) {
         guard let from = accounts.first(where: { $0.id == fromID }), let to = accounts.first(where: { $0.id == toID }),
               PlanningIntelligence.permitsPlanningRoute(from: from, to: to, retentionAccountID: metadata?.preferences?.retentionAccountID) else { throw PlanningFundingError.input("Choose two banks on a permitted route.") }
-        let received = try money(receivedText, currency: to.currency)
+        let received = try money(amountText ?? receivedText, currency: to.currency)
         guard let sent = PlanningIntelligence.transferPrincipal(received: received, fromCurrency: from.currency, plan: plan) else { throw PlanningFundingError.input("The monthly plan needs a valid conversion reference.") }
         return (sent, received)
     }

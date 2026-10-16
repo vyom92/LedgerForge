@@ -28,6 +28,7 @@ struct CategoryManagementView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject private var categoryStore: CategoryStore
     private let coordinator: CategoryManaging
+    private let availableWidth: CGFloat
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
 #endif
@@ -49,8 +50,10 @@ struct CategoryManagementView: View {
     init(
         categoryStore: CategoryStore? = nil,
         coordinator: CategoryManaging? = nil,
-        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil,
+        availableWidth: CGFloat = 0
     ) {
+        self.availableWidth = availableWidth
         let resolvedStore = categoryStore ?? .shared
         self.categoryStore = resolvedStore
         self.coordinator = coordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
@@ -60,8 +63,10 @@ struct CategoryManagementView: View {
     @MainActor
     init(
         categoryStore: CategoryStore? = nil,
-        coordinator: CategoryManaging? = nil
+        coordinator: CategoryManaging? = nil,
+        availableWidth: CGFloat = 0
     ) {
+        self.availableWidth = availableWidth
         let resolvedStore = categoryStore ?? .shared
         self.categoryStore = resolvedStore
         self.coordinator = coordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
@@ -71,53 +76,53 @@ struct CategoryManagementView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
             LFSettingsPageHeader("Categories", subtitle: "Organise imported transactions with your own categories.")
-            LFPanel(title: "New category") {
-            VStack(alignment: .leading, spacing: 14) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: theme.spacing.controlGap) { createControls }
-                    VStack(alignment: .leading, spacing: theme.spacing.controlGap) { createControls }
+            LFSettingsColumns(availableWidth: availableWidth, leadingFraction: 0.32) {
+                LFPanel(title: "Create category") {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: theme.spacing.controlGap) { createControls }
+                        VStack(alignment: .leading, spacing: theme.spacing.controlGap) { createControls }
+                    }
                 }
-                Divider().overlay(theme.palette.divider)
-
-                if categoryStore.categories.isEmpty {
-                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
-                        Image(systemName: "tag").font(theme.typography.sectionIcon)
-                            .foregroundStyle(theme.palette.secondaryText).accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: theme.spacing.small) {
-                            Text("No categories yet").font(theme.typography.sectionTitle)
-                            Text("Create a category to classify imported transactions.")
-                                .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
-                                .fixedSize(horizontal: false, vertical: true)
+            } trailing: {
+                LFPanel(title: "Existing categories") {
+                    if categoryStore.categories.isEmpty {
+                        HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                            Image(systemName: "tag").font(theme.typography.sectionIcon)
+                                .foregroundStyle(theme.palette.secondaryText).accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                Text("No categories yet").font(theme.typography.sectionTitle)
+                                Text("Create a category to classify imported transactions.")
+                                    .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
-                    }
-                    .padding(.vertical, theme.spacing.sectionGap)
-                } else {
-                    categorySection(title: "Active", categories: categoryStore.activeCategories)
-                    if !categoryStore.archivedCategories.isEmpty {
-                        Divider().overlay(theme.palette.divider)
-                        categorySection(title: "Archived", categories: categoryStore.archivedCategories)
-                    }
-                }
-
-                if let message {
-                    Text(message)
-                        .font(theme.typography.formCaption)
-                        .foregroundStyle(LFTheme.warning)
-                }
-
-                if categoryReconciliationRequired {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
-                            .font(theme.typography.formCaption)
-                            .foregroundStyle(LFTheme.warning)
-                        Button("Retry refresh", action: retryCanonicalHydration)
-                            .lfSecondaryAction()
+                        .padding(.vertical, theme.spacing.sectionGap)
+                    } else {
+                        categorySection(title: "Active", categories: categoryStore.activeCategories)
+                        if !categoryStore.archivedCategories.isEmpty {
+                            Divider().overlay(theme.palette.divider)
+                            categorySection(title: "Archived", categories: categoryStore.archivedCategories)
+                        }
                     }
                 }
             }
+            if let message {
+                Text(message)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(LFTheme.warning)
+            }
+            if categoryReconciliationRequired {
+                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                    Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
+                        .font(theme.typography.secondary)
+                        .foregroundStyle(LFTheme.warning)
+                    Button("Retry refresh", action: retryCanonicalHydration)
+                        .lfSecondaryAction()
+                }
+            }
         }
-            .frame(maxWidth: 1000, alignment: .leading)
-        }
+        .font(theme.typography.body)
+        .foregroundStyle(theme.palette.primaryText)
         .onAppear {
             DatabaseActivityGate.shared.registerDraftOwner(restoreDraft) { [weak draft = restoreDraft] in draft?.hasDraft == true }
         }
@@ -174,7 +179,7 @@ struct CategoryManagementView: View {
         if !categories.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(theme.typography.formCaption.weight(.semibold))
+                    .font(theme.typography.secondary.weight(.semibold))
                     .foregroundStyle(theme.palette.secondaryText)
 
                 ForEach(categories) { category in
@@ -206,7 +211,7 @@ struct CategoryManagementView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if isInUse(category) {
                     Text("Assigned")
-                        .font(theme.typography.finePrint)
+                        .font(theme.typography.secondary)
                         .foregroundStyle(theme.palette.secondaryText)
                 }
                 Button {

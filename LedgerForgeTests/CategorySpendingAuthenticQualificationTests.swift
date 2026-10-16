@@ -1105,7 +1105,7 @@ final class CategorySpendingAuthenticQualificationTests: XCTestCase {
     /// helper, ordinary ImportEngine preparation and the production import mapper.
     /// No transaction/domain DTO is authored or copied into either provider.
     private func qualifyFutureImport(provider: DatabaseProvider, database: SQLiteDatabase?, payload: Payload) async throws -> [String: FutureOutcome] {
-        let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
+        let plan = try await authenticConfirmedImportPlan(generationToken: provider.generationToken)
         let workspace = plan.workspace.id
         try check(workspace == payload.workspaceID, "Authentic future import selected a different approved workspace")
         let beforeFacts = try provider.transactionRepo.trustedTransactions(workspaceId: workspace)

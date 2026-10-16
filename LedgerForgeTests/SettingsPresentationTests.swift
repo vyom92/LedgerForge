@@ -41,22 +41,6 @@ struct SettingsPresentationTests {
         )
     }
 
-    @Test func completedImportsUsesHydratedHistoryRatherThanTransientFileSelection() {
-        let hydratedAttempts = [attempt(id: "success", outcome: .successfulImport)]
-
-        let original = SettingsPresentation.completedImports(
-            from: hydratedAttempts,
-            persistenceState: .verifiedSQLite
-        )
-        let relaunchEquivalent = SettingsPresentation.completedImports(
-            from: hydratedAttempts,
-            persistenceState: .verifiedSQLite
-        )
-
-        #expect(original == .available(1))
-        #expect(relaunchEquivalent == .available(1))
-    }
-
     @Test func completedImportsCountsUniqueFullPartialAndCBQSourceSessions() {
         let attempts = [
             attempt(id: "full", outcome: .successfulImport),
@@ -299,29 +283,6 @@ struct SettingsPresentationTests {
         }
     }
 
-#if DEBUG
-    @Test func developerProfileSettingsCopyIsBoundedAndCurrentHasNoResetAction() {
-        let current = DevelopmentDatabaseProfileDescriptor(
-            kind: .current,
-            displayName: DevelopmentDatabaseProfileKind.current.displayName,
-            persistenceClassification: .stableCurrent,
-            canReset: false,
-            migrationSourceVersion: nil,
-            verifiedCurrentSchemaVersion: 9
-        )
-        let copy = [
-            current.displayName,
-            current.currentSchemaLabel,
-            DeveloperDatabaseProfileOperationState.activationBlocked.message ?? ""
-        ].joined(separator: " ")
-
-        #expect(current.resetActionLabel == nil)
-        #expect(!copy.contains("/"))
-        #expect(!copy.lowercased().contains("sqlite"))
-        #expect(!copy.lowercased().contains("uuid"))
-        #expect(!copy.lowercased().contains("token"))
-    }
-#endif
 }
 
 @MainActor

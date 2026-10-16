@@ -323,7 +323,9 @@ enum NetWorthProjection {
             var dependencies: Set<AlDarCurrency> = [], dates: [Date] = [], stale = false
             var converted: NetWorthArithmetic.Fraction?
             if let quote = component.quote {
-                if quote.freshnessAge(at: now) >= 4 { stale = true; issues.append("Price valuation is \(quote.age(at: now)) days old") }
+                if let missed = quote.missedPublicationWindows(at: now), missed >= 4 {
+                    stale = true; issues.append("Price is behind \(missed) source publication windows")
+                }
                 if priceFailures.contains(quote.mapping.identity) { issues.append("Price refresh failed; last successful quote retained") }
             }
             if let amount = component.nativeValue {

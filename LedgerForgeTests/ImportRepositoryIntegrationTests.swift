@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
-/// Authentic-source replay/cancellation plus source-independent database bootstrap.
-/// Fabricated FinancialDocument factories were retired under the hard corpus rule.
+/// Fixture-based replay/cancellation and source-independent database bootstrap.
 @MainActor
 struct ImportRepositoryIntegrationTests {
     @Test(.globalRuntimeStateIsolation)
@@ -36,8 +35,8 @@ struct ImportRepositoryIntegrationTests {
         let folder = try temporaryFolder(named: "LedgerForgeExactReimportTests")
         defer { try? FileManager.default.removeItem(at: folder) }
         let databaseURL = folder.appendingPathComponent("exact-reimport.sqlite")
-        // Byte-exact registered authentic source; these assertions cover replay transport, not a source oracle.
-        let originalURL = try AuthenticSourceTestSupport.axisBankCSV()
+        // Byte-identical fixture; these assertions cover replay transport, not institution-source acceptance.
+        let originalURL = try MechanicsTestSupport.axisBankCSV()
         let renamedURL = folder.appendingPathComponent("renamed-axis-statement.csv")
         try FileManager.default.copyItem(at: originalURL, to: renamedURL)
 
@@ -147,7 +146,7 @@ struct ImportRepositoryIntegrationTests {
         )
 
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
 

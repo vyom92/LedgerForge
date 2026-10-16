@@ -453,10 +453,16 @@ struct DashboardMoneyFlowCard: View {
                 let groups = Dictionary(grouping: detail.transactionIDs.compactMap { projection.reviewRows[$0] }, by: \.explanation)
                 ForEach(groups.keys.sorted(), id: \.self) { reason in
                     let rows = groups[reason] ?? []
-                    VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                        Button("\(rows.count) \(rows.count == 1 ? "transaction" : "transactions") · " + reason) {
-                            inspect(Set(rows.map(\.id)))
-                        }.buttonStyle(.borderless)
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        Text(reason)
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        let reviewIDs = Set(rows.map(\.id))
+                        if reviewIDs != detail.allTransactionIDs {
+                            Button("Review \(rows.count) \(rows.count == 1 ? "transaction" : "transactions")") {
+                                inspect(reviewIDs)
+                            }.lfSecondaryAction()
+                        }
                         Text("Categories: " + Set(rows.map(\.source.categoryName)).sorted().joined(separator: ", "))
                             .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }
@@ -532,7 +538,7 @@ struct DashboardMoneyFlowCard: View {
 
     private func coverageButton(_ projection: MoneyFlowProjection) -> some View {
         Button("Coverage & basis") { showsCoverage = true }
-            .buttonStyle(.link).font(theme.typography.secondary)
+            .lfSecondaryAction().font(theme.typography.secondary)
             .accessibilityIdentifier("dashboard.moneyFlow.coverage")
             .popover(isPresented: $showsCoverage) {
                 ScrollView {
@@ -541,7 +547,8 @@ struct DashboardMoneyFlowCard: View {
                             Text("Money flow basis").font(theme.typography.rowTitle)
                             Spacer()
                             Button("Close details", systemImage: "xmark") { showsCoverage = false }
-                                .labelStyle(.iconOnly).buttonStyle(.borderless)
+                                .labelStyle(.iconOnly).lfSecondaryAction()
+                                .keyboardShortcut(.cancelAction)
                         }
                         Text(monthTitle(projection.month) + " · " + projection.currency + " · All recorded accounts, including history-only accounts.")
                         Text("Actual movements use source dates. Account inflows and outflows can differ: no opening balance or savings residual is invented. Connections aggregate accounts; they do not trace a particular salary receipt.")
@@ -577,7 +584,7 @@ struct DashboardMoneyFlowCard: View {
                     Image(systemName: "arrow.right").accessibilityHidden(true)
                 }
             }
-            .buttonStyle(.link)
+            .lfSecondaryAction()
         }
     }
 

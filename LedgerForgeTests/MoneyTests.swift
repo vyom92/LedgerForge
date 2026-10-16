@@ -4,14 +4,6 @@ import Testing
 
 struct MoneyTests {
 
-    @Test func canonicalINRMoneyEncodesFixedScaleDecimalAndMinorUnits() throws {
-        let money = try Money(amount: Decimal(string: "100.5")!, currency: "inr")
-
-        #expect(money.currency.code == "INR")
-        #expect(try money.canonicalDecimalString() == "100.50")
-        #expect(try money.minorUnits() == 10_050)
-    }
-
     @Test func persistedINRTextRequiresCanonicalScale() throws {
         do {
             _ = try Money(canonicalDecimal: "100.5", currency: "INR")
@@ -26,25 +18,15 @@ struct MoneyTests {
         #expect(money.amount == Decimal(string: "100.50")!)
     }
 
-    @Test func catalogUsesReviewedFractionScales() throws {
-        #expect(try CurrencyCatalog.shared.definition(for: "KRW").fractionDigits == 0)
-        #expect(try CurrencyCatalog.shared.definition(for: "QAR").fractionDigits == 2)
-        #expect(try CurrencyCatalog.shared.definition(for: "KWD").fractionDigits == 3)
-    }
-
-    @Test func catalogIsVersionedAtV3() {
-        #expect(CurrencyCatalog.version == "ledgerforge.currency-catalog.v3")
-    }
-
     @Test func catalogContains155ActiveAndSourceRequiredHistoricalDefinitions() {
         let definitions = CurrencyCatalog.shared.definitions
         let codes = definitions.map { $0.code.code }
 
+        #expect(CurrencyCatalog.version == "ledgerforge.currency-catalog.v3")
         #expect(definitions.count == 157)
         #expect(definitions.filter { !["BGN", "HRK"].contains($0.code.code) }.count == 155)
         #expect(codes == codes.sorted())
         #expect(Set(codes).count == definitions.count)
-        #expect(definitions == definitions.sorted { $0.code < $1.code })
     }
 
     @Test func catalogIncludesRequiredOrdinaryCurrenciesAndScales() throws {
@@ -95,7 +77,7 @@ struct MoneyTests {
     }
 
     @Test func exactScaleRejectsFractionalKRWFourthDecimalBHDAndThirdDecimalTwoScale() {
-        let cases = [("1.1", "KRW"), ("1.2345", "BHD"), ("1.001", "EUR"), ("1.001", "BGN"), ("1.001", "HRK")]
+        let cases = [("1.1", "KRW"), ("1.2345", "BHD"), ("1.001", "INR"), ("1.001", "EUR"), ("1.001", "BGN"), ("1.001", "HRK")]
 
         for (amount, currency) in cases {
             do {
@@ -111,6 +93,7 @@ struct MoneyTests {
 
     @Test func canonicalScaleRoundTripsForZeroTwoAndThreeDecimalCurrencies() throws {
         let values = [
+            ("100.5", "inr", "100.50", Int64(10_050)),
             ("0", "KRW", "0", Int64(0)),
             ("12.34", "QAR", "12.34", Int64(1_234)),
             ("-12.34", "BGN", "-12.34", Int64(-1_234)),
@@ -120,23 +103,13 @@ struct MoneyTests {
 
         for (amount, currency, canonical, minorUnits) in values {
             let money = try Money(amount: Decimal(string: amount)!, currency: currency)
+            #expect(money.currency.code == currency.uppercased())
             #expect(try money.canonicalDecimalString() == canonical)
             #expect(try money.minorUnits() == minorUnits)
 
             let decoded = try Money(canonicalDecimal: canonical, currency: currency)
             #expect(decoded == money)
             #expect(try Money.fromMinorUnits(minorUnits, currency: currency) == money)
-        }
-    }
-
-    @Test func excessPrecisionFailsWithoutRounding() {
-        do {
-            _ = try Money(amount: Decimal(string: "1.001")!, currency: "INR")
-            Issue.record("Expected excess precision to fail")
-        } catch let error as MoneyError {
-            #expect(error == .excessPrecision(currency: "INR"))
-        } catch {
-            Issue.record("Expected MoneyError, got \(error)")
         }
     }
 

@@ -85,6 +85,10 @@ nonisolated struct InvestmentOverviewScope: Equatable, Sendable {
     let quotes: [InvestmentQuote]
     let fxDates: [Date]
     let fxMissing: Bool
+    var oldestPriceDay: String? { quotes.map(\.valuationDay).min() }
+    func missedPricePublicationWindows(at now: Date) -> Int? {
+        quotes.compactMap { $0.missedPublicationWindows(at: now) }.max()
+    }
     var usd: InvestmentOverviewLine? { lines.first { $0.currency == "USD" } }
     var hasCompleteCost: Bool { holdingCount > 0 && costCount == holdingCount }
     var hasCompleteGain: Bool { holdingCount > 0 && gainCount == holdingCount }

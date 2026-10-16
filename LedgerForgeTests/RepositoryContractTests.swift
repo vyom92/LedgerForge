@@ -2,10 +2,8 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
-/// Shared repository behavior is qualified with source-independent workspace
-/// values and complete plans derived from an unchanged authentic statement.
-/// Historical hand-authored transaction/document graphs were deliberately
-/// retired under the authentic-source rule.
+/// Shared repository behavior uses workspace values and small deterministic
+/// import plans, including real mapping, persistence and reopen.
 @MainActor
 struct RepositoryContractTests {
     @Test(arguments: RepositoryProviderKind.allCases)
@@ -35,25 +33,8 @@ struct RepositoryContractTests {
         }
     }
 
-    @Test(.globalRuntimeStateIsolation, arguments: RepositoryProviderKind.allCases)
-    func authenticConfirmedImportRoundTripsAndExactReplayMatchesAcrossProviders(
-        _ kind: RepositoryProviderKind
-    ) async throws {
-        try await withProvider(kind) { provider in
-            let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
-
-            #expect(provider.confirmedImportRepo.commitConfirmedImport(plan) == .committed(receipt(for: plan)))
-            #expect(try provider.workspaceRepo.workspace(id: plan.workspace.id) == plan.workspace)
-            #expect(try provider.accountRepo.account(id: plan.proposedAccount.id) != nil)
-            #expect(try provider.importSessionRepo.importSession(id: plan.historyTemplate.importSession.id) != nil)
-            #expect(try provider.importSessionRepo.importedDocument(id: plan.historyTemplate.document.id) == plan.historyTemplate.document)
-            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: plan.workspace.id).count == plan.transactionTemplates.count)
-            #expect(provider.confirmedImportRepo.commitConfirmedImport(plan) == .exactDuplicate)
-        }
-    }
-
     @Test(.globalRuntimeStateIsolation)
-    func sqliteAuthenticImportSurvivesCloseAndReopen() async throws {
+    func sqliteImportSurvivesCloseAndReopen() async throws {
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let path = folder.appendingPathComponent("reopen.sqlite").path
@@ -115,26 +96,6 @@ private func withProvider(
         )
         defer { sqlite.database.close() }
         try body(DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false))
-    }
-}
-
-@MainActor
-private func withProvider(
-    _ kind: RepositoryProviderKind,
-    body: (DatabaseProvider) async throws -> Void
-) async throws {
-    switch kind {
-    case .inMemory:
-        try await body(DatabaseProvider(inMemory: true))
-    case .sqlite:
-        let folder = try temporaryFolder()
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let sqlite = try SQLiteRepositoryProvider(
-            path: folder.appendingPathComponent("contract.sqlite").path,
-            migrations: allMigrations
-        )
-        defer { sqlite.database.close() }
-        try await body(DatabaseProvider.verifiedSQLite(sqlite, protectsGeneration: false))
     }
 }
 

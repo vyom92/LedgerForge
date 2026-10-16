@@ -215,9 +215,6 @@ struct PlanningInsightsView: View {
             if !usable {
                 Text("Planning context is unavailable or this draft belongs to an older ledger. Reload the plan before editing.").foregroundStyle(LFTheme.warning)
             } else if let value = model.projection {
-                if section == "Cash runway" { runway(value) }
-                else if section == "Commitments" { LFPanel { commitments(value) } }
-                else { LFPanel { reserves(value) } }
                 LFPanel(contentSpacing: 12) {
                     ViewThatFits(in: .horizontal) {
                         insightNavigation
@@ -226,6 +223,11 @@ struct PlanningInsightsView: View {
                             insightTools
                         }
                     }
+                }
+                if section == "Cash runway" { runway(value) }
+                else if section == "Commitments" { LFPanel { commitments(value) } }
+                else { LFPanel { reserves(value) } }
+                LFPanel(contentSpacing: 12) {
                     DisclosureGroup("Planning setup and changes") {
                         if let issue = SpendingIntelligence.salarySetupIssue(preferences: metadata?.preferences, categories: CategoryStore.shared.snapshot, sources: store.sources) {
                             Text(issue).font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
@@ -294,9 +296,9 @@ struct PlanningInsightsView: View {
     }
     private var insightTools: some View {
         HStack(spacing: 12) {
-            Button("Salary assistance") { editor = .preferences }.buttonStyle(.link)
-            Button("Account funding") { editor = .funding }.buttonStyle(.link)
-            Button("Plan assumptions") { editor = .budget }.buttonStyle(.link)
+            Button("Salary assistance") { editor = .preferences }.lfSecondaryAction()
+            Button("Account funding") { editor = .funding }.lfSecondaryAction()
+            Button("Plan assumptions") { editor = .budget }.lfSecondaryAction()
         }
     }
 
@@ -436,9 +438,9 @@ struct PlanningInsightsView: View {
                         DisclosureGroup("What needs review") {
                             ForEach(capacity.1, id: \.self) { Text($0).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText) }
                             HStack(spacing: 16) {
-                                Button("Open Commitments") { selection.section = "Commitments" }.buttonStyle(.link)
-                                Button("Open Reserves") { selection.section = "Reserves" }.buttonStyle(.link)
-                                Button("Salary assistance") { editor = .preferences }.buttonStyle(.link)
+                                Button("Open Commitments") { selection.section = "Commitments" }.lfSecondaryAction()
+                                Button("Open Reserves") { selection.section = "Reserves" }.lfSecondaryAction()
+                                Button("Salary assistance") { editor = .preferences }.lfSecondaryAction()
                             }
                         }
                     }
@@ -614,7 +616,7 @@ struct PlanningInsightsView: View {
                         let configured = metadata?.recurring.contains { $0.revisions.contains { $0.amount.currency == currency } } == true
                         Text(configured ? "No recurring payments included in this period" : "Not configured").font(theme.typography.sectionTitle)
                         Text("Matched and remaining amounts are unavailable.").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                        Button("Open Commitments") { selection.section = "Commitments" }.buttonStyle(.link)
+                        Button("Open Commitments") { selection.section = "Commitments" }.lfSecondaryAction()
                     } else {
                         Text(actual == 0 ? "No matched payments" : "Matched: " + amount(actual, currency)).font(theme.typography.body.weight(.semibold))
                         Text("Remaining: " + amount(remaining, currency)).monospacedDigit()

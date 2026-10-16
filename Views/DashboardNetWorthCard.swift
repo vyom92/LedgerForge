@@ -16,6 +16,8 @@ struct DashboardNetWorthCard: View {
     @State private var expandedSection: ExpandedSection?
     @State private var showsDetails = false
     @State private var showsBreakdown = false
+    @State private var showsCoverage = false
+    @FocusState private var optionsFocused: Bool
     @Binding var showsZeroBalances: Bool
     @State private var failure: String?
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
@@ -46,7 +48,7 @@ struct DashboardNetWorthCard: View {
             case .noData:
                 supporting("No current bank, card or investment positions are recorded.")
             case .noIncludedMembers:
-                supporting("No accounts included. Open Report options to include an account or investment container.")
+                supporting("No accounts included. Open Report options to include an account or portfolio.")
             case .ready:
                 totals
                 if showsBreakdown {
@@ -86,16 +88,24 @@ struct DashboardNetWorthCard: View {
         }
     }
 
-    private var currencyMenu: some View {
-        Menu("Currencies") {
+    private var currencyChoices: some View {
+        HStack(spacing: theme.spacing.small) {
             ForEach(ReportingCurrency.allCases) { currency in
                 Toggle(currency.rawValue, isOn: Binding(
                     get: { preferences.currencies.contains(currency) },
                     set: { preferences.setVisible($0, currency: currency) }))
                     .disabled(preferences.currencies == [currency])
+                    .toggleStyle(.checkbox)
+                    .font(theme.typography.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(theme.spacing.controlGap)
+                    .background(theme.palette.controlSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: theme.radius.control)
+                            .strokeBorder(theme.palette.border, lineWidth: 1)
+                    }
             }
         }
-        .lfMenuAction()
         .accessibilityIdentifier("netWorth.currencies")
         .help("Choose the currencies shown in this report. At least one stays visible.")
     }
@@ -119,6 +129,7 @@ struct DashboardNetWorthCard: View {
             }
             Button("Report options", systemImage: "slider.horizontal.3") { selectedRow = nil; showsDetails.toggle() }
                 .lfSecondaryAction()
+                .focused($optionsFocused)
                 .accessibilityIdentifier("netWorth.details")
                 .help("Choose display currencies and included accounts; inspect estimate sources")
                 .popover(isPresented: $showsDetails) { reportDetails }
@@ -192,7 +203,7 @@ struct DashboardNetWorthCard: View {
                             Text(kind.rawValue).font(theme.typography.rowTitle)
                             Spacer(minLength: theme.spacing.small)
                             let excluded = members.filter { !$0.isIncluded }.count
-                            supporting("\(members.count) \(kind == .investment ? "containers" : "accounts")"
+                            supporting("\(members.count) \(kind == .investment ? "entries" : "accounts")"
                                 + (excluded == 0 ? "" : " · \(excluded) excluded"))
                         }
                     }
@@ -203,22 +214,62 @@ struct DashboardNetWorthCard: View {
     }
 
     private var reportDetails: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                HStack {
-                    Text("Report options & sources").font(theme.typography.rowTitle)
-                    Spacer()
-                    Button("Close details", systemImage: "xmark") { showsDetails = false }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Report options").font(theme.typography.sectionTitle)
+                Spacer()
+                Button("Close details", systemImage: "xmark") {
+                    showsDetails = false
+                    optionsFocused = true
                 }
-                currencyMenu
-                if !report.members.isEmpty { breakdown }
-                ForEach(report.targets) { target in
-                    supporting(target.currency.rawValue + ": " + target.label
-                        + (target.missingCount == 0 ? "" : " · \(target.missingCount) positions unavailable"))
+                .labelStyle(.iconOnly).lfSecondaryAction()
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding(theme.spacing.panelPadding)
+            Divider()
+            ViewThatFits(in: .vertical) {
+                reportOptionsContent.fixedSize(horizontal: false, vertical: true)
+                ScrollView { reportOptionsContent }.frame(height: 540)
+            }
+            .frame(maxHeight: 540)
+        }
+        .frame(width: 620)
+        .fixedSize(horizontal: false, vertical: true)
+        .disclosureGroupStyle(LFDisclosureGroupStyle())
+    }
+
+    private var reportOptionsContent: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            VStack(alignment: .leading, spacing: theme.spacing.small) {
+                Text("Currencies").font(theme.typography.rowTitle)
+                currencyChoices
+                supporting("Keep at least one currency selected.")
+            }
+            Divider()
+            if !report.members.isEmpty {
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    Text("Included accounts & investments").font(theme.typography.rowTitle)
+                    breakdown
                 }
-                supporting("Balances and holdings have different source dates. Transfers may span those dates.")
-                ForEach(report.scopeNotes, id: \.self) { supporting($0) }
+            }
+            DisclosureGroup(isExpanded: $showsCoverage) {
+                coverageDetails.padding(.top, theme.spacing.controlGap)
+            } label: {
+                Text("Coverage & sources").font(theme.typography.rowTitle)
+            }
+            .accessibilityIdentifier("netWorth.coverage")
+        }
+        .padding(theme.spacing.panelPadding)
+    }
+
+    private var coverageDetails: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+            ForEach(report.targets) { target in
+                supporting(target.currency.rawValue + ": " + target.label
+                    + (target.missingCount == 0 ? "" : " · \(target.missingCount) positions unavailable"))
+            }
+            supporting("Balances and holdings have different source dates. Transfers may span those dates.")
+            ForEach(report.scopeNotes, id: \.self) { supporting($0) }
             if report.historyOnlyCount > 0 {
                 supporting("\(report.historyOnlyCount) history-only \(report.historyOnlyCount == 1 ? "account is" : "accounts are") outside current reporting.")
             }
@@ -229,12 +280,9 @@ struct DashboardNetWorthCard: View {
                         + (oldest == newest ? "." : "–\(InvestmentPriceDates.fetchInstant(newest))."))
                 }
             }
-            supporting("Investment values use current holdings and qualified prices. Policy totals, vested values, cost, salary and planned savings are not added.")
-            supporting("Inclusion choices are saved with this ledger and its backups. Display currencies are remembered on this Mac.")
-            }
-            .padding(theme.spacing.panelPadding)
+            supporting("Investment values use recorded holdings and available prices. Policy totals, vested values, cost, salary and planned savings are not added.")
+            supporting("Your inclusion choices are saved automatically. Display currencies are remembered on this Mac.")
         }
-        .frame(width: 560, height: 480)
     }
 
     private func memberRow(_ member: NetWorthMember) -> some View {
@@ -248,7 +296,7 @@ struct DashboardNetWorthCard: View {
                 .disabled(!permitsMutation || report.generation == nil)
                 .accessibilityLabel("Include \(member.title) · \(member.context) in net worth")
                 .accessibilityIdentifier("netWorth.include." + member.id.stableKey)
-                .help("Include this \(member.kind == .investment ? "whole investment container" : "account") in net worth. The choice saves with the ledger.")
+                .help("Include this \(member.kind == .investment ? "whole portfolio" : "account") in net worth. The choice saves automatically.")
                 Spacer(minLength: theme.spacing.small)
                 if member.kind != .investment, let component = member.components.first {
                     Text(InvestmentArithmetic.displayedMoney(component.nativeValue, currency: component.currency))
@@ -316,7 +364,7 @@ struct DashboardNetWorthCard: View {
     }
 
     private func supporting(_ text: String) -> some View {
-        Text(text).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+        Text(text).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -679,16 +727,18 @@ struct DashboardReportRows: View {
                 Text(title(row)).font(theme.typography.rowTitle)
                 Spacer(minLength: theme.spacing.controlGap)
                 Button("Close details", systemImage: "xmark") { selectedRow = nil }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    .labelStyle(.iconOnly).lfSecondaryAction()
+                    .keyboardShortcut(.cancelAction)
             }
             ViewThatFits(in: .vertical) {
                 detail(row).fixedSize(horizontal: false, vertical: true)
-                ScrollView { detail(row) }.frame(height: 380)
-            }.frame(maxHeight: 420)
+                ScrollView { detail(row) }.frame(height: 440)
+            }.frame(maxHeight: 480)
         }
         .padding(theme.spacing.panelPadding)
-        .frame(width: 520)
+        .frame(width: 600)
         .foregroundStyle(theme.palette.primaryText)
+        .disclosureGroupStyle(LFDisclosureGroupStyle())
     }
 
     private func detail(_ row: NetWorthChartProjection.Row) -> some View {
@@ -697,32 +747,42 @@ struct DashboardReportRows: View {
             ForEach(report.members.filter { row.memberIDs.contains($0.id) }) { member in
                 VStack(alignment: .leading, spacing: theme.spacing.small) {
                     Text(member.title).font(theme.typography.body.weight(.semibold))
-                    Text(member.context).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    Text(member.context).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     ForEach(member.components.filter { ids.contains($0.id) }) { component in
-                        VStack(alignment: .leading, spacing: theme.spacing.micro) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(component.title)
+                        VStack(alignment: .leading, spacing: theme.spacing.small) {
+                            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.controlGap) {
+                                Text(component.title).fixedSize(horizontal: false, vertical: true)
                                 Spacer(minLength: theme.spacing.small)
-                                VStack(alignment: .trailing, spacing: theme.spacing.micro) {
-                                    ForEach(convertedValues["component:" + component.id] ?? []) { value in
-                                        Text(value.amount?.display ?? (netWorthCurrencyName(value.currency) + " unavailable"))
-                                            .monospacedDigit()
-                                            .accessibilityLabel(value.display)
-                                    }
-                                }
+                                Text(InvestmentArithmetic.displayedMoney(component.nativeValue, currency: component.currency))
+                                    .font(theme.typography.tableMoney).monospacedDigit()
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             .font(theme.typography.body)
-                            Text(InvestmentArithmetic.displayedMoney(component.nativeValue, currency: component.currency)
-                                 + " · " + component.dateContext)
-                                .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
-                            if let quote = component.quote {
-                                Text("Price dated \(AppDateDisplay.civil(quote.valuationDay)) · \(quote.dateBasis.label)")
-                                    .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                            DisclosureGroup("Conversions and source dates") {
+                                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                    ForEach(convertedValues["component:" + component.id] ?? []) { value in
+                                        HStack {
+                                            Text(value.currency.rawValue)
+                                            Spacer(minLength: theme.spacing.small)
+                                            Text(value.amount?.display ?? "Unavailable")
+                                                .monospacedDigit()
+                                                .accessibilityLabel(value.display)
+                                        }
+                                    }
+                                    Text(component.dateContext)
+                                    if let quote = component.quote {
+                                        Text("Price dated \(AppDateDisplay.civil(quote.valuationDay)) · \(quote.dateBasis.label)")
+                                    }
+                                }
+                                .padding(.top, theme.spacing.small)
                             }
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                             if let issue = component.issue {
-                                Text(issue).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                                Text(issue).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                             }
                         }
+                        .padding(.vertical, theme.spacing.micro)
+                        if component.id != member.components.last(where: { ids.contains($0.id) })?.id { Divider() }
                     }
                 }
             }

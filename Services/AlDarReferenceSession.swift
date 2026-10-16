@@ -66,6 +66,12 @@ final class AlDarReferenceSession: ObservableObject {
         PublicObservationPresentation.cacheStatus(networkAvailable: networkAvailable, failed: !failures.isEmpty)
     }
 
+    /// The fetch age already explains a healthy observation in the native card.
+    /// Keep the detailed cache provenance available to reports and MCP responses.
+    var observationWarning: String? {
+        networkAvailable == false || !failures.isEmpty ? observationStatus : nil
+    }
+
     func setNetworkAvailable(_ available: Bool) { networkAvailable = available }
 
     func installShared(_ values: [AlDarCurrency: AlDarUnitReference], failures: Set<AlDarCurrency>, busy: Bool,

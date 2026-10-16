@@ -102,13 +102,90 @@ extension View {
 
 /// A single theme owner for in-app actions. Native menus and confirmation
 /// dialogs keep their platform interaction; commands and enablement stay local.
-enum LFActionKind: Equatable { case primary, secondary, icon }
+enum LFActionKind: Equatable { case primary, secondary, icon, positive, negative }
+
+enum LFConnectionStatus: String {
+    case connected = "Connected", disconnected = "Disconnected", error = "Error"
+    var color: Color {
+        switch self {
+        case .connected: LFTheme.success
+        case .disconnected: .yellow
+        case .error: LFTheme.danger
+        }
+    }
+}
 
 /// Row/selection buttons already own their themed surface. Add a consistent
 /// press response without turning each selectable row into a filled action.
 struct LFPlainActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(configuration.isPressed ? 0.78 : 1)
+        configuration.label
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.78 : 1)
+    }
+}
+
+/// The arrow, label and surrounding row are one native button. Disclosure
+/// content stays outside that button so its own controls keep their actions.
+struct LFDisclosureGroupStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                configuration.isExpanded.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .frame(width: 12)
+                        .accessibilityHidden(true)
+                    configuration.label
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(LFDisclosureButtonStyle())
+            .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+
+            if configuration.isExpanded {
+                configuration.content
+                    .padding(.leading, 20)
+                    .disclosureGroupStyle(LFDisclosureGroupStyle())
+            }
+        }
+    }
+}
+
+private struct LFDisclosureButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        LFDisclosureButtonBody(configuration: configuration)
+    }
+}
+
+private struct LFDisclosureButtonBody: View {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.isFocused) private var isFocused
+    @State private var isHovered = false
+    let configuration: ButtonStyleConfiguration
+
+    var body: some View {
+        configuration.label
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .frame(minHeight: max(32, theme.typography.compactControlMinimum))
+            .foregroundStyle(theme.palette.primaryText)
+            .background {
+                RoundedRectangle(cornerRadius: theme.radius.control)
+                    .fill(theme.palette.primaryText.opacity(isEnabled ? (configuration.isPressed ? 0.10 : isHovered ? 0.05 : 0) : 0))
+            }
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: theme.radius.control)
+                        .strokeBorder(theme.interaction.focusRing, lineWidth: 2)
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? 1 : 0.65)
+            .onHover { isHovered = $0 }
     }
 }
 
@@ -130,20 +207,21 @@ private struct LFActionButtonBody: View {
     let kind: LFActionKind
     let wide: Bool
 
-    private var destructive: Bool { configuration.role == .destructive }
+    private var destructive: Bool { configuration.role == .destructive || kind == .negative }
+    private var semanticColor: Color? { destructive ? LFTheme.danger : kind == .positive ? LFTheme.success : nil }
     private var surface: AnyShapeStyle {
-        if destructive { return AnyShapeStyle(LFTheme.danger.opacity(0.14)) }
+        if let semanticColor { return AnyShapeStyle(semanticColor.opacity(0.20)) }
         switch kind {
-        case .primary: return AnyShapeStyle(theme.palette.primaryAction)
-        case .secondary: return AnyShapeStyle(theme.palette.secondaryAction)
+        case .primary, .secondary: return AnyShapeStyle(theme.palette.secondaryAction)
         case .icon: return AnyShapeStyle(theme.palette.controlSurface)
+        case .positive, .negative: return AnyShapeStyle(theme.palette.secondaryAction)
         }
     }
 
     var body: some View {
         configuration.label
             .font(theme.typography.button)
-            .foregroundStyle(destructive ? LFTheme.danger : theme.palette.primaryText)
+            .foregroundStyle(semanticColor ?? theme.palette.primaryText)
             .padding(.horizontal, wide ? 32 : kind == .icon ? 8 : 12)
             .padding(.vertical, wide ? 13 : kind == .icon ? 6 : 8)
             .frame(minWidth: wide ? 180 : kind == .icon ? theme.typography.compactControlMinimum : nil,
@@ -156,11 +234,11 @@ private struct LFActionButtonBody: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: theme.radius.control)
-                    .strokeBorder(isFocused ? theme.interaction.focusRing : theme.palette.border, lineWidth: isFocused ? 2 : 1)
+                    .strokeBorder(isFocused ? theme.interaction.focusRing : semanticColor?.opacity(0.65) ?? theme.palette.border, lineWidth: isFocused ? 2 : 1)
                     .allowsHitTesting(false)
             }
             .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
-            .opacity(isEnabled ? 1 : 0.5)
+            .opacity(isEnabled ? 1 : 0.65)
             .onHover { isHovered = $0 }
     }
 }
@@ -171,7 +249,7 @@ private struct LFMenuAction: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .buttonStyle(.glass)
+            .buttonStyle(LFActionButtonStyle())
             .buttonBorderShape(.roundedRectangle(radius: theme.radius.control))
             .tint(theme.palette.primaryText)
             .foregroundStyle(theme.palette.primaryText)
@@ -183,14 +261,26 @@ extension View {
     func lfPrimaryAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .primary)) }
     func lfSecondaryAction() -> some View { buttonStyle(LFActionButtonStyle()) }
     func lfIconAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .icon)) }
+    func lfConnectAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .positive)) }
+    func lfDisconnectAction() -> some View { buttonStyle(LFActionButtonStyle(kind: .negative)) }
     func lfMenuAction() -> some View { modifier(LFMenuAction()) }
 }
 
 /// Native editable controls keep their bindings and responder behavior. Only
 /// the surrounding surface and the ordinary field focus cue are shared.
 private struct LFInputSurface: ViewModifier {
-    @Environment(\.lfTheme) private var theme
     @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(LFInputAppearance(isFocused: isFocused))
+            .focused($isFocused)
+    }
+}
+
+private struct LFInputAppearance: ViewModifier {
+    @Environment(\.lfTheme) private var theme
+    let isFocused: Bool
 
     func body(content: Content) -> some View {
         content
@@ -203,12 +293,12 @@ private struct LFInputSurface: ViewModifier {
                     .strokeBorder(isFocused ? theme.interaction.focusRing : theme.palette.border, lineWidth: isFocused ? 2 : 1)
                     .allowsHitTesting(false)
             }
-            .focused($isFocused)
     }
 }
 
 extension View {
     func lfTextField() -> some View { modifier(LFInputSurface()) }
+
 }
 
 /// One continuous native backdrop and color wash behind the shared header and

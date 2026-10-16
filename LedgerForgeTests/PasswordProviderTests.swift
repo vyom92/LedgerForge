@@ -49,18 +49,25 @@ struct PasswordProviderTests {
 
     @Test func coordinatorReturnsTypedFailureWhenProviderThrowsImportError() async throws {
         let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
-        let coordinator = DefaultImportCoordinator(
-            readerRegistry: PasswordTestReaderRegistry(
-                reader: RecordingPasswordReader(expectedPassword: "fictional-never-used-password")
-            ),
-            passwordProvider: ThrowingPasswordProvider(error: .passwordRequired)
-        )
+        let failures: [(ImportError, String)] = [
+            (.passwordRequired, "A password is required to read this document."),
+            (.unknown(message: "Unexpected reader state"), "Unknown import error: Unexpected reader state")
+        ]
+        for (error, description) in failures {
+            let coordinator = DefaultImportCoordinator(
+                readerRegistry: PasswordTestReaderRegistry(
+                    reader: RecordingPasswordReader(expectedPassword: "fictional-never-used-password")
+                ),
+                passwordProvider: ThrowingPasswordProvider(error: error)
+            )
 
-        let result = await coordinator.importDocument(request)
+            let result = await coordinator.importDocument(request)
 
-        #expect(result.status == .failed)
-        #expect(result.rawDocument == nil)
-        #expect(result.error == .passwordRequired)
+            #expect(result.status == .failed)
+            #expect(result.rawDocument == nil)
+            #expect(result.error == error)
+            #expect(result.error?.errorDescription == description)
+        }
     }
 
     @Test func coordinatorReusesRememberedPasswordWithoutChallenging() async throws {

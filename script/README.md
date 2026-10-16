@@ -16,130 +16,94 @@ directly.
 ./script/validate.sh --help
 ```
 
-`build-debug` and `build-release` run a fresh signed build in the named Xcode
-configuration. `test-focused` requires one or more real Xcode test selectors
-and translates each to `-only-testing:`. A focused result with zero executed
-tests is failed evidence. `test-full` invokes the ordinary app regression plan selection in
-the canonical `TestPlan`.
+`build-debug` and `build-release` run signed builds in the named Xcode
+configuration. `test-focused` requires one or more real Xcode selectors;
+`test-full` runs the complete ordinary selection in `TestPlan.xctestplan`.
 `cycle-close` uses separate fresh Debug, Release and test artifact roots, then
-runs that same ordinary app regression plan selection after both builds pass.
+runs that same ordinary selection after both builds pass. Use a fresh artifact
+root for fresh-build evidence; explicitly reusing a task-owned root permits
+incremental builds and must be reported as such.
 
-The Sprint-94 owner decision separates 17 existing definitions from ordinary
-regression: 13 corpus campaigns, their evidence-destination preflight, two tests
-that copy statement files, and the separately authorized live-provider check.
-Their definitions are retained. `TestPlan.xctestplan` owns the exclusion list;
-`test-full` also forwards it as explicit `-skip-testing:` arguments because the
-current Xcode runner does not consistently apply Swift Testing exclusions from
-the plan alone. This applies to both direct testing and external-environment
-testing. Use this driver for the ordinary run; an unfiltered Xcode run is not
-the owner-approved selection. The earlier Sprint-94 ordinary app regression plan passed 554 definitions /
-614 executions. Final owner corrections added 13 definitions; the renewed
-ordinary app regression plan passed 567 definitions / 627 executions with zero
-failures/skips. It is not complete authentic/source acceptance. The same 12
-selectors cover 17 retained, separately gated definitions; no exclusions were
-added by the corrections. No definition may be excluded because it fails.
-Parameterized cases may produce more executions than definitions. The final
-two-decimal-only Sprint-94 correction adds one focused definition and passed
-1/1 plus Debug, optimized Release and native inspection. The owner explicitly
-retains the preceding 567/627 ordinary result without a rerun; do not describe
-it as an execution on the last display-only fingerprint.
+### Ordinary tests and explicit integrations
 
-App-hosted tests do not reliably inherit arbitrary variables exported only in
-the invoking shell. When authentic tests require private paths, temporary
-passwords or other external configuration, create a JSON dictionary outside
-the repository whose keys and values are strings, then point the validation
-command to it:
+The owner retired the historical authentic-only fixture, FIFO-only transport
+and cumulative whole-corpus testing restrictions on 15 October 2026. See the
+[current decision](../Project%20documents/SCOPE_DECISIONS.md#testing-restrictions-retired-20261015).
+Ordinary tests use deterministic fixtures, temporary databases and isolated
+Keychain test items. They require no owner statements, statement passwords,
+existing personal ledger or live provider session. Tests use the existing
+`.TestRun` bundle suffix and disable automatic background/public-reference
+network work. They never install or replace the production app.
+
+The accepted 16 October compiled inventory is **978 definitions: 833 ordinary and 145 retained integrations**. The ordinary run passed 939 parameter-expanded executions with zero failures/skips; the historical Xcode navigator count is not a substitute for compiled enumeration. The 60-definition cleanup preserved unique assertions, and UI-template removal predates that cleanup baseline.
+
+`TestPlan.xctestplan` is the single ordinary-selection authority. Its exclusions
+identify retained original/corpus, populated-ledger and live-provider integration
+checks. Exclusions are classified by prerequisites, not by failed assertions.
+`test-full` forwards that same list as explicit `-skip-testing:` arguments because
+this Xcode version does not consistently apply Swift Testing plan exclusions.
+The unused UI-test target and its three launch/screenshot templates were removed
+under the owner's instruction. Ordinary results do not certify unexecuted
+integration conditions or native UI behavior; existing native interaction
+acceptance remains separate.
+
+`test-focused` explicitly selects the requested suite or method, including an
+integration excluded from ordinary selection. Both commands build the canonical
+project/scheme/plan for testing, preserve generated metadata, then execute that
+`.xctestrun`. For focused runs only, the generated skip lists are removed before
+applying `-only-testing:`; the canonical plan itself is not rewritten. Timeouts
+and serial target scheduling remain in force. Every requested selector must
+resolve to at least one passing executed definition in the result tree. A zero,
+skip-only or unresolved-selector result fails the command, even if Xcode exits
+successfully. A suite selector does not promise a fixture for its integration
+methods: use exact method selectors when you need only its ordinary checks.
+
+The small CSV mechanics fixture traverses the actual reader, classifier, parser,
+validator and mapper. Each preparation owns its engine and snapshot. Its fixed
+invented values exercise repository/snapshot/lifecycle mechanics; they do not
+claim institution-source coverage. The nonfinancial BIFF8 fixture exercises real
+libxls open/copy/lifetime/cancellation. The genuine three-carrier CSV/PDF/XLS
+mapper comparison and independent source oracles remain explicit integrations.
+
+### Running an explicitly selected integration
+
+App-hosted tests do not reliably inherit arbitrary shell variables. Supply the
+specific integration's existing prerequisites in an external JSON dictionary
+with string keys/values, then run its exact selector:
 
 ```bash
 LEDGERFORGE_TEST_ENVIRONMENT_FILE=/absolute/external/test-environment.json \
-  ./script/validate.sh test-focused 'LedgerForgeTests/SomeSuite/someTest()'
-```
-
-For `test-focused`, `test-full` and the test phase of `cycle-close`, this option
-first builds the canonical project, scheme and test plan for testing. It then
-merges the supplied dictionary into every generated test target's existing
-`EnvironmentVariables` and runs that exact generated `.xctestrun` with
-`test-without-building`. Existing Xcode variables and test-run metadata are
-preserved. Without the option, validation retains its existing one-step
-`xcodebuild test` behavior.
-
-Treat the JSON file as restricted private credential material and store it only
-in an approved task-owned location. Its values are copied into the task-owned
-`.xctestrun`, so that artifact root is also private until it is recoverably
-removed. Do not publish passwords, authentic-source paths, source oracles or the
-environment file. Merely exporting the underlying variables in the shell is
-not evidence that an app-hosted test received them.
-
-The separately gated global authentic-corpus campaign is excluded from the
-current ordinary selection. Its historical workflow below creates derived
-financial evidence and is incompatible with the current in-memory-only source
-processing rule; it must not run without a new explicit owner decision.
-That historical gate requires `LEDGERFORGE_GLOBAL_AUTHENTIC_RESULT_FILE`
-to name a writable test-host destination. Forwarding a path does not grant sandbox
-write access: use a task-owned directory inside the app's container, then copy the
-completed result to the external evidence archive after the run. A source-independent
-atomic-write/readback/remove preflight runs before the corpus and can also be selected
-alone as `LedgerForgeTests/GlobalAuthenticCorpusAcceptanceTests/configuredEvidenceDestinationSupportsAtomicWrites()`.
-The final report write remains mandatory and any write failure fails the gate.
-
-A missing required original, password or oracle in the approved selection is a
-failed test environment, not a passing result or a reason to disable that test. The script
-continues to require a readable nonzero test-result summary after execution.
-
-### Post-94 affected-family checks
-
-The six existing affected family suites support the current in-memory-only
-source rule. They read the approved originals directly and retain source/oracle
-comparisons only in memory. Their external environment dictionary needs paths,
-not passwords: `LEDGERFORGE_PRIVATE_AMEX_ROOT`, `LEDGERFORGE_AXIS_BANK_ROOT`,
-`LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_ROOT`, `LEDGERFORGE_CBQ_BANK_ROOT`,
-`LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY` (the retained key now points to original
-CBQ card PDFs), and `LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY`. Ordinary
-original-backed tests use `LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY` as well.
-Passwords come from the existing statement-password Keychain scopes. A missing
-credential is an explicit test-environment failure; never put a password in a
-checked-in command or source file. The older file-output global workflow above
-remains separately gated and incompatible with the current source rule.
-
-Use the existing focused selection, after authorizing the relevant authentic
-campaign:
-
-```bash
-LEDGERFORGE_TEST_ENVIRONMENT_FILE=/absolute/external/paths-only.json \
   ./script/validate.sh test-focused \
-  LedgerForgeTests/AmericanExpressPrivateAcceptanceTests \
-  LedgerForgeTests/AxisBankAuthenticAcceptanceTests \
-  LedgerForgeTests/HDFCBankAccountAuthenticAcceptanceTests \
-  LedgerForgeTests/CBQBankAuthenticAcceptanceTests \
-  LedgerForgeTests/CBQCreditCardPrivateAcceptanceTests \
-  LedgerForgeTests/AxisCreditCardAuthenticAcceptanceTests
+  'LedgerForgeTests/ImportPersistenceFormatAuthorityMapperTests/authenticCarriersKeepExactFormatAndFingerprintAuthority()'
 ```
 
-### Sprint-96 current-holdings qualification
+The driver merges that dictionary into each generated test target's environment.
+Missing prerequisites fail the integration; they are never counted as a pass.
+The environment and generated `.xctestrun` can contain private paths/credentials,
+so keep them outside Git. Legitimate local evidence files are permitted.
+`AuthenticSourceTestSupport.presentationDatabaseURL()` requires an explicit
+`LEDGERFORGE_PRESENTATION_DATABASE` nomination; it no longer silently falls back
+to the adopted Current database. Its readers remain read-only.
 
-`InvestmentSourceImportTests` and `InvestmentRAMOriginalTests` are separately
-selected original-dependent suites (eight definitions), alongside the retained
-pre-existing corpus exclusions. Select them explicitly with `test-focused`.
-The local suite reads `LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY`. The RAM suite
-requires `LEDGERFORGE_INVESTMENT_RAM_PIPE`, an owner-owned FIFO containing the
-unchanged nominated originals and independent comparison fields. Passwords and
-financial comparisons stay in memory; neither a statement substitute nor an
-oracle file is a permitted setup step.
+Retained family integrations use their existing keys, including
+`LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY`, `LEDGERFORGE_AXIS_BANK_ROOT`,
+`LEDGERFORGE_PRIVATE_AMEX_ROOT`, `LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_ROOT`,
+`LEDGERFORGE_CBQ_BANK_ROOT`, `LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY` (original
+PDFs), and `LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY`. Statement credentials use
+the existing Keychain scopes or explicitly forwarded test configuration.
+Check the selected test's helper for its exact inputs; do not run every private
+campaign for an unrelated change.
 
-The complete Salary suite also accepts
-`LEDGERFORGE_PRIVATE_SALARY_ORACLE_PIPE` with the real Salary originals root.
-Its independent native-text/geometry comparison traverses the FIFO in memory;
-the older file-backed oracle path remains historical and is not used under the
-current source-processing rule.
-
-For an explicitly selected real-process continuation, the populated investment
-recovery test accepts `LEDGERFORGE_S96_RECOVERY_NAMESPACE` beginning with
-`s93-recovery-s96-`. It requires a fresh isolated namespace and exports only an
-ordinary app database plus its genuine format-1 backup for the existing DEBUG
-restore/reopen probe. It never selects or replaces the owner's actual Current
-database. The ordinary Dashboard/Transactions checks read Current's exact
-registered schema prefix through read-only connections, without applying a
-candidate migration.
+Some historical integration implementations still accept named FIFO/oracle
+transports (`LEDGERFORGE_INVESTMENT_RAM_PIPE`,
+`LEDGERFORGE_PRIVATE_SALARY_ORACLE_PIPE`) and a selected real-process recovery
+namespace. Those are implementation-specific routes, not a ban on ordinary test
+files. The shared RAM-nomination helper now accepts a regular JSON file or FIFO.
+The retained global-corpus test still requires its result destination and runs
+its atomic-write/readback/remove preflight internally before the corpus. Its
+redundant standalone preflight test was removed. Use a writable destination in
+the isolated test host's container; forwarding a path does not grant sandbox
+access. Do not use a test namespace to replace or migrate the adopted ledger.
 
 LegacyXLS's source-independent integer/buffer check constructs no workbook or
 financial row. It covers fixed-width sector identifiers, sentinel/range paths,
@@ -267,7 +231,7 @@ returned unchanged.
 ## Explicit exclusions
 
 These scripts do not create an alternate Xcode configuration, choose a custom
-database path, modify signing settings, enable the disabled UI-test target,
+database path, modify signing settings, add test targets,
 perform UI smoke automation, configure CI or change distribution, notarization
 or deployment behavior.
 
@@ -276,3 +240,18 @@ or deployment behavior.
 `InvestmentPriceQualificationTests` is a separately selected live-provider/original-ledger gate, outside the ordinary app plan. Its one definition uses the accepted closed isolated `input.ledgerforgebackup/ledger.sqlite` through `LEDGERFORGE_S97_QUALIFIED_LEDGER`; it never populates Current. Forward `LEDGERFORGE_S97_PYTHON` with the actual Python executable returned by `xcrun --find python3`, not the `/usr/bin/python3` developer shim (the shim invokes xcrun, which is unavailable inside the app sandbox). Full response and independent Decimal/Fraction expectations stay in RAM; only normal isolated databases/backups and minimal public quote cache are written. Existing source/corpus exclusions are unchanged; this adds one explicitly live qualification selector.
 
 `ZurichISPQualificationTests` is a separate authenticated native gate. Set `LEDGERFORGE_S97_ZIO_QUALIFY=1` alongside those path variables; it reads the existing saved LedgerForge ISP credential from Keychain, performs one complete native account read, and replays original responses in RAM. It checks the independent source fields and reported-summary totals, direct/CSV provider parity, atomic persistence, stale/cancel/failure retention and V22 backup/reopen. It never creates or replaces credentials. This adds two gated definitions; ordinary TestPlan does not perform authenticated Zurich requests.
+
+## Owner-authorized local releases
+
+The app target’s Debug and Release metadata currently specifies **1.2 (4)**.
+`build-release` creates the optimized signed candidate but does not install it.
+The release executor must verify the fresh native backup, retain the prior app,
+check signature/entitlements and complete bundle identity, then install only the
+qualified artifact after normal quit. Ordinary installed launch/relaunch and
+Current-ledger preservation are separate checks. Do not use `build_and_run.sh`
+as a production installer; its Debug memory-host behavior is deliberate.
+
+Only delete inventoried task-owned temporary output after retaining required
+results, source/build receipts and native evidence. Preserve the native backup
+and app-only rollback separately. See the [build/rollback contract](../Project%20documents/BUILD_AND_PROJECT_CONVENTIONS.md#local-installed-upgrade-and-rollback)
+and [v1.2 outcome](../Project%20documents/Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-ui-release).

@@ -416,6 +416,7 @@
 		C10002012610020000000001 /* LFSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10002002610020000000001 /* LFSettingsLayout.swift */; };
 		C18123BC232C5503C92DEDAE /* ZurichISP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A97000000000000000000009 /* ZurichISP.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
+		C61520261016000000000002 /* LFNumericEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61520261016000000000001 /* LFNumericEditing.swift */; };
 		C6376E9A5D26A7B8D5F8AE6D /* BackgroundWorker/BackgroundActivityBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B342BE11901B13EB448FDB7 /* BackgroundWorker/BackgroundActivityBridge.c */; };
 		C693F5F1208ED72BB43BA771 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
 		C7805345A5EB8FAFCB973C70 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
@@ -479,13 +480,6 @@
 			remoteInfo = LedgerForgeBackgroundWorker;
 		};
 		288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
-			remoteInfo = LedgerForge;
-		};
-		288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
 			proxyType = 1;
@@ -597,7 +591,6 @@
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		288EB0B42FF7955300F09BC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0D82FF7997000F09BC9 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
 		288EB0E52FF7A6C000F09BC9 /* ImportEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportEngine.swift; sourceTree = "<group>"; };
 		288EB0E82FF7AC9500F09BC9 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
@@ -816,6 +809,7 @@
 		BF0E61359D62CF443983CEDE /* FinancialIntelligenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialIntelligenceStore.swift; sourceTree = "<group>"; };
 		C10002002610020000000001 /* LFSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSettingsLayout.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
+		C61520261016000000000001 /* LFNumericEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFNumericEditing.swift; sourceTree = "<group>"; };
 		C88000013088000000000001 /* AppShellPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellPresentation.swift; sourceTree = "<group>"; };
 		C88000033088000000000001 /* AppDestinationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationContainer.swift; sourceTree = "<group>"; };
 		C88000053088000000000001 /* ImportCentreFooterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreFooterRenderer.swift; sourceTree = "<group>"; };
@@ -856,11 +850,6 @@
 			path = LedgerForgeTests;
 			sourceTree = "<group>";
 		};
-		288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LedgerForgeUITests;
-			sourceTree = "<group>";
-		};
 		28A3A4C22FFE1E3900DD5727 /* UI Assets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "UI Assets";
@@ -889,13 +878,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		288EB0B72FF7955300F09BC9 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C12FF7955300F09BC9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1038,6 +1020,7 @@
 				91AA00012026091400000001 /* LFAppearancePreferences.swift */,
 				286D68F22FFFF60E0078AAC5 /* LFTheme.swift */,
 				286D68F42FFFF6300078AAC5 /* LFPanel.swift */,
+				C61520261016000000000001 /* LFNumericEditing.swift */,
 				F99000210000000000000001 /* LFPasswordField.swift */,
 				A95000000000000000000003 /* AlDarFXCard.swift */,
 				286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */,
@@ -1062,7 +1045,6 @@
 				288EB0D72FF7995800F09BC9 /* Models */,
 				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
 				B60000123050000000000001 /* SubprocessProbe */,
-				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
 				28E75F8130725B40007DA308 /* LedgerForgeCompanion */,
 				288EB0AE2FF7955200F09BC9 /* Products */,
 				288EB0DD2FF7A3D000F09BC9 /* Core */,
@@ -1092,7 +1074,6 @@
 			children = (
 				288EB0AD2FF7955200F09BC9 /* LedgerForge.app */,
 				288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */,
-				288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */,
 				B60000103050000000000001 /* LedgerForgeSubprocessProbe */,
 				28E75F8030725B40007DA308 /* LedgerForgeCompanion.app */,
 			);
@@ -1518,29 +1499,6 @@
 			productReference = 288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */;
-			buildPhases = (
-				288EB0C02FF7955300F09BC9 /* Sources */,
-				288EB0C12FF7955300F09BC9 /* Frameworks */,
-				288EB0C22FF7955300F09BC9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				288EB0C62FF7955300F09BC9 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
-			);
-			name = LedgerForgeUITests;
-			packageProductDependencies = (
-			);
-			productName = LedgerForgeUITests;
-			productReference = 288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 		28E75F7F30725B40007DA308 /* LedgerForgeCompanion */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 28E75F8830725B41007DA308 /* Build configuration list for PBXNativeTarget "LedgerForgeCompanion" */;
@@ -1612,10 +1570,6 @@
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = 288EB0AC2FF7955200F09BC9;
 					};
-					288EB0C32FF7955300F09BC9 = {
-						CreatedOnToolsVersion = 26.6;
-						TestTargetID = 288EB0AC2FF7955200F09BC9;
-					};
 					28E75F7F30725B40007DA308 = {
 						CreatedOnToolsVersion = 27.0;
 					};
@@ -1641,7 +1595,6 @@
 			targets = (
 				288EB0AC2FF7955200F09BC9 /* LedgerForge */,
 				288EB0B92FF7955300F09BC9 /* LedgerForgeTests */,
-				288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */,
 				B60000133050000000000001 /* LedgerForgeSubprocessProbe */,
 				C90003013099000000000001 /* LedgerForgeBackgroundWorker */,
 				28E75F7F30725B40007DA308 /* LedgerForgeCompanion */,
@@ -1659,13 +1612,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		288EB0B82FF7955300F09BC9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C22FF7955300F09BC9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2011,6 +1957,7 @@
 				28E76A133072EE02007DA308 /* DashboardMoneyFlowCard.swift in Sources */,
 				281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */,
 				286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */,
+				C61520261016000000000002 /* LFNumericEditing.swift in Sources */,
 				F99000210000000000000002 /* LFPasswordField.swift in Sources */,
 				A95000000000000000000004 /* AlDarFXCard.swift in Sources */,
 				281BB15A2FFC486C006E7424 /* Repository.swift in Sources */,
@@ -2029,13 +1976,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		288EB0B62FF7955300F09BC9 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C02FF7955300F09BC9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2248,11 +2188,6 @@
 			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
 			targetProxy = 288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */;
 		};
-		288EB0C62FF7955300F09BC9 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
-			targetProxy = 288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */;
-		};
 		B60000213050000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B60000133050000000000001 /* LedgerForgeSubprocessProbe */;
@@ -2394,7 +2329,7 @@
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2432,7 +2367,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -2457,7 +2392,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2494,7 +2429,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -2562,56 +2497,6 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LedgerForge.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LedgerForge";
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Release;
-		};
-		288EB0D52FF7955300F09BC9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = LedgerForge;
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Debug;
-		};
-		288EB0D62FF7955300F09BC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = LedgerForge;
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;
@@ -2820,15 +2705,6 @@
 			buildConfigurations = (
 				288EB0D22FF7955300F09BC9 /* Debug */,
 				288EB0D32FF7955300F09BC9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				288EB0D52FF7955300F09BC9 /* Debug */,
-				288EB0D62FF7955300F09BC9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -279,6 +279,49 @@ nonisolated enum WeekdayFreshness {
     }
 }
 
+/// Presentation deadlines, independent of the app's six-hour fetch cadence.
+/// Nasdaq: regular-session close in New York; AMFI: 23:00 India NAV deadline.
+/// Owner decision 15 Oct 2026: FE/CBQ get a conservative Tuesday-Friday UTC
+/// end-of-day window for the preceding weekday's valuation. No Monday deadline.
+/// These rules do not synthesize quote dates or advance unchanged FE prices.
+nonisolated struct InvestmentPublicationWindow {
+    let zone: String
+    let weekdays: Set<Int>
+    let minute: Int
+    let priorValuationDay: Bool
+
+    static func source(_ provider: String) -> Self? {
+        switch provider {
+        case "nasdaq": return .init(zone: "America/New_York", weekdays: [2, 3, 4, 5, 6], minute: 16 * 60, priorValuationDay: false)
+        case "amfi": return .init(zone: "Asia/Kolkata", weekdays: [2, 3, 4, 5, 6], minute: 23 * 60, priorValuationDay: false)
+        case "fe", "fidelity", "blackrock", "franklin":
+            return .init(zone: "UTC", weekdays: [3, 4, 5, 6], minute: 24 * 60, priorValuationDay: true)
+        default: return nil
+        }
+    }
+
+    func missedPublications(valuationDay: String, at now: Date) -> Int {
+        let calendar = InvestmentPriceDates.calendar(zone)
+        guard var day = InvestmentPriceDates.date(valuationDay, zone: zone) else { return 4 }
+        let lastDay = calendar.startOfDay(for: now)
+        var missed = 0
+        while day <= lastDay {
+            if weekdays.contains(calendar.component(.weekday, from: day)),
+               let deadline = calendar.date(byAdding: .minute, value: minute, to: day), deadline <= now {
+                var expected = day
+                if priorValuationDay {
+                    repeat { expected = calendar.date(byAdding: .day, value: -1, to: expected)! }
+                    while [1, 7].contains(calendar.component(.weekday, from: expected))
+                }
+                if InvestmentPriceDates.day(expected, zone: zone) > valuationDay { missed += 1 }
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day), next > day else { break }
+            day = next
+        }
+        return missed
+    }
+}
+
 nonisolated struct InvestmentQuote: Equatable, Codable, Sendable {
     let mapping: InvestmentPriceMapping
     let price: InvestmentDecimal
@@ -309,6 +352,10 @@ nonisolated struct InvestmentQuote: Equatable, Codable, Sendable {
 
     func freshnessAge(at now: Date) -> Int {
         InvestmentPriceDates.freshnessAge(day: valuationDay, instant: valuationInstant, zone: calendarTimeZone, now: now)
+    }
+
+    func missedPublicationWindows(at now: Date) -> Int? {
+        InvestmentPublicationWindow.source(mapping.provider)?.missedPublications(valuationDay: valuationDay, at: now)
     }
 
     /// A successful identical FE response proves retrieval, not a new valuation date.

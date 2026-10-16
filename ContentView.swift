@@ -604,12 +604,14 @@ struct ImportAccountOutcomeView: View {
     @Environment(\.lfTheme) private var theme
     let presentation: ImportAccountOutcomePresentation
     let iconName: String
-    let tone: ImportOutcomeTone
+    let tone: ImportOutcomeTone?
+
+    private var color: Color { tone?.color ?? theme.palette.secondaryText }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: iconName)
-                .foregroundStyle(tone.color)
+                .foregroundStyle(color)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 Text(presentation.label)
@@ -621,7 +623,7 @@ struct ImportAccountOutcomeView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(tone.color.opacity(0.08))
+        .background(color.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(presentation.accessibilityText)
@@ -793,6 +795,25 @@ enum ImportAccountConfirmationPolicy {
 }
 
 enum DurableImportAccountOutcomeSection {
+    static func isUnavailable(for attempt: RepositoryImportAttempt) -> Bool {
+        switch ImportAttemptOutcome(rawValue: attempt.outcomeCode) {
+        case .successfulImport, .partialImportCommitted:
+            switch ImportAttemptAccountDecision(rawValue: attempt.accountDecisionCode) {
+            case .matchedExisting, .userSelectedExisting, .createdNew,
+                 .selectedExisting, .resolvedOrCreated:
+                return false
+            case .noFinancialMutation, .sideEffectsMayExist, nil:
+                return true
+            }
+        case .accountChoiceRequired, .identifierOwnershipConflict,
+             .identityAmbiguity, .identityConflict,
+             .staleAccountChoice, .staleProviderGeneration:
+            return false
+        default:
+            return true
+        }
+    }
+
     static func presentation(
         for attempt: RepositoryImportAttempt
     ) -> ImportAccountOutcomePresentation? {
@@ -1482,6 +1503,8 @@ struct ContentView: View {
     @ObservedObject private var ispSyncSession: ZurichISPSyncSession
     @ObservedObject private var ibkrFlexSession: IBKRFlexSyncSession
     @ObservedObject private var backgroundUpdates = BackgroundUpdatesSession.shared
+    @ObservedObject private var financialMCP = FinancialMCPController.shared
+    @ObservedObject private var companion = CompanionMacCoordinator.shared
     @State private var settingsSubsection: SettingsSubsection?
     @ObservedObject private var salaryViewModel: SalaryWorkspaceViewModel
     @StateObject private var dashboardViewModel: DashboardViewModel
@@ -1691,7 +1714,8 @@ struct ContentView: View {
                     subtitle: toolbarSubtitle,
                     accessory: selectedSection == .dashboard
                         ? AnyView(DashboardLiveFXHeaderAccessory(session: alDarReferenceSession))
-                        : nil
+                        : nil,
+                    compact: selectedSection == .dashboard || selectedSection == .accounts
                 )
                 }
             },
@@ -1726,6 +1750,8 @@ struct ContentView: View {
         }
         .font(theme.typography.secondary)
         .tint(theme.palette.accent)
+        .buttonStyle(LFActionButtonStyle())
+        .disclosureGroupStyle(LFDisclosureGroupStyle())
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             shellPresentationWidth = size.width
 #if DEBUG
@@ -1902,6 +1928,14 @@ struct ContentView: View {
                         .frame(width: usesColumns ? investmentWidth : nil)
                         salaryDashboardSummary
                     }
+                    columns {
+                        dashboardAccountPanel(isCard: false)
+                            .frame(width: usesColumns ? investmentWidth : nil)
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                            dashboardAccountPanel(isCard: true)
+                            importActivityCard
+                        }
+                    }
                     if let month = dashboardViewModel.moneyFlowMonth {
                         DashboardMoneyFlowCard(projection: dashboardViewModel.moneyFlow,
                             selectedMonth: Binding(get: { dashboardViewModel.moneyFlowMonth ?? month },
@@ -1920,14 +1954,6 @@ struct ContentView: View {
                                 transactionViewModel.showMoneyFlowInspection(inspection)
                                 selectedSection = .transactions
                             }
-                    }
-                    columns {
-                        dashboardAccountPanel(isCard: false)
-                            .frame(width: usesColumns ? investmentWidth : nil)
-                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-                            dashboardAccountPanel(isCard: true)
-                            importActivityCard
-                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -2037,6 +2063,11 @@ struct ContentView: View {
                         .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                Image(systemName: "chevron.right")
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .padding(.top, theme.spacing.micro)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }
@@ -2051,7 +2082,8 @@ struct ContentView: View {
                     Text(position.displayName).font(theme.typography.rowTitle)
                     Spacer()
                     Button("Close details", systemImage: "xmark") { dashboardDetailedAccount = nil }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                        .labelStyle(.iconOnly).lfSecondaryAction()
+                        .keyboardShortcut(.cancelAction)
                 }
                 Text(position.institution + " · " + kind).font(theme.typography.secondary)
                 Text(dashboardMoneyText(position.amount)).font(theme.typography.headlineMoney).monospacedDigit()
@@ -2069,12 +2101,12 @@ struct ContentView: View {
 
     private func dashboardSourceContextText(_ position: DashboardAccountPosition) -> String {
         if position.asOf == nil, let periodEnd = position.sourcePeriodEnd {
-            return "Statement · " + DashboardAccountPosition.asOfLabel(for: periodEnd)
+            return "Statement period ends " + periodEnd.presentation
         }
         if position.asOf == nil, let sourceContext = position.sourceContext {
             return sourceContext
         }
-        return DashboardAccountPosition.asOfLabel(for: position.asOf)
+        return (position.asOf.map { "Balance as of " + $0.presentation } ?? "Balance date unavailable")
             + (position.sourceContext.map { " · \($0)" } ?? "")
     }
 
@@ -2130,7 +2162,7 @@ struct ContentView: View {
                     Text("Planning estimates").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                     Spacer(minLength: theme.spacing.small)
                     Button("Rate details") { dashboardShowsPlanDetails.toggle() }
-                        .buttonStyle(.link).font(theme.typography.caption)
+                        .lfSecondaryAction().font(theme.typography.caption)
                         .accessibilityIdentifier("dashboard.planRateDetails")
                         .popover(isPresented: $dashboardShowsPlanDetails) {
                             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
@@ -2138,7 +2170,8 @@ struct ContentView: View {
                                 Text(dashboardViewModel.fundingRateDetail ?? "Plan rate unavailable.")
                                 Text("These are planning amounts, not completed payments. The India equivalent and remaining amount use this plan’s rate, even when Live FX has a newer reference.")
                                 Text("Available transfer capacity reserves the configured fee. When no India transfer is needed, the unused fee stays in the remaining balance.")
-                                Button("Close") { dashboardShowsPlanDetails = false }.lfSecondaryAction()
+                                Button("Close") { dashboardShowsPlanDetails = false }
+                                    .lfSecondaryAction().keyboardShortcut(.cancelAction)
                             }
                             .font(theme.typography.secondary).padding(theme.spacing.panelPadding).frame(width: 420)
                         }
@@ -2258,26 +2291,39 @@ struct ContentView: View {
     private var accountsContent: some View {
         GeometryReader { geometry in
             let width = geometry.size.width - theme.spacing.pagePadding * 2
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Current totals exclude history-only accounts")
-                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+            if width >= 1120 {
+                VStack(alignment: .leading, spacing: 18) {
                     accountSummaryStrip(width: width)
                     if accountsViewModel.accounts.isEmpty {
                         LFEmptyState(title: "No accounts found", message: "Your accounts appear here after importing statements.",
                             actionTitle: "Import Statement", systemImage: "wallet.pass") { requestFileSelection() }
                     } else {
-                        let layout = width >= 1120 ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
-                            : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
-                        layout {
-                            accountGroups(width: width >= 1120 ? width - 362 : width)
-                                .frame(maxWidth: .infinity)
-                            accountDetailPanel.frame(width: width >= 1120 ? 344 : nil)
+                        HStack(alignment: .top, spacing: 18) {
+                            ScrollView {
+                                accountGroups(width: (width - 18) / 2, stacked: true)
+                            }
+                            .accessibilityIdentifier("accounts.listScroll")
+                            .frame(width: (width - 18) / 2)
+                            accountDetailPanel(scrolls: true)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
                 }
                 .padding(theme.spacing.pagePadding)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        accountSummaryStrip(width: width)
+                        if accountsViewModel.accounts.isEmpty {
+                            LFEmptyState(title: "No accounts found", message: "Your accounts appear here after importing statements.",
+                                actionTitle: "Import Statement", systemImage: "wallet.pass") { requestFileSelection() }
+                        } else {
+                            accountGroups(width: width)
+                            accountDetailPanel(scrolls: false)
+                        }
+                    }
+                    .padding(theme.spacing.pagePadding)
+                }
             }
         }
     }
@@ -2293,6 +2339,9 @@ struct ContentView: View {
                 accountSummaryGroup(cards: true)
             }
             .fixedSize(horizontal: false, vertical: true)
+            Text("Current totals exclude history-only accounts")
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
         }
     }
 
@@ -2324,8 +2373,8 @@ struct ContentView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func accountGroups(width: CGFloat) -> some View {
-        let layout = width >= 735 ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
+    private func accountGroups(width: CGFloat, stacked: Bool = false) -> some View {
+        let layout = width >= 735 && !stacked ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
             : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
         return VStack(alignment: .leading, spacing: 18) {
             layout {
@@ -2376,8 +2425,21 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
+    private var isIdleImportWorkspace: Bool {
+        guard importCentre.items.isEmpty,
+              !importCentre.isPreparationDraining,
+              pendingBatchSourceURLs.isEmpty,
+              case .idle = importState else { return false }
+        return true
+    }
+
+    private var visibleImportHistoryAttempt: RepositoryImportAttempt? {
+        guard importCentre.permitsSourceSelection, isIdleImportWorkspace else { return nil }
+        return importHistoryViewModel.selectedAttempt
+    }
+
     private var importWizardContent: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             if !showsAutomaticImportProgress { importStepper }
 
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
@@ -2406,7 +2468,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .transaction { $0.animation = nil }
             } else {
-            HStack(alignment: .top, spacing: 18) {
+            HStack(alignment: .top, spacing: 16) {
                 LFPanel {
                     Text(importCentre.items.isEmpty ? "Import Statements" : "Current statement")
                         .font(theme.typography.formSection.weight(.semibold))
@@ -2421,12 +2483,6 @@ struct ContentView: View {
                     ScrollViewReader { scroll in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 16) {
-                                if importCentre.items.isEmpty {
-                                    Text("Choose statements, then start the batch once. LedgerForge imports each validated statement and pauses when it needs your decision.")
-                                        .font(theme.typography.formBody)
-                                        .foregroundStyle(theme.palette.secondaryText)
-                                }
-
                                 if importCentre.items.isEmpty && !emailIntake.sources.isEmpty {
                                     EmailInboxQueueView(session: emailIntake)
                                 }
@@ -2440,34 +2496,29 @@ struct ContentView: View {
                                     Button {
                                         requestFileSelection()
                                     } label: {
-                                        VStack(spacing: 14) {
+                                        HStack(spacing: 14) {
                                             Image(systemName: "folder")
-                                                .font(theme.typography.dropTargetIcon)
-                                                .foregroundStyle(theme.palette.accentHover)
+                                                .font(theme.typography.formSection)
+                                                .foregroundStyle(theme.palette.secondaryText)
                                             Text("Choose or drop statements")
-                                                .font(theme.typography.formHeading)
-                                            Text("Browse Files")
                                                 .font(theme.typography.formBody.weight(.semibold))
-                                                .padding(.horizontal, 20)
-                                                .padding(.vertical, 9)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .stroke(theme.palette.accent, lineWidth: 1)
-                                                )
+                                            Spacer(minLength: 8)
+                                            Text("Browse Files")
+                                                .font(theme.typography.button)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .background(theme.palette.secondaryAction, in: RoundedRectangle(cornerRadius: theme.radius.control))
+                                                .overlay(RoundedRectangle(cornerRadius: theme.radius.control).strokeBorder(theme.palette.border))
                                         }
-                                        .frame(maxWidth: .infinity, minHeight: 210)
-                                        .background(
-                                            theme.palette.accent.opacity(statementDropIsTargeted ? 0.15 : 0.05)
-                                        )
+                                        .padding(16)
+                                        .frame(maxWidth: .infinity, minHeight: 84)
+                                        .background(theme.palette.controlSurface.opacity(statementDropIsTargeted ? 1 : 0.6))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(
-                                                    statementDropIsTargeted
-                                                        ? theme.palette.accentHover
-                                                        : theme.palette.accent.opacity(0.75),
-                                                    lineWidth: statementDropIsTargeted ? 2 : 1
-                                                )
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(statementDropIsTargeted ? theme.interaction.focusRing : theme.palette.border,
+                                                        lineWidth: statementDropIsTargeted ? 2 : 1)
                                         )
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
                                     }
                                     .buttonStyle(LFPlainActionStyle())
                                     .disabled(importSelectionDisabled || statementDropRequestGate.isActive)
@@ -2493,7 +2544,14 @@ struct ContentView: View {
                                     .font(theme.typography.formBody)
                                 }
 
-                                if importCentre.items.isEmpty {
+                                if isIdleImportWorkspace {
+                                    importedFileRow(
+                                        name: "No active import batch",
+                                        subtitle: "Choose statements, then start the batch when you are ready.",
+                                        icon: "tray",
+                                        color: theme.palette.secondaryText
+                                    )
+                                } else if importCentre.items.isEmpty {
                                     importResultPanel
                                 }
 
@@ -2505,7 +2563,7 @@ struct ContentView: View {
 
                                 importAttemptHistoryPanel
 
-                                if importCentre.items.isEmpty && importState.showsPreConfirmationNoWriteMessage {
+                                if !isIdleImportWorkspace && importCentre.items.isEmpty && importState.showsPreConfirmationNoWriteMessage {
                                     HStack(spacing: 10) {
                                         Image(systemName: "info.circle")
                                             .foregroundStyle(LFTheme.info)
@@ -2540,21 +2598,38 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 LFPanel {
-                    Text("Validation Review")
-                        .font(theme.typography.formSection.weight(.semibold))
+                    HStack {
+                        Text(visibleImportHistoryAttempt == nil ? "Validation Review" : "Import attempt details")
+                            .font(theme.typography.formSection.weight(.semibold))
+                        Spacer()
+                        if visibleImportHistoryAttempt != nil {
+                            Button("Close") { importHistoryViewModel.clearSelection() }
+                                .lfSecondaryAction()
+                                .accessibilityHint("Closes historical details and returns to statement validation")
+                        }
+                    }
                     ScrollViewReader { scroll in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 18) {
-                                validationReviewPanel
-                                    .id("import-validation-start")
-                                if let prepared = preparedTransactionPreview {
-                                    ScrollView(.horizontal) {
-                                        transactionPreviewPanel(prepared, columns: previewColumns(prepared))
+                                if let attempt = visibleImportHistoryAttempt {
+                                    importAttemptDetails(attempt)
+                                        .id("import-history-start")
+                                } else {
+                                    validationReviewPanel
+                                        .id("import-validation-start")
+                                    if let prepared = preparedTransactionPreview {
+                                        ScrollView(.horizontal) {
+                                            transactionPreviewPanel(prepared, columns: previewColumns(prepared))
+                                        }
                                     }
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                         .frame(maxHeight: .infinity)
+                        .onChange(of: visibleImportHistoryAttempt?.id) { _, _ in
+                            scroll.scrollTo("import-history-start", anchor: .top)
+                        }
                         .onChange(of: displayedImportItem?.id) { _, _ in
                             scroll.scrollTo("import-validation-start", anchor: .top)
                         }
@@ -2567,6 +2642,18 @@ struct ContentView: View {
             }
             .frame(maxHeight: .infinity)
 
+            }
+            if importCentre.permitsSourceSelection, pendingBatchSourceURLs.isEmpty,
+               let source = emailIntake.selectedSource {
+                HStack(spacing: 8) {
+                    Label("Selected email original", systemImage: "envelope")
+                        .foregroundStyle(theme.palette.secondaryText)
+                    Text(source.displayName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                }
+                .font(theme.typography.formCaption)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: theme.spacing.controlGap) { importFooterControls }
@@ -2665,7 +2752,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                     if settingsSubsection != nil {
                         Button("Settings", systemImage: "chevron.left") { settingsSubsection = nil }
-                            .buttonStyle(.borderless)
+                            .lfSecondaryAction()
                             .font(theme.typography.secondary)
                             .tint(theme.palette.secondaryText)
                             .accessibilityHint("Returns to the Settings overview")
@@ -2689,13 +2776,13 @@ struct ContentView: View {
                     } else if settingsSubsection == .backgroundUpdates {
                         BackgroundUpdatesSettingsView(session: backgroundUpdates, availableWidth: width)
                     } else if settingsSubsection == .financialMCP {
-                        FinancialMCPSettingsView()
+                        FinancialMCPSettingsView(availableWidth: width)
                     } else if settingsSubsection == .companion {
-                        CompanionMacSettingsView(session: .shared)
+                        CompanionMacSettingsView(session: .shared, availableWidth: width)
                     } else if settingsSubsection == .backup {
                         BackupRestoreSettingsSection(availableWidth: width)
                     } else if settingsSubsection == .categories {
-                        CategoryManagementView()
+                        CategoryManagementView(availableWidth: width)
                     } else {
                         LFSettingsPageHeader("Settings", subtitle: "Preferences, connections and your ledger.")
                         settingsOverview(availableWidth: width)
@@ -2722,9 +2809,13 @@ struct ContentView: View {
             }
             settingsDataPanel(availableWidth: availableWidth)
             VStack(alignment: .leading, spacing: theme.spacing.small) {
-                Text(DatabaseProvider.shared.persistenceState.statusMessage)
+                if !DatabaseProvider.shared.persistenceState.isDurable {
+                    Text(DatabaseProvider.shared.persistenceState.statusMessage)
+                }
                 if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance { Text(guidance) }
-                Text(dashboardViewModel.presentationState.message)
+                if case .loaded = dashboardViewModel.presentationState {} else {
+                    Text(dashboardViewModel.presentationState.message)
+                }
             }
             .font(theme.typography.secondary)
             .foregroundStyle(theme.palette.secondaryText)
@@ -2767,7 +2858,8 @@ struct ContentView: View {
     }
 
     private var settingsPersistence: some View {
-        Text(DatabaseProvider.shared.persistenceState.displayName)
+        Text(DatabaseProvider.shared.persistenceState.isDurable
+             ? "Ledger verified" : DatabaseProvider.shared.persistenceState.displayName)
             .font(theme.typography.secondary.weight(.semibold))
             .foregroundStyle(DatabaseProvider.shared.persistenceState.isDurable ? LFTheme.success : LFTheme.warning)
     }
@@ -2810,27 +2902,16 @@ struct ContentView: View {
     }
 
     private func settingsDestinationRow(_ destination: SettingsSubsection) -> some View {
+        let connection = connectionStatus(destination)
         let summary: String
         switch destination {
         case .appearance:
             summary = appearance.overrides.isEmpty ? "Dark · Default appearance" : "Dark · Custom appearance"
         case .backup:
             summary = backupRecovery.isBusy ? "Backup or restore in progress" : "Create or restore a verified ledger backup"
-        case .liveFX: summary = liveFXSummary
         case .categories: summary = categorySummary
-        case .ispAccount: summary = ispSyncSession.connectionSummary
-        case .emailStatements: summary = emailIntake.connectionSummary
-        case .ibkrAccount: summary = ibkrFlexSession.connectionSummary
-        case .backgroundUpdates: summary = backgroundUpdates.status
-        case .companion: summary = "Mac snapshots and Monthly Plan sync with your iPhone."
-        case .financialMCP: summary = "Read-only financial information for ChatGPT, while LedgerForge is open."
-        }
-        let needsAttention: Bool
-        switch destination {
-        case .ispAccount: needsAttention = !ispSyncSession.isConnectionAvailable
-        case .emailStatements: needsAttention = emailIntake.account != nil && !emailIntake.isConnected
-        case .backgroundUpdates: needsAttention = backgroundUpdates.configuration.enabled && !backgroundUpdates.activeSchedule
-        default: needsAttention = false
+        case .liveFX, .ispAccount, .emailStatements, .ibkrAccount, .backgroundUpdates, .companion, .financialMCP:
+            summary = connection?.rawValue ?? LFConnectionStatus.disconnected.rawValue
         }
         return Button { settingsSubsection = destination } label: {
             HStack(spacing: theme.spacing.controlGap) {
@@ -2842,7 +2923,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: theme.spacing.micro) {
                     Text(destination.rawValue).font(theme.typography.rowTitle)
                     Text(summary).font(theme.typography.secondary)
-                        .foregroundStyle(needsAttention ? LFTheme.warning : theme.palette.secondaryText)
+                        .foregroundStyle(connection?.color ?? theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: theme.spacing.small)
@@ -2868,17 +2949,35 @@ struct ContentView: View {
         return "\(active) active · \(archived) archived"
     }
 
-    private var liveFXSummary: String {
-        if !alDarReferenceSession.refreshing.isEmpty || !investmentPriceSession.refreshing.isEmpty {
-            return "Refreshing currency rates and investment prices"
+    private func connectionStatus(_ destination: SettingsSubsection) -> LFConnectionStatus? {
+        func state(_ connected: Bool, error: Bool = false) -> LFConnectionStatus {
+            error ? .error : connected ? .connected : .disconnected
         }
-        let currencyStatus = alDarReferenceSession.legs.count == AlDarCurrency.allCases.count
-            ? "Currency rates ready"
-            : alDarReferenceSession.legs.isEmpty ? "Currency rates need a refresh" : "Some currency rates available"
-        let investmentStatus = investmentPriceSession.rows.isEmpty
-            ? "No investment holdings"
-            : investmentPriceSession.quotes.isEmpty ? "Investment prices need a refresh" : "Investment prices available"
-        return "\(currencyStatus) · \(investmentStatus)"
+        func failed(_ kind: BackgroundJobKind, since success: Date?) -> Bool {
+            guard let record = backgroundUpdates.jobRecords[kind], record.outcome == .failedFinal else { return false }
+            return success.map { $0 < (record.completedAt ?? record.claimedAt) } ?? true
+        }
+        switch destination {
+        case .liveFX:
+            return state(alDarReferenceSession.networkAvailable != false && alDarReferenceSession.legs.count == AlDarCurrency.allCases.count,
+                         error: !alDarReferenceSession.failures.isEmpty || !investmentPriceSession.failures.isEmpty)
+        case .ispAccount:
+            return state(ispSyncSession.isConnectionAvailable && ispSyncSession.username != nil && !ispSyncSession.requiresReconnect,
+                         error: ispSyncSession.hasConnectionError || (ispSyncSession.username != nil && failed(.zurichISP, since: ispSyncSession.lastSuccessfulFetch)))
+        case .ibkrAccount:
+            return state(ibkrFlexSession.isConnectionAvailable && ibkrFlexSession.accountID != nil,
+                         error: ibkrFlexSession.hasConnectionError || (ibkrFlexSession.accountID != nil && failed(.ibkrFlex, since: ibkrFlexSession.lastSuccessfulFetch)))
+        case .emailStatements:
+            return state(emailIntake.isConnected, error: emailIntake.hasConnectionError)
+        case .backgroundUpdates:
+            return state(backgroundUpdates.configuration.enabled && backgroundUpdates.activeSchedule,
+                         error: backgroundUpdates.configuration.enabled && !backgroundUpdates.available)
+        case .companion:
+            return state(companion.phoneID != nil, error: companion.status == "Needs attention")
+        case .financialMCP:
+            return state(financialMCP.state == "Connected", error: !financialMCP.lastFailure.isEmpty && financialMCP.desired)
+        default: return nil
+        }
     }
 
     private var importActivityCard: some View {
@@ -2959,201 +3058,275 @@ struct ContentView: View {
         return ImportActivityPresentation.latestDurableAttempt(from: persisted)
     }
 
-    private var accountDetailPanel: some View {
-        LFPanel(variant: .inspector) {
-            VStack(alignment: .leading, spacing: 18) {
-                if let account = accountsViewModel.selectedAccount {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            if accountsViewModel.isEditingDisplayName {
-                                TextField("Display name", text: $accountsViewModel.displayNameDraft)
-                                    .lfTextField()
-                            } else {
-                                Text(account.displayName)
-                                    .font(theme.typography.sectionTitle)
-                            }
-                            Text(accountContext(account))
-                                .font(theme.typography.secondary)
-                                .foregroundStyle(theme.palette.secondaryText)
+    private func accountDetailPanel(scrolls: Bool) -> some View {
+        LFPanel(variant: .inspector, contentSpacing: 14) {
+            if let account = accountsViewModel.selectedAccount {
+                accountInspectorHeader(account)
+                Divider().overlay(theme.palette.divider)
+                if scrolls {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            accountInspectorDetails(account)
+                                .id("accounts.detailsTop")
                         }
-                        Spacer()
+                        .accessibilityIdentifier("accounts.detailScroll")
+                        .onChange(of: account.id) { _, _ in
+                            proxy.scrollTo("accounts.detailsTop", anchor: .top)
+                        }
                     }
+                } else {
+                    accountInspectorDetails(account)
+                }
+            } else {
+                LFCompactEmptyState(message: "Select an account to see its details")
+            }
+        }
+    }
 
-                    if accountsViewModel.isEditingDisplayName {
-                        HStack(spacing: 10) {
-                            Button("Save") {
-                                accountsViewModel.saveDisplayName()
-                            }
-                            .lfPrimaryAction()
-                            Button("Cancel") {
-                                accountsViewModel.cancelDisplayNameEdit()
-                            }
-                            .lfSecondaryAction()
-                        }
-                    } else {
-                        Button("Edit display name") {
-                            accountsViewModel.beginDisplayNameEdit()
-                        }
+    private func accountInspectorHeader(_ account: AccountsAccountPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if accountsViewModel.isEditingDisplayName {
+                HStack(spacing: 10) {
+                    TextField("Display name", text: $accountsViewModel.displayNameDraft)
+                        .lfTextField()
+                    Button("Save") { accountsViewModel.saveDisplayName() }
+                        .lfPrimaryAction()
+                    Button("Cancel") { accountsViewModel.cancelDisplayNameEdit() }
                         .lfSecondaryAction()
-                        if account.isHistoryOnly {
-                            Button("Make current") { accountsViewModel.markAccountCurrent(accountID: account.id) }
-                                .lfSecondaryAction()
-                                .help("Include this account in current views and totals again.")
-                                .accessibilityIdentifier("accounts.makeCurrent")
-                        } else {
-                            Button("Keep as history only…") {
-                                confirmsCardHistoryOnly = true
-                            }
-                            .lfSecondaryAction()
-                            .confirmationDialog(account.accountType == .creditCard
-                                                ? "Is this card closed and fully settled?"
-                                                : "Keep this account for history only?",
-                                                isPresented: $confirmsCardHistoryOnly,
-                                                titleVisibility: .visible) {
-                                Button("Keep history only") {
-                                    accountsViewModel.markAccountHistoryOnly(accountID: account.id)
-                                }
-                                Button("Cancel", role: .cancel) { }
-                            } message: {
-                                Text("This account will be excluded from default views and totals. Select it explicitly to review its history. You can make it current again here.")
-                            }
-                        }
-                    }
+                }
+            } else {
+                Text(account.displayName).font(theme.typography.sectionTitle)
+            }
+            Text(accountContext(account))
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
 
-                    if let message = accountsViewModel.presentationState.message {
-                        Text(message)
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(LFTheme.warning)
-                    }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(account.isHistoryOnly ? "Historical statement balance"
+                     : account.accountType == .creditCard ? "Amount owed" : "Current balance")
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                Text(account.currentBalance.map { formatCurrency($0, currencyCode: account.currencyCode) } ?? "Unavailable")
+                    .font(theme.typography.headlineMoney.weight(.semibold))
+                    .foregroundStyle(accountBalanceColor(account))
+                    .monospacedDigit()
+            }
+            if account.isHistoryOnly {
+                Text("History only · excluded from default views and totals.")
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let message = accountsViewModel.presentationState.message {
+                Text(message)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(LFTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(account.currentBalanceLabel)
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(theme.palette.secondaryText)
-                        Text(account.currentBalance.map { formatCurrency($0, currencyCode: account.currencyCode) } ?? "Unavailable")
-                            .font(theme.typography.headlineMoney.weight(.semibold))
-                            .foregroundStyle(accountBalanceColor(account))
-                            .monospacedDigit()
-                    }
+    private func accountInspectorDetails(_ account: AccountsAccountPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                LFInfoRow(title: "Account type", value: account.accountTypeLabel, textRole: .body)
+                LFInfoRow(title: "Transactions", value: "\(accountsViewModel.transactionCount)", textRole: .body)
+                if let period = account.latestStatementPeriod {
+                    LFInfoRow(title: "Latest statement", value: period, textRole: .body)
+                }
+                if let dueDate = account.dueDate {
+                    LFInfoRow(title: account.isHistoryOnly ? "Historical due date" : "Due date", value: dueDate, textRole: .body)
+                }
+                if let count = account.cardInstrumentCount {
+                    LFInfoRow(title: "Cards", value: "\(count)", textRole: .body)
+                }
+            }
 
-                    if account.isHistoryOnly {
-                        Text("History only · excluded from default views and totals.")
-                            .font(theme.typography.secondary)
-                            .foregroundStyle(theme.palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            if !accountsViewModel.isEditingDisplayName {
+                accountManagementActions(account)
+            }
+            Divider().overlay(theme.palette.divider)
 
-                    LFInfoRow(title: "Account Type", value: account.accountTypeLabel, textRole: .body)
-                    LFInfoRow(title: "Transactions", value: "\(accountsViewModel.transactionCount)", textRole: .body)
-                    if let period = account.latestStatementPeriod {
-                        LFInfoRow(title: "Latest Statement", value: period, textRole: .body)
-                    }
-                    if let dueDate = account.dueDate {
-                        LFInfoRow(title: account.isHistoryOnly ? "Historical Due Date" : "Due Date", value: dueDate, textRole: .body)
-                    }
-                    if let count = account.cardInstrumentCount {
-                        LFInfoRow(title: "Cards", value: "\(count)", textRole: .body)
-                    }
-
-                    Divider().overlay(theme.palette.divider)
-
-                    DisclosureGroup("Recent activity") {
-
+            DisclosureGroup("Recent activity") {
+                VStack(alignment: .leading, spacing: 12) {
                     if accountsViewModel.recentActivity.isEmpty {
-                        LFCompactEmptyState(message: "No trusted activity for this account")
+                        LFCompactEmptyState(message: "No recorded activity for this account")
                     }
-
                     ForEach(accountsViewModel.recentActivity) { transaction in
-                        HStack {
-                            Image(systemName: transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? "arrow.down" : "arrow.up")
-                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
+                        let positive = transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: positive ? "arrow.down" : "arrow.up")
+                                .foregroundStyle(positive ? theme.financialPositive : theme.financialNegative)
                                 .frame(width: 28, height: 28)
-                                .background((transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative).opacity(0.12))
+                                .background((positive ? theme.financialPositive : theme.financialNegative).opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             Text(transaction.description)
-                                .lineLimit(1)
-                            Spacer()
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             Text(transaction.signedAmountDisplay)
-                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
+                                .foregroundStyle(positive ? theme.financialPositive : theme.financialNegative)
                                 .monospacedDigit()
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .font(theme.typography.secondary)
                     }
+                }
+                .padding(.top, 10)
+            }
+            .font(theme.typography.body).tint(theme.palette.primaryText)
 
-                    }.font(theme.typography.body).tint(theme.palette.primaryText)
-
-                    Divider().overlay(theme.palette.divider)
-
-                    DisclosureGroup("Verified financial identity") {
+            Divider().overlay(theme.palette.divider)
+            DisclosureGroup("Verified account details") {
+                VStack(alignment: .leading, spacing: 10) {
                     if account.identitySummaries.isEmpty {
-                        LFCompactEmptyState(message: "No verified strong identifiers")
+                        Text("No additional account identifiers verified")
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(theme.palette.secondaryText)
                     } else {
                         ForEach(account.identitySummaries) { identifier in
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text("\(identifier.kind) · \(identifier.redactedValue)")
                                     .font(theme.typography.secondary.weight(.semibold))
-                                Text("\(identifier.strength) · \(identifier.verificationState) · \(identifier.provenance)")
-                                    .font(theme.typography.caption)
+                                // Hydration includes only strong, verified identifiers here.
+                                Text("Verified · \(accountIdentifierSource(identifier.provenance))")
+                                    .font(theme.typography.secondary)
                                     .foregroundStyle(theme.palette.secondaryText)
                             }
                         }
                     }
+                }
+                .padding(.top, 10)
+            }
+            .font(theme.typography.body).tint(theme.palette.primaryText)
 
-                    }.font(theme.typography.body).tint(theme.palette.primaryText)
-
-                    Divider().overlay(theme.palette.divider)
-
-                    DisclosureGroup("Import history") {
+            Divider().overlay(theme.palette.divider)
+            DisclosureGroup("Import history") {
+                VStack(alignment: .leading, spacing: 8) {
                     if accountsViewModel.importHistory.isEmpty {
-                        LFCompactEmptyState(message: "No trusted import history for this account")
+                        LFCompactEmptyState(message: "No recorded import history for this account")
                     } else {
                         ForEach(accountsViewModel.importHistory) { session in
-                            Button {
-                                accountsViewModel.selectImportSession(id: session.id)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(session.sourceDocumentName ?? "Imported statement")
-                                        .font(theme.typography.secondary.weight(.semibold))
-                                    Text((session.recognizedExistingRowCount ?? 0) > 0
-                                         ? "\(session.validationStatus) · \(session.transactionCount) new, \(session.recognizedExistingRowCount ?? 0) already recorded"
-                                         : "\(session.validationStatus) · \(session.transactionCount) transaction(s)")
-                                        .font(theme.typography.caption)
-                                        .foregroundStyle(theme.palette.secondaryText)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(LFPlainActionStyle())
+                            accountImportRow(session)
                         }
                     }
-
-                    if let session = accountsViewModel.selectedImportSession {
-                        Divider().overlay(theme.palette.divider)
-                        HStack {
-                            Text("Import Detail")
-                                .font(theme.typography.rowTitle)
-                            Spacer()
-                            Button("Close") {
-                                accountsViewModel.clearSelectedImportSession()
-                            }
-                            .lfSecondaryAction()
-                        }
-                        LFInfoRow(title: "Source", value: session.sourceDocumentName ?? "Imported statement", textRole: .body)
-                        LFInfoRow(title: "Status", value: session.validationStatus, textRole: .body)
-                        LFInfoRow(title: "Transactions", value: "\(session.transactionCount)", textRole: .body)
-                        if (session.recognizedExistingRowCount ?? 0) > 0 {
-                            LFInfoRow(title: "Import Type", value: session.transactionCount == 0 ? "Supporting source" : "New and already recorded activity", textRole: .body)
-                            LFInfoRow(title: "Source Rows", value: "\(session.sourceRowCount ?? 0)", textRole: .body)
-                            LFInfoRow(title: "Already Represented", value: "\(session.recognizedExistingRowCount ?? 0)", textRole: .body)
-                        }
-                        if let parserVersion = session.parserVersion {
-                            LFInfoRow(title: "Parser", value: parserVersion, textRole: .body)
-                        }
-                    }
-                    }.font(theme.typography.body).tint(theme.palette.primaryText)
-                } else {
-                    LFCompactEmptyState(message: "Select an account after importing trusted data")
                 }
+                .padding(.top, 10)
             }
+            .font(theme.typography.body).tint(theme.palette.primaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 4)
+    }
+
+    private func accountManagementActions(_ account: AccountsAccountPresentation) -> some View {
+        HStack(spacing: 10) {
+            Button("Edit display name") { accountsViewModel.beginDisplayNameEdit() }
+                .lfSecondaryAction()
+            if account.isHistoryOnly {
+                Button("Make current") { accountsViewModel.markAccountCurrent(accountID: account.id) }
+                    .lfSecondaryAction()
+                    .help("Include this account in current views and totals again.")
+                    .accessibilityIdentifier("accounts.makeCurrent")
+            } else {
+                Button("Keep as history only…") { confirmsCardHistoryOnly = true }
+                    .lfSecondaryAction()
+                    .confirmationDialog(account.accountType == .creditCard
+                                        ? "Is this card closed and fully settled?"
+                                        : "Keep this account for history only?",
+                                        isPresented: $confirmsCardHistoryOnly,
+                                        titleVisibility: .visible) {
+                        Button("Keep history only") {
+                            accountsViewModel.markAccountHistoryOnly(accountID: account.id)
+                        }
+                        Button("Cancel", role: .cancel) { }
+                    } message: {
+                        Text("This account will be excluded from default views and totals. Select it explicitly to review its history. You can make it current again here.")
+                    }
+            }
+        }
+    }
+
+    private func accountImportRow(_ session: AccountImportHistoryPresentation) -> some View {
+        let selected = accountsViewModel.selectedImportSession?.id == session.id
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                accountsViewModel.selectImportSession(id: session.id)
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: selected ? "chevron.down" : "chevron.right")
+                        .frame(width: 12)
+                        .padding(.top, 3)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.sourceDocumentName ?? "Imported statement")
+                            .font(theme.typography.secondary.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text((session.recognizedExistingRowCount ?? 0) > 0
+                             ? "\(accountImportStatus(session.validationStatus)) · \(session.transactionCount) new, \(session.recognizedExistingRowCount ?? 0) already recorded"
+                             : "\(accountImportStatus(session.validationStatus)) · \(session.transactionCount) \(session.transactionCount == 1 ? "transaction" : "transactions")")
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(theme.palette.secondaryText)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .foregroundStyle(theme.palette.primaryText)
+                .padding(10)
+                .contentShape(Rectangle())
+                .background(selected ? theme.interaction.dataRow(selected: true, active: appearsActive) : theme.palette.raisedSurface.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: theme.radius.control))
+                .overlay(RoundedRectangle(cornerRadius: theme.radius.control)
+                    .strokeBorder(selected ? AnyShapeStyle(theme.palette.accent.opacity(0.7))
+                                  : AnyShapeStyle(theme.palette.panelEdge), lineWidth: 1))
+            }
+            .buttonStyle(LFPlainActionStyle())
+            .accessibilityIdentifier("accounts.import." + session.id)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+
+            if selected {
+                accountImportDetails(session)
+                    .padding(12)
+                    .lfSurface(.subtle)
+            }
+        }
+    }
+
+    private func accountImportDetails(_ session: AccountImportHistoryPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Import details").font(theme.typography.rowTitle)
+                Spacer()
+                Button("Close") { accountsViewModel.clearSelectedImportSession() }
+                    .lfSecondaryAction()
+            }
+            LFInfoRow(title: "Source", value: session.sourceDocumentName ?? "Imported statement", textRole: .body)
+            LFInfoRow(title: "Status", value: accountImportStatus(session.validationStatus), textRole: .body)
+            LFInfoRow(title: "Transactions", value: "\(session.transactionCount)", textRole: .body)
+            if (session.recognizedExistingRowCount ?? 0) > 0 {
+                LFInfoRow(title: "Import type", value: session.transactionCount == 0 ? "Supporting source" : "New and already recorded activity", textRole: .body)
+                LFInfoRow(title: "Source rows", value: "\(session.sourceRowCount ?? 0)", textRole: .body)
+                LFInfoRow(title: "Already recorded", value: "\(session.recognizedExistingRowCount ?? 0)", textRole: .body)
+            }
+            if let parserVersion = session.parserVersion {
+                LFInfoRow(title: "Statement type", value: parserVersion, textRole: .body)
+            }
+        }
+    }
+
+    private func accountImportStatus(_ status: String) -> String {
+        status == "passed" ? "Passed checks" : status
+    }
+
+    private func accountIdentifierSource(_ provenance: String) -> String {
+        switch provenance {
+        case "user_confirmed": "Confirmed by you"
+        case "institution_structured_field": "From the institution's account details"
+        case "imported_metadata": "From imported information"
+        case "parser_derived_text": "From statement text"
+        case "migration": "Retained from earlier records"
+        case "administrative": "From an administrative record"
+        default: "Source unavailable"
         }
     }
 
@@ -3169,7 +3342,8 @@ struct ContentView: View {
             stepLine(active: importStep >= 5)
             wizardStep(5, title: "Import", subtitle: "Complete import", active: importStep >= 5)
         }
-        .padding(.vertical, 10)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, 4)
     }
 
     private var importStep: Int {
@@ -3583,11 +3757,13 @@ struct ContentView: View {
     }
 
     private var importAttemptHistoryPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Import History").font(theme.typography.formHeading)
+                Text("Recent imports").font(theme.typography.formHeading)
                 Spacer()
-                Text("\(importHistoryViewModel.attempts.count)").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                Text("Latest \(min(8, importHistoryViewModel.attempts.count)) of \(importHistoryViewModel.attempts.count)")
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
             if importHistoryViewModel.attempts.isEmpty {
                 Text("Supported import outcomes appear here after processing.")
@@ -3595,56 +3771,84 @@ struct ContentView: View {
             } else {
                 ForEach(importHistoryViewModel.attempts.prefix(8)) { attempt in
                     let presentation = DurableImportAttemptPresentation(attempt: attempt)
+                    let selected = importHistoryViewModel.selectedAttempt?.id == attempt.id
                     Button { importHistoryViewModel.select(id: attempt.id) } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(presentation.outcome.label).font(theme.typography.formBody.weight(.semibold))
-                                Text(ImportInstantFormatting.display(attempt.createdAtISO)).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
+                                Text(ImportInstantFormatting.display(attempt.createdAtISO))
+                                    .font(theme.typography.formCaption)
+                                    .foregroundStyle(theme.palette.secondaryText)
                             }
-                            Spacer()
-                            Text(attempt.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue
-                                 ? "\(attempt.importedTransactionCount ?? attempt.transactionCount) new · partial"
-                                 : "\(attempt.transactionCount) transactions")
-                                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                            Spacer(minLength: 8)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                if let sourceCount = attempt.sourceRowCount {
+                                    Text("\(sourceCount) source rows")
+                                } else {
+                                    Text("\(attempt.transactionCount) transactions")
+                                }
+                                if let imported = attempt.importedTransactionCount {
+                                    Text("\(imported) imported")
+                                }
+                            }
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                         }
-                        .padding(9).background(theme.palette.contentSurface).clipShape(RoundedRectangle(cornerRadius: 7))
+                        .padding(12)
+                        .background(selected ? theme.palette.secondaryAction : theme.palette.contentSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(selected ? theme.interaction.focusRing : theme.palette.border.opacity(0.5)))
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(LFPlainActionStyle())
                     .accessibilityLabel("\(presentation.outcome.label). \(presentation.outcome.explanation)")
-                }
-            }
-            if let attempt = importHistoryViewModel.selectedAttempt {
-                let presentation = DurableImportAttemptPresentation(attempt: attempt)
-                Divider()
-                HStack { Text("Attempt Detail").font(theme.typography.formBody.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.lfSecondaryAction() }
-                LFInfoRow(title: "Outcome", value: presentation.outcome.label)
-                LFInfoRow(title: "Coverage", value: presentation.coverage)
-                LFInfoRow(title: "Guidance", value: presentation.guidance)
-                if let accountPresentation = DurableImportAccountOutcomeSection.presentation(for: attempt) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Account Outcome")
-                            .font(theme.typography.formCaption.weight(.semibold))
-                            .foregroundStyle(theme.palette.secondaryText)
-                        ImportAccountOutcomeView(
-                            presentation: accountPresentation,
-                            iconName: durableAccountOutcomeIcon(outcomeCode: attempt.outcomeCode),
-                            tone: durableAccountOutcomeTone(outcomeCode: attempt.outcomeCode)
-                        )
-                    }
-                }
-                if let sourceCount = attempt.sourceRowCount {
-                    LFInfoRow(title: "Source Rows", value: "\(sourceCount)")
-                    LFInfoRow(title: "Imported", value: "\(attempt.importedTransactionCount ?? 0)")
-                    LFInfoRow(title: "Already Represented", value: "\(attempt.recognizedExistingRowCount ?? 0)")
-                    LFInfoRow(title: "Blocked", value: "\(attempt.blockedRowCount ?? 0)")
-                }
-                if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
-                    Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
-                        .font(theme.typography.formCaption.weight(.semibold)).buttonStyle(LFPlainActionStyle()).foregroundStyle(theme.palette.accentHover)
+                    .accessibilityValue(selected ? "Selected" : "")
                 }
             }
         }
-        .padding(12).background(theme.palette.contentSurface).clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func importAttemptDetails(_ attempt: RepositoryImportAttempt) -> some View {
+        let presentation = DurableImportAttemptPresentation(attempt: attempt)
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(presentation.outcome.label, systemImage: presentation.outcome.iconName)
+                    .font(theme.typography.formHeading.weight(.semibold))
+                Text(ImportInstantFormatting.display(attempt.createdAtISO))
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
+            }
+            if let sourceCount = attempt.sourceRowCount {
+                LFInfoRow(title: "Source rows", value: "\(sourceCount)")
+                LFInfoRow(title: "Imported", value: "\(attempt.importedTransactionCount ?? 0)")
+                LFInfoRow(title: "Already represented", value: "\(attempt.recognizedExistingRowCount ?? 0)")
+                LFInfoRow(title: "Blocked", value: "\(attempt.blockedRowCount ?? 0)")
+            }
+            Divider()
+            LFInfoRow(title: "Outcome", value: presentation.outcome.label)
+            LFInfoRow(title: "Coverage", value: presentation.coverage)
+            LFInfoRow(title: "Guidance", value: presentation.guidance)
+            if let accountPresentation = DurableImportAccountOutcomeSection.presentation(for: attempt) {
+                let unavailable = DurableImportAccountOutcomeSection.isUnavailable(for: attempt)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Account association")
+                        .font(theme.typography.formCaption.weight(.semibold))
+                        .foregroundStyle(theme.palette.secondaryText)
+                    ImportAccountOutcomeView(
+                        presentation: unavailable
+                            ? ImportAccountOutcomePresentation(label: "Account information unavailable", explanation: accountPresentation.explanation)
+                            : accountPresentation,
+                        iconName: unavailable ? "info.circle" : durableAccountOutcomeIcon(outcomeCode: attempt.outcomeCode),
+                        tone: unavailable ? nil : durableAccountOutcomeTone(outcomeCode: attempt.outcomeCode)
+                    )
+                }
+            }
+            if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
+                Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
+                    .lfSecondaryAction()
+            }
+        }
     }
 
     private func durableAccountOutcomeTone(outcomeCode: String) -> ImportOutcomeTone {
@@ -4722,9 +4926,9 @@ struct ContentView: View {
     private var toolbarSubtitle: String {
         switch selectedSection {
         case .dashboard:
-            return "Here's your financial overview"
+            return ""
         case .accounts:
-            return "All your financial accounts in one place"
+            return ""
         case .investments:
             return investmentStore.snapshot.latestZioAccount == nil
                 ? "Current positions from your statements"
@@ -4732,7 +4936,7 @@ struct ContentView: View {
         case .transactions:
             return "All your transactions, in one place"
         case .imports:
-            return "Import statements in a few simple steps"
+            return ""
         case .salary:
             return "Monthly estimates · \(salaryViewModel.planMonthTitle)"
         case .settings:

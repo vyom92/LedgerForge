@@ -7,6 +7,33 @@ import Testing
 struct PlannerEditorTests {
     private let locale = Locale(identifier: "en_US_POSIX")
 
+    @Test func financialMCPQualifiesCurrentInputResultsWhileNativeTotalsCanBeHeld() throws {
+        let setup = try editor(), vm = setup.vm
+        #expect(vm.updateMoney(.fixed, text: "5000.55"))
+        vm.flushPendingEntries()
+        let saves = setup.spy.saves, retentions = setup.spy.scratchpadSaves
+        #expect(vm.updateMoney(.fixed, text: "5000.75"))
+        let valid = try FinancialMCPPresentation.editor(vm)
+        let calculation = try #require(valid["calculation"] as? [String: Any])
+        let values = try #require(calculation["values"] as? [[String: Any]])
+        #expect(values.first { $0["label"] as? String == "Expected net pay" }?["amount"] as? String == "5000.75")
+        #expect(valid["has_valid_calculation"] as? Bool == true)
+        let basis = try #require(valid["calculation_basis"] as? String)
+        #expect(basis.contains("Current validated editor inputs"))
+        #expect(basis.contains("not that held display snapshot"))
+        #expect((valid["status_basis"] as? String)?.contains("Editor retention and validation") == true)
+
+        #expect(!vm.updateMoney(.fixed, text: "5000."))
+        let incomplete = try FinancialMCPPresentation.editor(vm)
+        #expect(incomplete["has_valid_calculation"] as? Bool == false)
+        #expect((incomplete["raw_input"] as? [String: String])?["fixed"] == "5000.")
+        #expect((incomplete["calculation"] as? [String: Any])?["state"] as? String == "unavailable")
+        #expect((incomplete["inr_buffer_estimate"] as? [String: Any])?["amount"] is NSNull)
+        #expect(incomplete["calculation_basis"] as? String == basis)
+        #expect(setup.spy.saves == saves && setup.spy.scratchpadSaves == retentions,
+                "Reading the editor does not save its valid or incomplete input.")
+    }
+
     @Test func clearedAmountsRemainEditableAndBecomeZeroOnlyWhenFocusEnds() throws {
         let setup = try editor(), vm = setup.vm
         let month = vm.month
@@ -111,6 +138,77 @@ struct PlannerEditorTests {
         #expect(vm.plan == saved && vm.rawText == raw)
         #expect(setup.spy.saves == saves && setup.spy.scratchpadSaves == retentions,
                 "Browsing has no canonical or scratchpad writes; actual pending edits use the existing retention path.")
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func restoredDraftBrowsingPreservesSavedAndRetainedState(hasCanonical: Bool, incomplete: Bool) async throws {
+        let setup = try editor()
+        var canonical = setup.vm.plan
+        canonical.expectedFixedEarnings = try Money(canonicalDecimal: "4000.00", currency: "QAR")
+        var draft = canonical
+        draft.expectedFixedEarnings = try Money(canonicalDecimal: "5000.50", currency: "QAR")
+        var raw = setup.vm.rawText
+        raw["fixed"] = incomplete ? "5000." : "5000.50"
+        let retained = MonthlyPlanScratchpad(plan: draft, canonical: hasCanonical ? canonical : nil,
+            rawText: raw, fieldErrors: incomplete ? ["fixed": "Complete the amount"] : [:],
+            untouchedZeroFields: [], unavailableBalanceAccountIDs: [], preReductionBasis: [:],
+            excludedRecurringOccurrenceIDs: [])
+        if hasCanonical { _ = try setup.spy.base.savePlan(canonical.persistenceDTO()) }
+        try setup.spy.base.saveScratchpad(retained.dto())
+        setup.store.installWithoutObservation(hasCanonical ? [canonical] : [],
+            generation: setup.holder.active.generationToken, scratchpads: [retained])
+        let savedBefore = try setup.spy.plans(workspaceId: draft.workspaceID)
+        let retainedBefore = try setup.spy.scratchpads(workspaceId: draft.workspaceID)
+
+        func reopen() -> SalaryWorkspaceViewModel {
+            SalaryWorkspaceViewModel(month: draft.month, provider: { setup.holder.active },
+                accountStore: AccountStore(), salaryStore: SalaryStore(), fundingPlanStore: setup.store,
+                locale: locale, refresh: { active in
+                    let hydrator = RepositoryStoreHydrator(accountRepo: active.accountRepo,
+                        importSessionRepo: active.importSessionRepo, transactionRepo: active.transactionRepo,
+                        fundingPlanRepo: active.fundingPlanRepo, accountStore: AccountStore(),
+                        transactionStore: TransactionStore(), categoryStore: CategoryStore(), cardStore: CardStore(),
+                        salaryStore: SalaryStore(), fundingPlanStore: setup.store, importSessionStore: ImportSessionStore(),
+                        importAttemptStore: ImportAttemptStore(), providerGeneration: active.generationToken,
+                        participatesInLifecycleGate: false)
+                    _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+                })
+        }
+
+        var vm = reopen()
+        for _ in 0..<2 {
+            vm.plannerOpened()
+            vm.receiveSharedReference(try AlDarUnitReference(currency: .inr, rawToken: "3", fetchedAtISO: "2026-09-16T08:00:00Z"))
+            for _ in 0..<2 {
+                for section in ["Plan insights", "Salary History", "This Month"] {
+                    vm.destinationSection = section
+                    vm.plannerOpened()
+                    vm.flushPendingEntries()
+                }
+                vm.switchMonth(to: try SelectedStatementMonth(canonical: "2027-03"))
+                vm.switchMonth(to: draft.month)
+                setup.store.notifyInstalledValue()
+            }
+            try await Task.sleep(for: .milliseconds(900))
+            #expect(SalaryWorkspaceViewModel.prepareForCompanionReceive(provider: setup.holder.active),
+                "An observed public quote does not turn fully retained entries into an unsaved companion conflict.")
+            try #require(setup.spy.saves == 0 && setup.spy.scratchpadSaves == 0,
+                "Restoration, navigation, unchanged hydration and live FX are not fresh edits.")
+            #expect(try setup.spy.plans(workspaceId: draft.workspaceID) == savedBefore)
+            #expect(try setup.spy.scratchpads(workspaceId: draft.workspaceID) == retainedBefore)
+            #expect(vm.plan.id == draft.id && vm.plan.expectedFixedEarnings == draft.expectedFixedEarnings)
+            #expect(vm.rawText == raw && vm.fieldErrors == retained.fieldErrors)
+            #expect(vm.isDirty, "The retained draft still differs from canonical authority for conflict/recovery purposes.")
+            vm = reopen()
+        }
+
+        #expect(vm.updateMoney(.fixed, text: "6000.75"))
+        for _ in 0..<150 where setup.spy.saves == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(setup.spy.saves == 1 && vm.saveState == .saved)
+        let savedAfter = try #require(setup.spy.plans(workspaceId: draft.workspaceID).first)
+        #expect(savedAfter.id == draft.id && savedAfter.expectedFixedDecimal == "6000.75")
+        let retainedAfter = try MonthlyPlanScratchpad.decode(#require(setup.spy.scratchpads(workspaceId: draft.workspaceID).first))
+        #expect(retainedAfter.canonical == vm.plan && retainedAfter.rawText["fixed"] == "6000.75")
     }
 
     @Test func startupRestoresLastSavedMonthWithoutRememberingMonthBrowsing() throws {

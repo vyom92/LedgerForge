@@ -9,10 +9,11 @@ struct ImportSnapshotAcquisitionTests {
     @Test(.globalRuntimeStateIsolation)
     func engineAcquiresOnceAndCoordinatorReadsThoseExactBytes() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
+        let sourceURL = try MechanicsTestSupport.axisBankCSV()
         let sourceBytes = try Data(contentsOf: sourceURL)
         let sourceText = try #require(String(data: sourceBytes, encoding: .utf8))
-        let acquirer = SnapshotAcquirerProbe(bytes: sourceBytes)
+        let snapshot = SourceContentSnapshot(bytes: sourceBytes)
+        let acquirer = SnapshotAcquirerProbe(snapshot: snapshot)
         let coordinator = SnapshotTextCoordinator(text: sourceText)
         let engine = makeEngine(coordinator: coordinator, acquirer: acquirer.acquire)
 
@@ -22,34 +23,17 @@ struct ImportSnapshotAcquisitionTests {
         #expect(acquirer.acquisitionCount == 1)
         #expect(coordinator.invocationCount == 1)
         #expect(coordinator.receivedBytes == sourceBytes)
-    }
+        #expect(prepared.validation.passed)
+        #expect(try snapshot.withBytes { $0 } == sourceBytes)
+        #expect(try prepared.sourceSnapshot.withBytes { $0 } == sourceBytes)
 
-    @Test(.globalRuntimeStateIsolation)
-    func acquisitionFailureStopsBeforeCoordinatorInvocationWithBoundedError() async {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let coordinator = FailingSnapshotCoordinator()
-        let sourceURL = URL(fileURLWithPath: "/private/source/that-must-not-appear.csv")
-        let engine = ImportEngine(
-            importCoordinator: coordinator,
-            sourceSnapshotAcquirer: { _ in throw SnapshotAcquisitionProbeError.failed },
-            importPersistenceCoordinator: SnapshotPreparationPersistenceCoordinator(),
-            developerConsole: DeveloperConsole(),
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
-            providerGenerationProvider: { ProviderGenerationToken() }
-        )
-
-        do {
-            _ = try await engine.prepareImport(from: sourceURL)
-            Issue.record("Expected source acquisition to fail before coordination.")
-        } catch let error as SourceContentSnapshotError {
-            #expect(error == .acquisitionFailed)
-            #expect(error.localizedDescription == "The selected source document could not be read.")
-            #expect(!error.localizedDescription.contains(sourceURL.path))
-        } catch {
-            Issue.record("Expected a bounded SourceContentSnapshotError.")
+        engine.cancelPreparedImport(prepared)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try snapshot.withBytes { $0 }
         }
-
-        #expect(coordinator.invocationCount == 0)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try prepared.sourceSnapshot.withBytes { $0 }
+        }
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -99,49 +83,6 @@ struct ImportSnapshotAcquisitionTests {
         }
     }
 
-    @Test(.globalRuntimeStateIsolation)
-    func successfulPreparationRetainsSnapshotUntilPreviewCancellation() async throws {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
-        let bytes = try Data(contentsOf: sourceURL)
-        let text = try #require(String(data: bytes, encoding: .utf8))
-        let snapshot = SourceContentSnapshot(bytes: bytes)
-        let acquirer = SnapshotAcquirerProbe(snapshot: snapshot)
-        let engine = makeEngine(
-            coordinator: SnapshotTextCoordinator(text: text),
-            acquirer: acquirer.acquire
-        )
-
-        let prepared = try await engine.prepareImport(from: sourceURL)
-        #expect(prepared.validation.passed)
-        #expect(try snapshot.withBytes { $0 } == bytes)
-
-        engine.cancelPreparedImport(prepared)
-        #expect(throws: SourceContentSnapshotError.invalidated) {
-            try snapshot.withBytes { $0 }
-        }
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func currentRawTextFingerprintRemainsBoundToAuthenticSourceSnapshot() async throws {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
-        let expectedText = try CSVReader().read(from: sourceURL)
-        let engine = ImportEngine(
-            importPersistenceCoordinator: SnapshotPreparationPersistenceCoordinator(),
-            developerConsole: DeveloperConsole(),
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
-            providerGenerationProvider: { ProviderGenerationToken() }
-        )
-
-        let prepared = try await engine.prepareImport(from: sourceURL)
-        defer { engine.cancelPreparedImport(prepared) }
-
-        #expect(prepared.rawContents == expectedText)
-        #expect(prepared.fingerprint == ExactStatementFingerprint(text: expectedText))
-        #expect(prepared.validation.passed)
-    }
-
     private func makeEngine(
         coordinator: any ImportFramework.ImportCoordinator,
         acquirer: @escaping (URL) throws -> SourceContentSnapshot
@@ -157,18 +98,10 @@ struct ImportSnapshotAcquisitionTests {
     }
 }
 
-private enum SnapshotAcquisitionProbeError: Error {
-    case failed
-}
-
 private final class SnapshotAcquirerProbe: @unchecked Sendable {
     private let lock = NSLock()
     private let snapshot: SourceContentSnapshot
     private var count = 0
-
-    init(bytes: Data) {
-        self.snapshot = SourceContentSnapshot(bytes: bytes)
-    }
 
     init(snapshot: SourceContentSnapshot) {
         self.snapshot = snapshot

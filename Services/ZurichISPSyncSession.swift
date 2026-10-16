@@ -31,6 +31,7 @@ final class ZurichISPSyncSession: ObservableObject {
     @Published private(set) var credentialLabel: String?
     @Published private(set) var isBusy = false
     @Published private(set) var message: String?
+    @Published private(set) var hasConnectionError = false
     @Published private(set) var lastSuccessfulFetch: Date?
     @Published private(set) var sourceValuationDates: [String] = []
     @Published private(set) var requiresReconnect = false
@@ -115,6 +116,9 @@ final class ZurichISPSyncSession: ObservableObject {
 
     func notifyInstalledValue() {
         let sources = snapshot.latestZioAccount?.policies ?? []
+        if let fetched = snapshot.latestZioAccount?.fetchedAt, lastSuccessfulFetch.map({ fetched > $0 }) ?? true {
+            hasConnectionError = false
+        }
         lastSuccessfulFetch = snapshot.latestZioAccount?.fetchedAt
         sourceValuationDates = Array(Set(sources.map(\.valuationDay))).sorted()
         if pendingDueCheck { Task { [weak self] in self?.checkMonthlyDue() } }
@@ -164,7 +168,7 @@ final class ZurichISPSyncSession: ObservableObject {
         }
         let baseline = snapshot, keychain = keychain, client = client, now = now
         let expected = Set(baseline.containers.filter { $0.institution == "Zurich ISP" }.map(\.identity))
-        let token = UUID(); epoch = token; isBusy = true; message = "Connecting to Zurich…"
+        let token = UUID(); epoch = token; isBusy = true; hasConnectionError = false; message = "Connecting to Zurich…"
         operation = Task { [weak self] in
             defer {
                 if let self, self.epoch == token {
@@ -269,6 +273,7 @@ final class ZurichISPSyncSession: ObservableObject {
                 if let error = error as? ZurichISPClientError,
                    [.rejectedSignIn, .rejectedPIN, .unsupportedSignIn, .unexpectedSignInPage, .sessionExpired].contains(error) { self.requiresReconnect = true }
                 self.message = (error as? LocalizedError)?.errorDescription ?? "The ISP update failed. Previous holdings are retained."
+                self.hasConnectionError = true
             }
         }
     }
@@ -294,6 +299,7 @@ final class ZurichISPSyncSession: ObservableObject {
             do {
                 try await Task.detached { try keychain.disconnect() }.value
                 self?.username = nil; self?.requiresReconnect = false
+                self?.hasConnectionError = false
                 self?.credentialLabel = nil
                 self?.message = "Disconnected. Existing holdings and statement import remain available."
             } catch { self?.message = error.localizedDescription }

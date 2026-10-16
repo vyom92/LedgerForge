@@ -8,6 +8,15 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="v12-ui-release-20261016"></a>
+### Wide-window UI campaign and v1.2 release — owner direction, 16 October 2026
+
+The owner selects a page-by-page UI/UX improvement campaign for the private single-user app, coordinated directly with **Sprint Coordinator -20** in the Codex browser. Prioritize wide windows, legible text, consistent visual controls, human wording and intuitive interaction; the complete icon, label and visible padded disclosure area acts as one target. Existing financial/source meanings remain authoritative. Designer references support the review and do not independently authorize a workflow. No MCP Admin or MCP Executor is to be used. This current coordination direction supersedes the earlier Investment Portfolio Review routing for test cleanup and UI work. <!-- user-specified -->
+
+The owner separately approved the narrow Budget Planning correction: browsing an untouched retained draft keeps it a draft; genuine edits retain existing automatic retention/saving. The owner selected **Apply dates / Cancel** for Transactions custom dates and directly reported Amount ascending/descending sorting, search/clear and row selection responsive. Neither decision authorizes a financial-calculation rewrite or new persistence mechanism.
+
+After the seven-page isolated campaign and test cleanup were technically closed, the owner instructed **“Upgrade the app as v1.2. Update documentation and git push”** and **“Also cleanup any artifacts and tmp files.”** This authorizes the bounded 1.2 (4) release, verified native backup, signed Release qualification, installed upgrade/relaunch, exact reviewed-path commit/normal push and removal of inventoried task-owned disposable output. Preserve the adopted ledger, credentials, original statements, separate iPhone worktree, native backup, previous installed app for rollback and compact durable evidence. A backup is not permission to restore or overwrite the current ledger. New features, tags, force push and unrelated cleanup are not selected. [Current state](PROJECT_STATE.md#v12-release-20261016) records execution rather than inferring success from this authorization.
+
 
 <a id="testing-restrictions-retired-20261015"></a>
 ### Retire historical testing restrictions — owner decision, 15 October 2026
@@ -17,6 +26,10 @@ After requesting an independent audit of the roughly 960-test bundle, the owner 
 Choose focused tests that can falsify the changed behavior, retain useful financial/persistence/security assertions, and select real-source integration or broader regressions for a named affected boundary. A fixture pass demonstrates the tested behavior; it does not establish an observation of the owner's financial state or certify every real statement. Existing historical reports retain their original evidence boundaries. The audit authorizes no indiscriminate deletion of tests or product coverage.
 
 Production imports still require authentic source authority and truthful provenance. The protected ledger, exact financial arithmetic, owner choices, migration identity, read-only MCP boundary and prohibition on private material or credentials in Git remain unchanged. The older source-processing and corpus clauses below remain historical where they conflict with this testing decision; no new blanket restriction on legitimate local or owner-ChatGPT inspection is introduced.
+
+The owner subsequently instructed **“Discuss, coordinate and trim the tests as well in same manner, end to end.”** This authorizes bounded test/runner/documentation simplification, independent read-only audits and initially direct coordination with Investment Portfolio Review; the [later owner direction](#v12-ui-release-20261016) routes the continuing work to Sprint Coordinator -20. Preserve unique assertions, move private/live prerequisites to explicit integration, verify real selector execution and run one final ordinary selection. It does not authorize altering accepted financial calculations, weakening correctness constraints or silently including unrelated work in a publication. <!-- user-specified -->
+
+The owner added **“Remove the UI tests as well if its needed. I had them disabled manually.”** Independent inspection found only three uncustomized Xcode launch/performance/screenshot templates, with no established product interaction assertions. Remove these files and their unused target, scheme and TestPlan references. Retain previously recorded native interaction evidence separately; deletion of an already disabled target does not count as a reduction in ordinary execution time. <!-- user-specified -->
 
 <a id="investment-presentation-windows-20261015"></a>
 ### Investment navigation and source-specific freshness — owner decision, 15 October 2026

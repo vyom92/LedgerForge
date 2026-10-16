@@ -548,7 +548,7 @@ struct SpendingAndMovementView: View {
                  : "Based on recorded transactions; some records may be missing or need review.")
                 .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             Button("Recorded spending transactions") { onTransactions(spendingIDs(value.analysis.report)) }
-                .buttonStyle(.borderless).disabled(spendingIDs(value.analysis.report).isEmpty)
+                .lfSecondaryAction().disabled(spendingIDs(value.analysis.report).isEmpty)
         }
     }
 
@@ -563,7 +563,7 @@ struct SpendingAndMovementView: View {
             }
             Button("View transactions") { onTransactions(ids) }.lfSecondaryAction().disabled(ids.isEmpty)
             Button("Review financial treatment") { section = "Movement review"; reviewKind = "Needs review" }
-                .buttonStyle(.borderless).disabled(ids.isEmpty)
+                .lfSecondaryAction().disabled(ids.isEmpty)
         }
     }
 
@@ -586,7 +586,7 @@ struct SpendingAndMovementView: View {
                         selectCalendarMonth(); showsComparisonDetails = false; applyDates()
                     }.lfSecondaryAction()
                 }
-                Button("Review coverage") { showsComparisonDetails = true }.buttonStyle(.borderless)
+                Button("Review coverage") { showsComparisonDetails = true }.lfSecondaryAction()
             }
         }.accessibilityIdentifier("spending.missingComparison")
     }
@@ -634,13 +634,40 @@ struct SpendingAndMovementView: View {
             }
         } else if !value.contributors.isEmpty {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
-                ForEach(value.contributors) { item in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(item.title).font(theme.typography.body.weight(.semibold))
-                        Button("Analysis " + amount(item.analysis)) { onTransactions(item.analysisIDs) }.disabled(item.analysisIDs.isEmpty)
-                        Button("Comparison " + amount(item.baseline)) { onTransactions(item.baselineIDs) }.disabled(item.baselineIDs.isEmpty)
-                        Button("Change " + amount(item.change)) { onTransactions(item.analysisIDs.union(item.baselineIDs)) }
-                    }.buttonStyle(.borderless).font(theme.typography.body).monospacedDigit()
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Category").frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Analysis").gridColumnAlignment(.trailing)
+                        Text("Comparison").gridColumnAlignment(.trailing)
+                        Text("Change").gridColumnAlignment(.trailing)
+                    }
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    ForEach(value.contributors) { item in
+                        GridRow(alignment: .center) {
+                            Text(item.title)
+                                .font(theme.typography.body.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Button(amount(item.analysis)) { onTransactions(item.analysisIDs) }
+                                .lfSecondaryAction()
+                                .fixedSize()
+                                .disabled(item.analysisIDs.isEmpty)
+                                .accessibilityLabel("\(item.title), Analysis, \(amount(item.analysis))")
+                            Button(amount(item.baseline)) { onTransactions(item.baselineIDs) }
+                                .lfSecondaryAction()
+                                .fixedSize()
+                                .disabled(item.baselineIDs.isEmpty)
+                                .accessibilityLabel("\(item.title), Comparison, \(amount(item.baseline))")
+                            Button((item.change > 0 ? "+" : "") + amount(item.change)) {
+                                onTransactions(item.analysisIDs.union(item.baselineIDs))
+                            }
+                            .lfSecondaryAction()
+                            .fixedSize()
+                            .accessibilityLabel("\(item.title), Change, \(item.change > 0 ? "+" : "")\(amount(item.change))")
+                        }
+                        .monospacedDigit()
+                    }
                 }
                 Text("These categories explain the recorded difference, not the reason your spending changed.")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
@@ -673,22 +700,22 @@ struct SpendingAndMovementView: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(title + " · " + value.title).font(theme.typography.formSection)
             if value.report.rows.isEmpty { Text("No observed transactions in this scope. Zero recorded totals do not establish zero activity.").foregroundStyle(LFTheme.warning) }
-            Button("Recorded income: " + amount(value.report.income)) { onTransactions(recognizedIDs(value.report, treatment: .income)) }.buttonStyle(.borderless)
-            Button("Recorded spending: " + amount(value.report.spending)) { onTransactions(spendingIDs(value.report)) }.buttonStyle(.borderless)
+            Button("Recorded income: " + amount(value.report.income)) { onTransactions(recognizedIDs(value.report, treatment: .income)) }.lfSecondaryAction()
+            Button("Recorded spending: " + amount(value.report.spending)) { onTransactions(spendingIDs(value.report)) }.lfSecondaryAction()
             Button("\(value.purchaseIDs.count) purchases · average " + (value.averagePurchase.map(averageAmount) ?? "unavailable")) { onTransactions(value.purchaseIDs) }
-                .buttonStyle(.borderless).disabled(value.purchaseIDs.isEmpty)
-            Button("Fees / interest " + amount(value.chargeAmount)) { onTransactions(value.chargeIDs) }.buttonStyle(.borderless).disabled(value.chargeIDs.isEmpty)
+                .lfSecondaryAction().disabled(value.purchaseIDs.isEmpty)
+            Button("Fees / interest " + amount(value.chargeAmount)) { onTransactions(value.chargeIDs) }.lfSecondaryAction().disabled(value.chargeIDs.isEmpty)
             refundTotals(value.report.amounts)
             let refundIDs = Set(value.report.rows.filter { $0.treatment == .expense && !$0.refundDetails.isEmpty }.flatMap { [$0.id] + Array($0.supportingTransactionIDs) })
-            Button("Inspect allocated refunds") { onTransactions(refundIDs) }.buttonStyle(.borderless).disabled(refundIDs.isEmpty)
+            Button("Inspect allocated refunds") { onTransactions(refundIDs) }.lfSecondaryAction().disabled(refundIDs.isEmpty)
             let unresolved = value.report.rows.filter { $0.treatment == .unresolved || $0.refundNeedsReview }
             Button("\(unresolved.count) need review · " + amount(unresolved.reduce(0) { $0 + $1.source.amount }) + " before offsets") {
                 onTransactions(Set(unresolved.map(\.id)))
-            }.buttonStyle(.borderless).disabled(unresolved.isEmpty)
+            }.lfSecondaryAction().disabled(unresolved.isEmpty)
             let excluded = value.report.rows.filter { ![.income, .expense, .refund, .unresolved].contains($0.treatment) }
             Button("\(excluded.count) transfers, settlements or financing entries excluded · " + amount(excluded.reduce(0) { $0 + $1.source.amount }) + " gross") {
                 onTransactions(Set(excluded.map(\.id)))
-            }.buttonStyle(.borderless).disabled(excluded.isEmpty)
+            }.lfSecondaryAction().disabled(excluded.isEmpty)
             DisclosureGroup("Source coverage · \(value.coverage.filter { !$0.complete }.count) accounts incomplete") {
                 ForEach(value.coverage) { item in
                     VStack(alignment: .leading, spacing: theme.spacing.micro) {
@@ -706,7 +733,7 @@ struct SpendingAndMovementView: View {
     }
     private func difference(_ title: String, _ change: Decimal, baseline: Decimal, ids: Set<String>) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Button(title + ": " + exact(change)) { onTransactions(ids) }.buttonStyle(.borderless).disabled(ids.isEmpty)
+            Button(title + ": " + exact(change)) { onTransactions(ids) }.lfSecondaryAction().disabled(ids.isEmpty)
             if let percent = SpendingComparison.percentage(change: change, baseline: baseline) {
                 Text(percent.formatted(.number.precision(.fractionLength(1))) + "% of the comparison total")
             } else { Text("Percentage unavailable: comparison total is zero or negative.") }
@@ -884,7 +911,7 @@ struct SpendingAndMovementView: View {
 
     private func inspectEntry(_ row: SpendingSourceRow) -> some View {
         Button { onTransactions([row.id]) } label: { Image(systemName: "arrow.up.right.square") }
-            .buttonStyle(.borderless).help("Inspect the original transaction").accessibilityLabel("Inspect original transaction")
+            .lfSecondaryAction().help("Inspect the original transaction").accessibilityLabel("Inspect original transaction")
             .accessibilityIdentifier("movements.inspect.\(row.id)")
     }
     private func candidateAccounts(_ suggestion: MovementSuggestion) -> String {
@@ -959,6 +986,8 @@ private struct MovementReviewEditor: View {
     @State private var acknowledgement = false
     @State private var openedMetadata: FinancialIntelligenceSnapshot?
     @State private var allocationText: [String: String] = [:]
+    @FocusState private var focusedAllocation: String?
+    @State private var allocationPresentation = LFEditingPresentation<[String: String]>()
     @State private var newEventID = UUID().uuidString
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
     @State private var challenge: DevelopmentProfileAcknowledgementChallenge?
@@ -966,7 +995,13 @@ private struct MovementReviewEditor: View {
     private var selected: [SpendingSourceRow] { rows.filter { ids.contains($0.id) } }
     private var purchases: [SpendingSourceRow] { selected.filter { $0.isBankOut || $0.isCardIncrease } }
     private var credits: [SpendingSourceRow] { selected.filter { $0.isBankIn || $0.isCardDecrease } }
-    private var refundPreview: MovementRefundValidation.Result? { try? reviewedRefund().result }
+    private var refundPreview: MovementRefundValidation.Result? {
+        try? reviewedRefund(text: allocationPresentation.value(or: allocationText)).result
+    }
+    private var presentedRefundError: String? {
+        do { _ = try reviewedRefund(text: allocationPresentation.value(or: allocationText)); return nil }
+        catch { return error.localizedDescription }
+    }
     private var refundError: String? {
         guard kind == .refund else { return nil }
         do { _ = try reviewedRefund(); return nil } catch { return error.localizedDescription }
@@ -1000,7 +1035,9 @@ private struct MovementReviewEditor: View {
                     if let warning { Text(warning).foregroundStyle(LFTheme.warning) }
                     if let ratio { Text(ratio).font(theme.typography.formCaption) }
                     if kind == .refund {
-                        if let refundError { Text(refundError).foregroundStyle(LFTheme.warning).accessibilityIdentifier("movements.refundError") }
+                        Text("The allocation preview updates when you finish editing an amount.")
+                            .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
+                        if let presentedRefundError { Text(presentedRefundError).foregroundStyle(LFTheme.warning).accessibilityIdentifier("movements.refundError") }
                         if let preview = refundPreview { refundSummary(preview) }
                         if let previous = try? replacementEvent(), previous.kind == .expense {
                             Text("This replaces the existing spending interpretation for the original purchase and keeps its saved relationship.")
@@ -1023,7 +1060,7 @@ private struct MovementReviewEditor: View {
                         ForEach(matches.prefix(80)) { row in
                             HStack(alignment: .top) {
                                 Button { ids.insert(row.id) } label: { Image(systemName: "plus.circle") }
-                                    .buttonStyle(.borderless).disabled(ids.contains(row.id))
+                                    .lfSecondaryAction().disabled(ids.contains(row.id))
                                     .help("Add this original entry").accessibilityLabel("Add original entry")
                                 rowLabel(row)
                             }
@@ -1038,7 +1075,7 @@ private struct MovementReviewEditor: View {
             HStack {
                 Spacer()
                 Button(kind == .refund ? "Confirm refund allocation" : "Confirm interpretation", action: requestSave)
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(!canSave)
+                    .lfPrimaryAction().keyboardShortcut(.defaultAction).disabled(!canSave)
                     .accessibilityIdentifier("movements.confirm")
             }
         }
@@ -1048,6 +1085,10 @@ private struct MovementReviewEditor: View {
         .onChange(of: kind) { _, _ in acknowledgement = false; message = nil; seedValidDefaults() }
         .onChange(of: ids) { _, _ in acknowledgement = false; message = nil; seedValidDefaults() }
         .onChange(of: allocationText) { _, _ in acknowledgement = false; message = nil }
+        .onChange(of: focusedAllocation) { _, current in
+            allocationPresentation.end()
+            if current != nil { allocationPresentation.begin(allocationText) }
+        }
         .onChange(of: explanation) { _, _ in acknowledgement = false }
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
         .alert(DevelopmentProfileAcknowledgementPresentation.title, isPresented: Binding(get: { challenge != nil }, set: { if !$0 { challenge = nil } })) {
@@ -1061,7 +1102,7 @@ private struct MovementReviewEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 Button { ids.remove(row.id); allocationText.removeValue(forKey: row.id) } label: { Image(systemName: "minus.circle") }
-                    .buttonStyle(.borderless).help("Remove this entry from the review").accessibilityLabel("Remove original entry")
+                    .lfSecondaryAction().help("Remove this entry from the review").accessibilityLabel("Remove original entry")
                 VStack(alignment: .leading, spacing: 5) {
                     if kind == .refund {
                         Text(row.isBankOut || row.isCardIncrease ? "Original purchase" : "Refund credit").font(theme.typography.formSection)
@@ -1076,14 +1117,15 @@ private struct MovementReviewEditor: View {
                         .textFieldStyle(.roundedBorder).frame(width: 170).monospacedDigit()
                         .accessibilityLabel("Amount allocated from credit on " + (row.date?.presentation ?? "unknown date"))
                         .accessibilityIdentifier("movements.refundAmount.\(row.id)")
+                        .focused($focusedAllocation, equals: row.id)
+                        .onSubmit { focusedAllocation = nil }
                     if let remaining = refundPreview?.residualByCredit[row.id] {
                         Text("Unallocated " + nativeAmount(remaining) + (remaining.amount > 0 ? " · Needs review" : ""))
                             .font(theme.typography.formCaption).foregroundStyle(remaining.amount > 0 ? LFTheme.warning : theme.palette.secondaryText)
                     }
                 }.padding(.leading, 24)
-                if let error = amountError(for: row) {
-                    Text(error).font(theme.typography.formCaption).foregroundStyle(LFTheme.warning).padding(.leading, 24)
-                }
+                LFNumericInputFeedback(isEditing: focusedAllocation == row.id, error: amountError(for: row))
+                    .padding(.leading, 24)
             }
             Divider()
         }

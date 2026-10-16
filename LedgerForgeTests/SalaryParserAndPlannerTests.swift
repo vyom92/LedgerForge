@@ -69,18 +69,6 @@ struct SalaryParserAndPlannerTests {
         }
     }
 
-    @Test func noBalanceIsAutoSelectedAndCaptureIsNotLiveLinked() throws {
-        let plan = Self.plan()
-        #expect(plan.balances.isEmpty)
-        let qar = try CurrencyCode("QAR")
-        let captured = FundingPlanBalance(id: "x", accountID: "cbq", nativeCurrency: qar, included: false, money: try Money(amount: 80, currency: qar), provenance: .capturedAccountBalance(capturedAtISO: "2026-08-28T00:00:00Z"))
-        var changedAccountValue = try Money(amount: 100, currency: qar)
-        #expect(captured.money?.amount == 80)
-        changedAccountValue = try Money(amount: 120, currency: qar)
-        #expect(changedAccountValue.amount == 120)
-        #expect(captured.money?.amount == 80)
-    }
-
     @Test func salaryNavigationEligibilityAndExplicitRolloverRemainUserControlled() throws {
         #expect(AppShellSection.ordinaryNavigation == [.dashboard, .accounts, .investments, .salary, .transactions, .imports, .settings])
         let accounts = AccountStore()
@@ -102,36 +90,6 @@ struct SalaryParserAndPlannerTests {
         #expect(viewModel.updateMoney(.fixed, text: "123.00"))
         #expect(viewModel.plan.expectedFixedProvenance == .manual)
         #expect(previous.expectedFixedEarnings.amount == 0)
-    }
-
-    @Test func plannerEligibilityIgnoresDisplayNameAndNickname() throws {
-        // Source-independent account-metadata checks; no statement or balance evidence is asserted.
-        let initial = [
-            Account(repositoryAccountId: "axis", institution: Institution.axis.rawValue, name: "NRE", type: .bank, currencyCode: "INR"),
-            Account(repositoryAccountId: "hdfc", institution: Institution.hdfc.rawValue, name: "NRO", type: .bank, currencyCode: "INR"),
-            Account(repositoryAccountId: "cbq", institution: Institution.cbq.rawValue, name: "Current", type: .bank, currencyCode: "QAR"),
-            Account(repositoryAccountId: "inr-card", institution: Institution.axis.rawValue, name: "Card", type: .creditCard, currencyCode: "INR"),
-            Account(repositoryAccountId: "qar-card", institution: Institution.cbq.rawValue, name: "Card", type: .creditCard, currencyCode: "QAR")
-        ]
-        let accounts = AccountStore()
-        accounts.installAccountsWithoutObservation(initial)
-        let viewModel = SalaryWorkspaceViewModel(accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: FundingPlanStore())
-        let expectedIDs: Set<String> = ["axis", "hdfc", "cbq"]
-        let expectedCardIDs: Set<String> = ["inr-card", "qar-card"]
-        #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
-        #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
-
-        for (name, nickname) in [("Everyday funds", nil), ("Travel USD card", "Reserve"), ("NRE", "NRO")] as [(String, String?)] {
-            accounts.installAccountsWithoutObservation(initial.map { account in
-                var renamed = account
-                renamed.name = name
-                renamed.nickname = nickname
-                return renamed
-            })
-            #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
-            #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
-            #expect(viewModel.plan.balances.isEmpty)
-        }
     }
 
     @Test func plannerEligibilityUsesNativeCurrencyAndAccountRoleWithoutInstitutionRestrictions() throws {
@@ -160,11 +118,25 @@ struct SalaryParserAndPlannerTests {
         }
         accounts.installAccountsWithoutObservation(candidates)
         let viewModel = SalaryWorkspaceViewModel(accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: FundingPlanStore())
-        #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == ["axis", "hdfc", "cbq", "other-bank"])
-        #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == [
+        let expectedIDs: Set<String> = ["axis", "hdfc", "cbq", "other-bank"]
+        let expectedCardIDs: Set<String> = [
             "other-card", "\(Institution.axis.rawValue)-creditCard", "\(Institution.hdfc.rawValue)-creditCard", "\(Institution.cbq.rawValue)-creditCard"
-        ])
+        ]
+        #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
+        #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
         #expect(viewModel.plan.balances.isEmpty)
+
+        for (name, nickname) in [("Everyday funds", nil), ("Travel USD card", "Reserve"), ("NRE", "NRO")] as [(String, String?)] {
+            accounts.installAccountsWithoutObservation(candidates.map { account in
+                var renamed = account
+                renamed.name = name
+                renamed.nickname = nickname
+                return renamed
+            })
+            #expect(Set(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId)) == expectedIDs)
+            #expect(Set(viewModel.eligibleCommitmentAccounts.compactMap(\.repositoryAccountId)) == expectedCardIDs)
+            #expect(viewModel.plan.balances.isEmpty)
+        }
     }
 
     @Test func manualCardCommitmentLinkHydratesWithoutChangingAmountOrLegacyBankLink() throws {

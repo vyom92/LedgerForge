@@ -19,8 +19,8 @@ struct DashboardLiveFXHeaderAccessory: View {
                         .foregroundStyle(theme.palette.primaryText)
                     freshness(at: context.date)
                 }
-                if !session.legs.isEmpty {
-                    Text(session.observationStatus).font(theme.typography.caption)
+                if !session.legs.isEmpty, let warning = session.observationWarning {
+                    Text(warning).font(theme.typography.caption)
                         .foregroundStyle(theme.palette.secondaryText)
                 }
 
@@ -124,8 +124,8 @@ struct AlDarFXCard: View {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     freshnessBadge(at: context.date)
                 }
-                if !session.legs.isEmpty {
-                    Text(session.observationStatus).font(theme.typography.secondary)
+                if !session.legs.isEmpty, let warning = session.observationWarning {
+                    Text(warning).font(theme.typography.secondary)
                         .foregroundStyle(theme.palette.secondaryText)
                 }
             }
@@ -205,6 +205,10 @@ struct AlDarFXCard: View {
 
 /// Shared native freshness scale; callers supply weekday age, never displayed age.
 enum FreshnessTint {
+    static func publicationColor(_ missed: Int?, unknown: Color) -> Color {
+        guard let missed else { return unknown }
+        return color(position: WeekdayFreshness.colorPosition(days: Double(missed)))
+    }
     static func color(position: Double) -> Color {
         let first = (position <= 1 ? NSColor.systemGreen : NSColor.systemYellow).usingColorSpace(.deviceRGB)!
         let second = (position <= 1 ? NSColor.systemYellow : NSColor.systemRed).usingColorSpace(.deviceRGB)!

@@ -45,13 +45,14 @@ struct InvestmentListView: View {
                     Button(showsCustomizedTable ? "Compact rows" : "Table columns", systemImage: "tablecells") {
                         showsCustomizedTable.toggle()
                     }.lfSecondaryAction()
-                        .help("Open the table with your saved columns")
+                        .help(showsCustomizedTable ? "Show compact holding rows" : "Open the table with your saved columns")
                 }
-                Button(showsHoldingsTable || selectedPortfolio != nil ? "Collapse holdings" : "Expand holdings",
-                       systemImage: showsHoldingsTable || selectedPortfolio != nil ? "chevron.up" : "list.bullet") {
-                    if selectedPortfolio != nil || showsHoldingsTable { selectedPortfolio = nil; showsHoldingsTable = false }
-                    else { showsHoldingsTable = true }
-                }.lfSecondaryAction()
+                if selectedPortfolio == nil {
+                    Button(showsHoldingsTable ? "Back to overview" : "All holdings",
+                           systemImage: showsHoldingsTable ? "arrow.left" : "list.bullet") {
+                        showsHoldingsTable.toggle()
+                    }.lfSecondaryAction()
+                }
             }
             if availabilityState == .loading {
                 ProgressView("Loading holdings…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -68,7 +69,8 @@ struct InvestmentListView: View {
                     containers: store.snapshot.containers, portfolioNames: prices.portfolioNames,
                     valuations: prices.valuations,
                     selection: Binding(get: { fundSelections[selectedPortfolio.id] },
-                                       set: { fundSelections[selectedPortfolio.id] = $0 }))
+                                       set: { fundSelections[selectedPortfolio.id] = $0 }),
+                    onBack: { self.selectedPortfolio = nil; showsHoldingsTable = false })
             } else if showsHoldingsTable {
                 if showsCustomizedTable {
                     VStack(alignment: .leading, spacing: theme.spacing.small) {
@@ -77,7 +79,7 @@ struct InvestmentListView: View {
                                 .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                             Spacer()
                             if selected != nil {
-                                Button("Show selected holding details") { showsCustomizedTable = false }.buttonStyle(.link)
+                                Button("Show selected holding details") { showsCustomizedTable = false }.lfSecondaryAction()
                             }
                         }
                         table
@@ -126,9 +128,9 @@ struct InvestmentListView: View {
                             HStack(spacing: theme.spacing.sectionGap) {
                                 sortHeading("Investment", field: .investment).frame(maxWidth: .infinity, alignment: .leading)
                                 if wide { sortHeading("Portfolio", field: .portfolio).frame(width: 175, alignment: .leading) }
-                                sortHeading("Units", field: .units).frame(width: compactUnitsWidth, alignment: .trailing)
+                                sortHeading("Units", field: .units, alignment: .trailing).frame(width: compactUnitsWidth, alignment: .trailing)
                                 if showsDate { sortHeading("NAV / price date", field: .date).frame(width: 150, alignment: .leading) }
-                                sortHeading("Current value", field: .value).frame(width: compactValueWidth, alignment: .trailing)
+                                sortHeading("Current value", field: .value, alignment: .trailing).frame(width: compactValueWidth, alignment: .trailing)
                             }.padding(.horizontal, theme.spacing.controlGap).padding(.vertical, theme.spacing.controlGap)
                             Divider()
                             LazyVStack(alignment: .leading, spacing: 0) {
@@ -196,7 +198,7 @@ struct InvestmentListView: View {
                 if showsDate {
                     Text(prices.valuations[holding.id]?.quote.map { InvestmentPriceDates.display($0.valuationDay) } ?? "Unavailable")
                         .font(theme.typography.secondary).monospacedDigit()
-                        .foregroundStyle(prices.valuations[holding.id]?.quote.map { ageColor($0.freshnessAge(at: .now)) } ?? theme.palette.secondaryText)
+                        .foregroundStyle(FreshnessTint.publicationColor(prices.valuations[holding.id]?.quote?.missedPublicationWindows(at: .now), unknown: theme.palette.secondaryText))
                         .frame(width: 150, alignment: .leading)
                 }
                 Text(prices.valueText[holding.id] ?? "Unavailable").font(theme.typography.body).monospacedDigit()
@@ -223,7 +225,7 @@ struct InvestmentListView: View {
         proxy.scrollTo(next, anchor: .center)
     }
 
-    private func sortHeading(_ title: String, field: InvestmentHoldingSort.Field) -> some View {
+    private func sortHeading(_ title: String, field: InvestmentHoldingSort.Field, alignment: Alignment = .leading) -> some View {
         Button {
             let order: SortOrder = sortOrder.first?.field == field && sortOrder.first?.order == .forward ? .reverse : .forward
             sortOrder = [comparator(field, order: order)]
@@ -234,8 +236,12 @@ struct InvestmentListView: View {
                     Image(systemName: sortOrder.first?.order == .forward ? "chevron.up" : "chevron.down").font(theme.typography.caption)
                 }
             }
-        }.buttonStyle(.plain).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: alignment)
+            .padding(.horizontal, theme.spacing.micro)
+            .contentShape(Rectangle())
+        }.buttonStyle(LFPlainActionStyle()).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             .accessibilityLabel("Sort by " + title)
+            .accessibilityValue(sortOrder.first?.field == field ? (sortOrder.first?.order == .forward ? "Ascending" : "Descending") : "Not sorted")
     }
 
     private func comparator(_ field: InvestmentHoldingSort.Field, order: SortOrder = .forward) -> InvestmentHoldingSort {
@@ -368,15 +374,15 @@ struct InvestmentListView: View {
     @ViewBuilder private func valuationDate(_ quote: InvestmentQuote?, at now: Date) -> some View {
         if let quote {
             let days = quote.age(at: now)
-            let freshness = quote.freshnessAge(at: now)
-            let color = ageColor(freshness)
+            let freshness = quote.missedPublicationWindows(at: now)
+            let color = FreshnessTint.publicationColor(freshness, unknown: theme.palette.secondaryText)
             Text(InvestmentPriceDates.display(quote.valuationDay))
                 .monospacedDigit().fixedSize().foregroundStyle(color)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(LinearGradient(colors: [color.opacity(0.16), color.opacity(0.05)],
                     startPoint: .leading, endPoint: .trailing), in: Capsule())
                 .frame(maxWidth: .infinity)
-                .help("\(quote.dateBasis.label) · \(days == 0 ? "Today" : "\(days) days old")\(freshness >= 4 ? " · Stale" : "")")
+                .help("\(quote.dateBasis.label) · \(days == 0 ? "Today" : "\(days) days old")\((freshness ?? 0) >= 4 ? " · Stale" : "")")
         } else {
             Text("Unavailable").foregroundStyle(theme.palette.secondaryText).frame(maxWidth: .infinity)
         }

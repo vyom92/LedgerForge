@@ -44,10 +44,12 @@ Canonical test plan: TestPlan.xctestplan
 Platform: macOS
 Primary application target: LedgerForge
 Primary test target: LedgerForgeTests
-Generic UI-test target: LedgerForgeUITests
 ```
 
-`LedgerForgeUITests` remains intentionally disabled unless an approved prompt changes that state.
+The owner-authorized test cleanup removed the disabled `LedgerForgeUITests`
+target and its three uncustomized launch/screenshot templates. There is no
+automated UI-test target. Native interaction acceptance remains separately
+recorded; ordinary test results do not establish native UI behavior.
 
 Never infer current scheme, target or test-plan behavior from memory.
 
@@ -120,7 +122,6 @@ Typical intent:
 | Services and coordinators | LedgerForge |
 | Readers, parsers and detectors | LedgerForge |
 | Unit and integration tests | LedgerForgeTests |
-| Generic UI tests | LedgerForgeUITests, only when explicitly enabled |
 | Fixtures | Test resources or repository evidence according to current structure |
 
 Always inspect actual membership.
@@ -189,7 +190,7 @@ inspection evidence.
 
 ## Repository-owned command interface
 
-The [script guide](../script/README.md) and executable [validate.sh](../script/validate.sh) / [build_and_run.sh](../script/build_and_run.sh) own exact flags and behavior. Xcode project `LedgerForge.xcodeproj`, shared scheme `LedgerForge`, destination `platform=macOS` and `TestPlan.xctestplan` remain truth. The Sprint-94 owner-authorized ordinary selection is recorded below and in the script guide.
+The [script guide](../script/README.md) and executable [validate.sh](../script/validate.sh) / [build_and_run.sh](../script/build_and_run.sh) own exact flags and behavior. Xcode project `LedgerForge.xcodeproj`, shared scheme `LedgerForge`, destination `platform=macOS` and `TestPlan.xctestplan` remain truth. The current ordinary/integration split is recorded below and in the script guide. The macOS app Debug and Release configurations specify 1.2 (4); test, helper and iPhone target versions remain separate.
 
 | Need | Existing command | Boundary |
 | --- | --- | --- |
@@ -208,13 +209,21 @@ The Run helper defaults to `--verify`; it validates exact executable/bundle iden
 
 The owner-selected Developer Mode controls compile into the app's Debug and Release configurations through `LEDGERFORGE_DEVELOPER_TOOLS`. The helper and subprocess targets do not receive this flag. It enables the existing profile/lifecycle/warning/acknowledgement controls without enabling Debug-only environment selectors or fault injection. Release Current Database keeps the adopted personal path and cannot be reset through profile controls; Debug Current and the separate development profiles keep their established identities. See the [4 October owner decision](SCOPE_DECISIONS.md#background-recovery-release-developer-tools-20261004) and [ADR-035](ADR.md#adr-035).
 
-App-hosted tests do not reliably inherit arbitrary shell variables. The existing `LEDGERFORGE_TEST_ENVIRONMENT_FILE` route builds for testing, merges string dictionary entries into each generated `.xctestrun` target while preserving metadata, then runs `test-without-building`. The [source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) takes precedence over historical artifact-producing tests. For Sprint 94, the owner explicitly approved separating the incompatible corpus, statement-copy and live-provider tests while retaining their definitions. The audited ordinary selection retains genuine-original in-memory app checks; it forwards only their required private source/oracle/password configuration, without a corpus evidence-output destination or live-provider authorization. External test configuration and build artifacts remain outside Git.
+The [15 October testing decision](SCOPE_DECISIONS.md#testing-restrictions-retired-20261015) permits deterministic synthetic fixtures and ordinary local evidence files in isolated tests. Routine tests must not require the owner's statements, credentials, adopted ledger or live provider sessions. `TestPlan.xctestplan` owns the ordinary exclusions; retained original-backed, populated-ledger and live-provider checks run explicitly when their boundary is affected. Moving a test to integration is not a passing result and must be justified by its prerequisites, never by a failed assertion.
 
-`test-full` forwards the canonical plan's exclusion list as explicit runner arguments in both execution paths because this Xcode version does not consistently honor Swift Testing exclusions in the plan alone. The earlier Sprint-94 **ordinary app regression plan** passed 554 definitions / 614 executions. Final owner corrections added 13 definitions and the renewed ordinary app regression plan passed **567 definitions / 627 executions, zero failures/skips** on the final candidate. The unchanged 12 exclusion selectors cover the same 17 retained, separately gated definitions for source/corpus, prohibited financial-evidence output, copied-statement replay and live-provider access. This is not complete authentic/source acceptance. Use the validation driver; do not substitute an unfiltered Xcode run or exclude additional failed/missing-evidence tests.
+The accepted 16 October enumeration contains **978 definitions: 833 ordinary and 145 explicit integrations**, with 99 typed, disjoint exclusion selectors. Xcode navigator counts are not execution evidence. The current typed TestPlan and CLI identifier sets were independently matched; the ordinary run had 939 parameter-expanded passing executions.
 
-The final Sprint-94 two-decimal presentation correction adds one focused definition and uses its own **1/1 PASS**, Debug, optimized Release and native rate check. By explicit owner instruction the preceding **567/627 ordinary result is retained without rerunning it**; it is not an ordinary run on the last display-only fingerprint. No exclusions or validation-driver behavior changed for this correction.
+The driver always builds for testing with the existing `.TestRun` bundle suffix, then executes the generated `.xctestrun`. It forwards canonical exclusions for `test-full`; for `test-focused`, it removes only generated skip lists and applies explicit selectors. Every requested selector must resolve to a passing executed definition. Zero/skip-only results fail. Timeouts, serial scheduling and existing metadata remain intact. Build time, test time, definitions and parameterized executions are distinct measures.
 
-Test selectors must discover nonzero tests, preserve TestPlan timeouts and serial test-target scheduling, and use existing result inspection; never skip absent authentic evidence to get green. Required results must not expose private financial content or violate the current disk-artifact rule. Keep ordinary build/test artifacts outside the repository; preserve required permitted evidence before cleanup and remove only task-owned paths. Never commit DerivedData, result bundles, local databases/sidecars, credentials or Xcode user state.
+App-hosted tests do not reliably inherit arbitrary shell variables. An explicitly selected integration may use `LEDGERFORGE_TEST_ENVIRONMENT_FILE`, an external string dictionary merged into generated test environments. Keep credentials, private originals, real financial evidence, local databases, DerivedData and result bundles out of Git. The [script guide](../script/README.md) owns exact setup and current integration routes. Historical Sprint-94 counts and transport restrictions are superseded for current testing; their past results retain their original evidence boundaries.
+
+A test-only selection/fixture change needs affected focused checks and one ordinary run because it changes global test infrastructure. It does not require a product deployment, live-ledger mutation, a new whole-corpus campaign or unrelated native UI repetition. Preserve required local results before cleaning only task-owned artifacts.
+
+## Local installed upgrade and rollback
+
+An owner-authorized local release uses a fresh native verified ledger backup and retains the complete previous installed app separately. Build the optimized signed Release with the app’s existing identity and entitlements, verify the full bundle inventory/signature, then replace only the application after a normal quit. Verify the installed version, Current database identity/integrity, account and transaction counts, applicable preferences, connection state and ordinary launch/relaunch. Classify normal background cache activity separately from protected financial records; never infer data preservation from an unchanged main SQLite file while WAL is active.
+
+App rollback restores the retained application only after quitting its replacement. It must not automatically restore the older ledger backup. Financial-data restoration requires a separate explicit decision. Keep compact release receipts, backup and rollback outside temporary build output and outside Git. The [v1.2 outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-ui-release) records the release-specific evidence and limits.
 
 ## Documentation and resource containment
 

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import LedgerForge
 
@@ -10,6 +11,15 @@ struct DeveloperDatabaseProfilePresentationTests {
         let profile = descriptor(kind: .current)
         #expect(DeveloperDatabaseProfileWarningPresentation(profile: profile) == nil)
         #expect(profile.resetActionLabel == nil)
+        let text = [
+            profile.displayName,
+            profile.currentSchemaLabel,
+            DeveloperDatabaseProfileOperationState.activationBlocked.message ?? ""
+        ].joined(separator: " ")
+        #expect(!text.contains("/"))
+        #expect(!text.lowercased().contains("sqlite"))
+        #expect(!text.lowercased().contains("uuid"))
+        #expect(!text.lowercased().contains("token"))
     }
 
     @Test(arguments: [
@@ -33,12 +43,16 @@ struct DeveloperDatabaseProfilePresentationTests {
             presentation?.detail,
             presentation?.sourceSchema,
             presentation?.currentSchema,
-            presentation?.accessibilityLabel
+            presentation?.accessibilityLabel,
+            profile.sourceSchemaLabel,
+            profile.currentSchemaLabel,
+            DevelopmentProfileAcknowledgementError.developmentDatabaseUnavailable.localizedDescription
         ].compactMap { $0 }.joined(separator: " ")
         #expect(!text.contains("/"))
         #expect(!text.lowercased().contains("sqlite"))
         #expect(!text.lowercased().contains("uuid"))
         #expect(!text.lowercased().contains("token"))
+        #expect(!text.lowercased().contains("fingerprint"))
     }
 
     @Test

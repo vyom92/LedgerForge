@@ -189,6 +189,9 @@ final class FinancialMCPPresentation {
             "missing_fx": prices.overview.total.fxMissing,
             "oldest_valuation_age_days": prices.overview.total.oldestAge(at: Date()),
             "oldest_freshness_age_days": prices.overview.total.oldestFreshnessAge(at: Date()),
+            "oldest_price_date": prices.overview.total.oldestPriceDay as Any? ?? NSNull(),
+            "missed_price_publication_windows": prices.overview.total.missedPricePublicationWindows(at: Date()) as Any? ?? NSNull(),
+            "price_freshness_basis": "Source publication windows; Nasdaq New York close, AMFI 23:00 India, FE and CBQ Tuesday-Friday end-of-day UTC for prior weekday valuations. Calendar ages remain elapsed-age metadata, not warning thresholds.",
           ]
         }
       case .reserveStatus:
@@ -218,7 +221,7 @@ final class FinancialMCPPresentation {
           result["saved"] = try saved.map(Self.plan) ?? NSNull()
           result["retained"] = try retained.map(Self.scratchpad) ?? NSNull()
           result["calculated_outputs"] =
-            "Unavailable for an explicitly requested record. Omit month to read the actual displayed calculation."
+            "Unavailable for an explicitly requested record. Omit month to read the current editor calculation."
         } else {
           result["selection_basis"] =
             "Actual selected Budget Planning workspace, including uncommitted input and unsaved scenario."
@@ -317,10 +320,12 @@ final class FinancialMCPPresentation {
   static func editor(_ value: SalaryWorkspaceViewModel) throws -> [String: Any] {
     [
       "month": value.month.canonical, "plan": try plan(value.plan), "status": value.statusText,
+      "status_basis": "Editor retention and validation status; the native worksheet can show an editing indicator while an amount field has focus.",
       "save_state": String(describing: value.saveState), "dirty": value.isDirty,
       "retention_pending": value.retentionPending, "raw_input": value.rawText,
       "field_errors": value.fieldErrors,
       "has_valid_calculation": value.hasValidCalculation,
+      "calculation_basis": "Current validated editor inputs. While an amount field is being edited, the native worksheet temporarily holds earlier totals to keep the editor stable. Calculation validity, calculated values and the INR buffer estimate here describe the current inputs, not that held display snapshot. Incomplete input has no current calculation.",
       "calculation": calculation(value.hasValidCalculation ? value.calculation : nil),
       "inr_buffer_estimate": metric(
         "Final buffer INR estimate", value.hasValidCalculation ? value.finalBufferINREstimate : nil),

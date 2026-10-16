@@ -719,24 +719,29 @@ struct TransactionListViewModelTests {
 
     @Test(.globalRuntimeStateIsolation)
     func presentationSearchRequiresEveryNormalizedLiteralTerm() async throws {
-        let context = try await authenticTransactionListContext()
-        let transaction = try #require(context.transactionStore.transactions.first)
-        let knownTerm = try #require(transaction.description.split(whereSeparator: \.isWhitespace).first.map(String.init))
+        let snapshot = try await mechanicsTransactionSnapshot()
+        let transactionStore = TransactionStore()
+        let accountStore = AccountStore()
+        transactionStore.replaceTransactions(snapshot.transactions)
+        accountStore.replaceAccounts(snapshot.accounts)
         let viewModel = TransactionListViewModel(
-            transactionStore: context.transactionStore,
-            importSessionStore: context.importSessionStore,
-            accountStore: context.accountStore,
-            categoryStore: context.categoryStore
+            transactionStore: transactionStore,
+            importSessionStore: ImportSessionStore(),
+            accountStore: accountStore,
+            categoryStore: CategoryStore()
         )
         viewModel.synchronizePresentation(
-            generation: context.provider.generationToken,
+            generation: try #require(snapshot.providerGeneration),
             availabilityState: .current
         )
 
-        viewModel.presentationFilter.searchText = "\(knownTerm) ledgerforge-presentation-no-match-7f23d0"
+        viewModel.presentationFilter.searchText = "  teST   groceries  "
+        #expect(viewModel.transactionPresentationResult.state == .ready)
+        #expect(viewModel.transactionPresentationResult.rows.count == 1)
+        viewModel.presentationFilter.searchText = "Test ledgerforge-presentation-no-match-7f23d0"
 
         #expect(viewModel.transactionPresentationResult.state == .validEmpty)
-        #expect(viewModel.transactionPresentationResult.exclusions.search == context.transactionStore.transactions.count)
+        #expect(viewModel.transactionPresentationResult.exclusions.search == snapshot.transactions.count)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -813,17 +818,17 @@ struct TransactionListViewModelTests {
 
     @Test(.globalRuntimeStateIsolation)
     func invalidAmountBoundsAreExplicitlyRejected() async throws {
-        let context = try await authenticTransactionListContext()
-        let knownCurrency = try #require(context.transactionStore.transactions.first?.money.currency)
+        let snapshot = try await mechanicsTransactionSnapshot()
+        let knownCurrency = try #require(snapshot.transactions.first?.money.currency)
         var filter = TransactionPresentationFilterSpec.empty
         filter.currencies = [knownCurrency]
         filter.amountRange = TransactionPresentationAmountRange(lowerBound: 3, upperBound: 2)
 
         let result = TransactionPresentationEngine.evaluate(
-            transactions: context.transactionStore.transactions,
-            accounts: context.accountStore.accounts,
-            categories: context.categoryStore.categories,
-            assignments: context.categoryStore.snapshot.assignments,
+            transactions: snapshot.transactions,
+            accounts: snapshot.accounts,
+            categories: snapshot.categorySnapshot.categories,
+            assignments: snapshot.categorySnapshot.assignments,
             filter: filter,
             sort: .init(),
             availability: .available
@@ -1310,4 +1315,18 @@ private func authenticTransactionListContext() async throws -> AuthenticTransact
     )
     AcceptedTransactionSnapshot.cached = context
     return context
+}
+
+/// A small imported fixture for source-independent presentation contracts.
+@MainActor
+private func mechanicsTransactionSnapshot() async throws -> RepositoryRuntimeSnapshot {
+    let provider = DatabaseProvider(inMemory: true)
+    let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
+    guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
+        throw RepositoryError.persistenceUnavailable
+    }
+    let snapshot = try RepositoryStoreHydrator(databaseProvider: provider,
+        workspaceId: plan.workspace.id, participatesInLifecycleGate: false).stageHydration()
+    try #require(snapshot.transactions.count == 4)
+    return snapshot
 }

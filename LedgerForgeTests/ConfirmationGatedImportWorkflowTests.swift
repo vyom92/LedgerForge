@@ -217,7 +217,7 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let url = try AuthenticSourceTestSupport.axisBankCSV()
+        let url = try MechanicsTestSupport.axisBankCSV()
 
         let preparedImport = try await engine.prepareImport(from: url)
 
@@ -237,7 +237,7 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let preparedImport = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        let preparedImport = try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV())
 
         let result = await engine.commitPreparedImport(preparedImport)
 
@@ -260,7 +260,7 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let preparedImport = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        let preparedImport = try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV())
 
         let firstResult = await engine.commitPreparedImport(preparedImport)
         let secondResult = await engine.commitPreparedImport(preparedImport)
@@ -276,7 +276,7 @@ struct ConfirmationGatedImportWorkflowTests {
     func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let existingEngine = availableImportEngine(CountingPersistenceCoordinator())
-        let existingPrepared = try await existingEngine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV(alternatePeriod: true))
+        let existingPrepared = try await existingEngine.prepareImport(from: MechanicsTestSupport.axisBankCSV(alternatePeriod: true))
         defer { existingEngine.cancelPreparedImport(existingPrepared) }
         TransactionStore.shared.replaceTransactions(existingPrepared.financialDocument.transactions)
         DocumentStore.shared.update(with: existingPrepared.rawContents)
@@ -289,7 +289,7 @@ struct ConfirmationGatedImportWorkflowTests {
         persistence.errorToThrow = ConfirmationPersistenceError.writeFailed
         let engine = availableImportEngine(persistence)
 
-        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
+        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV()))
 
         #expect(result.validationPassed)
         #expect(!result.persisted)
@@ -307,7 +307,7 @@ struct ConfirmationGatedImportWorkflowTests {
         persistence.resultOverride = .skipped
         let engine = availableImportEngine(persistence)
 
-        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
+        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV()))
 
         #expect(result.validationPassed)
         #expect(!result.persisted)
@@ -330,7 +330,7 @@ struct ConfirmationGatedImportWorkflowTests {
             persistence.errorToThrow = error
             let engine = availableImportEngine(persistence)
 
-            let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
+            let result = await engine.commitPreparedImport(try await engine.prepareImport(from: MechanicsTestSupport.axisBankCSV()))
 
             #expect(!result.persisted)
             #expect(result.errorMessage == error.localizedDescription)
@@ -452,7 +452,7 @@ struct ConfirmationGatedImportWorkflowTests {
             forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) },
             rejectedAttemptHydration: { _ = try hydrator.stageHydration() }
         )
-        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let source = try MechanicsTestSupport.axisBankCSV()
         let blank = try await engine.prepareImport(from: source)
         let rejected = await engine.commitPreparedImport(blank, accountChoice: .createNewAccount(displayName: " \n "))
         #expect(!rejected.persisted)
@@ -508,7 +508,7 @@ struct ConfirmationGatedImportWorkflowTests {
         )
         let firstEngine = availableImportEngine(firstCoordinator, providerGeneration: provider.generationToken)
         let secondEngine = availableImportEngine(secondCoordinator, providerGeneration: provider.generationToken)
-        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let source = try MechanicsTestSupport.axisBankCSV()
         let first = try await firstEngine.prepareImport(from: source)
         let second = try await secondEngine.prepareImport(from: source)
 

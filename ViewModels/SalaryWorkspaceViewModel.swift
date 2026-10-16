@@ -63,6 +63,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     // A saved month follows the owner's edits, not automatic carry-forward,
     // captured-balance refreshes, or recurring-payment discovery while browsing.
     private var hasUserEditToRemember = false
+    // Restored differences still protect drafts from conflicting hydration, but
+    // only a fresh entry change can start automatic retention/publication.
+    private var hasPendingEntryEdits = false
     /// Retained value before a reduction. The one-month exception can be
     /// selected either before or after editing the remaining bill.
     private var preReductionBasis: [String: Money] = [:]
@@ -78,6 +81,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         let basePlan: FundingPlan?
         let dirty: Bool
         let hasUserEditToRemember: Bool
+        let hasPendingEntryEdits: Bool
         var saveState: SaveState
         let error: String?
         let committed: FundingPlan?
@@ -97,6 +101,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         MonthDraftState(plan: plan, raw: rawText, errors: fieldErrors, untouched: untouchedZeroFields,
             unavailable: unavailableCurrentBalanceAccountIDs, generation: baseGeneration, canonical: baseCanonical,
             baseRaw: baseRawText, basePlan: baseDraftPlan, dirty: isDirty, hasUserEditToRemember: hasUserEditToRemember,
+            hasPendingEntryEdits: hasPendingEntryEdits,
             saveState: saveState, error: errorMessage, committed: committedCandidate,
             preReductionBasis: preReductionBasis, excludedRecurringOccurrenceIDs: excludedRecurringOccurrenceIDs,
             retainedScratchpad: retainedScratchpad, retentionPending: retentionPending,
@@ -109,6 +114,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         unavailableCurrentBalanceAccountIDs = state.unavailable; baseGeneration = state.generation; baseCanonical = state.canonical
         baseRawText = state.baseRaw; baseDraftPlan = state.basePlan; isDirty = state.dirty; saveState = state.saveState
         hasUserEditToRemember = state.hasUserEditToRemember
+        hasPendingEntryEdits = state.hasPendingEntryEdits
         errorMessage = state.error; committedCandidate = state.committed
         preReductionBasis = state.preReductionBasis
         excludedRecurringOccurrenceIDs = state.excludedRecurringOccurrenceIDs
@@ -1042,10 +1048,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             guard var state = monthDrafts[key] else { continue }
             let changed = state.generation != provider().generationToken || fundingPlanStore.generation != state.generation
             let incoming = fundingPlanStore.scratchpads.first { $0.plan.workspaceID == workspaceID && $0.plan.month == key }
-            let fullyRetained = !state.retentionPending && state.retainedScratchpad == MonthlyPlanScratchpad(
+            let fullyRetained = !state.retentionPending && Self.retainedEntriesMatch(MonthlyPlanScratchpad(
                 plan: state.plan, canonical: state.canonical, rawText: state.raw, fieldErrors: state.errors,
                 untouchedZeroFields: state.untouched, unavailableBalanceAccountIDs: state.unavailable,
-                preReductionBasis: state.preReductionBasis, excludedRecurringOccurrenceIDs: state.excludedRecurringOccurrenceIDs)
+                preReductionBasis: state.preReductionBasis, excludedRecurringOccurrenceIDs: state.excludedRecurringOccurrenceIDs), retained: state.retainedScratchpad)
                 && state.knownLocaleIdentifiers.filter { state.raw[$0.key] != nil && Self.isNumericInputKey($0.key) } == state.retainedLocaleIdentifiers
             let paired = !changed && (try? CompanionMacCoordinator.isPaired(workspaceID: workspaceID, month: key, provider: provider())) == true
             let retainedContext = paired ? try? CompanionMacCoordinator.retainedEditorContext(workspaceID: workspaceID, month: key, provider: provider()) : nil
@@ -1067,7 +1073,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
         let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
         let incoming = fundingPlanStore.scratchpads.first { $0.plan.workspaceID == workspaceID && $0.plan.month == month }
-        let fullyRetained = !retentionPending && currentScratchpad == retainedScratchpad && currentKnownLocaleIdentifiers == retainedLocaleIdentifiers
+        let fullyRetained = !retentionPending && Self.retainedEntriesMatch(currentScratchpad, retained: retainedScratchpad) && currentKnownLocaleIdentifiers == retainedLocaleIdentifiers
         let paired = !changedProvider && (try? CompanionMacCoordinator.isPaired(workspaceID: workspaceID, month: month, provider: provider())) == true
         let retainedContext = paired ? try? CompanionMacCoordinator.retainedEditorContext(workspaceID: workspaceID, month: month, provider: provider()) : nil
         let incomingLexical = retainedContext?.lexicalContext
@@ -1085,10 +1091,12 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     private func captureDraftBase() {
         baseRawText = rawText; baseDraftPlan = plan; baseLocaleIdentifiers = currentKnownLocaleIdentifiers
         isDirty = false; preReductionBasis = [:]; hasUserEditToRemember = false
+        hasPendingEntryEdits = false
     }
 
     private func markEdited(userInitiated: Bool = true) {
         if userInitiated { hasUserEditToRemember = true }
+        hasPendingEntryEdits = true
         isDirty = hasEntryChanges
         if [.ready, .saved, .failed].contains(saveState) { saveState = .ready }
         errorMessage = nil
@@ -1132,6 +1140,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         preReductionBasis = scratch.preReductionBasis
         excludedRecurringOccurrenceIDs = scratch.excludedRecurringOccurrenceIDs
         retainedScratchpad = scratch; retentionPending = false
+        hasPendingEntryEdits = false
         guard reloadRetainedLexicalContext() else { return true }
         retainedLocaleIdentifiers = currentKnownLocaleIdentifiers; baseLocaleIdentifiers = currentKnownLocaleIdentifiers
         let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
@@ -1150,13 +1159,14 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         // Publishing a valid plan must never normalize a focused or retained string.
         baseDraftPlan = canonical; baseRawText = rawText; baseLocaleIdentifiers = currentKnownLocaleIdentifiers; isDirty = false
         committedCandidate = nil; saveState = .saved; errorMessage = nil
+        hasPendingEntryEdits = false
         retentionPending = false; retainedScratchpad = currentScratchpad
         retainedLocaleIdentifiers = currentKnownLocaleIdentifiers
         scheduleRecurringInclusion()
     }
 
     private func scheduleRetention() {
-        guard !isRebasing, canEdit else { return }
+        guard hasPendingEntryEdits, !isRebasing, canEdit else { return }
         retentionPending = true
         retentionTask?.cancel(); commitTask?.cancel()
         let editingMonth = month, generation = baseGeneration
@@ -1174,6 +1184,16 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         }
     }
 
+    private static func retainedEntriesMatch(_ snapshot: MonthlyPlanScratchpad, retained: MonthlyPlanScratchpad?) -> Bool {
+        var retainedEntries = retained
+        // A newly observed public quote is not an edit to the retained entries.
+        if retainedEntries?.plan.calculationVersion == .budgetV1, snapshot.plan.calculationVersion == .budgetV1,
+           retainedEntries?.plan.referenceMode == .alDar, snapshot.plan.referenceMode == .alDar {
+            retainedEntries?.plan.effectiveAlDarReference = snapshot.plan.effectiveAlDarReference
+        }
+        return snapshot == retainedEntries
+    }
+
     private func retainCurrentEntries() {
         // The one-row scratchpad upsert is safe to retry at the next navigation
         // or quit boundary. A failed financial-plan transaction still requires
@@ -1182,12 +1202,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
               !requiresApplicationAvailability || ApplicationAvailability.shared.permitsMutation,
               provider().generationToken == baseGeneration, fundingPlanStore.generation == baseGeneration else { return }
         let snapshot = currentScratchpad
-        var retainedEntries = retainedScratchpad
-        if retainedEntries?.plan.calculationVersion == .budgetV1, snapshot.plan.calculationVersion == .budgetV1,
-           retainedEntries?.plan.referenceMode == .alDar, snapshot.plan.referenceMode == .alDar {
-            retainedEntries?.plan.effectiveAlDarReference = snapshot.plan.effectiveAlDarReference
-        }
-        guard snapshot != retainedEntries || currentKnownLocaleIdentifiers != retainedLocaleIdentifiers else { retentionPending = false; return }
+        guard !Self.retainedEntriesMatch(snapshot, retained: retainedScratchpad) || currentKnownLocaleIdentifiers != retainedLocaleIdentifiers else { retentionPending = false; return }
         do {
             let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
             defer { lease.finish() }
@@ -1208,7 +1223,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         retentionTask?.cancel(); retentionTask = nil
         commitTask?.cancel(); commitTask = nil
         guard hasOpenedPlanner else { return }
-        if retentionPending || (isDirty && currentScratchpad != retainedScratchpad) { retainCurrentEntries() }
+        if retentionPending || (hasPendingEntryEdits && isDirty && currentScratchpad != retainedScratchpad) { retainCurrentEntries() }
         publishValidEntries()
     }
 
@@ -1242,7 +1257,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             workspace.flushPendingEntries()
             guard !workspace.retentionPending,
                   ![SaveState.saving, .failed, .retentionFailed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(workspace.saveState),
-                  !workspace.isDirty || (workspace.currentScratchpad == workspace.retainedScratchpad && workspace.currentKnownLocaleIdentifiers == workspace.retainedLocaleIdentifiers),
+                  !workspace.isDirty || (retainedEntriesMatch(workspace.currentScratchpad, retained: workspace.retainedScratchpad) && workspace.currentKnownLocaleIdentifiers == workspace.retainedLocaleIdentifiers),
                   !workspace.monthDrafts.values.contains(where: { $0.retentionPending }) else { return false }
         }
         return true
@@ -1263,9 +1278,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     private func publishValidEntries() {
-        guard !retentionPending, isDirty, canSave else { return }
+        guard hasPendingEntryEdits, !retentionPending, isDirty, canSave else { return }
         if plan == baseCanonical {
             baseRawText = rawText; baseDraftPlan = plan; baseLocaleIdentifiers = currentKnownLocaleIdentifiers; isDirty = false; saveState = .saved
+            hasPendingEntryEdits = false
             rememberSavedMonthIfUserEdited()
             return
         }
@@ -1617,7 +1633,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             historyOnlyAccountIDs: excludedHistoryAccountIDs, salaryReceipt: payslipReceiptState)
         if saveState != .committedNeedsRefresh {
             isDirty = hasEntryChanges
-            if !isDirty { hasUserEditToRemember = false }
+            if !isDirty { hasUserEditToRemember = false; hasPendingEntryEdits = false }
         }
         if hasOpenedPlanner, !isRebasing, canEdit, isDirty, currentScratchpad != retainedScratchpad { scheduleRetention() }
     }

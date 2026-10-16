@@ -351,7 +351,7 @@ struct MovementIntelligenceTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func genuineImportedLegMetadataMatchesBothProvidersAndRejectsInvalidRelationships() async throws {
+    func importedLegMetadataMatchesBothProvidersAndRejectsInvalidRelationships() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-s99-movement-parity-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: folder) }

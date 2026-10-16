@@ -43,7 +43,7 @@ enum FinancialMCPProtocol {
         properties["month"] = [
           "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
           "description":
-            "Omit for the displayed editor and scenario. A specified month returns hydrated saved and retained records only, without changing the UI.",
+            "Omit for the selected editor inputs and scenario. A specified month returns hydrated saved and retained records only, without changing the UI.",
         ]
       }
       return [

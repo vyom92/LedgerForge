@@ -89,10 +89,10 @@ struct PeriodOverviewControls: View {
 
     private var dateControls: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text("Period").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             HStack(spacing: 8) {
-                Text("Period").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                 ForEach(PeriodOverviewRange.allCases, id: \.self) { choice in
-                    Button(choice.rawValue) {
+                    Button {
                         if choice == .custom {
                             customStart = model.presentationFilter.statementDateRange?.start?.canonical ?? ""
                             customEnd = model.presentationFilter.statementDateRange?.end?.canonical ?? ""
@@ -101,8 +101,22 @@ struct PeriodOverviewControls: View {
                         } else if let today = PeriodOverviewRange.today(), let range = choice.dates(ending: today) {
                             apply(range, choice: choice)
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(choice.rawValue)
+                            Image(systemName: "checkmark")
+                                .frame(width: 10)
+                                .opacity(chosenRange == choice ? 1 : 0)
+                                .accessibilityHidden(true)
+                        }
                     }
-                    .buttonStyle(LFActionButtonStyle(kind: chosenRange == choice ? .primary : .secondary))
+                    .lfSecondaryAction()
+                    .overlay {
+                        RoundedRectangle(cornerRadius: theme.radius.control)
+                            .strokeBorder(chosenRange == choice ? theme.palette.accentHover : Color.clear, lineWidth: 2)
+                            .allowsHitTesting(false)
+                    }
+                    .accessibilityLabel(choice.rawValue)
                     .accessibilityAddTraits(chosenRange == choice ? .isSelected : [])
                     .accessibilityIdentifier("periodOverview.range.\(choice.rawValue)")
                 }
@@ -138,6 +152,7 @@ struct PeriodOverviewControls: View {
             historyOnlyAccountIDs: AccountPresentationScope.historyOnlyIDs(in: accounts),
             excludesAllAccounts: model.presentationFilter.excludesAllAccounts)
         return VStack(alignment: .leading, spacing: 8) {
+            Text("Include accounts").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             LFAccountMenu(title: accountTitle, allTitle: "Current accounts", options: accounts.map { account in
                 let id = account.repositoryAccountId!
                 return .init(id: id, title: account.preferredDisplayName, detail: account.selectionContext,
@@ -158,7 +173,6 @@ struct PeriodOverviewControls: View {
             }
             .fixedSize().accessibilityLabel("Include accounts")
             .accessibilityIdentifier("periodOverview.accounts")
-            Text("Include accounts").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
         }
     }
 

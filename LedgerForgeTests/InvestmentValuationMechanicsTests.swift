@@ -102,6 +102,59 @@ struct InvestmentValuationMechanicsTests {
         #expect(AppDateDisplay.timestamp(instant("2026-01-01T23:30:00Z"), zone: TimeZone(secondsFromGMT: 3 * 3_600)!) == "02 Jan 26, 02:30 · UTC+03:00")
     }
 
+    @Test func publicationWindowsPauseForWeekendsAndRespectMondayBySource() throws {
+        let friday = "2026-10-16"
+        let nasdaq = try #require(InvestmentPublicationWindow.source("nasdaq"))
+        let amfi = try #require(InvestmentPublicationWindow.source("amfi"))
+        let fe = try #require(InvestmentPublicationWindow.source("fe"))
+        for provider in [nasdaq, amfi, fe] {
+            #expect(provider.missedPublications(valuationDay: friday, at: instant("2026-10-18T12:00:00Z")) == 0)
+        }
+        #expect(nasdaq.missedPublications(valuationDay: friday, at: instant("2026-10-19T19:59:59Z")) == 0)
+        #expect(nasdaq.missedPublications(valuationDay: friday, at: instant("2026-10-19T20:00:00Z")) == 1)
+        #expect(amfi.missedPublications(valuationDay: friday, at: instant("2026-10-19T17:29:59Z")) == 0)
+        #expect(amfi.missedPublications(valuationDay: friday, at: instant("2026-10-19T17:30:00Z")) == 1)
+        #expect(fe.missedPublications(valuationDay: friday, at: instant("2026-10-20T23:59:59Z")) == 0)
+        #expect(fe.missedPublications(valuationDay: friday, at: instant("2026-10-21T00:00:00Z")) == 1)
+    }
+
+    @Test func publicationDatesDoNotAgeAtUnrelatedMidnightAndUseDST() throws {
+        let fe = try #require(InvestmentPublicationWindow.source("fe"))
+        let amfi = try #require(InvestmentPublicationWindow.source("amfi"))
+        let nasdaq = try #require(InvestmentPublicationWindow.source("nasdaq"))
+        let ownerEvening = instant("2026-10-16T02:00:00Z")
+        #expect(fe.missedPublications(valuationDay: "2026-10-14", at: ownerEvening) == 0)
+        #expect(amfi.missedPublications(valuationDay: "2026-10-15", at: ownerEvening) == 0)
+        #expect(nasdaq.missedPublications(valuationDay: "2026-10-15", at: ownerEvening) == 0)
+        #expect(nasdaq.missedPublications(valuationDay: "2026-10-30", at: instant("2026-11-02T20:59:59Z")) == 0)
+        #expect(nasdaq.missedPublications(valuationDay: "2026-10-30", at: instant("2026-11-02T21:00:00Z")) == 1)
+        #expect(InvestmentPublicationWindow.source("ibkr-flex") == nil)
+    }
+
+    @Test @MainActor func oldestPriceDateUsesQuotedDaysAndKeepsFXAgeSeparate() throws {
+        let now = instant("2026-10-16T02:00:00Z")
+        func quote(_ provider: String, _ day: String) throws -> InvestmentQuote {
+            let mapping = try #require(InvestmentPriceRegistry.definitions.first { $0.mapping.provider == provider }?.mapping)
+            return .init(mapping: mapping, price: try InvestmentDecimal("1"), valuationDay: day,
+                         valuationText: nil, valuationInstant: nil, dateBasis: provider == "fe" ? .ownerPriorWeekdayUTC : .providerCalendarDate,
+                         calendarTimeZone: "UTC", fetchedAt: now, sourceURL: "https://example.invalid/test",
+                         qualification: "Isolated date aggregation fixture")
+        }
+        func scope(_ quotes: [InvestmentQuote]) -> InvestmentOverviewScope {
+            .init(holdingCount: 3, priceCount: quotes.count, costCount: 0, gainCount: 0, lines: [],
+                  quotes: quotes, fxDates: [instant("2026-10-01T00:00:00Z")], fxMissing: false)
+        }
+        let mixed = scope(try [quote("fe", "2026-10-14"), quote("nasdaq", "2026-10-15")])
+        #expect(mixed.oldestPriceDay == "2026-10-14")
+        #expect(mixed.missedPricePublicationWindows(at: now) == 0)
+        let missing = scope([])
+        #expect(missing.oldestPriceDay == nil)
+        #expect(missing.missedPricePublicationWindows(at: now) == nil)
+        let delayed = scope(try [quote("fe", "2026-10-14"), quote("amfi", "2026-10-14")])
+        #expect(delayed.oldestPriceDay == "2026-10-14")
+        #expect(delayed.missedPricePublicationWindows(at: now) == 1)
+    }
+
     @Test func publicJSONPreservesLexemesAndRejectsAmbiguousSyntax() throws {
         let json = try InvestmentPriceJSON.read(Data(#"{"value":0.000000123400,"text":"quote: \"ok\"","ok":true}"#.utf8))
         #expect(json["value"]?.text == "0.000000123400")

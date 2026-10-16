@@ -211,15 +211,15 @@ struct IBKRFlexSettingsView: View {
             Button("Disconnect") {
                 weekly = false
                 saveSchedule { saved in if saved { session.disconnect() } }
-            }.lfSecondaryAction().disabled(session.isBusy || backgroundUpdates.isSaving)
+            }.lfDisconnectAction().disabled(session.isBusy || backgroundUpdates.isSaving)
         }
     }
     @ViewBuilder private var connectionActions: some View {
         Button(session.accountID == nil ? "Connect and update holdings" : "Verify and save connection") {
             session.connect(entered)
-        }.lfPrimaryAction().disabled(!canConnect).accessibilityIdentifier("ibkr.connect")
+        }.lfConnectAction().disabled(!canConnect).accessibilityIdentifier("ibkr.connect")
         if session.accountID == nil {
-            Button("Use saved proof token") { session.useSavedProofToken() }
+            Button("Use saved token") { session.useSavedProofToken() }
                 .lfSecondaryAction().disabled(session.isBusy || backgroundUpdates.isSaving || !session.isConnectionAvailable)
                 .accessibilityIdentifier("ibkr.useSavedToken")
         }

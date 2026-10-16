@@ -6,6 +6,7 @@ import AppKit
 struct CompanionMacSettingsView: View {
     @Environment(\.lfTheme) private var theme
     @ObservedObject var session: CompanionMacCoordinator
+    var availableWidth: CGFloat = 0
     @State private var phoneCode = ""
     @State private var choosingFolder = false
     @State private var folderAction: FolderAction?
@@ -23,13 +24,16 @@ struct CompanionMacSettingsView: View {
             LFSettingsPageHeader("iPhone Companion", subtitle: "Read your Mac snapshot and edit Monthly Plan entries on your iPhone.") {
                 if busy { ProgressView().controlSize(.small).accessibilityLabel("Checking companion connection") }
             }
-            if let recovery = session.recoveryReview {
-                CompanionMacLedgerRecoveryView(reviewID: recovery.id, phoneID: recovery.phoneID,
-                    previousLedgerLabel: "Previously paired Mac ledger", currentLedgerLabel: "Current Mac database",
-                    isWorking: busy, permitsNewFolder: true, message: nil,
-                    onConfirmAndChooseNewFolder: session.beginLedgerRecovery)
-            } else { connectionPanel }
-            statusPanel
+            LFSettingsColumns(availableWidth: availableWidth) {
+                if let recovery = session.recoveryReview {
+                    CompanionMacLedgerRecoveryView(reviewID: recovery.id, phoneID: recovery.phoneID,
+                        previousLedgerLabel: "Previously paired Mac ledger", currentLedgerLabel: "Current Mac database",
+                        isWorking: busy, permitsNewFolder: true, message: nil,
+                        onConfirmAndChooseNewFolder: session.beginLedgerRecovery)
+                } else { connectionPanel }
+            } trailing: {
+                statusPanel
+            }
             if session.phoneID != nil { versionControls }
             if let writer = session.reviewWriter, !session.fileChoices.isEmpty {
                 versionChoices(writer)
@@ -56,7 +60,7 @@ struct CompanionMacSettingsView: View {
                     LabeledContent("Companion folder", value: session.folderName ?? "Folder access needs reconnecting")
                     Button("Reconnect folder", systemImage: "folder") {
                         chooseFolder(.reconnect)
-                    }
+                    }.lfConnectAction()
                     .disabled(busy || choosingFolder)
                     .help("Choose the same companion folder to renew access while retaining the existing pairing.")
                 } else {
@@ -74,7 +78,7 @@ struct CompanionMacSettingsView: View {
                     Button("Choose folder and pair", systemImage: "folder.badge.plus") {
                         guard let phoneID = validPhoneCode else { return }
                         chooseFolder(.pair(phoneID))
-                    }
+                    }.lfConnectAction()
                     .disabled(validPhoneCode == nil || busy || choosingFolder)
                     Text("After pairing, choose this same folder in the iPhone app.")
                         .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
@@ -84,22 +88,22 @@ struct CompanionMacSettingsView: View {
     }
 
     private var statusPanel: some View {
-        LFPanel(title: "Publication and checking") {
+        LFPanel(title: "Updates and checks") {
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
                 Text(session.status).font(theme.typography.rowTitle)
                     .accessibilityIdentifier("companionSettings.status")
                 if let published = session.lastPublishedAt {
-                    LabeledContent("Last folder publication") { Text(published, format: .dateTime) }
+                    LabeledContent("Last snapshot saved to folder") { Text(published, format: .dateTime) }
                 }
                 if let checked = session.lastCheckedAt {
                     LabeledContent("Last folder check") { Text(checked, format: .dateTime) }
                 }
-                Button("Check and publish", systemImage: "arrow.clockwise") { run { await session.exchange() } }
+                Button("Check and save snapshot", systemImage: "arrow.clockwise") { run { await session.exchange() } }
                     .disabled(busy || session.phoneID == nil || session.folderName == nil)
-                Text("Checks and publications run while LedgerForge is in the foreground. The iPhone keeps its last received snapshot and saved edits when either device is offline.")
+                Text("While LedgerForge is your active app, the Mac checks for iPhone edits and saves its latest snapshot to the shared folder. The iPhone keeps its last received snapshot and saved edits when either device is offline.")
                     .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("A folder publication means this Mac wrote a complete file to the selected folder; it does not prove the iPhone received it. On the iPhone, an edit is acknowledged only after a matching Mac receipt arrives. The snapshot publication time and the last folder check describe different events.")
+                Text("A snapshot saved to the folder may not have reached your iPhone yet. The iPhone marks an edit as acknowledged only after it receives a matching receipt from the Mac. The saved-snapshot time and last folder check refer to separate events.")
                     .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }

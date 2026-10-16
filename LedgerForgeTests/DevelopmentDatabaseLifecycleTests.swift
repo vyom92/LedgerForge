@@ -302,7 +302,7 @@ struct DevelopmentDatabaseLifecycleTests {
 
         let preparationTask = Task {
             try await engine.prepareImport(
-                from: try AuthenticSourceTestSupport.axisBankCSV()
+                from: try MechanicsTestSupport.axisBankCSV()
             )
         }
         await suspension.waitUntilArrived()
@@ -345,7 +345,7 @@ struct DevelopmentDatabaseLifecycleTests {
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         let suspension = AsyncOverlapGate()
         DevelopmentDatabaseActivityGate.shared.setTransitionObserverForTesting { activity in
@@ -398,7 +398,7 @@ struct DevelopmentDatabaseLifecycleTests {
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         #expect(try prepared.sourceSnapshot.withBytes { !$0.isEmpty })
 

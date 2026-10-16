@@ -17,7 +17,7 @@ struct ImportLifecycleTests {
         var progress: [ImportProgress] = []
 
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV(),
+            from: try MechanicsTestSupport.axisBankCSV(),
             requestId: requestID
         ) { progress.append($0) }
         defer { engine.cancelPreparedImport(prepared) }
@@ -88,7 +88,7 @@ struct ImportLifecycleTests {
             },
             rejectedAttemptHydration: {}
         )
-        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let source = try MechanicsTestSupport.axisBankCSV()
 
         let sourceA = try await engine.prepareImport(from: source)
         engine.cancelPreparedImport(sourceA)
@@ -171,7 +171,7 @@ struct ImportLifecycleTests {
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
                 rejectedAttemptHydration: {}
             )
-            let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
             defer { preparedOwner.cancel() }
             let prepared = preparedOwner.preparedImport
 
@@ -319,7 +319,7 @@ struct ImportLifecycleTests {
                 forcedHydration: { recoveryHydrationResult() },
                 rejectedAttemptHydration: {}
             )
-            let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            let preparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
             defer { preparedOwner.cancel() }
             let prepared = preparedOwner.preparedImport
 
@@ -342,7 +342,7 @@ struct ImportLifecycleTests {
             persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
             rejectedAttemptHydration: {}
         )
-        let integrityPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        let integrityPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
         defer { integrityPreparedOwner.cancel() }
         let integrityPrepared = integrityPreparedOwner.preparedImport
         integrityPrepared.sourceSnapshot.invalidate()
@@ -372,7 +372,7 @@ struct ImportLifecycleTests {
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
                 rejectedAttemptHydration: {}
             )
-            let failClosedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            let failClosedPreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
             defer { failClosedPreparedOwner.cancel() }
             let failClosedPrepared = failClosedPreparedOwner.preparedImport
 
@@ -394,7 +394,7 @@ struct ImportLifecycleTests {
                 developerConsole: DeveloperConsole(),
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
             )
-            let hostilePreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            let hostilePreparedOwner = try await MechanicsTestSupport.preparedAxisBankCSV()
             defer { hostilePreparedOwner.cancel() }
             let hostilePrepared = hostilePreparedOwner.preparedImport
 
@@ -410,7 +410,7 @@ struct ImportLifecycleTests {
     @Test(.globalRuntimeStateIsolation)
     func prepareAgainUsesOrdinaryURLPreparationWithFreshIdentityAndEvidence() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
+        let sourceURL = try MechanicsTestSupport.axisBankCSV()
         let sourceBytes = try Data(contentsOf: sourceURL)
         let failure = ImportPersistenceCommitFailure(
             originalError: ImportPersistenceCoordinationError.retryableContention,
@@ -669,7 +669,7 @@ struct ImportLifecycleTests {
             developmentProfileAcknowledgementGate: gate
         )
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
 
@@ -703,7 +703,7 @@ struct ImportLifecycleTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
 
         let barrier = DevelopmentDatabaseActivityGate.shared.beginProfileSwitch {

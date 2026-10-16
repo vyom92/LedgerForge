@@ -1034,7 +1034,7 @@ struct PlanningIntelligenceTests {
         #expect(SalaryISPVerification.nextCheck(record, preferences: preferences, now: late, latestFetch: nil) == nil)
     }
     @Test(.globalRuntimeStateIsolation)
-    func planningMetadataUsesGenuineAccountsAndMatchesProvidersWithoutChangingFacts() async throws {
+    func planningMetadataMatchesProvidersWithoutChangingFacts() async throws {
         let root = try folder(); defer { try? FileManager.default.removeItem(at: root) }
         let sqlite = try SQLiteRepositoryProvider(path: root.appendingPathComponent("parity.sqlite").path)
         defer { sqlite.database.close() }

@@ -80,10 +80,10 @@ struct BackupRestoreSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
-            LFSettingsPageHeader("Backup & Restore", subtitle: "A verified copy of Current Database, or a saved backup to restore.")
+            LFSettingsPageHeader("Backup & Restore", subtitle: "A verified copy of your ledger, or a saved backup to restore.")
             LFSettingsColumns(availableWidth: availableWidth) {
                 LFPanel(title: "Create a backup", systemImage: "archivebox") {
-                    Text("Save a verified copy of Current Database.")
+                    Text("Save a verified copy of your ledger.")
                         .font(theme.typography.body).foregroundStyle(theme.palette.secondaryText)
                     Button("Create Backup…", systemImage: "archivebox") { select(destination: true) }
                         .lfPrimaryAction()

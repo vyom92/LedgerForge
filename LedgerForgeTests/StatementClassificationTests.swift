@@ -13,30 +13,13 @@ struct StatementClassificationTests {
         #expect(classification.documentType == .bankStatement)
         #expect(classification.confidence == 0.95)
         #expect(classification.reasons.isEmpty)
-    }
 
-    @Test func statementClassificationStoresExplainableReasons() async throws {
-        let classification = StatementClassification(
+        let explained = StatementClassification(
             documentType: .bankStatement,
             confidence: 0.95,
             reasons: ["Matched account statement title."]
         )
-
-        #expect(classification.reasons == ["Matched account statement title."])
-    }
-
-    @Test func classifierCanBeConstructed() async throws {
-        let classifier = StatementClassificationDetector()
-        let rawDocument = RawDocument(
-            sourceURL: URL(fileURLWithPath: "/tmp/unknown.txt"),
-            fileName: "unknown.txt",
-            fileExtension: "txt",
-            content: .text("No supported document-family signatures.")
-        )
-
-        let classification = try await classifier.classify(document: rawDocument, institution: nil)
-
-        #expect(classification.documentType == .unknown)
+        #expect(explained.reasons == ["Matched account statement title."])
     }
 
     @Test func unknownTextClassifiesAsUnknownWithoutGuessing() async throws {

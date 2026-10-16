@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
-/// Repository atomicity checks use an untouched authentic statement plan.
+/// Repository atomicity checks use a small deterministic statement plan.
 /// Injected failures alter repository mechanics only, never financial content.
 @MainActor
 struct ConfirmedImportAtomicityTests {
@@ -37,22 +37,6 @@ struct ConfirmedImportAtomicityTests {
         #expect(institutionCount(sqlite, id: institutionID) == 1)
     }
 
-    @Test(.globalRuntimeStateIsolation)
-    func sqliteConfirmedImportCreatesInstitutionInsideAcceptedGraph() async throws {
-        let folder = try temporaryFolder()
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let provider = try SQLiteRepositoryProvider(
-            path: folder.appendingPathComponent("institutions.sqlite").path,
-            migrations: allMigrations
-        )
-        defer { provider.database.close() }
-        let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
-        let institutionID = try #require(plan.proposedAccount.institutionId)
-
-        #expect(provider.confirmedImportRepo.commitConfirmedImport(plan) == .committed(receipt(for: plan)))
-        #expect(institutionCount(provider, id: institutionID) == 1)
-    }
-
     @Test(.globalRuntimeStateIsolation, arguments: ConfirmedImportFailureInjectionPoint.allCases)
     func injectedInMemoryFailurePublishesNoAcceptedGraph(
         _ point: ConfirmedImportFailureInjectionPoint
@@ -73,18 +57,7 @@ struct ConfirmedImportAtomicityTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func inMemoryProviderPublishesFinalAccountScopedGraphOnlyOnSuccess() async throws {
-        let provider = InMemoryRepositoryProvider()
-        let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
-
-        #expect(provider.confirmedImportRepo.commitConfirmedImport(plan) == .committed(receipt(for: plan)))
-        #expect(try provider.accountRepo.account(id: plan.proposedAccount.id) != nil)
-        #expect(try provider.importSessionRepo.importAttempts(workspaceId: plan.workspace.id).count == 1)
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: plan.workspace.id).count == plan.transactionTemplates.count)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func sqliteAndInMemoryAgreeForAuthenticAcceptedThenExactReplay() async throws {
+    func sqliteAndInMemoryAgreeForAcceptedThenExactReplay() async throws {
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let sqlite = try SQLiteRepositoryProvider(
@@ -98,12 +71,27 @@ struct ConfirmedImportAtomicityTests {
 
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .committed(receipt(for: sqlitePlan)))
         #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .committed(receipt(for: memoryPlan)))
+        #expect(try sqlite.workspaceRepo.workspace(id: sqlitePlan.workspace.id) == sqlitePlan.workspace)
+        #expect(try memory.workspaceRepo.workspace(id: memoryPlan.workspace.id) == memoryPlan.workspace)
+        #expect(try sqlite.accountRepo.account(id: sqlitePlan.proposedAccount.id) != nil)
+        #expect(try memory.accountRepo.account(id: memoryPlan.proposedAccount.id) != nil)
+        #expect(try sqlite.importSessionRepo.importSession(id: sqlitePlan.historyTemplate.importSession.id) != nil)
+        #expect(try memory.importSessionRepo.importSession(id: memoryPlan.historyTemplate.importSession.id) != nil)
+        #expect(try sqlite.importSessionRepo.importedDocument(id: sqlitePlan.historyTemplate.document.id) == sqlitePlan.historyTemplate.document)
+        #expect(try memory.importSessionRepo.importedDocument(id: memoryPlan.historyTemplate.document.id) == memoryPlan.historyTemplate.document)
+        #expect(try sqlite.importSessionRepo.importAttempts(workspaceId: sqlitePlan.workspace.id).count == 1)
+        #expect(try memory.importSessionRepo.importAttempts(workspaceId: memoryPlan.workspace.id).count == 1)
+        let institutionID = try #require(sqlitePlan.proposedAccount.institutionId)
+        #expect(institutionCount(sqlite, id: institutionID) == 1)
+
         let sqliteWork = try sqlite.categoryRepo.automationSnapshot(workspaceId: sqlitePlan.workspace.id)
         let memoryWork = try memory.categoryRepo.automationSnapshot(workspaceId: memoryPlan.workspace.id)
         #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .exactDuplicate)
         #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .exactDuplicate)
         #expect(try sqlite.categoryRepo.automationSnapshot(workspaceId: sqlitePlan.workspace.id) == sqliteWork)
         #expect(try memory.categoryRepo.automationSnapshot(workspaceId: memoryPlan.workspace.id) == memoryWork)
+        #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: sqlitePlan.workspace.id).count == sqlitePlan.transactionTemplates.count)
+        #expect(try memory.transactionRepo.trustedTransactions(workspaceId: memoryPlan.workspace.id).count == memoryPlan.transactionTemplates.count)
     }
 
     private func receipt(for plan: ConfirmedImportPlanDTO) -> ConfirmedImportReceiptDTO {

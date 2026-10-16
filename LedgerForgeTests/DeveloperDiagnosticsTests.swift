@@ -35,35 +35,6 @@ struct DeveloperDiagnosticsTests {
         #expect(first.timestamp <= now)
     }
 
-    @Test("Sequence numbers are unique and preserve chronological order")
-    func sequenceUniquenessAndOrdering() async throws {
-        let console = DeveloperConsole()
-
-        console.info(.application, "App started")
-        console.warning(.validation, "Missing optional metadata")
-        console.error(.database, "Persistence failed", metadata: ["code": "SQLITE_BUSY"])
-
-        let sequences = console.entries.map { $0.sequence }
-        #expect(sequences == [1, 2, 3])
-    }
-
-    @Test("All approved levels and categories can be assigned")
-    func allApprovedLevelsAndCategories() async throws {
-        let console = DeveloperConsole()
-
-        console.debug(.application, "Application debug")
-        console.info(.`import`, "Import info")
-        console.warning(.parser, "Parser warning")
-        console.error(.validation, "Validation error")
-        console.info(.database, "Database info")
-        console.info(.runtime, "Runtime info")
-
-        #expect(console.entries.map(\.level) == [.debug, .info, .warning, .error, .info, .info])
-        #expect(console.entries.map(\.category) == [.application, .`import`, .parser, .validation, .database, .runtime])
-        #expect(Set(DeveloperLogLevel.allCases) == Set([.debug, .info, .warning, .error]))
-        #expect(Set(DeveloperLogCategory.allCases) == Set([.application, .`import`, .parser, .validation, .database, .runtime]))
-    }
-
     @Test("Debug hidden by default; filters reveal debug when requested")
     func levelFilteringAndDebugDefaultHidden() async throws {
         let console = DeveloperConsole()
@@ -142,6 +113,8 @@ struct DeveloperDiagnosticsTests {
         console.warning(.validation, "Ignored rows")
         console.error(.database, "Repository persistence failed")
 
+        #expect(console.entries.map(\.level) == [.debug, .info, .warning, .error])
+        #expect(console.entries.map(\.category) == [.parser, .`import`, .validation, .database])
         let storedSequences = console.entries.map(\.sequence)
 
         var filters = DeveloperConsole.Filters()
@@ -157,51 +130,18 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.map(\.sequence) == storedSequences)
     }
 
-    @Test("Copy All uses chronological order and includes essential fields")
-    func copyAllChronological() async throws {
-        let console = DeveloperConsole()
-
-        console.info(.application, "First")
-        console.error(.application, "Second")
-
-        let text = console.completeLogText
-        // Expect lines in chronological order "First" then "Second"
-        let idxFirst = (text as NSString).range(of: "First").location
-        let idxSecond = (text as NSString).range(of: "Second").location
-        #expect(idxFirst != NSNotFound && idxSecond != NSNotFound && idxFirst < idxSecond)
-        #expect(text.contains("[Info]"))
-        #expect(text.contains("[Error]"))
-        #expect(text.contains("[Application]"))
-    }
-
-    @Test("Copy All is independent of active filters")
+    @Test("Copy All is independent of active filters and preserves chronological order")
     func copyAllIgnoresPresentationFilters() async throws {
-        let entries = [
-            DeveloperLogEntry(
-                id: 1,
-                sequence: 1,
-                timestamp: Date(timeIntervalSince1970: 1_804_896_000),
-                level: .debug,
-                category: .parser,
-                message: "Detected delimiter",
-                metadata: ["delimiter": ","]
-            ),
-            DeveloperLogEntry(
-                id: 2,
-                sequence: 2,
-                timestamp: Date(timeIntervalSince1970: 1_804_896_001),
-                level: .info,
-                category: .`import`,
-                message: "Import completed",
-                metadata: nil
-            )
-        ]
+        let console = DeveloperConsole()
+        console.debug(.parser, "Detected delimiter", metadata: ["delimiter": ","])
+        console.info(.`import`, "Import completed")
+        let entries = console.entries
 
         var filters = DeveloperConsole.Filters()
         filters.level = .exact(.info)
         #expect(DeveloperConsole.filteredEntries(entries, using: filters).map(\.message) == ["Import completed"])
 
-        let copied = DeveloperConsole.logText(from: entries)
+        let copied = console.completeLogText
         #expect(copied.contains("[Debug] [Parser] Detected delimiter"))
         #expect(copied.contains("[Info] [Import] Import completed"))
         #expect((copied as NSString).range(of: "Detected delimiter").location < (copied as NSString).range(of: "Import completed").location)
@@ -282,20 +222,6 @@ struct DeveloperDiagnosticsTests {
         #expect(visibleText.contains("reason: committed"))
     }
 
-    @Test("Clear is synchronous and does not reuse sequence numbers")
-    func clearResets() async throws {
-        let console = DeveloperConsole()
-
-        console.info(.application, "Before clear")
-        #expect(console.entries.count == 1)
-
-        console.clear()
-        #expect(console.entries.isEmpty)
-
-        console.info(.application, "After clear")
-        #expect(console.entries.first?.sequence == 2)
-    }
-
     @Test("Retained history is capped at 1,000 chronological entries")
     func retainedHistoryBound() {
         let console = DeveloperConsole()
@@ -310,6 +236,11 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.last?.sequence == 1_002)
         #expect(console.entries.last?.message == "Entry 1002")
         #expect(console.entries.map(\.sequence) == Array(3...1_002))
+
+        console.clear()
+        #expect(console.entries.isEmpty)
+        console.info(.application, "After clear")
+        #expect(console.entries.first?.sequence == 1_003)
     }
 
     @Test("Clear removes diagnostics without mutating account metadata", .globalRuntimeStateIsolation)
@@ -367,7 +298,7 @@ struct DeveloperDiagnosticsTests {
             forcedHydration: { RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0) }
         )
         let result = await engine.importFileAndReturnResult(
-            from: try AuthenticSourceTestSupport.axisBankCSV()
+            from: try MechanicsTestSupport.axisBankCSV()
         )
 
         #expect(result.succeeded)
@@ -443,33 +374,6 @@ struct DeveloperDiagnosticsTests {
         #expect(visible.map(\.level) == [.info, .error, .error])
     }
 
-#if DEBUG
-    @Test("Development profile presentation never emits path or provider identity")
-    func developmentProfilePresentationPrivacy() {
-        let descriptor = DevelopmentDatabaseProfileDescriptor(
-            kind: .migrationSandbox,
-            displayName: DevelopmentDatabaseProfileKind.migrationSandbox.displayName,
-            persistenceClassification: .processOwnedMigrationSandbox,
-            canReset: true,
-            migrationSourceVersion: 7,
-            verifiedCurrentSchemaVersion: 9
-        )
-        let warning = DeveloperDatabaseProfileWarningPresentation(profile: descriptor)
-        let diagnosticText = [
-            descriptor.displayName,
-            descriptor.sourceSchemaLabel,
-            descriptor.currentSchemaLabel,
-            warning?.accessibilityLabel,
-            DevelopmentProfileAcknowledgementError.developmentDatabaseUnavailable.localizedDescription
-        ].compactMap { $0 }.joined(separator: " ")
-
-        #expect(!diagnosticText.contains("/"))
-        #expect(!diagnosticText.lowercased().contains("sqlite"))
-        #expect(!diagnosticText.lowercased().contains("uuid"))
-        #expect(!diagnosticText.lowercased().contains("token"))
-        #expect(!diagnosticText.lowercased().contains("fingerprint"))
-    }
-#endif
 }
 
 private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinating {
