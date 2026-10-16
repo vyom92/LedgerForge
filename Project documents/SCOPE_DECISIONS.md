@@ -8,6 +8,11 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="v12-salary-reprint-20261016"></a>
+### Regular salary reprint correction — owner direction, 16 October 2026
+
+The owner reported doubled July Salary History and explicitly instructed “fix it.” Independent original-document inspection established two printouts of the same regular salary. Under the continuing direct installed v1.2 maintenance, documentation, normal Git publication and task-cleanup instructions, Sprint Coordinator -20 accepted the three-file derived grouping/presentation correction and qualified candidate, and selected **v1.2 (6)** for release. Preserve both immutable source records, all separate bonus/ad-hoc payments and financial distinctions, existing saved/retained plan links, protected ledger and signed prior app for rollback. No record deletion, SQL repair, import/schema change, generic payroll identity or automatic bank matching is authorized. The model identity limitation and exact rule are recorded in [ADR-045](ADR.md#adr-045). <!-- user-specified -->
+
 <a id="v12-ui-release-20261016"></a>
 ### Wide-window UI campaign and v1.2 release — owner direction, 16 October 2026
 

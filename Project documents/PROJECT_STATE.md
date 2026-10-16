@@ -1,5 +1,14 @@
 # Current project state
 
+<a id="v12-salary-reprint-maintenance-20261016"></a>
+## 16 October — regular salary reprint correction accepted; v1.2 (6) release underway
+
+Sprint Coordinator -20 accepted the owner-requested correction for identical regular payslip printouts being counted as separate salaries. A shared derived projection now counts exact regular-salary financial evidence once in History/monthly actuals and planning proposals, retains every original source, and suppresses reoffering when any copy is already linked. Separate bonus/ad-hoc payments and differing regular evidence remain additive. No import, schema, stored financial record, calculator or existing plan link changes. [Decision](SCOPE_DECISIONS.md#v12-salary-reprint-20261016); [financial boundary](ADR.md#adr-045).
+
+Twelve focused tests passed with zero failures/skips, including three new regression definitions. Independent read-only review found no blocker. The isolated native view shows one salary with two individually inspectable copies. All 33 native History monthly totals were compared against the prechange source baseline: only the reported month changes; all other 32 totals and all 35 stored sources remain intact. Monthly actual/proposal behavior is view-model-tested, not claimed as native July proposal proof in the current October UI. Fresh production inspection preserved all 86 tables, schema and database identity; the native backup retains all 82 protected tables. The current model has no employee/payee/payment-event identity field; the accepted single-owner source limitation remains explicit.
+
+**Installed production remains v1.2 (5) at this source checkpoint.** The qualified candidate is authorized for optimized signed **1.2 (6)** Release, app-only installation, normal Git publication and scoped cleanup; those release steps remain pending until verified. [Outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-salary-reprint-maintenance); [local evidence](/Users/vyom/.codex/artifacts/ledgerforge/salary-reprint-20261016/STATUS.md).
+
 <a id="v12-net-worth-maintenance-20261016"></a>
 ## 16 October — v1.2 (5) Dashboard maintenance installed and qualified
 

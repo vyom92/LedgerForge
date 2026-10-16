@@ -3,7 +3,7 @@ import SwiftUI
 /// Selection is presentation-only and never changes the planner's funding month.
 struct SalaryHistoryView: View {
     @Environment(\.lfTheme) private var theme
-    let groups: [(month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money)]
+    let groups: [(month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money, salaryCount: Int)]
     @Binding var selectedStatementID: String?
 
     private var selected: SalaryStatement? {
@@ -20,7 +20,7 @@ struct SalaryHistoryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Salary history").font(theme.typography.sectionTitle)
-                            Text("Printed salary totals").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                            Text("Salary totals").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                             ForEach(groups, id: \.month) { group in
                                 monthRow(group)
                                 Divider()
@@ -53,7 +53,7 @@ struct SalaryHistoryView: View {
         }.font(theme.typography.body).foregroundStyle(theme.palette.primaryText)
     }
 
-    private func monthRow(_ group: (month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money)) -> some View {
+    private func monthRow(_ group: (month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money, salaryCount: Int)) -> some View {
         let isSelected = selected?.evidence.financialPeriod == group.month
         return VStack(alignment: .leading, spacing: 8) {
             Button {
@@ -62,8 +62,11 @@ struct SalaryHistoryView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(monthTitle(group.month)).font(theme.typography.body.weight(.semibold))
                     Text(MoneyFormatting.display(group.actual)).font(theme.typography.sectionTitle).monospacedDigit()
-                    if group.statements.count > 1 {
-                        Text("\(group.statements.count) salary records").font(theme.typography.secondary)
+                    if group.statements.count > group.salaryCount {
+                        Text("\(group.salaryCount) \(group.salaryCount == 1 ? "salary" : "payments") · \(group.statements.count) copies")
+                            .font(theme.typography.secondary)
+                    } else if group.statements.count > 1 {
+                        Text("\(group.salaryCount) payments").font(theme.typography.secondary)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
                     .background(isSelected ? theme.palette.navigationSelected : .clear, in: RoundedRectangle(cornerRadius: theme.radius.control))

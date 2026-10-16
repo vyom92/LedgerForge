@@ -177,6 +177,41 @@ struct SalaryStatement: Identifiable, Equatable, Sendable {
     let importedAtISO: String
 }
 
+/// A presentation-only contribution with every original source still available.
+/// In the accepted single-owner Qatar Airways profile, an exact regular-payslip
+/// reprint contributes once. This is not a persisted payroll/payment identity.
+struct SalaryPaymentGroup: Equatable, Sendable {
+    let representative: SalaryStatement
+    private(set) var statements: [SalaryStatement]
+
+    static func grouped(_ statements: [SalaryStatement]) -> [Self] {
+        var groups: [Self] = []
+        for statement in statements.sorted(by: { ($0.importedAtISO, $0.id) < ($1.importedAtISO, $1.id) }) {
+            if let index = groups.firstIndex(where: { $0.representative.isRegularSalaryReprint(of: statement) }) {
+                groups[index].statements.append(statement)
+            } else {
+                groups.append(Self(representative: statement, statements: [statement]))
+            }
+        }
+        return groups
+    }
+}
+
+private extension SalaryStatement {
+    func isRegularSalaryReprint(of other: Self) -> Bool {
+        let lhs = evidence, rhs = other.evidence
+        return workspaceID == other.workspaceID &&
+            lhs.kind == .regularSalary && rhs.kind == .regularSalary &&
+            lhs.sourceAuthority == rhs.sourceAuthority &&
+            lhs.profileID == rhs.profileID && lhs.profileVersion == rhs.profileVersion &&
+            lhs.financialPeriod == rhs.financialPeriod && lhs.nativeCurrency == rhs.nativeCurrency &&
+            lhs.earnings == rhs.earnings && lhs.deductions == rhs.deductions &&
+            lhs.printedEarningsTotal == rhs.printedEarningsTotal &&
+            lhs.printedDeductionsTotal == rhs.printedDeductionsTotal &&
+            lhs.printedNet == rhs.printedNet && lhs.printedPaymentTotal == rhs.printedPaymentTotal
+    }
+}
+
 extension PayslipReceiptState {
     nonisolated static func resolve(plan: FundingPlan, transactions: [Transaction], excludedAccounts: Set<String> = []) -> Self? {
         guard let link = plan.assistance?.payslipFunding else { return nil }

@@ -4,6 +4,86 @@ import Testing
 
 @MainActor
 struct SalaryParserAndPlannerTests {
+    @Test func regularPayslipReprintsCountOnceWithoutLosingEitherOriginal() throws {
+        let first = try Self.salary("a", printed: "2027-02-27")
+        let reprint = try Self.salary("b", printed: "2027-03-01")
+        let originals = [reprint, first]
+        let groups = SalaryPaymentGroup.grouped(originals)
+        #expect(groups.count == 1)
+        #expect(groups.first?.representative == first)
+        #expect(groups.first?.statements == [first, reprint])
+        #expect(groups == SalaryPaymentGroup.grouped(originals.reversed()))
+        #expect(try Money.aggregate(groups.map { $0.representative.evidence.printedPaymentTotal }).amount == 100)
+        #expect(originals == [reprint, first])
+        #expect(Set(groups.flatMap(\.statements).map(\.documentID)) == Set(originals.map(\.documentID)))
+    }
+
+    @Test func equalNetDoesNotCollapseDifferentSalaryEvidenceOrAdditionalPayments() throws {
+        let regular = try Self.salary("regular")
+        let distinct = try [
+            Self.salary("reference", deductions: [("Ticket B", 20)]),
+            Self.salary("components", earnings: [("Base", 60), ("Allowance", 60)]),
+            Self.salary("multiplicity", deductions: [("Ticket A", 10), ("Ticket A", 10)]),
+            Self.salary("no-deductions", earnings: [("Base", 100)], deductions: []),
+            Self.salary("other-month", month: "2027-03"),
+            Self.salary("other-workspace", workspace: "other"),
+            Self.salary("revised", earnings: [("Base", 130)])
+        ]
+        #expect(SalaryPaymentGroup.grouped([regular] + distinct).count == 8)
+        let bonuses = try [Self.salary("bonus-a", kind: .annualDiscretionaryBonus), Self.salary("bonus-b", kind: .annualDiscretionaryBonus)]
+        let adhoc = try [Self.salary("adhoc-a", kind: .adhocPayment), Self.salary("adhoc-b", kind: .adhocPayment)]
+        let all = [regular] + bonuses + adhoc
+        #expect(SalaryPaymentGroup.grouped(all).count == 5)
+        #expect(try Money.aggregate(SalaryPaymentGroup.grouped(all).map { $0.representative.evidence.printedPaymentTotal }).amount == 500)
+    }
+
+    @Test func salaryHistoryActualsAndProposalsShareReprintGroupingAndPreserveLinks() throws {
+        let provider = DatabaseProvider(inMemory: true)
+        let salary = SalaryStore(), plans = FundingPlanStore(), intelligence = FinancialIntelligenceStore()
+        let first = try Self.salary("a"), reprint = try Self.salary("b", printed: "2027-03-01")
+        let otherMonth = try Self.salary("previous", month: "2027-01")
+        let originals = [reprint, otherMonth, first]
+        salary.installWithoutObservation(originals)
+        plans.installWithoutObservation([], generation: provider.generationToken)
+        intelligence.installWithoutObservation(FinancialIntelligenceSnapshot(workspaceID: "default-workspace",
+            preferences: IntelligencePreferences(workspaceID: "default-workspace")), generation: provider.generationToken)
+        let month = first.evidence.financialPeriod
+        let now = try #require(ISO8601DateFormatter().date(from: "2027-02-15T12:00:00Z"))
+        func model() -> SalaryWorkspaceViewModel {
+            SalaryWorkspaceViewModel(month: month, provider: { provider }, accountStore: AccountStore(),
+                transactionStore: TransactionStore(), salaryStore: salary, fundingPlanStore: plans,
+                intelligenceStore: intelligence, now: { now }, refresh: { _ in })
+        }
+        let unlinked = model(), untouchedPlan = unlinked.plan
+        #expect(unlinked.currentMonthActual?.amount == 100)
+        #expect(unlinked.historyGroups.map(\.actual.amount) == [100, 100])
+        #expect(unlinked.historyGroups.first?.salaryCount == 1)
+        #expect(unlinked.historyGroups.first?.statements == [first, reprint])
+        #expect(unlinked.payslipProposals == [first])
+        #expect(unlinked.plan == untouchedPlan && !unlinked.isDirty)
+        // Either original may already be linked. Keep that exact source link,
+        // including when it lives in another saved month, instead of reoffering.
+        for linkedCopy in [first, reprint] {
+            for savedMonth in [month, otherMonth.evidence.financialPeriod] {
+                var linked = Self.plan(month: savedMonth)
+                linked.assistance = PlanAssistance(workspaceID: linked.workspaceID, month: savedMonth.canonical,
+                    payslipFunding: PayslipFunding(statementID: linkedCopy.id,
+                        fingerprintAlgorithm: linkedCopy.fingerprintAlgorithm, fingerprintDigest: linkedCopy.fingerprintDigest,
+                        accountID: "bank", net: try PlanningAmount(linkedCopy.evidence.printedNet)))
+                plans.installWithoutObservation([linked], generation: provider.generationToken)
+                let linkedModel = model()
+                #expect(linkedModel.payslipProposals.isEmpty)
+                #expect(plans.plans == [linked])
+                #expect(!linkedModel.isDirty)
+                if savedMonth == month { #expect(linkedModel.plan == linked) }
+            }
+        }
+        salary.installWithoutObservation(originals.reversed())
+        #expect(unlinked.historyGroups.first?.statements == [first, reprint])
+        #expect(unlinked.currentMonthActual?.amount == 100)
+        #expect(Set(salary.statements.map(\.id)) == Set(originals.map(\.id)))
+    }
+
     @Test func plannerArithmeticCompletenessRoundingFeeAndNegativeBuffers() throws {
         let qar = try CurrencyCode("QAR"), inr = try CurrencyCode("INR")
         var plan = Self.plan(
@@ -188,6 +268,32 @@ struct SalaryParserAndPlannerTests {
         #expect(viewModel.retainedCommitmentAccountLabel(id: "bank") == "bank")
         #expect(viewModel.retainedCommitmentAccountContext(id: "bank") == "QAR · Saved funding bank")
         #expect(viewModel.plan.balances.isEmpty)
+    }
+
+    private static func salary(_ id: String, printed: String = "2027-02-27", month: String = "2027-02",
+                               workspace: String = "default-workspace", kind: SalaryDocumentKind = .regularSalary,
+                               earnings: [(String, Decimal)] = [("Base", 120)],
+                               deductions: [(String, Decimal)] = [("Ticket A", 20)]) throws -> SalaryStatement {
+        // Small isolated domain inputs; these are not imported source statements.
+        let qar = try CurrencyCode("QAR")
+        func components(_ values: [(String, Decimal)], side: SalaryComponentSide) throws -> [SalaryComponent] {
+            try values.enumerated().map { index, value in
+                try SalaryComponent(side: side, sourceOrdinal: index + 1, sourceLabel: value.0,
+                    money: Money(amount: value.1, currency: qar))
+            }
+        }
+        let earningRows = try components(earnings, side: .earning)
+        let deductionRows = try components(deductions, side: .deduction)
+        let gross = try Money.aggregate(earningRows.map(\.money))
+        let deducted = deductionRows.isEmpty ? nil : try Money.aggregate(deductionRows.map(\.money))
+        let net = try gross - (deducted ?? Money(amount: 0, currency: qar))
+        let evidence = try SalaryStatementEvidence(sourceAuthority: .qatarAirways,
+            financialPeriod: SelectedStatementMonth(canonical: month), printDate: StatementDate(canonical: printed),
+            kind: kind, nativeCurrency: qar, earnings: earningRows, deductions: deductionRows,
+            printedEarningsTotal: gross, printedDeductionsTotal: deducted, printedNet: net, printedPaymentTotal: net)
+        return SalaryStatement(id: id, workspaceID: workspace, documentID: "document-\(id)", importSessionID: "import-\(id)",
+            fingerprintAlgorithm: "ledgerforge.source-bytes.sha256.v1", fingerprintDigest: "fixture-\(id)",
+            evidence: evidence, importedAtISO: "2027-03-01T12:00:00Z")
     }
 
     private static func plan(fixed: Money? = nil, variable: Money? = nil, deductions: Money? = nil,

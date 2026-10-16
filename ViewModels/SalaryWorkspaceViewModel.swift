@@ -474,12 +474,14 @@ final class SalaryWorkspaceViewModel: ObservableObject {
               intelligenceStore.snapshot?.preferences?.salaryAssistanceEnabled == true else { return [] }
         let linked = Set(([plan] + fundingPlanStore.plans + monthDrafts.values.map(\.plan))
             .compactMap { $0.assistance?.payslipFunding?.statementID })
-        let regular = statements.filter {
+        let regular = SalaryPaymentGroup.grouped(statements.filter {
             $0.workspaceID == workspaceID && $0.evidence.kind == .regularSalary &&
                 $0.evidence.financialPeriod == currentPlanningMonth
-        }
+        })
         // Two different regular slips for one pay period require source review.
-        return regular.count == 1 ? regular.filter { !linked.contains($0.id) } : []
+        guard regular.count == 1, let group = regular.first,
+              !group.statements.contains(where: { linked.contains($0.id) }) else { return [] }
+        return [group.representative]
     }
     var payslipReceiptState: PayslipReceiptState? {
         guard fundingPlanStore.generation == baseGeneration, intelligenceStore.generation == baseGeneration else {
@@ -544,16 +546,19 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     var currentMonthActual: Money? {
-        let values = statements.filter { $0.workspaceID == workspaceID && $0.evidence.financialPeriod == month }.map { $0.evidence.printedPaymentTotal }
+        let values = SalaryPaymentGroup.grouped(statements.filter {
+            $0.workspaceID == workspaceID && $0.evidence.financialPeriod == month
+        }).map { $0.representative.evidence.printedPaymentTotal }
         guard !values.isEmpty else { return nil }
         return try? Money.aggregate(values)
     }
 
-    var historyGroups: [(month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money)] {
+    var historyGroups: [(month: SelectedStatementMonth, statements: [SalaryStatement], actual: Money, salaryCount: Int)] {
         Dictionary(grouping: statements.filter { $0.workspaceID == workspaceID }, by: { $0.evidence.financialPeriod })
             .compactMap { period, values in
-                guard let total = try? Money.aggregate(values.map { $0.evidence.printedPaymentTotal }) else { return nil }
-                return (period, values.sorted { ($0.importedAtISO, $0.id) < ($1.importedAtISO, $1.id) }, total)
+                let groups = SalaryPaymentGroup.grouped(values)
+                guard let total = try? Money.aggregate(groups.map { $0.representative.evidence.printedPaymentTotal }) else { return nil }
+                return (period, values.sorted { ($0.importedAtISO, $0.id) < ($1.importedAtISO, $1.id) }, total, groups.count)
             }
             .sorted { $0.month > $1.month }
     }

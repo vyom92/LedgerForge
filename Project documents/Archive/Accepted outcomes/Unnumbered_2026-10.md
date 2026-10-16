@@ -4,8 +4,18 @@ Historical outcomes and their explicit evidence boundaries. [Current state](../.
 
 ## Index
 
+- [v1.2 (6) regular salary reprint correction — 16 October 2026](#v12-salary-reprint-maintenance)
 - [v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026](#v12-net-worth-maintenance)
 - [Seven-page UI campaign, test cleanup and v1.2 release — 16 October 2026](#v12-ui-release)
+
+<a id="v12-salary-reprint-maintenance"></a>
+## v1.2 (6) regular salary reprint correction — 16 October 2026
+
+**Candidate accepted by Sprint Coordinator -20; release authorized under the owner's continuing v1.2 instructions.** Two independently inspected accepted original attachments contain the same complete regular-salary evidence and different printed footers. The new pure projection counts qualifying regular reprints once while retaining every source in History, with a concise salary/copy count. Monthly actuals and regular-payslip proposals share that grouping; an existing link to either original suppresses another proposal. Source order/labels/references, exact Money, optional controls, period/workspace and profile boundaries remain significant. Equal bonus/ad-hoc sources stay additive, and changed regular evidence is never silently superseded. [ADR-045](../../ADR.md#adr-045) records the accepted single-owner source boundary and the absence of persisted employee/payee/event identifiers.
+
+**Validation:** 12 focused test executions passed, zero failures/skips; three new domain/view-model definitions and nine existing planner/persistence checks. The authentic original bytes and complete two-page texts were independently checked outside Git. Native isolated History showed the corrected aggregate, both selectable print dates and all 33 month totals; the other 32 totals matched the authoritative prechange baseline. All 35 salary records and 454 components remained stored. Independent read-only source review found no blocker; a test clock was moved away from a month boundary for timezone independence. No full-suite, new import acceptance, native historical proposal, general payment-identity or bank-reconciliation claim is made.
+
+The isolated clone preserved all 82 non-public-refresh tables through native navigation. Production preserved all 86 tables, schema, database identity and metadata; only two pre-existing public-cache preference timestamps advanced. The verified native backup's seal, integrity and foreign keys pass and its protected records match Current. Exact optimized Release identity, installation/relaunch, final publication and scoped cleanup will be recorded in the [durable receipt](/Users/vyom/.codex/artifacts/ledgerforge/salary-reprint-20261016/STATUS.md) and [current state](../../PROJECT_STATE.md#v12-salary-reprint-maintenance-20261016) after completion. Previous v1.2 build evidence remains historical.
 
 <a id="v12-net-worth-maintenance"></a>
 ## v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026

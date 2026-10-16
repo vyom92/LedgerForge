@@ -5875,6 +5875,14 @@ not generic card equivalence.
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 
+## Accepted regular-payslip reprint alignment — 2026-10-16
+
+The owner requested correction of a doubled historical salary; Sprint Coordinator -20 accepted the bounded derived grouping after independent inspection established two original printouts of the same salary. In the accepted single-owner Qatar Airways regular-salary profile, sources with the same workspace, authority, profile/version, financial period, native currency, exact ordered earning/deduction components (including labels/references and Money), and every printed financial control contribute once to Salary History and monthly actuals. Print dates, document fingerprints and carrier/import IDs may differ. Bonus/ad-hoc payments and regular sources with any represented financial difference remain separate; there is no newest-copy supersession or amount-only matching.
+
+Every immutable source remains independently inspectable. The earliest `(importedAtISO, id)` source is the deterministic proposal representative; a current, saved or retained draft link to any copy suppresses reoffering the group. Existing plan source IDs/fingerprints are unchanged. This alignment supersedes the original sum-every-document presentation only for qualifying regular reprints; import byte identity, persistence, canonical hydration, calculators and bank receipt rules are unchanged.
+
+The current model does not persist a separate employee, payee or payroll-event identifier. Those identities were independently checked in the reported originals, not programmatically compared by this helper. Indistinguishable represented evidence from genuinely different future payment events cannot be conclusively distinguished; this is not a general payroll identity mechanism. No schema expansion is selected. [Outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-salary-reprint-maintenance).
+
 ## Accepted Sprint-99 alignment — 2026-09-29
 
 [Accepted Sprint 99](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-99) applies the owner’s salary-cycle generation/due windows and payslip-first reviewable proposal to existing plan/provider ownership. Expected pay remains separate from confirmed receipt; exact dated included-balance acknowledgment and bank evidence prevent double counting, including deductions already in net pay. Monthly worksheets and their Dashboard summary exclude saved reserve targets; explicit Keep in CBQ remains. V28 optional assistance and V29 captured financial dates follow ADR-047. Shared reporting FX reuses the accepted Al Dar authority. These later selected boundaries supersede the corresponding original exclusions only; no automated payment or bank receipt is fabricated. UI/UX adoption remains outstanding.
