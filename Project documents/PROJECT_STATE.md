@@ -1,5 +1,14 @@
 # Current project state
 
+<a id="v12-net-worth-maintenance-20261016"></a>
+## 16 October — v1.2 (5) Dashboard maintenance qualified; Release installation pending
+
+The owner selected a direct installed-app update, still **v1.2**, for the false net-worth unavailable warning and the designer's upper-card reference. The correction removes generic source notes from the shared partial-total predicate; actual included-member coverage, missing contributions and arithmetic failure still qualify totals. Currency arithmetic, membership, freshness rules and source notes are unchanged. The card uses equal reporting-currency panels with labels above the existing amounts, retaining Breakdown and Report options and omitting the reference's currency buttons and inline graphs.
+
+Five focused mechanics definitions passed. The retained populated net-worth integration also passed against an isolated read-only clone with its independent Fraction oracle, checking all three currencies and source-note independence. One initial exact selector executed zero tests and was rejected as evidence; the corrected selector first failed for a missing Python prerequisite, then passed after the explicit executable was supplied. No production data or expectations were changed to force a pass. The test inventory gains one focused definition; the previous 978-definition cleanup and full ordinary run retain their historical boundary.
+
+Independent source review found no blocker. UI/UX Designer -2 accepted the native wide card, and a fresh independent finish reviewer returned **ship**. Three/two-currency and Breakdown captures passed; options/source notes and restoration of all three display currencies were observed through accessibility, not a physical-pointer or child-popover screenshot claim. Protected production state remained unchanged during qualification. The existing native backup is sealed and matches all 82 non-public-cache tables; four public refresh tables have advanced normally. Signed Release, installed launch/relaunch, final preservation and publication are pending in the [maintenance receipt](/Users/vyom/.codex/artifacts/ledgerforge/networth-availability-20261016/STATUS.md). The installed baseline remains **1.2 (4)** until those steps complete.
+
 <a id="v12-release-20261016"></a>
 ## 16 October — v1.2 (4) installed and qualified; seven-page UI campaign and test cleanup accepted
 

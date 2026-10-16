@@ -6,6 +6,15 @@ Canonical approved written R1 Dashboard contract. Read the [responsibility-based
 
 **Accepted Sprint-92 extension — 2026-09-14:** [the accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) includes one all-recorded effect comparison under FW-P2-46, the current shared financial red/green roles and main/supporting composition, while preserving the accepted theme/local preferences. This explicitly extends the earlier Sprint-91A no-chart/no-financial-recolouring boundary; broader interactive charts and analytics are not accepted by this slice.
 
+<a id="v12-net-worth-card-20261016"></a>
+## v1.2 net-worth card alignment — 16 October 2026
+
+The owner-selected upper-card refinement retains **Net worth estimate** at left and the existing **Breakdown** and **Report options** actions at right. Display the selected reporting currencies in equal-width slate panels, with currency identity above the unchanged prominent, tabular amount. Two selected currencies occupy two panels; do not reserve an empty third panel. These are converted reporting totals, distinct from the historical native-currency account groups below.
+
+Reuse the existing panel, text, spacing, border and radius roles. The panels are display-only. Currency choices remain within Report options; do not add card-level selectors, inline graphs, Primary/trend badges, new navigation or a new visual system. Real missing values, incomplete included holdings, stale observations and arithmetic failures retain their appropriate text and symbol qualifications. General source notes remain in Report options and do not alone imply that a selected value is unavailable. The rest of Dashboard is outside this refinement.
+
+UI/UX Designer -2 accepted the native wide screenshot; an independent finish review returned **ship** at 1710 logical pixels. Three/two-currency composition and expanded Breakdown have native image evidence. Report options and retained notes have accessibility observations; the native screenshot capture omits that child popover. Broader keyboard, VoiceOver, appearance variants and genuine-warning native states are not newly certified. [Current qualification](../../PROJECT_STATE.md#v12-net-worth-maintenance-20261016) distinguishes this visual contract from installation status.
+
 ## 4. Dashboard reference
 
 ### 4.1 Hierarchy

@@ -6,6 +6,8 @@ The frozen hierarchy remains the shared interface architecture. [R1 README](UI%2
 
 The owner-selected seven-page campaign is accepted for the isolated candidate and selected for v1.2 release. The [October outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-ui-release) records the implemented delta to inherited R1: wider split workspaces and independent inspectors, consistent readable actions, full icon/label/padded-row disclosure targets, simplified view wording, and the specifically approved retained-draft and custom-date behavior. This alignment governs the changed surfaces; untouched inherited requirements and exact financial/source qualifications remain. It does not claim comprehensive physical pointer, keyboard, live integration or restore coverage.
 
+The same-day [v1.2 net-worth card alignment](UI%20Assets/LF-UI-2026-09-R1/SC-03_Dashboard.md#v12-net-worth-card-20261016) refines only the topmost Dashboard card: equal selected-currency panels, currency above amount, existing actions and truthful qualifications. It retains the incumbent theme and all other Dashboard behavior.
+
 ## Screen and shared-authority routing
 
 Order inherits [Guide rule H](Project_Guide.md#documentation-order): revision, then natural SC number/suffix. Detailed screen requirements have one written owner; untouched inherited behavior remains explicit.

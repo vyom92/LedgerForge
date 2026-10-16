@@ -307,7 +307,7 @@ enum NetWorthProjection {
         let state: NetWorthReport.State = members.isEmpty ? .noData : included.isEmpty ? .noIncludedMembers : .ready
         let targets = state == .ready ? currencies.map { target in
             calculate(target, members: included, legs: legs, rateFailures: rateFailures,
-                      priceFailures: priceFailures, scopeUnverified: !scopeNotes.isEmpty, now: now)
+                      priceFailures: priceFailures, now: now)
         } : []
         return .init(state: state, members: members, targets: targets, scopeNotes: scopeNotes,
                      historyOnlyCount: accounts.filter(\.isHistoryOnly).count, generation: generation)
@@ -315,7 +315,7 @@ enum NetWorthProjection {
 
     private static func calculate(_ target: ReportingCurrency, members: [NetWorthMember],
                                   legs: [AlDarCurrency: AlDarUnitReference], rateFailures: Set<AlDarCurrency>,
-                                  priceFailures: Set<String>, scopeUnverified: Bool, now: Date) -> NetWorthTarget {
+                                  priceFailures: Set<String>, now: Date) -> NetWorthTarget {
         let rates = legs.mapValues { $0.returned.decimal }
         let contributions = members.flatMap { member in member.components.map { component -> NetWorthContribution in
             var issues: [String] = []
@@ -362,7 +362,9 @@ enum NetWorthProjection {
                 if value.display == "Out of range" { failed = true } else { amount = value }
             } catch { failed = true }
         }
-        let partial = scopeUnverified || members.contains { $0.coverageIssue != nil }
+        // Global source-coverage notes do not establish a missing selected value.
+        // Keep them in report details; qualify totals from their actual inputs.
+        let partial = members.contains { $0.coverageIssue != nil }
             || contributions.contains { $0.amount == nil } || failed
         return .init(currency: target, amount: amount, contributions: contributions, isPartial: partial, arithmeticFailure: failed)
     }

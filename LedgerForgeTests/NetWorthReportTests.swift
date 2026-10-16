@@ -326,8 +326,11 @@ struct NetWorthReportTests {
             #expect(!component.dateContext.isEmpty)
         }
         try independentExactOracle(report: report, inputs: expected, rates: source.cache.alDarLegs)
+        #expect(report.scopeNotes == ["Source coverage unresolved"])
+        #expect(report.targets == source.report(notes: []).targets)
         for target in report.targets {
-            #expect(target.isPartial)
+            let incompleteScope = report.members.contains { $0.isIncluded && $0.coverageIssue != nil }
+            #expect(target.isPartial == (incompleteScope || target.missingCount > 0 || target.arithmeticFailure))
             #expect(target.missingCount == expected.values.filter { $0.1 == nil }.count)
             print("S99_REPORT \(target.currency.rawValue) exact arithmetic verified; coverage and freshness checked")
         }

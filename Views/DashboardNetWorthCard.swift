@@ -26,7 +26,7 @@ struct DashboardNetWorthCard: View {
 #endif
 
     var body: some View {
-        LFPanel(contentSpacing: theme.spacing.controlGap) {
+        LFPanel(contentSpacing: theme.spacing.sectionGap) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: theme.spacing.sectionGap) {
                     heading
@@ -138,45 +138,52 @@ struct DashboardNetWorthCard: View {
 
     private var totals: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 0) {
+            HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
                 ForEach(report.targets) { target in
                     total(target)
-                        .fixedSize(horizontal: true, vertical: false)
-                    if target.id != report.targets.last?.id {
-                        HStack(spacing: 0) {
-                            Spacer(minLength: theme.spacing.valueGutter)
-                            Rectangle().fill(theme.palette.divider).frame(width: 1)
-                            Spacer(minLength: theme.spacing.valueGutter)
+                        .frame(minWidth: minimumCurrencyColumnWidth + 2 * theme.spacing.panelPadding,
+                               maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background(theme.palette.raisedSurface.opacity(0.55),
+                                    in: RoundedRectangle(cornerRadius: theme.radius.panel))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: theme.radius.panel)
+                                .strokeBorder(theme.palette.border, lineWidth: 1)
+                                .allowsHitTesting(false)
                         }
-                        .accessibilityHidden(true)
-                    }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
                 ForEach(report.targets) { target in
                     total(target).frame(maxWidth: .infinity, alignment: .leading)
-                    if target.id != report.targets.last?.id { Divider() }
+                        .background(theme.palette.raisedSurface.opacity(0.55),
+                                    in: RoundedRectangle(cornerRadius: theme.radius.panel))
                 }
             }
         }
-        .padding(.top, theme.spacing.small)
     }
 
     private func total(_ target: NetWorthTarget) -> some View {
         VStack(alignment: .leading, spacing: theme.spacing.small) {
+            Text(target.currency.rawValue)
+                .font(theme.typography.body.weight(.medium))
+                .foregroundStyle(theme.palette.secondaryText)
             Text(target.amount?.display ?? "Unavailable")
                 .font(theme.typography.headlineMoney)
                 .monospacedDigit()
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Net worth \(target.currency.rawValue): \(target.amount?.display ?? "unavailable")")
-            Text(target.currency.rawValue).font(theme.typography.caption)
-                .foregroundStyle(theme.palette.secondaryText)
             if target.isPartial || target.isStale || target.arithmeticFailure || target.amount == nil {
-                supporting(target.label + (target.missingCount == 0 ? "" : " · \(target.missingCount) unavailable"))
+                Label(target.label + (target.missingCount == 0 ? "" : " · \(target.missingCount) unavailable"),
+                      systemImage: target.isStale && !target.isPartial ? "clock" : "exclamationmark.circle")
+                    .font(theme.typography.caption)
+                    .foregroundStyle(target.arithmeticFailure || target.amount == nil ? LFTheme.danger : LFTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(theme.spacing.panelPadding)
         .multilineTextAlignment(.leading)
+        .accessibilityElement(children: .combine)
     }
 
     private var breakdown: some View {
