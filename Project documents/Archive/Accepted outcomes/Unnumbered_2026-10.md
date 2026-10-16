@@ -4,7 +4,27 @@ Historical outcomes and their explicit evidence boundaries. [Current state](../.
 
 ## Index
 
+- [v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026](#v12-net-worth-maintenance)
 - [Seven-page UI campaign, test cleanup and v1.2 release — 16 October 2026](#v12-ui-release)
+
+<a id="v12-net-worth-maintenance"></a>
+## v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026
+
+**Owner-authorized v1.2 maintenance installed and qualified.** Sprint Coordinator -20 accepted the shared completeness correction, focused tests and native card qualification; UI/UX Designer -2 accepted the wide visual result. The owner explicitly selected a direct installed update as part of v1.2, continuing documentation, normal Git publication and bounded cleanup authority.
+
+Generic source notes had made complete net-worth totals appear partial even when every included contribution was available. Those notes remain accessible under Coverage & sources, but no longer determine completeness. Missing included contributions, included incomplete holdings and arithmetic failures still qualify totals. Currency arithmetic, membership, source dates and freshness rules are unchanged. The top card uses equal selected-currency panels with labels above the existing amounts, retaining Breakdown and Report options. The reference's currency buttons, inline graphs and decorative trend/primary badges were omitted as directed.
+
+Five focused mechanics definitions passed, including one added regression covering complete-with-notes, missing balance/quote, incomplete holdings, exclusion, target-specific FX, stale-but-complete and companion projection behavior. The retained populated net-worth integration passed against an isolated read-only clone with its independent Fraction oracle for all three currencies. An initial zero-test selector was rejected as evidence; the corrected selector first failed for a missing Python prerequisite, then passed with the explicit interpreter. These attempts remain in the local receipt. The prior 978-definition inventory gains one ordinary definition; no full-suite rerun or broader live-financial qualification is claimed.
+
+Independent source review found no blocker and a fresh independent native finish reviewer returned **ship**. The exercised wide layout, three/two-currency selection and expanded Breakdown passed. Report options/source-note interactions were observed through accessibility; the preview's options screenshot contains only the parent window, so it is not child-popover or physical-pointer proof. Full keyboard traversal, VoiceOver and app-wide physical hit targets were not requalified.
+
+The installed **1.2 (5)** optimized Release was built from clean source `ac904b55ed483691e1a8e7b58490c340f5556ec4`. All 14 files still match the qualified artifact after native launch/relaunch. Executable SHA256: `ab367ac84a896d1296de60e2170f849c8151ce303f97666289744827f4733a73`; bundle inventory SHA256: `28f9996a1bb1b90d946869bc7fa98e665ca7fa742b4d6ef437335ed3635891b5`. Strict/deep signatures, existing signing identity/designated requirement/entitlements and packaged-resource containment passed. The existing Keychain deprecation warning remains. The complete previous signed 1.2 (4) app and sealed native backup are retained.
+
+Before replacement, the native backup matched all 82 non-public-refresh tables, with four public refresh tables having advanced normally. App-only replacement preserved all 86 tables and every recorded preference before launch. After launch/relaunch, database identity, schema, SQLite metadata, integrity, all 82 non-public-refresh tables and owner/configuration preferences remained unchanged. Only four public cache/progress/receipt tables and two public-cache preferences changed through ordinary refresh. No ledger restoration/replacement, migration, credential rewrite or financial edit occurred.
+
+Production Dashboard MCP responses before/after have identical exact/displayed totals, member identities/inclusion/metrics, scope notes, display filters and planning context. All three targets changed from falsely partial to complete. Subsequent public refresh changed only price/FX fetch timestamps in the compared detail/reference fields. This is a narrow Dashboard comparison, not a repeat certification of all four MCP tools.
+
+Background Updates briefly reported foreground fallback after rapid relaunch, then recovered to Connected on ordinary app activation without settings changes. Its initial trigger is unproven. The six connected services match the baseline; iPhone Companion remains Disconnected as before. The installed app is left on Dashboard. The [durable maintenance receipt](/Users/vyom/.codex/artifacts/ledgerforge/networth-availability-20261016/STATUS.md) owns the exact qualification, installed/preservation evidence, backup and rollback paths, direct reviewer dispositions, final publication and cleanup inventory. Later documentation-only commits do not rebind the executable. Earlier release, r10/r11 and separate iPhone worktree evidence remain untouched.
 
 <a id="v12-ui-release"></a>
 ## Seven-page UI campaign, test cleanup and v1.2 release — 16 October 2026
