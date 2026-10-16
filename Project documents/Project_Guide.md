@@ -54,7 +54,7 @@ Each fact has one primary home. Short safety reminders may link to it; do not re
 | [Accepted outcomes](Archive/Accepted%20outcomes) | Cycle-grouped original acceptance evidence, dates, failures, limits and non-runs |
 | [Implementation reports](Archive/Implementation%20Reports), [archived roadmaps](Sprint%20roadmap/Archived), Git | Historical record bodies, not current authorization |
 
-Exact local state comes from the selected local environment; exact pushed state comes from Git at the inspected ref. Neither a report nor an old upload proves current acceptance. Source support requires ADR-046, current state and the Harness corpus gate. When facts conflict, identify the precise ref and accepted-versus-WIP boundary, apply explicit owner decisions and source truth, and stop rather than guess.
+Exact local state comes from the selected local environment; exact pushed state comes from Git at the inspected ref. Neither a report nor an old upload proves current acceptance. Production source support requires ADR-046 and current state; validation follows the Harness risk-based source selection and the owner’s retirement of historical testing restrictions. When facts conflict, identify the precise ref and accepted-versus-WIP boundary, apply explicit owner decisions and source truth, and stop rather than guess.
 
 <a id="documentation-order"></a>
 ## Maintained documentation order

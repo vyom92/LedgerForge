@@ -8,6 +8,23 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+
+<a id="testing-restrictions-retired-20261015"></a>
+### Retire historical testing restrictions — owner decision, 15 October 2026
+
+After requesting an independent audit of the roughly 960-test bundle, the owner explicitly answered **“Retire the old testing restrictions.”** This supersedes the prior all-stages authentic-only/synthetic-fixture ban, obligatory FIFO/in-memory-only test transport, and automatically cumulative whole-corpus acceptance requirement. Deterministic synthetic statements, small test-only domain/DTO factories and ordinary local test artifacts are permitted in isolated development and tests. Routine mechanics tests should not depend on private originals, credentials, live services or the adopted ledger. <!-- user-specified -->
+
+Choose focused tests that can falsify the changed behavior, retain useful financial/persistence/security assertions, and select real-source integration or broader regressions for a named affected boundary. A fixture pass demonstrates the tested behavior; it does not establish an observation of the owner's financial state or certify every real statement. Existing historical reports retain their original evidence boundaries. The audit authorizes no indiscriminate deletion of tests or product coverage.
+
+Production imports still require authentic source authority and truthful provenance. The protected ledger, exact financial arithmetic, owner choices, migration identity, read-only MCP boundary and prohibition on private material or credentials in Git remain unchanged. The older source-processing and corpus clauses below remain historical where they conflict with this testing decision; no new blanket restriction on legitimate local or owner-ChatGPT inspection is introduced.
+
+<a id="investment-presentation-windows-20261015"></a>
+### Investment navigation and source-specific freshness — owner decision, 15 October 2026
+
+The owner requests independent holdings-list and selected-detail scrolling for all investment groups, with a nearby **Back to investments** action after per-portfolio **View holdings**. The overview's global Expand/Collapse actions retain their existing scope. These are presentation/navigation corrections, with no valuation arithmetic or financial persistence change.
+
+Display the actual oldest quoted valuation date. Freshness colours follow publication opportunities rather than a universal elapsed-day counter: weekends add no publication opportunity; Monday applies only to Nasdaq and Indian mutual funds. Nasdaq uses regular-session close in New York and AMFI the ordinary 23:00 India NAV deadline. For Zurich/FE and CBQ providers whose exact public publication hour is not established, the owner explicitly chose **conservative Tuesday–Friday end-of-day windows**, using the existing prior-weekday UTC convention. Fetch slots remain separate. The chosen weekly policy is not an exchange/fund holiday-calendar certification. <!-- user-specified -->
+
 <a id="financial-mcp-autonomy-activation-publication-20261015"></a>
 ### Financial MCP autonomous production operation and publication — owner direction, 15 October 2026
 

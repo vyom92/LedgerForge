@@ -37,7 +37,7 @@ Implement a coherent boundary, compile/type-check, run focused falsification, in
 
 ## Financial correctness and source ownership
 
-[Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Financial proof outranks time/token efficiency. No generated statement or production-derived sole oracle; preserve exact native semantics, fail closed on financial ambiguity and prove zero accepted losing-path residue, provider parity and canonical hydration/reopen where relevant. The [owner's current source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older on-disk copy/oracle-artifact permissions; historical evidence is not current permission. If an intake foundation is accepted locally before its full sprint, record that boundary and any effective source-authority transition separately from publication, full-sprint readiness and adoption.
+[Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Production financial inputs and source-support claims remain grounded in authentic source evidence; production output cannot be its own sole oracle. Isolated fixtures are permitted by the [owner's testing decision](SCOPE_DECISIONS.md#testing-restrictions-retired-20261015). Preserve exact native semantics and exercise affected ambiguity, atomicity, provider and hydration boundaries proportionally. Historical test transport/corpus restrictions do not override that decision.
 
 <a id="protected-adopted-ledger"></a>
 ## Protected adopted ledger
@@ -47,14 +47,15 @@ After personal adoption, the normal ledger is protected user data, not a disposa
 Before development work that may alter live data, persistence or schema, create and verify a current native backup outside Git. Preserve the existing ledger and exact original sources, and exercise development/test operations in an isolated namespace where possible. For an authorized live migration or persistence change, retain the backup, prove record/identity/manual-choice/source-link preservation and verify canonical hydration and normal relaunch. Never reset, delete, reseed, replace or downgrade the adopted ledger as a development shortcut; any intentional removal or replacement requires a fresh explicit owner decision naming that effect. A backup is a recovery safeguard, not permission to discard current data. <!-- user-specified -->
 
 <a id="parser--authentic-corpus-acceptance-policy"></a>
-## Parser / Authentic-Corpus Acceptance Policy
+## Parser and source regression selection
 
-1. Inventory every original authentic carrier in the approved root and its logical representation separately. Newly supplied recurring statements extend the cumulative corpus unless explicitly excluded/archived; never substitute a sample or representative month.
-2. Apply the all-stages authentic-input and in-memory processing rule before development/debugging, tests, oracles, persistence/migration acceptance, batch/developer UI or review. Missing genuine shapes remain uncertified, not manufactured.
-3. Derive independent source meaning before comparing ordinary production. Compare through an explicit architecture-aware semantic projection; raw oracle JSON need not equal production JSON. Preserve exact multiplicity and source order where authoritative, with no invented occurrence identity.
-4. Exercise ordinary prepare/validate/confirm and every affected accepted persistence/provider/reopen/hydration boundary. Generic extraction preserves physical/source evidence; family parsers interpret coherent financial controls flexibly across inert packaging and fail closed on ambiguous financial meaning.
-5. For shared readers, unlock orchestration, snapshots, detection/classification/routing, normalizers, Money, validation, duplicate/equivalence or persistence mapping, rerun the complete corpus of every affected supported family. Shared tests/full TestPlan supplement this proof; they do not replace it.
-6. Tie acceptance to the exact candidate and independent input freeze. Material corrections invalidate affected old green evidence. Distinguish historical profile acceptance from current complete-corpus certification and record real unobserved cases.
+The owner [retired the historical testing restrictions](SCOPE_DECISIONS.md#testing-restrictions-retired-20261015). The retained anchor above supports existing links; it no longer requires an automatically cumulative full private corpus.
+
+1. Select cases from the changed behavior and risk. Use deterministic isolated fixtures for ordinary mechanics, edge cases and rejection paths; keep them separate from production input and support claims.
+2. For parser/source changes, retain a compact set of relevant originals and previously observed regressions. Broaden to additional families or the full corpus only for a concrete shared-boundary risk, unexplained failure or explicit task requirement.
+3. Establish independent expected meaning before production comparison. Preserve exact Money, multiplicity, source order, date roles, identity and provenance; do not use the implementation as its sole oracle.
+4. Exercise affected prepare/validate/confirm, atomic persistence, provider, reopen and hydration boundaries. Scope follows the actual change, not every historical campaign gate.
+5. Record candidate identity, selected cases, actual results and remaining coverage limits. Synthetic coverage is valid regression evidence but is not an authentic observation. A changed boundary invalidates only the affected earlier evidence.
 
 The canonical ownership is intake (queue length one or many), unlock/extract, identify/classify/route, family semantic interpretation, normalize/validate/reconcile, duplicate/equivalence, explicit review/confirmation, provider-owned atomic persistence, canonical database/hydration and presentation. Institution parsers are ingestion modules, not separate analytical stores. Prefer deterministic/native structured extraction; model adjudication is not ordinary financial authority.
 
@@ -90,7 +91,7 @@ Documentation-only changes require full diff, status-claim, link/path/anchor, or
 
 Report exact starting/ending refs, changed paths/fingerprints, scope/exclusions, migration/ADR impact, source/oracle authority, named build/test/run IDs and nonzero counts, results/failures/non-runs, native/provider/recovery proof, privacy/residue, publication and falsification/limitations. Classify material claims **verified**, **reported only**, **contradicted** or **missing**. Complete logs are not the default report. Chat verifies before acceptance.
 
-Where reviewers cannot access native artifacts, provide an allowed compact operational acceptance manifest readable by the authorized review surfaces, with candidate/parent, paths/hashes, test/build results, run IDs/times and only permitted evidence. It supplements native artifacts, never replaces them. It must not contain originals, credentials or derived financial evidence prohibited by the current owner processing rule. Do not persist source-oracle records merely to satisfy a historical cross-tool recipe; resolve any incompatible evidence requirement before execution.
+Where reviewers cannot access native artifacts, provide an allowed compact operational acceptance manifest readable by the authorized review surfaces, with candidate/parent, paths/hashes, test/build results, run IDs/times and only permitted evidence. It supplements native artifacts, never replaces them. Keep private originals and credentials out of Git. Local test artifacts are permitted under the current testing decision; avoid collecting irrelevant private payloads merely to satisfy a historical report recipe.
 
 ## Corrective numbering and documentation close
 
