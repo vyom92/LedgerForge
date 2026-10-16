@@ -277,10 +277,20 @@ final class BackgroundPersistenceTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(40))
         accepted.finish(.indeterminate)
         XCTAssertEqual(outcomes, [.indeterminate, .accepted])
+
+        // Observed helper restarts can acknowledge after the old five-second
+        // deadline. Exercise the production default without changing clocks.
+        var delayedOutcomes: [BackgroundWorkerControlStatus] = []
+        let delayed = BackgroundControlAcknowledgement { delayedOutcomes.append($0) }
+        try await Task.sleep(for: .seconds(7))
+        XCTAssertTrue(delayedOutcomes.isEmpty, "A helper still launching must not be declared unavailable early")
+        delayed.finish(.accepted)
+        delayed.finish(.indeterminate)
+        XCTAssertEqual(delayedOutcomes, [.accepted])
     }
 
     func testXPCStyleTransportCallbacksFromNonMainQueueReachAcknowledgement() async {
-        let expected: [BackgroundWorkerControlStatus] = [.indeterminate, .indeterminate, .accepted, .unavailable]
+        let expected: [BackgroundWorkerControlStatus] = [.indeterminate, .indeterminate, .accepted, .unavailable, .refused]
         for (entry, status) in expected.enumerated() {
             let completed = expectation(description: "Transport callback \(entry) completed")
             completed.assertForOverFulfill = true
@@ -300,11 +310,13 @@ final class BackgroundPersistenceTests: XCTestCase {
                 case 0: failed(TestXPCTransportError.failed)
                 case 1: invalidated()
                 case 2: replied(BackgroundWorkerControlStatus.accepted.rawValue)
-                default: replied(Int.max)
+                case 3: replied(Int.max)
+                default: replied(BackgroundWorkerControlStatus.refused.rawValue)
                 }
             }
             let result = await XCTWaiter.fulfillment(of: [completed], timeout: 1)
             XCTAssertEqual(result, .completed)
+            acknowledgement.finish(.accepted)
             XCTAssertEqual(outcomes, [status])
         }
     }

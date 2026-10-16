@@ -6461,6 +6461,10 @@ No sync, scheduling, workspace switching, archive dependency, retention UI, encr
 <a id="adr-048"></a>
 # ADR-048 — Enrolled Background Worker and Shared Ledger Activation Authority
 
+## Control acknowledgement alignment — 2026-10-16
+
+The owner-authorized maintenance campaign observed control connections timing out after five seconds while replacement helpers became available after six to seven seconds. The existing asynchronous acknowledgement window is now 15 seconds for reschedule admission, public-work admission and status replies. This is a bounded startup/control-reply allowance, not a provider execution deadline. Immediate transport failure/refusal, response validation, exactly-once completion, authority checks, single-attempt behavior and lifecycle recovery remain unchanged. No enrollment, scheduling, worker residency or retry change is introduced. A genuinely unanswered request can remain pending ten seconds longer; native qualification and its limits belong in the [maintenance outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-helper-acknowledgement).
+
 ## Owner correction — ready foreground email imports, 2026-10-13
 
 The [owner's clarified autonomy decision](SCOPE_DECISIONS.md#foreground-ready-email-autonomy-20261013) removes the initial manual batch-start action for pending retained supported email sources while an ordinary app window owns Import Centre. The foreground session reconciles original-byte identities with accepted imports, preserves active queues and existing holds, and enters the unchanged confirmed-batch pipeline. Only that pipeline may establish review-free acceptance and perform its existing independent atomic commits. Password, account identity, unsupported/uncertain content, validation, duplicate/equivalence and partial-import decisions still stop for owner attention. Cancelled/skipped sources are not automatically retried. Retained accepted receipts prevent reimport after reopening.

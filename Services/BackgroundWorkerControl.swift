@@ -141,7 +141,10 @@ final class BackgroundControlAcknowledgement {
     private var completion: (@MainActor (BackgroundWorkerControlStatus) -> Void)?
     private var deadline: Task<Void, Never>?
 
-    init(timeout: Duration = .seconds(5), completion: @escaping @MainActor (BackgroundWorkerControlStatus) -> Void) {
+    // A control request may arrive just after the short-lived helper exits.
+    // Allow for launchd's observed restart delay; this bounds the reply, not
+    // provider work, and transport failures still resolve immediately.
+    init(timeout: Duration = .seconds(15), completion: @escaping @MainActor (BackgroundWorkerControlStatus) -> Void) {
         self.completion = completion
         deadline = Task { [weak self] in
             do { try await Task.sleep(for: timeout) } catch { return }
