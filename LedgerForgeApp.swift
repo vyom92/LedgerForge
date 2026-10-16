@@ -8,6 +8,9 @@
 import SwiftUI
 
 private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { FinancialMCPController.shared.activate() }
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         MainActor.assumeIsolated {
             if BackupRestoreCoordinator.shared.isBusy || DatabaseActivityGate.shared.hasActiveOperations || DatabaseActivityGate.shared.hasExclusiveOperation {
@@ -21,6 +24,7 @@ private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDeleg
     }
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
+            FinancialMCPController.shared.terminate()
 #if DEBUG || LEDGERFORGE_DEVELOPER_TOOLS
             DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #else

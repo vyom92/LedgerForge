@@ -43,6 +43,43 @@ struct NetWorthReportTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
+    func authenticPolicyProjectionMatchesNativeMoneyDisplayAndPreservesSourcePrecision() throws {
+        let source = try context(); defer { source.provider.database.close() }
+        let snapshot = source.snapshot.investments
+        let policies = snapshot.containers.filter { $0.zioSource != nil }
+        try #require(!policies.isEmpty, "An authentic Zurich policy is required for this display qualification.")
+        let before = try NetWorthTestSupport.financialDigest(source.provider.database)
+        let positions = DashboardPositionProjection.make(accounts: source.snapshot.accounts,
+            transactions: source.snapshot.transactions, cardSnapshot: source.snapshot.cardSnapshot)
+        let overview = InvestmentOverview.build(holdings: snapshot.holdings, valuations: source.valuations,
+            legs: source.cache.alDarLegs, containers: snapshot.containers, ispAccount: snapshot.latestZioAccount)
+        let projected = try CompanionMacProjectionBuilder.make(ledgerLineage: "qualification",
+            publicationID: UUID().uuidString, generation: 1, publishedAt: source.now,
+            report: source.report(), positions: positions, investmentSnapshot: snapshot,
+            overview: overview, valuations: source.valuations, investmentsAvailable: true)
+        for container in policies {
+            let policy = try #require(container.zioSource)
+            let actual = try #require(projected.investments.containers.first { $0.id == container.id })
+            let fields: [(String, InvestmentDecimal?)] = [
+                ("contributions", policy.contributions.amount), ("portalValue", policy.value.amount),
+                ("reportedGrowth", policy.growth.amount), ("allocatedContributions", policy.allocatedContributions?.amount),
+                ("vestedValue", policy.vestedValue?.amount)
+            ]
+            for (id, value) in fields {
+                let metric = try #require(actual.metrics.first { $0.id == id })
+                let displayMatches = metric.display == InvestmentArithmetic.displayedMoney(value?.value, currency: policy.currency)
+                let precisionMatches = metric.exact?.numerator == value?.canonical &&
+                    metric.exact?.denominator == value.map { _ in "1" } &&
+                    metric.exact?.currency == value.map { _ in policy.currency }
+                let sourceSpellingPreserved = metric.note == value.map { "Source amount: " + $0.sourceText + " " + policy.currency }
+                #expect(displayMatches && precisionMatches && sourceSpellingPreserved)
+            }
+        }
+        let unchangedLedger = try NetWorthTestSupport.financialDigest(source.provider.database) == before
+        #expect(unchangedLedger)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func authenticCachedObservationsKeepFetchAndValuationDatesAcrossCheckFailureAndRelaunch() throws {
         let source = try context(); defer { source.provider.database.close() }
         let quote = try #require(source.cache.investmentQuotes.values.first)

@@ -304,6 +304,7 @@ final class DashboardViewModel: ObservableObject {
     private var selectedFundingMonth: SelectedStatementMonth?
     private var cancellables = Set<AnyCancellable>()
     private var pendingRefreshID: UUID?
+    var financialMCPRefreshPending: Bool { pendingRefreshID != nil }
     private struct FlowQuery: Equatable {
         let generation: ProviderGenerationToken
         let revision: UInt64

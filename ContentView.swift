@@ -79,6 +79,7 @@ private enum SettingsSubsection: String {
     case emailStatements = "Email Statements"
     case backgroundUpdates = "Background Updates"
     case companion = "iPhone Companion"
+    case financialMCP = "Financial MCP"
     case backup = "Backup & Restore"
     case categories = "Categories"
 
@@ -90,6 +91,7 @@ private enum SettingsSubsection: String {
         case .emailStatements: "envelope"
         case .backgroundUpdates: "clock.arrow.circlepath"
         case .companion: "iphone"
+        case .financialMCP: "arrow.left.arrow.right"
         case .backup: "externaldrive"
         case .categories: "tag"
         }
@@ -1698,6 +1700,24 @@ struct ContentView: View {
             destination: { destinationContent }
         )
         .environment(\.lfTheme, theme)
+        .onAppear {
+            FinancialMCPPresentation.shared.attach(dashboard: dashboardViewModel, planner: salaryViewModel,
+                prices: investmentPriceSession, rates: alDarReferenceSession)
+            if FinancialMCPController.shared.hasSettingsRequest {
+                selectedSection = .settings
+                DispatchQueue.main.async { settingsSubsection = .financialMCP }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .financialMCPSettings)) { _ in
+            selectedSection = .settings
+            DispatchQueue.main.async { settingsSubsection = .financialMCP }
+        }
+        .onChange(of: selectedSection) { _, section in
+            FinancialMCPPresentation.shared.select(section: section.rawValue, showsZeroBalances: netWorthShowsZeroBalances)
+        }
+        .onChange(of: netWorthShowsZeroBalances) { _, value in
+            FinancialMCPPresentation.shared.select(section: selectedSection.rawValue, showsZeroBalances: value)
+        }
         .onReceive(salaryViewModel.$month) { month in
             dashboardViewModel.selectFundingMonth(month)
         }
@@ -2668,6 +2688,8 @@ struct ContentView: View {
                         }
                     } else if settingsSubsection == .backgroundUpdates {
                         BackgroundUpdatesSettingsView(session: backgroundUpdates, availableWidth: width)
+                    } else if settingsSubsection == .financialMCP {
+                        FinancialMCPSettingsView()
                     } else if settingsSubsection == .companion {
                         CompanionMacSettingsView(session: .shared)
                     } else if settingsSubsection == .backup {
@@ -2695,7 +2717,7 @@ struct ContentView: View {
                 }
             } trailing: {
                 settingsDestinationGroup("Connections & updates", destinations: [
-                    .liveFX, .ispAccount, .ibkrAccount, .emailStatements, .backgroundUpdates, .companion
+                    .liveFX, .ispAccount, .ibkrAccount, .emailStatements, .backgroundUpdates, .companion, .financialMCP
                 ])
             }
             settingsDataPanel(availableWidth: availableWidth)
@@ -2801,6 +2823,7 @@ struct ContentView: View {
         case .ibkrAccount: summary = ibkrFlexSession.connectionSummary
         case .backgroundUpdates: summary = backgroundUpdates.status
         case .companion: summary = "Mac snapshots and Monthly Plan sync with your iPhone."
+        case .financialMCP: summary = "Read-only financial information for ChatGPT, while LedgerForge is open."
         }
         let needsAttention: Bool
         switch destination {

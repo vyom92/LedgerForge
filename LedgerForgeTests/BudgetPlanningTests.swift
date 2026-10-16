@@ -142,6 +142,7 @@ final class BudgetPlanningTests: XCTestCase {
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let previous = try active.fundingPlanRepo.plans(workspaceId: "default-workspace")
         let next = try editor(month: "2026-10", active: active, store: store).0
+        next.rolloverFromPreviousPlan()
         XCTAssertEqual(next.plan.qatarCommitments.first?.money, try money("120"))
         XCTAssertNil(next.plan.qatarCommitments.first?.temporaryCarryBasis)
         XCTAssertNotEqual(next.plan.qatarCommitments.first?.id, ordinary)
@@ -160,8 +161,11 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertFalse(next.hasUnsavedDrafts)
         XCTAssertNil(next.plan.rolloverSourcePlanID)
         next.plannerOpened()
-        XCTAssertTrue(next.hasUnsavedDrafts)
-        XCTAssertEqual(next.plan.expectedFixedEarnings, try money("100"))
+        XCTAssertFalse(next.hasUnsavedDrafts)
+        XCTAssertNil(next.plan.rolloverSourcePlanID)
+        XCTAssertEqual(next.plan.expectedFixedEarnings, try money("0"))
+        next.flushPendingEntries()
+        XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").count, 1)
     }
 
     func testLegacyScalarDeductionRemainsVisibleWhenSeedingTheWorksheet() throws {
@@ -171,6 +175,7 @@ final class BudgetPlanningTests: XCTestCase {
         let (_, active, store) = try editor()
         store.installWithoutObservation([prior], generation: active.generationToken)
         let next = try editor(month: "2026-10", active: active, store: store).0
+        next.rolloverFromPreviousPlan()
         XCTAssertEqual(next.plan.deductions.first?.label, "Prior deduction total · unitemized")
         XCTAssertEqual(next.plan.deductions.first?.money, try money("50"))
         XCTAssertEqual(next.calculation.expectedNet, try money("1150"))
@@ -183,12 +188,13 @@ final class BudgetPlanningTests: XCTestCase {
         vm.save()
         vm.editCommitment(region: "qatar", id: id, field: "amount", text: "0")
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        vm.rolloverFromPreviousPlan()
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-09"))
         vm.setCommitmentDetails(region: "qatar", id: id, temporary: true)
         XCTAssertEqual(vm.plan.qatarCommitments.first?.temporaryCarryBasis, try money("120"))
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let reopenedNext = try editor(month: "2026-10", active: active, store: store).0
-        // October was already opened and retained with zero before the owner
+        // October was explicitly copied and retained with zero before the owner
         // marked September's reduction temporary. Do not rewrite that month.
         XCTAssertEqual(reopenedNext.plan.qatarCommitments.first?.money, try money("0"))
         XCTAssertEqual(vm.plan.qatarCommitments.first?.temporaryCarryBasis, try money("120"))
@@ -230,11 +236,11 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.rawText["fixed"], "100.")
         vm.switchMonth(to: future); XCTAssertEqual(vm.plan.expectedFixedEarnings, try money("250"))
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-08"))
-        XCTAssertEqual(vm.month, future)
+        XCTAssertEqual(vm.month.canonical, "2026-08"); XCTAssertFalse(vm.canEdit)
         let last = try SelectedStatementMonth(canonical: "2099-12")
         vm.switchMonth(to: last); XCTAssertEqual(vm.month, last); XCTAssertTrue(vm.canEdit)
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2100-01"))
-        XCTAssertEqual(vm.month, last)
+        XCTAssertEqual(vm.month.canonical, "2100-01"); XCTAssertFalse(vm.canEdit)
         let retainedPlans = try active.fundingPlanRepo.plans(workspaceId: "default-workspace")
         XCTAssertEqual(retainedPlans.count, 1)
         XCTAssertEqual(retainedPlans.first?.planMonthISO, future.canonical)
@@ -279,7 +285,7 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(try reopened.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.expectedFixedDecimal, "5000.50")
     }
 
-    func testSwitchingWithSharedFXSeedsSavedRowsBeforeMakingTheNewDraftDirty() throws {
+    func testSwitchingWithSharedFXDoesNotCopyPlansAndPreservesActualEdits() throws {
         let (vm, active, _) = try editor()
         _ = vm.updateMoney(.fixed, text: "700")
         _ = try bill(vm, region: "india", amount: "120")
@@ -287,11 +293,11 @@ final class BudgetPlanningTests: XCTestCase {
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         vm.receiveSharedReference(try AlDarUnitReference(currency: .inr, rawToken: "3", fetchedAtISO: "2026-09-16T08:00:00Z"))
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
-        XCTAssertEqual(vm.plan.expectedFixedEarnings, try money("700"))
-        XCTAssertEqual(vm.plan.indiaCommitments.first?.money, try money("120", "INR"))
+        XCTAssertEqual(vm.plan.expectedFixedEarnings, try money("0"))
+        XCTAssertTrue(vm.plan.indiaCommitments.isEmpty)
         XCTAssertEqual(vm.plan.referenceMode, .alDar)
         XCTAssertEqual(vm.plan.effectiveAlDarReference?.returnedINR.rawToken, "3")
-        XCTAssertNil(vm.errorMessage); XCTAssertTrue(vm.isDirty)
+        XCTAssertNil(vm.errorMessage); XCTAssertFalse(vm.isDirty)
         XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").count, 1)
         _ = vm.updateMoney(.variable, text: "5.")
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-09"))
@@ -321,6 +327,7 @@ final class BudgetPlanningTests: XCTestCase {
             vm.save(); XCTAssertEqual(vm.saveState, .saved)
             XCTAssertEqual(try active.fundingPlanRepo.plans(workspaceId: "default-workspace").first?.commitments.first?.dueDateISO, String(format: "%@-%02d", sourceMonth, day))
             let next = try editor(month: nextMonth, active: active, store: store).0
+            next.rolloverFromPreviousPlan()
             XCTAssertEqual(next.plan.qatarCommitments.first?.dueDate(in: next.month)?.canonical, expected)
             XCTAssertEqual(next.plan.dueDate(for: try XCTUnwrap(next.plan.qatarCommitments.first))?.canonical, expected)
         }
@@ -337,9 +344,11 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.calculation.indiaCommitments, try money("120", "INR"))
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let october = try editor(month: "2026-10", active: active, store: store).0
+        october.rolloverFromPreviousPlan()
         XCTAssertEqual(october.plan.dueDate(for: try XCTUnwrap(october.plan.indiaCommitments.first))?.canonical, "2026-11-01")
         october.save()
         let november = try editor(month: "2026-11", active: active, store: store).0
+        november.rolloverFromPreviousPlan()
         XCTAssertEqual(november.plan.dueDate(for: try XCTUnwrap(november.plan.indiaCommitments.first))?.canonical, "2026-12-01")
         var lastDay = try XCTUnwrap(november.plan.indiaCommitments.first)
         lastDay.dueDate = try StatementDate(canonical: "2026-01-31")
@@ -360,6 +369,7 @@ final class BudgetPlanningTests: XCTestCase {
         XCTAssertEqual(vm.calculation.qatarCommitments, try money("120"))
         vm.save(); XCTAssertEqual(vm.saveState, .saved)
         let october = try editor(month: "2026-10", active: active, store: store).0
+        october.rolloverFromPreviousPlan()
         XCTAssertEqual(october.plan.assistance?.salaryCycle?.expectedDay, 26)
         XCTAssertEqual(october.plan.assistance?.salaryCycle?.previousPayday, "2026-09-26")
         XCTAssertEqual(october.plan.dueDate(for: try XCTUnwrap(october.plan.qatarCommitments.first))?.canonical, "2026-11-10")
@@ -370,9 +380,11 @@ final class BudgetPlanningTests: XCTestCase {
             date: try XCTUnwrap(FinancialCalendar.instant(StatementDate(canonical: "2027-01-31"))), timeZone: TimeZone(secondsFromGMT: 0)!)
         january.save(); XCTAssertEqual(january.saveState, .saved)
         let february = try editor(month: "2027-02", active: januaryProvider, store: januaryStore).0
+        february.rolloverFromPreviousPlan()
         XCTAssertEqual(february.plan.dueDate(for: try XCTUnwrap(february.plan.qatarCommitments.first))?.canonical, "2027-02-28")
         february.save(); XCTAssertEqual(february.saveState, .saved)
         let march = try editor(month: "2027-03", active: januaryProvider, store: januaryStore).0
+        march.rolloverFromPreviousPlan()
         XCTAssertEqual(march.plan.dueDate(for: try XCTUnwrap(march.plan.qatarCommitments.first))?.canonical, "2027-03-31")
     }
 

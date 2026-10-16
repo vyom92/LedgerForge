@@ -181,6 +181,7 @@ final class AlDarReferenceTests: XCTestCase {
     func testRolloverDoesNotInheritAppliedExternalEvidence() throws {
         let (vm, active, store) = try editor(); _ = try seed(vm); try publish(vm); vm.save()
         let next = try editor(month: "2026-10", runtime: active, store: store).0
+        next.rolloverFromPreviousPlan()
         XCTAssertEqual(next.plan.referenceMode, .alDar); XCTAssertNil(next.plan.effectiveAlDarReference)
         try publish(next, raw: "4.00")
         XCTAssertEqual(next.calculation.requiredQARPrincipal, try money("0.25"))

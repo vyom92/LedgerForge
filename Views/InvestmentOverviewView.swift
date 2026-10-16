@@ -1066,13 +1066,16 @@ struct InvestmentPortfolioDetailView: View {
     }
 
     private func policySourceDetails(_ holding: InvestmentHolding) -> some View {
-        DisclosureGroup("Source details") {
+        DisclosureGroup {
             InvestmentHoldingInlineDetails(holding: holding, valuation: valuations[holding.id],
                 container: containers.first { $0.id == holding.containerID },
                 portfolioName: portfolioNames[holding.containerID] ?? "Unavailable")
                 .padding(.top, theme.spacing.small)
+        } label: {
+            Text("Source details")
+                .textSelection(.disabled)
+                .accessibilityLabel("Source details for " + (portfolioNames[holding.containerID] ?? "policy"))
         }.font(theme.typography.secondary)
-            .accessibilityLabel("Source details for " + (portfolioNames[holding.containerID] ?? "policy"))
     }
 
     private func policyDates(_ positions: [InvestmentHolding], fund: InvestmentFundSummary) -> some View {

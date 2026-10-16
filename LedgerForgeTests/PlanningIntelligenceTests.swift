@@ -8,6 +8,63 @@ import Testing
 struct PlanningIntelligenceTests {
 
     @Test(.globalRuntimeStateIsolation)
+    func financialMCPHidesCompletedAnalysisAfterSameValueRetentionFailure() async throws {
+        let root = try folder(), target = root.appendingPathComponent("qualification.sqlite")
+        let sourceURL = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_BUDGET_REPAIR_DATABASE"]))
+        let source = try AuthenticSourceTestSupport.readOnlyRegisteredProvider(at: sourceURL)
+        defer { source.database.close() }
+        try source.database.createBackup(at: target.path)
+        let sqlite = try SQLiteRepositoryProvider(path: target.path)
+        defer { sqlite.database.close(); try? FileManager.default.removeItem(at: root) }
+        let workspace = try #require(sqlite.database.query(sql: "SELECT id FROM workspaces;") { $0.string(at: 0) }.compactMap { $0 }.first)
+        let retained = try sqlite.fundingPlanRepo.scratchpads(workspaceId: workspace).map(MonthlyPlanScratchpad.decode)
+        let existing = try #require(retained.first {
+            $0.fieldErrors.isEmpty && $0.plan == $0.canonical &&
+                (try? $0.plan.keepInCBQ?.canonicalDecimalString().hasSuffix("0")) == true
+        })
+        let provider = DatabaseProvider.verifiedSQLite(sqlite)
+        DatabaseProvider.shared = provider
+        let hydrator = RepositoryStoreHydrator(databaseProvider: provider, workspaceId: workspace, participatesInLifecycleGate: false)
+        hydrator.publish(try hydrator.stageHydration())
+        let before = try retainedPlanDigest(sqlite.database)
+        let planner = SalaryWorkspaceViewModel(month: existing.plan.month, workspaceID: workspace,
+            provider: { provider }, locale: Locale(identifier: "en_US_POSIX"))
+        planner.plannerOpened()
+        planner.receiveSharedReference(try sqlite.backgroundPublicCacheRepo.snapshot(now: Date()).alDarLegs[.inr])
+        try #require(!planner.retentionPending && !planner.isDirty)
+        let analysis = planner.planningAnalysis
+        defer { analysis.cancel() }
+        try #require(planner.canEdit && planner.hasValidCalculation)
+        analysis.refresh(plan: planner.plan, scenario: planner.insightSelection.scenario,
+            selectedHistoryAccountIDs: planner.selectedHistoryAccountIDs,
+            retainedRecurringOccurrenceIDs: planner.retainedRecurringOccurrenceIDs,
+            excludedRecurringOccurrenceIDs: planner.recurringOccurrenceExclusions)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while analysis.isWorking && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(analysis.financialMCPProjection(for: planner) != nil)
+        let plan = planner.plan
+        // A lexical-only edit of the actual retained amount leaves every financial
+        // operand unchanged. Query-only mode injects a write failure in this test copy.
+        try sqlite.database.execute(sql: "PRAGMA query_only=ON;")
+        let reserve = try #require(plan.keepInCBQ)
+        let canonical = try reserve.canonicalDecimalString()
+        let shorter = String(canonical.dropLast(canonical.hasSuffix(".00") ? 3 : 1))
+        let spelling = planner.moneyText(.reserve) == canonical ? shorter : canonical
+        let exactSameAmount = try PlannerInputCodec.money(spelling, currency: reserve.currency.code,
+            locale: Locale(identifier: "en_US_POSIX")) == reserve
+        try #require(exactSameAmount && spelling != planner.moneyText(.reserve))
+        try #require(planner.updateMoney(.reserve, text: spelling))
+        planner.flushPendingEntries()
+        let unchangedPlan = planner.plan == plan
+        #expect(unchangedPlan && planner.hasValidCalculation)
+        #expect(planner.saveState == .retentionFailed && !planner.canEdit)
+        #expect(analysis.projection != nil, "The completed cache remains present; availability must hide it.")
+        #expect(analysis.financialMCPProjection(for: planner) == nil)
+        let unchangedLedger = try retainedPlanDigest(sqlite.database) == before
+        #expect(unchangedLedger)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
     func retainedOwnerPlansCanBeSavedWithoutLosingDrafts() async throws {
         let root = try folder(), target = root.appendingPathComponent("qualification.sqlite")
         let sourceURL = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LEDGERFORGE_BUDGET_REPAIR_DATABASE"]))
@@ -1049,6 +1106,8 @@ struct PlanningIntelligenceTests {
             vm.plannerOpened(); return vm
         }
         let model = open()
+        #expect(model.plan.indiaCommitments.isEmpty, "Opening a month does not create a plan.")
+        #expect(model.setSalaryCycle(try #require(SalaryFundingCycle.expected(month: month, day: 26))))
         for _ in 0..<200 where model.plan.indiaCommitments.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
         let row = try #require(model.plan.indiaCommitments.first)
         #expect(model.plan.indiaCommitments.count == 1)
@@ -1071,6 +1130,8 @@ struct PlanningIntelligenceTests {
         #expect(reopened.plan.indiaCommitments.first?.included == false)
         #expect(reopened.rawText["amount.\(row.id)"] == "2.5")
         reopened.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        #expect(reopened.plan.indiaCommitments.isEmpty, "Navigation does not copy or populate the target plan.")
+        #expect(reopened.setSalaryCycle(try #require(SalaryFundingCycle.expected(month: reopened.month, day: 26))))
         for _ in 0..<200 where reopened.plan.indiaCommitments.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
         #expect(reopened.plan.indiaCommitments.count == 1)
         #expect(reopened.plan.indiaCommitments.first?.dueDate?.canonical == "2026-11-01")

@@ -29,8 +29,6 @@ struct SalaryView: View {
     @State private var balanceDetailsID: String?
     @State private var billDetailsID: String?
     @State private var showingMonthPicker = false
-    @State private var pickerMonth = 1
-    @State private var pickerYear = 2026
     @State private var focusedMonth: SelectedStatementMonth?
     @FocusState private var focusedInput: String?
 
@@ -70,22 +68,7 @@ struct SalaryView: View {
                         Text("Salary History").tag("Salary History")
                     }.pickerStyle(.segmented).font(theme.typography.button).frame(maxWidth: 600)
                         .accessibilityLabel("Planning section")
-                    if section != "Salary History" {
-                        planningDates
-                        if !viewModel.historyScopeAccounts.isEmpty {
-                            Menu(viewModel.selectedHistoryAccountIDs.isEmpty ? "Current accounts" : "Current + selected history") {
-                                Button("Current accounts") { viewModel.selectCurrentAccountScope() }
-                                Divider()
-                                ForEach(viewModel.historyScopeAccounts) { account in
-                                    if let id = account.repositoryAccountId {
-                                        Toggle(account.selectionTitle,
-                                            isOn: Binding(get: { viewModel.selectedHistoryAccountIDs.contains(id) },
-                                                set: { viewModel.setHistoryAccountSelected(id, selected: $0) }))
-                                    }
-                                }
-                            }.help("History-only accounts are excluded until you select them here.")
-                        }
-                    }
+                    planningDates
                 }.frame(width: width, alignment: .leading)
                     .padding(.horizontal, theme.spacing.pagePadding).padding(.top, 12).padding(.bottom, 12)
                 Divider()
@@ -182,118 +165,170 @@ struct SalaryView: View {
 
 
     private func header(width: CGFloat) -> some View {
-        let layout = width >= 1060 ? AnyLayout(HStackLayout(alignment: .center, spacing: 20)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-        return VStack(alignment: .leading, spacing: 8) {
-            layout {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Budget Planning").font(theme.typography.pageTitle)
-                    if section == "Salary History" {
-                        Text("Salary history · Read-only").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                    } else {
-                        monthPicker
+        VStack(alignment: .leading, spacing: 10) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 24) {
+                    Text("Budget Planning").font(theme.typography.pageTitle).fixedSize()
+                    Spacer(minLength: 0)
+                    monthNavigation.fixedSize()
+                    Spacer(minLength: 0)
+                    planningControls.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .firstTextBaseline, spacing: 16) {
+                        Text("Budget Planning").font(theme.typography.pageTitle)
+                        Spacer(minLength: 0)
+                        planningControls
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-                if section == "Salary History" {
-                    HStack(spacing: 16) {
-                        if viewModel.hasUnsavedDrafts {
-                            Label("\(monthNames[viewModel.month.month - 1]) · \(viewModel.statusText)", systemImage: "circle.fill")
-                                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-                        }
-                        Button("Return to Monthly plan") { section = "This Month" }.lfSecondaryAction()
-                    }
-                } else {
-                    planningControls
+                    monthNavigation
                 }
             }
-            if section != "Salary History" {
-                if viewModel.saveState == .committedNeedsRefresh {
-                    Button("Reload saved plan") { viewModel.retryCanonicalRefresh() }.lfSecondaryAction()
-                } else if [.providerChanged, .canonicalChanged, .committedToPreviousProvider].contains(viewModel.saveState) {
-                    Button("Discard draft and reload") { confirmingDiscard = true }.lfSecondaryAction()
-                }
+            if viewModel.saveState == .committedNeedsRefresh {
+                Button("Reload saved plan") { viewModel.retryCanonicalRefresh() }.lfSecondaryAction()
+            } else if [.providerChanged, .canonicalChanged, .committedToPreviousProvider].contains(viewModel.saveState) {
+                Button("Discard draft and reload") { confirmingDiscard = true }.lfSecondaryAction()
             }
         }
     }
 
-    private var planningControls: some View {
-        HStack(spacing: 12) {
-            ForEach(1...2, id: \.self) { offset in
-                Button(offset == 1 ? "+1 month" : "+2 months") {
-                    if let target = viewModel.planningMonth(offsetBy: offset) { selectPlanningMonth(target) }
-                }.lfSecondaryAction()
-                    .disabled(viewModel.planningMonth(offsetBy: offset) == nil)
-                    .help(viewModel.planningMonth(offsetBy: offset).map { "Open \(fullMonthTitle($0))" } ?? "Outside the planning range")
-            }
-            Text(!SalaryWorkspaceViewModel.planningMonths.contains(viewModel.month) ? "Saved plan · read only" : viewModel.statusText)
-                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
-            Spacer(minLength: 4)
-            Button("Planning accounts") { showingPlanningAccounts = true }.lfSecondaryAction().disabled(!viewModel.canEdit)
+    private var monthNavigation: some View {
+        HStack(spacing: 8) {
+            Button { stepPlanningMonth(-1) } label: {
+                Image(systemName: "chevron.left")
+            }.lfIconAction()
+                .accessibilityLabel("Previous month").accessibilityIdentifier("planner.previousMonth")
+                .disabled(viewModel.planningMonth(offsetBy: -1) == nil)
+            monthPicker
+            Button { stepPlanningMonth(1) } label: {
+                Image(systemName: "chevron.right")
+            }.lfIconAction()
+                .accessibilityLabel("Next month").accessibilityIdentifier("planner.nextMonth")
+                .disabled(viewModel.planningMonth(offsetBy: 1) == nil)
+            Button("This month") { selectPlanningMonth(viewModel.currentPlanningMonth) }
+                .lfSecondaryAction().padding(.leading, 8)
+                .disabled(viewModel.month == viewModel.currentPlanningMonth)
+                .accessibilityIdentifier("planner.thisMonth")
+                .help("Return to \(fullMonthTitle(viewModel.currentPlanningMonth))")
         }
-        .disabled(viewModel.saveState == .saving || viewModel.saveState == .committedNeedsRefresh)
+        .disabled(monthNavigationDisabled)
+        .focusable()
+        .onKeyPress(.leftArrow) {
+            guard !showingMonthPicker else { return .ignored }
+            stepPlanningMonth(-1); return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            guard !showingMonthPicker else { return .ignored }
+            stepPlanningMonth(1); return .handled
+        }
+        .accessibilityElement(children: .contain).accessibilityLabel("Month navigator")
+    }
+
+    private var monthNavigationDisabled: Bool {
+        viewModel.saveState == .saving || viewModel.saveState == .committedNeedsRefresh
+    }
+
+    private func stepPlanningMonth(_ offset: Int) {
+        guard !monthNavigationDisabled, let target = viewModel.planningMonth(offsetBy: offset) else { return }
+        selectPlanningMonth(target)
+    }
+
+    private var planningControls: some View {
+        HStack(spacing: 16) {
+            Text(SalaryWorkspaceViewModel.planningMonths.contains(viewModel.month)
+                 ? viewModel.statusText : "Outside editable planning period · read only")
+                .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Planning accounts") { showingPlanningAccounts = true }
+                .lfSecondaryAction().disabled(!viewModel.canEdit)
+        }
+        .disabled(monthNavigationDisabled)
     }
 
     private var monthPicker: some View {
         Button {
-            pickerYear = max(2026, viewModel.month.year)
-            pickerMonth = pickerYear == 2026 ? max(9, viewModel.month.month) : viewModel.month.month
             showingMonthPicker = true
         } label: {
-            Label(fullMonthTitle(viewModel.month), systemImage: "calendar")
-                .font(theme.typography.sectionTitle)
-        }.buttonStyle(.plain)
-            .accessibilityLabel("Planning month and year").accessibilityValue(fullMonthTitle(viewModel.month))
-            .disabled(viewModel.saveState == .saving || viewModel.saveState == .committedNeedsRefresh)
+            HStack(spacing: 8) {
+                Text(fullMonthTitle(viewModel.month))
+                Image(systemName: "chevron.down").font(theme.typography.caption)
+            }
+        }.lfSecondaryAction()
+            .accessibilityLabel("Choose planning month").accessibilityValue(fullMonthTitle(viewModel.month))
+            .accessibilityIdentifier("planner.monthPicker")
+            .help("Choose any month and year")
             .popover(isPresented: $showingMonthPicker) {
-                VStack(alignment: .leading, spacing: 14) {
-                    Picker("Month", selection: $pickerMonth) {
-                        ForEach((pickerYear == 2026 ? 9 : 1)...12, id: \.self) { number in
-                            Text(monthNames[number - 1]).tag(number)
-                        }
-                    }
-                    Picker("Year", selection: $pickerYear) {
-                        ForEach(2026...2099, id: \.self) { Text(String($0)).tag($0) }
-                    }.onChange(of: pickerYear) { _, year in
-                        if year == 2026 { pickerMonth = max(9, pickerMonth) }
-                    }
-                    let earlier = viewModel.availableMonths.filter { !SalaryWorkspaceViewModel.planningMonths.contains($0) }
-                    if !earlier.isEmpty {
-                        Menu("Saved history") {
-                            ForEach(earlier, id: \.self) { month in
-                                Button(fullMonthTitle(month)) { selectPlanningMonth(month); showingMonthPicker = false }
-                            }
-                        }
-                    }
-                    HStack {
-                        Button("Cancel") { showingMonthPicker = false }.keyboardShortcut(.cancelAction)
-                        Spacer()
-                        Button("Open month") {
-                            if let target = try? SelectedStatementMonth(year: pickerYear, month: pickerMonth) {
-                                selectPlanningMonth(target)
-                                if viewModel.month == target { showingMonthPicker = false }
-                            }
-                        }.keyboardShortcut(.defaultAction)
-                    }
-                }.padding(20).frame(width: 300)
+                PlanningMonthPicker(selectedMonth: viewModel.month, disabled: monthNavigationDisabled,
+                                    onCancel: { showingMonthPicker = false }, onOpen: { target in
+                    selectPlanningMonth(target)
+                    if viewModel.month == target { showingMonthPicker = false }
+                })
             }
     }
 
     private var planningDates: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 20) {
+                fundingWindows.fixedSize()
+                accountScope.fixedSize()
+                Spacer(minLength: 0)
+                paydayControls.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                fundingWindows
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                    accountScope
+                    Spacer(minLength: 0)
+                    paydayControls
+                }
+            }
+        }.font(theme.typography.secondary)
+    }
+
+    private var fundingWindows: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 20) { fundingWindowLabels }
+            VStack(alignment: .leading, spacing: 4) { fundingWindowLabels }
+        }.foregroundStyle(theme.palette.secondaryText)
+    }
+
+    @ViewBuilder private var fundingWindowLabels: some View {
+        if let cycle = viewModel.plan.assistance?.salaryCycle {
+            Text("Bills: \(cycle.billRange)")
+            Text("Recurring: \(cycle.recurringRange)")
+        } else {
+            Text("Calendar-month plan")
+        }
+    }
+
+    @ViewBuilder private var accountScope: some View {
+        if viewModel.historyScopeAccounts.isEmpty {
+            Text("Current accounts").foregroundStyle(theme.palette.secondaryText)
+        } else {
+            Menu(viewModel.selectedHistoryAccountIDs.isEmpty ? "Current accounts" : "Current + selected history") {
+                Button("Current accounts") { viewModel.selectCurrentAccountScope() }
+                Divider()
+                ForEach(viewModel.historyScopeAccounts) { account in
+                    if let id = account.repositoryAccountId {
+                        Toggle(account.selectionTitle,
+                               isOn: Binding(get: { viewModel.selectedHistoryAccountIDs.contains(id) },
+                                             set: { viewModel.setHistoryAccountSelected(id, selected: $0) }))
+                    }
+                }
+            }.help("History-only accounts are excluded until you select them here.")
+        }
+    }
+
+    private var paydayControls: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if let cycle = viewModel.plan.assistance?.salaryCycle {
-                Text("Bills: \(cycle.billRange) · Recurring: \(cycle.recurringRange)")
-                    .foregroundStyle(theme.palette.secondaryText)
-                Spacer(minLength: 0)
                 Text("\(cycle.receivedSalaryID == nil ? "Expected payday" : "Salary received") \(cycle.recurringStart.presentation)")
                 if cycle.needsPreviousBoundaryReview(in: intelligenceStore.snapshot) {
                     Label("Review changed salary dates", systemImage: "exclamationmark.circle").foregroundStyle(LFTheme.warning)
                 }
-            } else {
-                Text("Calendar-month plan").foregroundStyle(theme.palette.secondaryText)
-                Spacer(minLength: 0)
             }
             Button(viewModel.plan.assistance?.salaryCycle == nil ? "Use salary dates" : "Edit payday") { showingSalaryCycle = true }
                 .lfSecondaryAction().disabled(!viewModel.canEdit)
-        }.font(theme.typography.secondary)
+        }
     }
 
     private var monthNames: [String] { ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] }
@@ -906,4 +941,84 @@ struct SalaryView: View {
         }
         .foregroundStyle(value == "Incomplete" ? LFTheme.warning : theme.palette.primaryText)
     }
+}
+
+/// The popover owns its initial selection, so its first presentation never uses
+/// a stale month captured while the main header was laid out.
+private struct PlanningMonthPicker: View {
+    @Environment(\.lfTheme) private var theme
+    @State private var pickerYear: Int
+    @State private var pickerMonth: Int
+    @FocusState private var focusedPickerMonth: Int?
+    let disabled: Bool
+    let onCancel: () -> Void
+    let onOpen: (SelectedStatementMonth) -> Void
+    private let monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+    init(selectedMonth: SelectedStatementMonth, disabled: Bool,
+         onCancel: @escaping () -> Void, onOpen: @escaping (SelectedStatementMonth) -> Void) {
+        _pickerYear = State(initialValue: selectedMonth.year)
+        _pickerMonth = State(initialValue: selectedMonth.month)
+        self.disabled = disabled
+        self.onCancel = onCancel
+        self.onOpen = onOpen
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 12) {
+                Button { pickerYear -= 1 } label: { Image(systemName: "chevron.left") }
+                    .lfIconAction().accessibilityLabel("Previous year").disabled(pickerYear <= 1900)
+                Spacer(minLength: 0)
+                TextField("Year", value: $pickerYear, format: .number.grouping(.never))
+                    .textFieldStyle(.roundedBorder).multilineTextAlignment(.center)
+                    .font(theme.typography.sectionTitle).frame(width: 84)
+                    .accessibilityLabel("Year")
+                Spacer(minLength: 0)
+                Button { pickerYear += 1 } label: { Image(systemName: "chevron.right") }
+                    .lfIconAction().accessibilityLabel("Next year").disabled(pickerYear >= 9999)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(1...12, id: \.self) { number in
+                    Button { pickerMonth = number; focusedPickerMonth = number } label: {
+                        Text(monthNames[number - 1]).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(LFActionButtonStyle(kind: pickerMonth == number ? .primary : .secondary))
+                    .focusable()
+                    .focused($focusedPickerMonth, equals: number)
+                    .accessibilityValue(pickerMonth == number ? "Selected" : "")
+                }
+            }
+            .onMoveCommand { direction in
+                guard let focusedPickerMonth else { return }
+                let offset: Int
+                switch direction {
+                case .left: offset = -1
+                case .right: offset = 1
+                case .up: offset = -3
+                case .down: offset = 3
+                default: return
+                }
+                let target = min(12, max(1, focusedPickerMonth + offset))
+                self.focusedPickerMonth = target
+                pickerMonth = target
+            }
+            if !(1900...9999).contains(pickerYear) {
+                Text("Enter a year from 1900 to 9999.")
+                    .font(theme.typography.secondary).foregroundStyle(LFTheme.warning)
+            }
+            HStack {
+                Button("Cancel", action: onCancel)
+                    .lfSecondaryAction().keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Open month") {
+                    guard let target = try? SelectedStatementMonth(year: pickerYear, month: pickerMonth) else { return }
+                    onOpen(target)
+                }.lfPrimaryAction().keyboardShortcut(.defaultAction)
+                    .disabled(!(1900...9999).contains(pickerYear) || disabled)
+            }
+        }.padding(20).frame(width: 400)
+
+    }
+
 }

@@ -356,3 +356,13 @@ struct LiveFXRefreshService {
         investmentPrices.refreshManually()
     }
 }
+
+
+extension InvestmentPriceSession {
+    /// Read-only identity check for the already-published UI projection.
+    func financialMCPMatches(generation expected: ProviderGenerationToken,
+                             snapshot current: InvestmentSnapshot,
+                             legs: [AlDarCurrency: AlDarUnitReference]) -> Bool {
+        generation == expected && snapshot == current && fxLegs == legs
+    }
+}

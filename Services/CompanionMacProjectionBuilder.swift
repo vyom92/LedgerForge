@@ -65,12 +65,12 @@ enum CompanionMacProjectionBuilder {
             var policyDetails: [CompanionReadFact] = []
             if let policy = container.zioSource {
                 policyMetrics = [
-                    sourceAmount(id: "contributions", label: "Contributions", value: policy.contributions.amount, currency: policy.currency),
-                    sourceAmount(id: "portalValue", label: "Portal value", value: policy.value.amount, currency: policy.currency),
-                    sourceAmount(id: "reportedGrowth", label: "Reported growth", value: policy.growth.amount, currency: policy.currency),
-                    sourceAmount(id: "allocatedContributions", label: "Allocated contributions", value: policy.allocatedContributions?.amount, currency: policy.currency),
+                    policyAmount(id: "contributions", label: "Contributions", value: policy.contributions.amount, currency: policy.currency),
+                    policyAmount(id: "portalValue", label: "Portal value", value: policy.value.amount, currency: policy.currency),
+                    policyAmount(id: "reportedGrowth", label: "Reported growth", value: policy.growth.amount, currency: policy.currency),
+                    policyAmount(id: "allocatedContributions", label: "Allocated contributions", value: policy.allocatedContributions?.amount, currency: policy.currency),
                     decimal(id: "pendingAllocation", label: "Pending allocation", value: policy.pendingAllocation, currency: policy.currency),
-                    sourceAmount(id: "vestedValue", label: "Vested value", value: policy.vestedValue?.amount, currency: policy.currency)
+                    policyAmount(id: "vestedValue", label: "Vested value", value: policy.vestedValue?.amount, currency: policy.currency)
                 ]
                 policyDetails = [fact("portalValuation", "Portal valuation", policy.valuationDateText),
                                  fact("portalFetched", "Holdings fetched", instant(policy.fetchedAt)),
@@ -219,6 +219,12 @@ enum CompanionMacProjectionBuilder {
         .init(id: id, label: label,
               display: value.map { $0.sourceText + " " + (currency ?? "Currency unavailable") } ?? "Unavailable",
               exact: value.flatMap { value in currency.map { .init(numerator: value.canonical, denominator: "1", currency: $0) } }, note: nil)
+    }
+    private static func policyAmount(id: String, label: String, value: InvestmentDecimal?, currency: String) -> CompanionReadMetric {
+        .init(id: id, label: label,
+              display: InvestmentArithmetic.displayedMoney(value?.value, currency: currency),
+              exact: value.map { .init(numerator: $0.canonical, denominator: "1", currency: currency) },
+              note: value.map { "Source amount: " + $0.sourceText + " " + currency })
     }
     private static func scopeMetrics(_ scope: InvestmentOverviewScope, performance: InvestmentOverviewScope? = nil) -> [CompanionReadMetric] {
         let basis = performance ?? scope

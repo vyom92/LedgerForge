@@ -76,7 +76,41 @@ struct PlannerEditorTests {
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-12"))
         #expect(vm.moneyText(.fee) == "15.")
         vm.switchMonth(to: try SelectedStatementMonth(canonical: "2099-12"))
-        #expect(vm.planningMonth(offsetBy: 1) == nil && vm.planningMonth(offsetBy: 2) == nil)
+        #expect(vm.planningMonth(offsetBy: 1)?.canonical == "2100-01")
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "9999-12"))
+        #expect(vm.planningMonth(offsetBy: 1) == nil)
+        #expect(vm.plan.recurringEnd.canonical == "9999-12-31")
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "1900-01"))
+        #expect(vm.planningMonth(offsetBy: -1) == nil)
+        #expect(vm.plan.recurringStart.canonical == "1900-01-01")
+    }
+
+    @Test func monthNavigationDoesNotCreatePlansOrModifySavedEntries() async throws {
+        let setup = try editor(), vm = setup.vm
+        let originalMonth = vm.month
+        #expect(vm.updateMoney(.fee, text: "25.50"))
+        vm.flushPendingEntries()
+        let saved = vm.plan, raw = vm.rawText
+        let saves = setup.spy.saves, retentions = setup.spy.scratchpadSaves
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2026-10"))
+        for _ in 0..<5 { vm.switchMonth(to: try #require(vm.planningMonth(offsetBy: 1))) }
+        #expect(vm.month.canonical == "2027-03")
+        vm.switchMonth(to: try #require(vm.planningMonth(offsetBy: -1)))
+        #expect(vm.month.canonical == "2027-02")
+        vm.switchMonth(to: try SelectedStatementMonth(canonical: "2027-12"))
+        for section in ["Plan insights", "Salary History", "This Month"] {
+            vm.destinationSection = section
+            vm.plannerOpened()
+            #expect(vm.month.canonical == "2027-12")
+        }
+        vm.switchMonth(to: vm.currentPlanningMonth)
+        #expect(vm.month == vm.currentPlanningMonth)
+        vm.switchMonth(to: originalMonth)
+        vm.flushPendingEntries()
+        try await Task.sleep(for: .milliseconds(900))
+        #expect(vm.plan == saved && vm.rawText == raw)
+        #expect(setup.spy.saves == saves && setup.spy.scratchpadSaves == retentions,
+                "Browsing has no canonical or scratchpad writes; actual pending edits use the existing retention path.")
     }
 
     @Test func startupRestoresLastSavedMonthWithoutRememberingMonthBrowsing() throws {
@@ -101,7 +135,7 @@ struct PlannerEditorTests {
         #expect(reopen(workspaceID: "separate-workspace").month == october)
 
         setup.vm.switchMonth(to: october)
-        setup.vm.flushPendingEntries() // Automatic carry-forward may save, but is not an owner edit.
+        setup.vm.flushPendingEntries() // Browsing alone is not an owner edit or a save.
         #expect(reopen().month.canonical == "2026-09")
         #expect(setup.vm.updateMoney(.fee, text: "26"))
         setup.vm.flushPendingEntries()

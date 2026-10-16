@@ -204,6 +204,7 @@
 		3A4400023004000000000001 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
 		3A4400043004000000000001 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
 		3B02B3A6A149973B10161CE6 /* SQLiteInvestmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96000000000000000000003 /* SQLiteInvestmentRepository.swift */; };
+		3CE272EF80AFF4C0C1096451 /* FinancialMCPController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90FA115F84E10F8A510FCC17 /* FinancialMCPController.swift */; };
 		3D91A86483E58266DFD146DC /* ZurichISPCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9700000000000000000000C /* ZurichISPCredentialStore.swift */; };
 		40B79D3CABA1AEE6DD794B05 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
 		4239DD616EB3ED3A699AB431 /* NetWorthMembershipRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3C6C27820989F516B00667 /* NetWorthMembershipRepository.swift */; };
@@ -214,6 +215,7 @@
 		5181EF3FF2825B6E2BD505E5 /* SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */; };
 		54B7ACB81C27E713994E459A /* PlanningInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499D9899875913D617187885 /* PlanningInsightsView.swift */; };
 		55D62BA95380F85983C1BD2B /* FinancialIntelligenceRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B7FC34F2ABFF2F45558BAE /* FinancialIntelligenceRepository.swift */; };
+		5609E9F66F4EAD18C3910CF8 /* FinancialMCPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F3B8D9E816B756BA90FC48 /* FinancialMCPSettingsView.swift */; };
 		5A0FD94952068FC0B6956980 /* CategoryAutomationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCDDA8542AE7AECDC97273B /* CategoryAutomationRepository.swift */; };
 		5D5061A556BE0BB56CE79849 /* GmailClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98000000000000000000002 /* GmailClient.swift */; };
 		603D4E694506B2260379B93D /* SQLiteConfirmedImportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */; };
@@ -293,8 +295,10 @@
 		A1695317A71872E3321B494C /* FinancialIntelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891033BEAF952174ECFE631F /* FinancialIntelligence.swift */; };
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
+		A5F23920CB470DA00FEB04E2 /* FinancialMCPProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019AF8974C39833A643DECC3 /* FinancialMCPProtocol.swift */; };
 		A69C100189964B7F80F52710 /* BackupPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 685D016F85D34981A5D36C74 /* BackupPackage.swift */; };
 		A785425D56F32EB5E3798BCA /* NetWorthMembershipRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3C6C27820989F516B00667 /* NetWorthMembershipRepository.swift */; };
+		A8E353FBF2A929AB4824B5D5 /* FinancialMCPPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DFF5860786298F62AD1F2A1 /* FinancialMCPPresentation.swift */; };
 		A94000000000000000000002 /* AlDarReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000001 /* AlDarReference.swift */; };
 		A94000000000000000000003 /* AlDarReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000001 /* AlDarReference.swift */; };
 		A94000000000000000000005 /* AlDarCurrentReferenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94000000000000000000004 /* AlDarCurrentReferenceProvider.swift */; };
@@ -534,6 +538,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		019AF8974C39833A643DECC3 /* FinancialMCPProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPProtocol.swift; sourceTree = "<group>"; };
 		041CBF52CAC0F55B8849EE45 /* BackgroundWorker/BackgroundActivityBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BackgroundWorker/BackgroundActivityBridge.h; sourceTree = "<group>"; };
 		05FCB90FD46EAAA328488D62 /* BackgroundWorker/RepositoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWorker/RepositoryDiagnostics.swift; sourceTree = "<group>"; };
 		07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingAndMovementView.swift; sourceTree = "<group>"; };
@@ -686,7 +691,9 @@
 		4CCDDA8542AE7AECDC97273B /* CategoryAutomationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryAutomationRepository.swift; sourceTree = "<group>"; };
 		538A81C295CEEE6CBCECD5E4 /* PlanningEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningEditors.swift; sourceTree = "<group>"; };
 		5D5686C35972B050701A5B40 /* NetWorthMembershipCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthMembershipCoordinator.swift; sourceTree = "<group>"; };
+		5DFF5860786298F62AD1F2A1 /* FinancialMCPPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPPresentation.swift; sourceTree = "<group>"; };
 		5E3C6C27820989F516B00667 /* NetWorthMembershipRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthMembershipRepository.swift; sourceTree = "<group>"; };
+		60F3B8D9E816B756BA90FC48 /* FinancialMCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPSettingsView.swift; sourceTree = "<group>"; };
 		61CA6A7104898BF64171C413 /* SpendingIntelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingIntelligence.swift; sourceTree = "<group>"; };
 		650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFNormalizer.swift; sourceTree = "<group>"; };
 		650000053065000000000001 /* AxisBankAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFParser.swift; sourceTree = "<group>"; };
@@ -727,6 +734,7 @@
 		891033BEAF952174ECFE631F /* FinancialIntelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialIntelligence.swift; sourceTree = "<group>"; };
 		898075C80078CAB7723F3B92 /* Services/BackgroundUpdatesSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/BackgroundUpdatesSession.swift; sourceTree = "<group>"; };
 		8B496E9910444BB8ABAF3E1A /* BankRelationshipPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankRelationshipPDFParser.swift; sourceTree = "<group>"; };
+		90FA115F84E10F8A510FCC17 /* FinancialMCPController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPController.swift; sourceTree = "<group>"; };
 		91AA00012026091400000001 /* LFAppearancePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFAppearancePreferences.swift; sourceTree = "<group>"; };
 		91AA00032026091400000001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		932964CD75632B3457E823CA /* FinancialIntelligenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialIntelligenceCoordinator.swift; sourceTree = "<group>"; };
@@ -1160,6 +1168,9 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				019AF8974C39833A643DECC3 /* FinancialMCPProtocol.swift */,
+				5DFF5860786298F62AD1F2A1 /* FinancialMCPPresentation.swift */,
+				90FA115F84E10F8A510FCC17 /* FinancialMCPController.swift */,
 				5D5686C35972B050701A5B40 /* NetWorthMembershipCoordinator.swift */,
 				932964CD75632B3457E823CA /* FinancialIntelligenceCoordinator.swift */,
 				AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */,
@@ -1269,6 +1280,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				60F3B8D9E816B756BA90FC48 /* FinancialMCPSettingsView.swift */,
 				AAEC91E426BBA2FDF1D2F6A9 /* DashboardNetWorthCard.swift */,
 				07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */,
 				41ED7CEC9E1C49DF81A252D8 /* PlanningFundingEditor.swift */,
@@ -1458,6 +1470,7 @@
 				288EB0AA2FF7955200F09BC9 /* Frameworks */,
 				288EB0AB2FF7955200F09BC9 /* Resources */,
 				AB1700030000000000000001 /* Embed Build Identity */,
+				F10A00012026101400000001 /* Embed Financial MCP */,
 				C90002013099000000000001 /* Embed Background Worker */,
 				C90002023099000000000001 /* Embed LaunchAgent */,
 			);
@@ -1705,6 +1718,28 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nsource_helper=\"${BUILT_PRODUCTS_DIR}/LedgerForgeSubprocessProbe\"\nhelper=\"${DERIVED_FILE_DIR}/LedgerForgeSubprocessProbe\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${TARGET_TEMP_DIR}\"/DerivedSources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess staging path is outside the expected test target directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"$source_helper\" ] || [ ! -f \"$entitlements\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$identity\" ] || [ \"$identity\" = \"-\" ]; then echo \"Stable development signing identity is unavailable for LedgerForgeSubprocessProbe.\" >&2; exit 1; fi\n/bin/cp \"$source_helper\" \"$helper\"\n/usr/bin/codesign --force --sign \"$identity\" --entitlements \"$entitlements\" --options runtime \"$helper\"\n/usr/bin/codesign --verify --strict --verbose=4 \"$helper\"\n/usr/bin/codesign -d --entitlements :- \"$helper\" > \"$entitlements_output\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"$entitlements_output\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"$keys\" != \"$expected\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"$keys\" >&2; exit 1; fi\n";
 		};
+		F10A00012026101400000001 /* Embed Financial MCP */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/script/embed_financial_mcp.sh",
+				"$(SRCROOT)/FinancialMCP/guardian.c",
+				"$(SRCROOT)/FinancialMCP/child.entitlements",
+				"$(SRCROOT)/FinancialMCP/financial_mcp_control.py",
+				"$(LEDGERFORGE_TUNNEL_CLIENT)",
+			);
+			name = "Embed Financial MCP";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/FinancialMCPGuardian",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/tunnel-client",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/financial_mcp_control.py",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/bin/bash \"$SRCROOT/script/embed_financial_mcp.sh\"";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -1712,6 +1747,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5609E9F66F4EAD18C3910CF8 /* FinancialMCPSettingsView.swift in Sources */,
+				A5F23920CB470DA00FEB04E2 /* FinancialMCPProtocol.swift in Sources */,
+				A8E353FBF2A929AB4824B5D5 /* FinancialMCPPresentation.swift in Sources */,
+				3CE272EF80AFF4C0C1096451 /* FinancialMCPController.swift in Sources */,
 				28E29A4A3072634500135713 /* MonthlyPlanSyncAdapter+Receipt.swift in Sources */,
 				FD09E7AFC30A1ADA44BDB34D /* DashboardNetWorthCard.swift in Sources */,
 				E69DF30383227FD8823D94C6 /* SpendingAndMovementView.swift in Sources */,
@@ -2280,6 +2319,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LEDGERFORGE_TUNNEL_CLIENT = "/opt/homebrew/Cellar/tunnel-client/0.0.11/libexec/tunnel-client";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -2337,6 +2377,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LEDGERFORGE_TUNNEL_CLIENT = "/opt/homebrew/Cellar/tunnel-client/0.0.11/libexec/tunnel-client";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

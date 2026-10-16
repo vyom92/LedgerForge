@@ -8,6 +8,13 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="financial-mcp-autonomy-activation-publication-20261015"></a>
+### Financial MCP autonomous production operation and publication — owner direction, 15 October 2026
+
+The owner confirms the standing autonomous-operation requirement and explicitly authorizes all four production financial-sharing groups, dedicated authenticated ChatGPT tunnel registration and runtime-key storage, enabling Financial MCP on LedgerForge launch, bounded automatic reconnection/recovery while LedgerForge runs, and the existing manual Stop/Restart/Revoke controls. Explicit Stop must suppress recovery for the stopped session; a subsequent app launch follows the saved startup preference. Normal/abnormal app exit must leave no usable financial endpoint. Closing a window does not itself stop the service while the app remains open. iPhone ChatGPT interoperability is optional, not a release gate. All four tools remain read-only and reuse existing displayed native authority, including exact/displayed amounts and completeness qualifications, with no financial write or independent calculation.
+
+This supersedes treating the stopped, unconfigured **15 October installation checkpoint** as the owner's desired steady state; that checkpoint remains an accurate observation of how the installed app was left. **Owner authorization is not evidence of activation.** Production credentials, actual ChatGPT invocation, enabled autostart, health/recovery and read-only confirmation require native on-device verification. Do not copy qualification credentials or tunnel registrations silently into production. The owner also authorizes relevant source/project documentation reconciliation and Git publication of the exact reviewed, validated implementation and documentation to origin/main, subject to one-writer safeguards, private-data scanning, source/build identity and fresh remote convergence. No financial database mutation, reset, migration, raw-source disclosure, unrelated work overwrite or force push is authorized. Retained unobserved authentic parity cases remain uncertified.
+
 <a id="combined-v11-publication-20261013"></a>
 ### Combined v1.1 closeout and publication — owner direction, 13 October 2026
 

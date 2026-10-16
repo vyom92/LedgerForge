@@ -136,14 +136,12 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     func planningMonth(offsetBy offset: Int) -> SelectedStatementMonth? {
         let index = month.year * 12 + month.month - 1 + offset
         guard index >= 0,
-              let target = try? SelectedStatementMonth(year: index / 12, month: index % 12 + 1),
-              Self.planningMonths.contains(target) || fundingPlanStore.plan(for: target, workspaceID: workspaceID) != nil else { return nil }
+              let target = try? SelectedStatementMonth(year: index / 12, month: index % 12 + 1) else { return nil }
         return target
     }
 
     func switchMonth(to target: SelectedStatementMonth) {
-        guard target != month, Self.planningMonths.contains(target) || fundingPlanStore.plan(for: target, workspaceID: workspaceID) != nil,
-              saveState != .saving, saveState != .committedNeedsRefresh else { return }
+        guard target != month, saveState != .saving, saveState != .committedNeedsRefresh else { return }
         flushPendingEntries()
         guard saveState != .saving && saveState != .committedNeedsRefresh && !retentionPending else { return }
         hasOpenedPlanner = true
@@ -157,8 +155,8 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         } else {
             rebaseFromPublishedPlan(generation: provider().generationToken)
         }
-        refreshCapturedAccountBalances()
-        scheduleRecurringInclusion()
+        // Browsing loads this month's saved or retained entries. It must not
+        // copy another plan, capture balances, or add recurring payments.
     }
 
     /// One explicit draft adoption; the saved legacy record remains unchanged until Save.
@@ -448,14 +446,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             .sink { [weak self] _ in self?.refreshCalendarMonth() }
     }
 
-    /// Opening Dashboard must not create an invisible unsaved planning draft.
+    /// Opening the planner is navigation. Only actual edits enter retention.
     func plannerOpened() {
         refreshCalendarMonth()
         hasOpenedPlanner = true
         canonicalDidPublish()
-        if baseCanonical == nil && !isDirty && canRollover { rolloverFromPreviousPlan(userInitiated: false) }
-        refreshCapturedAccountBalances()
-        scheduleRecurringInclusion()
         if isDirty { scheduleRetention() }
     }
 
@@ -1038,13 +1033,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         isDirty = false; saveState = .ready; errorMessage = nil
         syncDraft(); captureDraftBase()
         if restoringScratchpad, restoreRetainedEntries() { return }
-        // Seed a new month before attaching shared FX evidence. The reference
-        // itself changes the draft and would otherwise block carry-forward.
-        if hasOpenedPlanner, baseCanonical == nil, canRollover {
-            rolloverFromPreviousPlan(retainingPlanID: retainingPlanID, userInitiated: false)
-        } else {
-            recalculate()
-        }
+        recalculate()
     }
 
     private func canonicalDidPublish() {
@@ -1318,6 +1307,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     private func scheduleRecurringInclusion() {
         guard hasOpenedPlanner, canEdit, plan.calculationVersion == .budgetV1,
+              baseCanonical != nil || isDirty || retainedScratchpad != nil,
               intelligenceStore.generation == baseGeneration, let metadata = intelligenceStore.snapshot else { return }
         recurringTask?.cancel()
         let editingMonth = month, generation = baseGeneration, revision = intelligenceStore.revision
@@ -1734,5 +1724,32 @@ final class PlanningAnalysisModel: ObservableObject {
             self.cachedGeneration = generation; self.cachedRevision = revision; self.cachedCategoryRevision = categoryRevision
             self.rows = rows; self.projection = projection; self.isWorking = false
         }
+    }
+}
+
+
+extension SalaryWorkspaceViewModel {
+    var financialMCPRetainedEntries: MonthlyPlanScratchpad? { retainedScratchpad }
+}
+
+extension PlanningAnalysisModel {
+    /// Refuse a completed but superseded result, including the interval between
+    /// a draft edit and SwiftUI asking for its next analysis.
+    func financialMCPProjection(for planner: SalaryWorkspaceViewModel) -> PlanningProjection? {
+        guard planner.canEdit,
+              FinancialIntelligenceStore.shared.generation == planner.generation,
+              FinancialIntelligenceStore.shared.snapshot != nil,
+              !isWorking, let query,
+              query.generation == planner.generation,
+              query.generation == DatabaseProvider.shared.generationToken,
+              cachedGeneration == query.generation,
+              query.revision == FinancialIntelligenceStore.shared.revision,
+              query.categoryRevision == CategoryStore.shared.revision,
+              query.plan == planner.plan, query.scenario == planner.insightSelection.scenario,
+              query.selectedHistoryAccountIDs == planner.selectedHistoryAccountIDs,
+              query.retainedRecurringOccurrenceIDs == planner.retainedRecurringOccurrenceIDs,
+              query.excludedRecurringOccurrenceIDs == planner.recurringOccurrenceExclusions,
+              query.today == FinancialCalendar.statement(Date()), planner.hasValidCalculation else { return nil }
+        return projection
     }
 }
