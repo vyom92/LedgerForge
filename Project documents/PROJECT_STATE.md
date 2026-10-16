@@ -1,5 +1,14 @@
 # Current project state
 
+<a id="financial-mcp-source-publication-20261015"></a>
+## 15 October local / 16 October UTC — Financial MCP source and documents published; production connection still pending verification
+
+Owner-authorized publication completed on primary `main`: commit `a0984a6eaf5042f9caff2a10c3af73296b6483d5` changed exactly 26 Financial MCP, Budget Planning navigation, test and project-documentation paths. MCP Admin refreshed origin immediately before push, scanned all 26 staged paths with zero detected violations, committed with an empty residual index/worktree, and verified that local `main` and `origin/main` converged to the exact commit. The verified publication itself made no installed-app or protected-ledger change.
+
+The fresh publication-focused Financial MCP protocol run passed **7 of 7 tests**, no failures/skips. A separate broader executor `test-full` attempt ran **798 passing, 213 failing and 23 skipped**, with confirmed authentic-source prerequisite failures because `LEDGERFORGE_PRIVATE_ORIGINALS_DIRECTORY` was absent from that test host. Other failures from that attempt remain unadjudicated; it is **not** a green full TestPlan. The earlier qualified native ordinary suite (**948 passed, two retained authentic skips**) and exact signed Release acceptance retain their original source/build and setup boundaries. These results must not be silently merged or presented as a new full-suite pass.
+
+The owner separately approved production Financial MCP sharing for all four groups, automatic app-lifetime startup and autonomous recovery. This approval does **not** prove that the installed production connection is configured, its Keychain runtime key saved, autostart enabled, or ChatGPT production invocation successful. The latest verified production observation is the 15 October stopped/unconfigured checkpoint below; Mac-local activation, live four-tool read-only confirmation and recovery acceptance remain outstanding. No qualification credentials, private originals or financial payloads were committed.
+
 <a id="financial-mcp-production-owner-authorization-20261015"></a>
 ## 15 October — owner authorizes autonomous production Financial MCP and Git publication
 
