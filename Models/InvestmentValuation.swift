@@ -425,7 +425,7 @@ nonisolated enum InvestmentPriceError: String, Error, LocalizedError, Sendable {
         case .unavailable: "The source could not be reached. Try Refresh all again."
         case .networkInterrupted: "The connection was interrupted. Previous prices are retained."
         case .cancelled: "Refresh was cancelled after the active holdings changed."
-        case .olderResponse: "An older response was ignored; the newer cached price is retained."
+        case .olderResponse: "Source returned an older price; newer price retained."
         }
     }
 }

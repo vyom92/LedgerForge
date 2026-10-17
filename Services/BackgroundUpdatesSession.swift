@@ -327,7 +327,10 @@ final class BackgroundUpdatesSession: ObservableObject {
         guard let snapshot = try? current.backgroundPublicCacheRepo.snapshot(now: Date()),
               let progress = try? BackgroundPublicProgressStore(database: current.database).load() else { return }
         let rateFailures = Set(AlDarCurrency.allCases.filter { progress["aldar:" + $0.rawValue]?.failure != nil })
-        let quoteFailures = Dictionary(uniqueKeysWithValues: progress.values.filter { !$0.identity.hasPrefix("aldar:") && $0.failure != nil }.map { ($0.identity, InvestmentPriceError.unavailable) })
+        let quoteFailures = Dictionary(uniqueKeysWithValues: progress.values.compactMap { value -> (String, InvestmentPriceError)? in
+            guard !value.identity.hasPrefix("aldar:"), let error = value.priceError else { return nil }
+            return (value.identity, error)
+        })
         publicProgress = progress
         rates?.installShared(snapshot.alDarLegs, failures: rateFailures, busy: publicTask != nil,
             busyCurrencies: Set(AlDarCurrency.allCases.filter { busyPublicScopes.contains(.currency($0)) }),

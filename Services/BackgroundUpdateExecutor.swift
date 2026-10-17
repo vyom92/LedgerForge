@@ -268,6 +268,7 @@ actor BackgroundUpdateExecutor {
                     ? existing[identity]! : .init(identity: identity, slot: slot)
                 if manual { value.manuallyRequested = true }
                 value.attempts += 1; value.succeeded = false; value.retryAt = now.addingTimeInterval(60); value.failure = nil
+                value.priceFailure = nil
                 value.waitingForConnectivity = false
                 try withAuthority { try progressStore.save(value) }
                 attempts[identity] = value
@@ -319,13 +320,17 @@ actor BackgroundUpdateExecutor {
                             let cache = SQLiteBackgroundPublicCacheRepository(database: provider.database)
                             let previous = try cache.snapshot(now: Date()).investmentQuotes[identity]
                             let incoming = quote.retainingUndatedObservation(previous)
-                            guard incoming.mapping == definition.mapping, incoming.fetchedAt <= Date(), incoming.canReplace(previous) else { throw InvestmentPriceError.olderResponse }
+                            guard incoming.mapping == definition.mapping else { throw InvestmentPriceError.wrongIdentity }
+                            guard incoming.fetchedAt <= Date() else { throw InvestmentPriceError.invalidResponse }
+                            guard incoming.canReplace(previous) else { throw InvestmentPriceError.olderResponse }
                             value.succeeded = true; value.retryAt = nil
                             try cache.merge(alDarLegs: [:], investmentQuotes: [identity: incoming], progress: value, now: Date())
                         }
                         Self.publishHint()
                     } catch {
-                        value.recordFailure("Price unavailable", interrupted: (error as? InvestmentPriceError) == .networkInterrupted, at: Date())
+                        let reason = error as? InvestmentPriceError
+                        value.recordFailure("Price unavailable", interrupted: reason == .networkInterrupted,
+                                            at: Date(), priceError: reason)
                         try withAuthority { try progressStore.save(value) }
                     }
                 }

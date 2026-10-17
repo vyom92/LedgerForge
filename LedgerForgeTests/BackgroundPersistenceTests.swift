@@ -24,6 +24,14 @@ final class BackgroundPersistenceTests: XCTestCase {
         let oldJSON = Data(#"{"identity":"mechanical-leg","slot":100,"attempts":1,"succeeded":false}"#.utf8)
         var progress = try JSONDecoder().decode(BackgroundPublicLegProgress.self, from: oldJSON)
         XCTAssertNil(progress.checkedAt, "A scheduled slot is not evidence of an actual check time")
+        XCTAssertNil(progress.priceFailure)
+        XCTAssertNil(progress.priceError)
+        progress.failure = "Price unavailable"
+        XCTAssertEqual(progress.priceError, .unavailable, "An old generic failure has no proven older-price reason")
+        progress.priceFailure = "future-unknown-reason"
+        let future = try JSONDecoder().decode(BackgroundPublicLegProgress.self, from: JSONEncoder().encode(progress))
+        XCTAssertEqual(future.priceError, .unavailable, "Unknown optional reasons must not make an old receipt unreadable")
+        progress.priceFailure = InvestmentPriceError.olderResponse.rawValue
         let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
         let configuration = try provider.backgroundScheduleRepo.configuration()
         let checked = Date(timeIntervalSinceReferenceDate: 200)
@@ -36,10 +44,36 @@ final class BackgroundPersistenceTests: XCTestCase {
         XCTAssertEqual(restored, progress)
         XCTAssertEqual(restored.slot, Date(timeIntervalSinceReferenceDate: 100))
         XCTAssertEqual(restored.checkedAt, checked)
+        XCTAssertEqual(restored.priceError, .olderResponse)
         XCTAssertEqual(try reopened.backgroundScheduleRepo.configuration(), configuration)
         let oldReaderFields = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
         XCTAssertEqual(oldReaderFields["attempts"] as? Int, 1)
         XCTAssertEqual(oldReaderFields["succeeded"] as? Bool, false)
+
+        let legacy = BackgroundPublicLegProgress(identity: "legacy-price", slot: progress.slot, failure: "Price unavailable")
+        try BackgroundPublicProgressStore(database: reopened.database).save(legacy)
+        let defaultsName = "LedgerForge.progress-hydration.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let gate = DatabaseActivityGate.shared, wasUnavailable = gate.isUnavailable
+        XCTAssertTrue(gate.beginExclusive(allowUnavailable: true))
+        let previous = DatabaseProvider.shared
+        defer {
+            DatabaseProvider.shared = previous
+            if wasUnavailable { gate.enterUnavailable() }
+            else { gate.finishExclusive(providerChanged: false) }
+        }
+        DatabaseProvider.shared = .verifiedSQLite(reopened)
+        let prices = InvestmentPriceSession(defaults: defaults, enabled: false)
+        let rates = AlDarReferenceSession(defaults: defaults, enabled: false)
+        let isp = ZurichISPSyncSession(enabled: false)
+        let online = OnlineRefreshCoordinator(enabled: false)
+        let adapter = BackgroundUpdatesSession(networkEnabled: false,
+            enrollmentStore: .init(url: url.deletingLastPathComponent().appendingPathComponent("enrollment.json")))
+        adapter.start(rates: rates, prices: prices, isp: isp, online: online)
+        XCTAssertEqual(prices.failures[restored.identity], .olderResponse)
+        XCTAssertEqual(prices.failures[legacy.identity], .unavailable)
+        XCTAssertEqual(adapter.publicProgress[restored.identity], restored)
     }
 
     func testCachedObservationNeverImpliesOnlineOrSuccessfulRefresh() {

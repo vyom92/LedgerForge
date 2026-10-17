@@ -26,13 +26,23 @@ nonisolated struct BackgroundPublicLegProgress: Codable, Equatable, Sendable {
     // No timer while disconnected. Missing in older records means no proven
     // interruption; generic historical failures must never be reclassified.
     var waitingForConnectivity: Bool? = nil
+    // Preserve a known per-instrument reason across helper exit and relaunch.
+    // Raw storage keeps old/unknown records readable without inventing a cause.
+    var priceFailure: String? = nil
+
+    var priceError: InvestmentPriceError? {
+        guard failure != nil else { return nil }
+        return priceFailure.flatMap(InvestmentPriceError.init(rawValue:)) ?? .unavailable
+    }
 
     var pendingManualRetry: Bool {
         manuallyRequested == true && !succeeded && attempts < 2 && (retryAt != nil || waitingForConnectivity == true)
     }
 
-    mutating func recordFailure(_ message: String, interrupted: Bool, at now: Date) {
+    mutating func recordFailure(_ message: String, interrupted: Bool, at now: Date,
+                               priceError: InvestmentPriceError? = nil) {
         succeeded = false; failure = message; checkedAt = now
+        priceFailure = priceError?.rawValue
         waitingForConnectivity = interrupted
         if interrupted {
             // The check is retained above; only its provider-error allowance

@@ -42,6 +42,123 @@ final class ConnectivityRecoveryTests: XCTestCase {
               fetchRate: { try await transport.fetch($0) })
     }
 
+    private func seedPriceHoldings(_ definitions: [InvestmentPriceDefinition], in provider: SQLiteRepositoryProvider) throws {
+        // Small isolated DTOs exercise the real executor/repository boundary;
+        // the invented financial values and fingerprint are not source evidence.
+        let day = "20260101", account = "U1", generated = "20260102;000000"
+        let positions = try definitions.enumerated().map { offset, definition in
+            let mapping = definition.mapping, isin = try XCTUnwrap(definition.isin)
+            let attributes = ["accountId": account, "reportDate": day, "levelOfDetail": "SUMMARY",
+                "assetCategory": "STK", "subCategory": "ETF", "side": "Long", "securityIDType": "ISIN",
+                "securityID": isin, "isin": isin, "conid": String(definition.sourceIdentity.dropFirst("ibkr-conid:".count)),
+                "symbol": mapping.code, "listingExchange": try XCTUnwrap(mapping.listing), "description": "Isolated " + mapping.code,
+                "currency": "USD", "multiplier": "1", "position": "1", "costBasisPrice": "100", "costBasisMoney": "100",
+                "markPrice": "100", "positionValue": "100", "fifoPnlUnrealized": "0"]
+            return try IBKRFlexPosition.parse(attributes, ordinal: offset + 1, expectedAccountID: account, reportDateText: day)
+        }
+        let digest = String(repeating: "a", count: 64)
+        let source = IBKRFlexAccountSnapshot(observationID: "ibkr-flex-" + digest, accountID: account, queryID: "1",
+            referenceCode: "1", reportDate: "2026-01-01", reportDateText: day, generatedAtSourceText: generated,
+            fetchedAt: Date().addingTimeInterval(-60), sourceFingerprintAlgorithm: IBKRFlexAccountSnapshot.fingerprintAlgorithm,
+            sourceSHA256: digest, sourceByteCount: 1, queryAttributes: ["type": "AF", "queryName": "Isolated"],
+            statementAttributes: ["accountId": account, "period": "LastBusinessDay", "fromDate": day,
+                                  "toDate": day, "whenGenerated": generated], positions: positions)
+        XCTAssertEqual(provider.investmentRepo.saveIBKRFlexHoldings(.init(providerGeneration: provider.generationToken,
+            workspace: .init(id: "default-workspace", name: "Isolated", createdAtISO: "2026-01-01T00:00:00Z"),
+            baseline: .empty, source: source)), .saved)
+    }
+
+    func testPriceReasonsKeepMixedOutcomesNewerQuotesAndClearOnlyOnANewCheck() async throws {
+        let cases: [(String, InvestmentPriceError?)] = [
+            ("older", .olderResponse), ("equal", nil), ("newer", nil), ("offline", .networkInterrupted),
+            ("http401", .unavailable), ("http503", .unavailable), ("malformed", .invalidResponse),
+            ("identity", .wrongIdentity), ("currency", .wrongCurrency), ("missing", .invalidResponse)]
+        let definitions = Array(InvestmentPriceRegistry.definitions.filter { $0.mapping.provider == "nasdaq" }.prefix(cases.count))
+        XCTAssertEqual(definitions.count, cases.count)
+        let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
+        try seedPriceHoldings(definitions, in: provider)
+        let holdings = try provider.investmentRepo.snapshot(workspaceID: "default-workspace")
+        let config = BackgroundScheduleConfiguration(enabled: true, alDarCurrencyRatesEnabled: false,
+            investmentPublicPricesEnabled: true, gmailCollectionEnabled: false, zurichISPHoldingsEnabled: false)
+        try provider.backgroundScheduleRepo.saveConfiguration(config)
+        let fetched = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-05T20:00:00Z"))
+        var originals: [String: InvestmentQuote] = [:]
+        var responses: [String: (Data, Int)] = [:]
+        var goodResponses: [String: Data] = [:]
+        var offline: Set<String> = []
+        for (definition, test) in zip(definitions, cases) {
+            let mapping = definition.mapping, kind = test.0
+            originals[mapping.identity] = .init(mapping: mapping, price: try InvestmentDecimal("100"),
+                valuationDay: "2026-01-03", valuationText: "Jan 3, 2026", valuationInstant: nil,
+                dateBasis: .providerCalendarDate, calendarTimeZone: "America/New_York",
+                fetchedAt: fetched.addingTimeInterval(-86_400), sourceURL: "https://api.nasdaq.com", qualification: "Isolated test")
+            func body(_ kind: String) throws -> Data {
+                let primary: [String: String] = kind == "missing" ? [:] : [
+                    "lastSalePrice": kind == "malformed" ? "invalid" : "$110",
+                    "lastTradeTimestamp": kind == "older" ? "Jan 2, 2026" : kind == "equal" ? "Jan 3, 2026" : "Jan 4, 2026"]
+                return try JSONSerialization.data(withJSONObject: ["data": [
+                    "symbol": kind == "identity" ? "WRONG" : mapping.code,
+                    "assetClass": "ETF", "currency": kind == "currency" ? "INR" : "USD",
+                    "exchange": mapping.listing == "ARCA" ? "PSE" : "NASDAQ-GM", "primaryData": primary]])
+            }
+            responses[mapping.code] = (try body(kind), kind == "http401" ? 401 : kind == "http503" ? 503 : 200)
+            goodResponses[mapping.code] = try body("newer")
+            if kind == "offline" { offline.insert(mapping.code) }
+        }
+        try provider.backgroundPublicCacheRepo.mergeSeed(alDarLegs: [:], investmentQuotes: originals, now: Date())
+        let replies = responses, interruptions = offline
+        let client = InvestmentPriceClient(now: { fetched }, transport: { request in
+            let code = request.url!.pathComponents.dropLast().last!
+            if interruptions.contains(code) { throw URLError(.notConnectedToInternet) }
+            let reply = replies[code]!
+            return (reply.0, HTTPURLResponse(url: request.url!, statusCode: reply.1, httpVersion: nil, headerFields: nil)!)
+        })
+        let worker = BackgroundUpdateExecutor(provider: provider, activation: try provider.database.validatedActivationStamp(),
+            workspaceID: "default-workspace", prices: client)
+        let result = await worker.refreshPublic(configuration: config, manual: true, scopes: .nasdaq)
+        XCTAssertEqual(result, .completed(.retryPending))
+        let progress = try BackgroundPublicProgressStore(database: provider.database).load()
+        let quotes = try provider.backgroundPublicCacheRepo.snapshot(now: Date()).investmentQuotes
+        for (definition, test) in zip(definitions, cases) {
+            let key = definition.mapping.identity, state = try XCTUnwrap(progress[key])
+            XCTAssertEqual(state.priceError, test.1, test.0)
+            if test.1 != nil { XCTAssertEqual(quotes[key], originals[key], test.0) }
+            else { XCTAssertEqual(quotes[key]?.price.sourceText, "110"); XCTAssertTrue(state.succeeded) }
+            XCTAssertEqual(state.waitingForConnectivity, test.0 == "offline")
+            XCTAssertEqual(state.attempts, test.0 == "offline" ? 0 : 1)
+            XCTAssertEqual(state.retryAt != nil, test.1 != nil && test.0 != "offline")
+        }
+        XCTAssertEqual(try provider.investmentRepo.snapshot(workspaceID: "default-workspace"), holdings)
+        try provider.database.checkpointAndClose()
+        let reopened = try SQLiteRepositoryProvider(path: url.path)
+        defer { reopened.database.close() }
+        XCTAssertEqual(try BackgroundPublicProgressStore(database: reopened.database).load(), progress)
+        XCTAssertEqual(try reopened.backgroundPublicCacheRepo.snapshot(now: Date()).investmentQuotes, quotes)
+
+        let good = goodResponses
+        func nextWorker(at instant: Date) throws -> BackgroundUpdateExecutor {
+            .init(provider: reopened, activation: try reopened.database.validatedActivationStamp(), workspaceID: "default-workspace",
+                prices: .init(now: { instant }, transport: { request in
+                    let code = request.url!.pathComponents.dropLast().last!
+                    return (good[code]!, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                }))
+        }
+        // A valid response with a future fetch instant is rejected by the
+        // executor's admission guard, never mislabeled as an older quote.
+        let futureWorker = try nextWorker(at: Date().addingTimeInterval(3_600))
+        _ = await futureWorker.refreshPublic(configuration: config, manual: true, scopes: .nasdaq)
+        XCTAssertTrue(try BackgroundPublicProgressStore(database: reopened.database).load().values.allSatisfy { $0.priceError == .invalidResponse })
+        XCTAssertEqual(try reopened.backgroundPublicCacheRepo.snapshot(now: Date()).investmentQuotes, quotes)
+        let successfulWorker = try nextWorker(at: fetched.addingTimeInterval(86_400))
+        let success = await successfulWorker.refreshPublic(configuration: config, manual: true, scopes: .nasdaq)
+        XCTAssertEqual(success, .completed(.installedCache))
+        XCTAssertTrue(try BackgroundPublicProgressStore(database: reopened.database).load().values.allSatisfy {
+            $0.succeeded && $0.priceFailure == nil && $0.priceError == nil && $0.failure == nil && $0.retryAt == nil
+        })
+        XCTAssertEqual(try reopened.investmentRepo.snapshot(workspaceID: "default-workspace"), holdings)
+        XCTAssertEqual(try reopened.backgroundScheduleRepo.configuration(), config)
+    }
+
     func testInterruptedPublicWorkWaitsAcrossReopenAndRecoversWithoutSpendingProviderAttempts() async throws {
         let url = try location(), provider = try SQLiteRepositoryProvider(path: url.path)
         let config = configuration(), transport = RateTransport([.notConnectedToInternet, .networkConnectionLost, nil])
