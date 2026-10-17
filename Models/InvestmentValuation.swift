@@ -415,7 +415,7 @@ nonisolated struct InvestmentValuation: Equatable, Sendable {
 }
 
 nonisolated enum InvestmentPriceError: String, Error, LocalizedError, Sendable {
-    case invalidResponse, wrongIdentity, wrongCurrency, ambiguous, unavailable, cancelled, olderResponse
+    case invalidResponse, wrongIdentity, wrongCurrency, ambiguous, unavailable, cancelled, olderResponse, networkInterrupted
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "The source returned an invalid price or date."
@@ -423,6 +423,7 @@ nonisolated enum InvestmentPriceError: String, Error, LocalizedError, Sendable {
         case .wrongCurrency: "The response denomination did not match the holding."
         case .ambiguous: "The source returned more than one matching price."
         case .unavailable: "The source could not be reached. Try Refresh all again."
+        case .networkInterrupted: "The connection was interrupted. Previous prices are retained."
         case .cancelled: "Refresh was cancelled after the active holdings changed."
         case .olderResponse: "An older response was ignored; the newer cached price is retained."
         }

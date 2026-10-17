@@ -1,5 +1,14 @@
 import Foundation
 
+/// Only loss of connectivity is eligible for lifecycle recovery. HTTP errors,
+/// timeouts, authentication failures and untyped errors retain their policy.
+nonisolated enum ConnectivityInterruption {
+    static func matches(_ error: Error) -> Bool {
+        guard let error = error as? URLError else { return false }
+        return error.code == .notConnectedToInternet || error.code == .networkConnectionLost
+    }
+}
+
 nonisolated struct BackgroundPublicLegProgress: Codable, Equatable, Sendable {
     let identity: String
     let slot: Date
@@ -14,9 +23,25 @@ nonisolated struct BackgroundPublicLegProgress: Codable, Equatable, Sendable {
     // Actual completion of this leg's check, independent of the scheduled slot
     // and the last successful observation. Older receipts have no check time.
     var checkedAt: Date? = nil
+    // No timer while disconnected. Missing in older records means no proven
+    // interruption; generic historical failures must never be reclassified.
+    var waitingForConnectivity: Bool? = nil
 
     var pendingManualRetry: Bool {
-        manuallyRequested == true && !succeeded && attempts < 2 && retryAt != nil
+        manuallyRequested == true && !succeeded && attempts < 2 && (retryAt != nil || waitingForConnectivity == true)
+    }
+
+    mutating func recordFailure(_ message: String, interrupted: Bool, at now: Date) {
+        succeeded = false; failure = message; checkedAt = now
+        waitingForConnectivity = interrupted
+        if interrupted {
+            // The check is retained above; only its provider-error allowance
+            // is restored. A new connectivity event, not a timer, releases it.
+            attempts = max(0, attempts - 1)
+            retryAt = nil
+        } else {
+            retryAt = attempts < 2 ? now.addingTimeInterval(60) : nil
+        }
     }
 }
 

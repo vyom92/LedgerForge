@@ -3,6 +3,48 @@ import Combine
 import Foundation
 import Network
 
+/// One coalesced lifecycle opportunity per lane. A busy lease retains it, but
+/// does not itself schedule another pass. Only a newer event or completion can.
+nonisolated struct BackgroundConnectivityRecovery {
+    struct Attempt {
+        let publicEvent: UUID?
+        let ispEvent: UUID?
+        let publicVersion: UInt64
+        let ispVersion: UInt64
+    }
+    private var publicEvent: UUID?
+    private var ispEvent: UUID?
+    private var publicVersion: UInt64 = 0
+    private var ispVersion: UInt64 = 0
+    var hasPending: Bool { publicEvent != nil || ispEvent != nil }
+    func hasPending(_ kind: BackgroundJobKind) -> Bool {
+        kind == .publicReferences ? publicEvent != nil : kind == .zurichISP && ispEvent != nil
+    }
+
+    mutating func networkAvailableEvent() {
+        if publicEvent == nil { publicEvent = UUID() }
+        if ispEvent == nil { ispEvent = UUID() }
+    }
+    mutating func observedCompletion(_ kind: BackgroundJobKind? = nil) {
+        if kind == nil || kind == .publicReferences { publicVersion &+= 1 }
+        if kind == nil || kind == .zurichISP { ispVersion &+= 1 }
+    }
+    mutating func begin(networkAvailable: Bool?) -> Attempt {
+        let attempt = Attempt(publicEvent: networkAvailable == true ? publicEvent : nil,
+                              ispEvent: networkAvailable == true ? ispEvent : nil,
+                              publicVersion: publicVersion, ispVersion: ispVersion)
+        if networkAvailable == true { publicEvent = nil; ispEvent = nil }
+        return attempt
+    }
+    mutating func finish(_ attempt: Attempt, publicBusy: Bool, ispBusy: Bool) -> Bool {
+        let newerPublic = publicEvent != nil, newerISP = ispEvent != nil
+        if publicBusy, publicEvent == nil { publicEvent = attempt.publicEvent }
+        if ispBusy, ispEvent == nil { ispEvent = attempt.ispEvent }
+        return (publicEvent != nil && (newerPublic || publicVersion != attempt.publicVersion)) ||
+            (ispEvent != nil && (newerISP || ispVersion != attempt.ispVersion))
+    }
+}
+
 /// Foreground adapter for the same durable executor used by the helper.
 /// Settings owns a separate value draft; incoming status never rewrites it.
 @MainActor
@@ -28,6 +70,7 @@ final class BackgroundUpdatesSession: ObservableObject {
     private var networkMonitor: NWPathMonitor?
     @Published private(set) var networkAvailable: Bool?
     private var recoverInterruptedGmail = false
+    private var connectivityRecovery = BackgroundConnectivityRecovery()
     private var reconnectEmail = true
     private(set) var helperRecoveryGeneration = UUID()
     private let serviceStatus: @MainActor () -> BackgroundWorkerService.Status
@@ -41,6 +84,7 @@ final class BackgroundUpdatesSession: ObservableObject {
     private weak var online: OnlineRefreshCoordinator?
     private var observations: [AnyCancellable] = []
     private var automaticTask: Task<Void, Never>?
+    private var automaticConfiguration: BackgroundScheduleConfiguration?
     private var publicTask: Task<Void, Never>?
     private var ispTask: Task<Void, Never>?
     private var ispRequest: ZurichISPRefreshRequest?
@@ -48,6 +92,7 @@ final class BackgroundUpdatesSession: ObservableObject {
     private var timer: Task<Void, Never>?
     private var reloadTask: Task<Void, Never>?
     private var reloadInProgress = false
+    private var deferredFallbackRebind = false
     private var started = false
     private let networkEnabled: Bool
 
@@ -65,6 +110,10 @@ final class BackgroundUpdatesSession: ObservableObject {
 
 #if DEBUG
     var executorForTesting: BackgroundUpdateExecutor? { executor }
+    func holdAutomaticPassForTesting(_ task: Task<Void, Never>, configuration: BackgroundScheduleConfiguration) {
+        automaticTask = task; automaticConfiguration = configuration
+    }
+    func cancelAutomaticPassForTesting() { cancelExecution() }
 #endif
 
     func start(rates: AlDarReferenceSession, prices: InvestmentPriceSession,
@@ -73,13 +122,21 @@ final class BackgroundUpdatesSession: ObservableObject {
         started = true; self.rates = rates; self.prices = prices; self.isp = isp; self.online = online; self.ibkr = ibkr
         observations = [
             DistributedNotificationCenter.default().publisher(for: BackgroundUpdateExecutor.didPublishNotification)
-                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.queueReload() },
+                .receive(on: DispatchQueue.main).sink { [weak self] _ in
+                    self?.connectivityRecovery.observedCompletion(); self?.queueReload()
+                },
+            DistributedNotificationCenter.default().publisher(for: BackgroundUpdateExecutor.didReleaseNotification)
+                .receive(on: DispatchQueue.main).sink { [weak self] notice in
+                    guard let name = notice.object as? String, let kind = BackgroundJobKind(rawValue: name) else { return }
+                    self?.connectivityRecovery.observedCompletion(kind)
+                    if self?.connectivityRecovery.hasPending(kind) == true { self?.queueReload() }
+                },
             NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
                 .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.resumeAfterInterruption() },
             NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
                 .sink { [weak self] _ in self?.resumeAfterInterruption() },
             NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)
-                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.resumeAfterInterruption() },
+                .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.resumeAfterInterruption(recoverConnectivity: false) },
             DatabaseActivityGate.shared.didBecomeAvailable.sink { [weak self] in self?.queueReload() }
         ]
         observations.append(FinancialIntelligenceStore.shared.$snapshot.dropFirst().removeDuplicates().sink { [weak self] _ in self?.queueReload() })
@@ -98,10 +155,11 @@ final class BackgroundUpdatesSession: ObservableObject {
 
     /// A failed XPC exchange is temporary. Recheck the same enrollment on a
     /// real lifecycle opportunity; ordinary receipt reloads must not spin it.
-    func resumeAfterInterruption() {
+    func resumeAfterInterruption(recoverConnectivity: Bool = true) {
         helperRecoveryGeneration = UUID()
         unavailableHelperRevision = nil
         if networkAvailable != false { recoverInterruptedGmail = true }
+        if recoverConnectivity, networkAvailable == true { connectivityRecovery.networkAvailableEvent() }
         reconnectEmail = true
         queueReload()
     }
@@ -164,12 +222,23 @@ final class BackgroundUpdatesSession: ObservableObject {
                 && enrolled?.revision != unavailableHelperRevision
             let revision = managed ? enrolled?.revision : nil
             // Relaunch confirmation can adopt a new activation on the same provider.
-            if changed || activeSchedule != managed || executor == nil || executorEnrollmentRevision != revision || executorActivation != activation {
-                cancelExecution()
-                executor = BackgroundUpdateExecutor(provider: current, activation: activation, workspaceID: "default-workspace",
-                    enrollment: managed ? enrolled : nil)
-                executorEnrollmentRevision = revision
-                executorActivation = activation
+            if changed || activeSchedule != managed || executor == nil || executorEnrollmentRevision != revision || executorActivation != activation ||
+                (automaticTask != nil && automaticConfiguration != configuration) {
+                // A helper-contact failure does not invalidate this executor's
+                // ledger/enrollment authority. Finish its captured recovery pass
+                // before rebinding fallback, so the ISP opportunity is not lost.
+                let deferFallback = automaticTask != nil && !changed && executorActivation == activation &&
+                    automaticConfiguration == configuration &&
+                    configuration.enabled && matching && serviceStatus() == .enabled && !managed &&
+                    executorEnrollmentRevision == enrolled?.revision && unavailableHelperRevision == enrolled?.revision
+                if deferFallback { deferredFallbackRebind = true }
+                else {
+                    cancelExecution()
+                    executor = BackgroundUpdateExecutor(provider: current, activation: activation, workspaceID: "default-workspace",
+                        enrollment: managed ? enrolled : nil)
+                    executorEnrollmentRevision = revision
+                    executorActivation = activation
+                }
             }
             installSharedHandlers(true)
             activeSchedule = managed
@@ -197,6 +266,8 @@ final class BackgroundUpdatesSession: ObservableObject {
                 if managed {
                     requestAutomatic()
                     if let revision { workerControl.requestReschedule(enrollmentRevision: revision) { _ in } }
+                } else if connectivityRecovery.hasPending {
+                    requestAutomatic()
                 }
             }
             if !managed { armTimer() }
@@ -235,6 +306,8 @@ final class BackgroundUpdatesSession: ObservableObject {
     }
 
     private func cancelExecution() {
+        deferredFallbackRebind = false
+        automaticConfiguration = nil
         executionID = UUID()
         automaticTask?.cancel(); publicTask?.cancel(); ibkrTask?.cancel(); timer?.cancel()
         invalidateISPRequest()
@@ -270,31 +343,58 @@ final class BackgroundUpdatesSession: ObservableObject {
     }
 
     private func requestAutomatic(target: Date? = nil) {
-        guard networkEnabled, activeSchedule, automaticTask == nil, let executor,
+        guard networkEnabled, networkAvailable != false, activeSchedule || connectivityRecovery.hasPending,
+              automaticTask == nil, publicTask == nil, let executor,
               ApplicationAvailability.shared.permitsMutation else { return }
         let value = configuration, enrollmentRevision = executorEnrollmentRevision, executionID = executionID
         let recoveryGeneration = helperRecoveryGeneration
         let recoveringGmail = recoverInterruptedGmail
         recoverInterruptedGmail = false
+        let recovery = connectivityRecovery.begin(networkAvailable: networkAvailable)
+        let managed = activeSchedule
+        automaticConfiguration = value
         automaticTask = Task { [weak self] in
             guard let self else { return }
-            if let enrollmentRevision,
-               value.alDarCurrencyRatesEnabled || value.investmentPublicPricesEnabled {
-                let status = await self.requestHelperPublic(enrollmentRevision: enrollmentRevision,
-                                                            scopes: .init(rates: value.alDarCurrencyRatesEnabled,
-                                                                          prices: value.investmentPublicPricesEnabled),
-                                                            manual: false)
+            var publicBusy = false, releasedScopes: BackgroundPublicControlScopes = []
+            if recovery.publicEvent != nil {
+                switch await executor.releaseInterruptedPublic(configuration: value) {
+                case .released(let scopes): releasedScopes = scopes
+                case .busy: publicBusy = true
+                case .nothingEligible, .authorityRefused: break
+                }
                 guard self.executionID == executionID else { return }
+            }
+            var scopes = BackgroundPublicControlScopes(rates: value.enabled && value.alDarCurrencyRatesEnabled,
+                                                       prices: value.enabled && value.investmentPublicPricesEnabled)
+            scopes.formUnion(releasedScopes)
+            if let enrollmentRevision,
+               !scopes.isEmpty {
+                var status = await self.requestHelperPublic(enrollmentRevision: enrollmentRevision, scopes: scopes, manual: false)
+                guard self.executionID == executionID else { return }
+                // A just-finished helper drain may have coalesced this scope
+                // before its queue reset. Recheck due work once after completion;
+                // success, final failure and renewed waiting are all no-ops.
+                if !releasedScopes.isEmpty, status == .completed, self.networkAvailable == true {
+                    status = await self.requestHelperPublic(enrollmentRevision: enrollmentRevision, scopes: releasedScopes, manual: false)
+                    guard self.executionID == executionID else { return }
+                }
                 await self.handleHelperStatus(status, fallbackConfiguration: value, manual: false,
                                               recoveryGeneration: recoveryGeneration)
-            } else {
+            } else if managed || !releasedScopes.isEmpty {
                 _ = await executor.refreshPublic(configuration: value, manual: false, scheduledTarget: target)
             }
-            if self.activeSchedule { await executor.runAutomaticNonPublic(configuration: value, recoverInterruptedGmail: recoveringGmail) }
+            var ispBusy = false
+            if managed || recovery.ispEvent != nil {
+                ispBusy = await executor.runAutomaticNonPublic(configuration: value, recoverInterruptedGmail: recoveringGmail,
+                                                               recoverInterruptedISP: recovery.ispEvent != nil)
+            }
             guard self.executionID == executionID else { return }
+            let recheck = self.connectivityRecovery.finish(recovery, publicBusy: publicBusy, ispBusy: ispBusy)
             self.automaticTask = nil
+            self.automaticConfiguration = nil
             if let provider = self.provider { self.installSharedState(provider) }
-            if self.recoverInterruptedGmail { self.queueReload() }
+            if recheck || self.recoverInterruptedGmail || self.deferredFallbackRebind { self.queueReload() }
+            if !self.activeSchedule { self.armTimer() }
         }
     }
 
@@ -351,6 +451,7 @@ final class BackgroundUpdatesSession: ObservableObject {
             self.publicRequests = BackgroundPublicControlQueue()
             self.busyPublicScopes = []
             if let provider = self.provider { self.installSharedState(provider) }
+            if self.connectivityRecovery.hasPending { self.queueReload() }
             if !self.activeSchedule { self.armTimer() }
         }
         if let provider { installSharedState(provider) }
@@ -583,6 +684,7 @@ final class BackgroundUpdatesSession: ObservableObject {
                     try provider.backgroundScheduleRepo.saveConfiguration(value)
                 }
                 settingsSaved = true
+                self.cancelExecution()
                 if [.enabled, .requiresApproval].contains(self.service.status()) {
                     try await self.service.unregisterFromForegroundAction()
                 }
@@ -617,7 +719,8 @@ final class BackgroundUpdatesSession: ObservableObject {
         case .completed(.failedFinal): "Update failed. Previous successful data is retained."
         case .completed(.retryPending): kind == .gmailCollection
             ? "Email collection was interrupted. It will resume when the connection returns or LedgerForge becomes active."
-            : "Successful updates saved. Failed public updates will retry once after 60 seconds."
+            : kind == .zurichISP ? "The connection was interrupted. ISP will resume when the connection returns."
+            : "Previous observations are retained. Interrupted updates wait for a connection; other failed updates retry once."
         case .completed(.collectedNativeReceipts): "Email originals collected. Ready attachments are processed automatically while LedgerForge is open."
         case .completed(.installedCache): "Public rates and prices updated."
         }

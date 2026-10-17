@@ -33,6 +33,7 @@ nonisolated enum ZurichISPClientError: Error, LocalizedError, Equatable, Sendabl
     case cancelled
     case timedOut
     case network
+    case networkInterrupted
     case responseTooLarge
     case unauthorizedRedirect
     case malformedSource
@@ -61,6 +62,7 @@ nonisolated enum ZurichISPClientError: Error, LocalizedError, Equatable, Sendabl
         case .inFlight: "An ISP connection check is already in progress."
         case .cancelled: "The ISP connection check was cancelled."
         case .timedOut: "The ISP connection check took too long."
+        case .networkInterrupted: "The connection was interrupted. Previous ISP holdings are retained."
         case .incompleteCredentials: "Enter your Zurich username, password and full memorable PIN."
         case .rejectedSignIn: "Zurich did not complete the username and password step. Use the eye controls to check your entry, or verify the login on Zurich’s website before trying again."
         case .rejectedPIN: "Zurich returned to the memorable PIN step. Check that you entered the full memorable PIN, not only the three characters requested on the website."
@@ -159,7 +161,7 @@ actor ZurichISPClient {
             if error.invalidatesSession { reset() }
             throw error
         } catch {
-            throw ZurichISPClientError.network
+            throw ConnectivityInterruption.matches(error) ? ZurichISPClientError.networkInterrupted : .network
         }
     }
 
@@ -327,7 +329,7 @@ actor ZurichISPClient {
         } catch let error as ZurichISPClientError {
             throw error
         } catch {
-            throw ZurichISPClientError.network
+            throw ConnectivityInterruption.matches(error) ? ZurichISPClientError.networkInterrupted : .network
         }
     }
 

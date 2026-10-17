@@ -35,15 +35,17 @@ final class ZurichISPRefreshRequest {
 /// job lease. Network work never holds a SQLite or thread lock across await.
 actor BackgroundUpdateExecutor {
     nonisolated static let didPublishNotification = Notification.Name("com.vyom.LedgerForge.background-update-published")
+    nonisolated static let didReleaseNotification = Notification.Name("com.vyom.LedgerForge.background-lease-released")
     private let provider: SQLiteRepositoryProvider
     private let activation: LedgerActivationStamp
     private let workspaceID: String
     private let enrollment: BackgroundEnrollment?
     private let enrollmentStore: BackgroundEnrollmentStore
     private let prices: InvestmentPriceClient
-    private let rates: AlDarCurrentReferenceProvider
+    private let fetchRate: @Sendable (AlDarCurrency) async throws -> AlDarUnitReference
     private let gmailTokens: GmailTokenBroker
     private let ispClient: ZurichISPClient
+    private let ispCredentials: @Sendable () throws -> ZurichISPCredentials?
     private let ibkrClient = IBKRFlexClient()
     private let origin: BackgroundJobOrigin
 
@@ -51,10 +53,15 @@ actor BackgroundUpdateExecutor {
          enrollment: BackgroundEnrollment? = nil, enrollmentStore: BackgroundEnrollmentStore = .init(),
          prices: InvestmentPriceClient = .init(), rates: AlDarCurrentReferenceProvider = .init(),
          gmailTokens: GmailTokenBroker = .init(store: GmailKeychainGrantStore(interaction: .forbidden)),
-         ispClient: ZurichISPClient = .init(), origin: BackgroundJobOrigin = .foreground) {
+         ispClient: ZurichISPClient = .init(), origin: BackgroundJobOrigin = .foreground,
+         fetchRate: (@Sendable (AlDarCurrency) async throws -> AlDarUnitReference)? = nil,
+         ispCredentials: @escaping @Sendable () throws -> ZurichISPCredentials? = {
+             try ZurichISPCredentialStore(interaction: .forbidden).load()
+         }) {
         self.provider = provider; self.activation = activation; self.workspaceID = workspaceID
         self.enrollment = enrollment; self.enrollmentStore = enrollmentStore
-        self.prices = prices; self.rates = rates; self.gmailTokens = gmailTokens; self.ispClient = ispClient; self.origin = origin
+        self.prices = prices; self.fetchRate = fetchRate ?? { try await rates.fetchUnit(currency: $0) }
+        self.gmailTokens = gmailTokens; self.ispClient = ispClient; self.origin = origin; self.ispCredentials = ispCredentials
     }
 
     enum Outcome: Equatable, Sendable {
@@ -72,14 +79,28 @@ actor BackgroundUpdateExecutor {
     /// while Gmail and ISP retain their established executor paths. Keeping
     /// this split here prevents the foreground from racing a helper-owned
     /// public retry after the app closes.
-    func runAutomaticNonPublic(configuration: BackgroundScheduleConfiguration, recoverInterruptedGmail: Bool = false) async {
-        guard configuration.enabled else { return }
+    @discardableResult
+    func runAutomaticNonPublic(configuration: BackgroundScheduleConfiguration, recoverInterruptedGmail: Bool = false,
+                               recoverInterruptedISP: Bool = false) async -> Bool {
+        guard configuration.enabled else { return false }
+        // One event belongs to this interrupted receipt, never to a new failure
+        // produced by the same pass's monthly or salary-linked attempt.
+        let interrupted = recoverInterruptedISP ? try? withAuthority { try provider.backgroundJobRepo.jobRecord(.zurichISP) } : nil
+        let claimID = interrupted?.outcome == .retryPending ? interrupted?.claimID : nil
         if configuration.gmailCollectionEnabled {
             _ = await collectGmail(configuration: configuration, manual: false, recoverInterrupted: recoverInterruptedGmail)
         }
-        if configuration.zurichISPHoldingsEnabled { _ = await refreshISP(configuration: configuration, manual: false) }
-        _ = await refreshISP(configuration: configuration, manual: false, salaryCheck: true)
+        var ispBusy = false
+        if configuration.zurichISPHoldingsEnabled {
+            ispBusy = await refreshISP(configuration: configuration, manual: false, recovering: claimID) == .alreadyRunning
+        }
+        let salary = await refreshISP(configuration: configuration, manual: false, salaryCheck: true, recovering: claimID)
+        ispBusy = ispBusy || salary == .alreadyRunning
         if configuration.ibkrFlexHoldingsEnabled { _ = await refreshIBKR(configuration: configuration, manual: false) }
+        guard recoverInterruptedISP, ispBusy, let interrupted,
+              let latest = try? withAuthority({ try provider.backgroundJobRepo.jobRecord(.zurichISP) }),
+              latest.claimID == interrupted.claimID else { return false }
+        return latest.completedAt == nil || latest.outcome == .retryPending
     }
 
     private func withAuthority<T>(_ operation: () throws -> T) throws -> T {
@@ -131,15 +152,55 @@ actor BackgroundUpdateExecutor {
         let progress = try withAuthority { try BackgroundPublicProgressStore(database: provider.database).load() }
         let identities = Set(try await publicIdentities(BackgroundScheduleConfiguration(), progress: progress))
         return progress.values.filter {
-            identities.contains($0.identity) && !$0.succeeded && $0.attempts < 2
+            identities.contains($0.identity) && !$0.succeeded && $0.attempts < 2 && $0.waitingForConnectivity != true
         }.compactMap(\.retryAt).min()
+    }
+
+    enum ConnectivityRelease: Equatable, Sendable {
+        case released(BackgroundPublicControlScopes), nothingEligible, busy, authorityRefused
+    }
+
+    /// Called only for a real network-available recovery event. The same OS
+    /// lease prevents release from racing a helper's in-flight result.
+    func releaseInterruptedPublic(configuration: BackgroundScheduleConfiguration, now: Date = Date()) async -> ConnectivityRelease {
+        do {
+            var lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .publicReferences)
+            guard lease != nil else { return .busy }
+            defer { withExtendedLifetime(lease) {}; lease = nil; Self.releaseHint(.publicReferences) }
+            let store = BackgroundPublicProgressStore(database: provider.database)
+            let progress = try withAuthority { try store.load() }
+            var eligible = configuration
+            if !configuration.enabled { eligible.alDarCurrencyRatesEnabled = false; eligible.investmentPublicPricesEnabled = false }
+            let identities = Set(try await publicIdentities(eligible, progress: progress))
+            var scopes: BackgroundPublicControlScopes = []
+            try withAuthority {
+                try provider.database.execute(sql: "BEGIN IMMEDIATE;")
+                do {
+                    for var value in progress.values where identities.contains(value.identity) &&
+                        value.waitingForConnectivity == true && !value.succeeded && value.attempts < 2 {
+                        value.waitingForConnectivity = false; value.retryAt = now
+                        try store.save(value)
+                        if value.identity == "aldar:INR" { scopes.insert(.inr) }
+                        else if value.identity == "aldar:USD" { scopes.insert(.usd) }
+                        else { scopes.formUnion(.provider(String(value.identity.split(separator: "|").first ?? ""))) }
+                    }
+                    try provider.database.execute(sql: "COMMIT;")
+                } catch { try? provider.database.execute(sql: "ROLLBACK;"); throw error }
+            }
+            return scopes.isEmpty ? .nothingEligible : .released(scopes)
+        } catch { return .authorityRefused }
     }
 
     /// Attempts suppress repeated failures within a slot. Native durable
     /// receipts remain the authority for successful publication after a crash.
-    private func simpleDue(_ kind: BackgroundJobKind, slot: Date, nativeSuccess: Date?, recoverInterrupted: Bool = false) throws -> Bool {
+    private func simpleDue(_ kind: BackgroundJobKind, slot: Date, nativeSuccess: Date?, recoverInterrupted: Bool = false,
+                           recoveringClaim: UUID? = nil) throws -> Bool {
+        let receipt = try provider.backgroundJobRepo.jobRecord(kind)
+        if kind == .zurichISP, let receipt, receipt.completedAt != nil,
+           recoveringClaim == receipt.claimID, receipt.outcome == .retryPending,
+           nativeSuccess.map({ $0 < receipt.claimedAt }) ?? true { return true }
         if let nativeSuccess, nativeSuccess >= slot { return false }
-        if let receipt = try provider.backgroundJobRepo.jobRecord(kind), receipt.completedAt != nil,
+        if let receipt, receipt.completedAt != nil,
            receipt.claimedAt >= slot {
             if kind == .gmailCollection, recoverInterrupted, receipt.outcome == .retryPending { return true }
             // A helper denied its own Keychain authorization cannot suppress
@@ -163,8 +224,12 @@ actor BackgroundUpdateExecutor {
                     lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .publicReferences)
                 }
             }
-            guard let lease else { return .alreadyRunning }
-            defer { withExtendedLifetime(lease) {} }
+            guard lease != nil else { return .alreadyRunning }
+            defer {
+                withExtendedLifetime(lease) {}
+                lease = nil
+                Self.releaseHint(.publicReferences)
+            }
             let now = Date()
             guard let slot = BackgroundSchedule.latestOccurrence(of: configuration.publicReferencesRule, at: now) else { return .notDue }
             let progressStore = BackgroundPublicProgressStore(database: provider.database)
@@ -180,8 +245,13 @@ actor BackgroundUpdateExecutor {
                 (configuration.alDarCurrencyRatesEnabled || manualRetries.contains("aldar:" + $0.rawValue))
             }
             let identities = currencies.map { "aldar:" + $0.rawValue } + definitions.map { $0.mapping.identity }
+            func automaticallyEnabled(_ identity: String) -> Bool {
+                identity.hasPrefix("aldar:") ? configuration.alDarCurrencyRatesEnabled : configuration.investmentPublicPricesEnabled
+            }
             let due = identities.filter { identity in
                 if manual { return true }
+                if let progress = existing[identity], progress.waitingForConnectivity == true,
+                   progress.slot == slot || !automaticallyEnabled(identity) { return false }
                 if manualRetries.contains(identity), let retryAt = existing[identity]?.retryAt { return retryAt <= now }
                 if let progress = existing[identity], progress.slot == slot {
                     return !progress.succeeded && progress.attempts < 2 && (progress.retryAt.map { $0 <= now } ?? true)
@@ -193,10 +263,12 @@ actor BackgroundUpdateExecutor {
             guard let claim = try withAuthority({ try provider.backgroundJobRepo.claim(.publicReferences, activation: activation, origin: origin, now: now) }) else { return .alreadyRunning }
             var attempts: [String: BackgroundPublicLegProgress] = [:]
             for identity in due {
-                var value = !manual && (existing[identity]?.slot == slot || manualRetries.contains(identity))
+                let retainManual = manualRetries.contains(identity) && !automaticallyEnabled(identity)
+                var value = !manual && (existing[identity]?.slot == slot || retainManual)
                     ? existing[identity]! : .init(identity: identity, slot: slot)
                 if manual { value.manuallyRequested = true }
                 value.attempts += 1; value.succeeded = false; value.retryAt = now.addingTimeInterval(60); value.failure = nil
+                value.waitingForConnectivity = false
                 try withAuthority { try progressStore.save(value) }
                 attempts[identity] = value
             }
@@ -204,7 +276,7 @@ actor BackgroundUpdateExecutor {
                 let identity = "aldar:" + currency.rawValue
                 var value = attempts[identity]!
                 do {
-                    let reference = try await rates.fetchUnit(currency: currency)
+                    let reference = try await fetchRate(currency)
                     value.checkedAt = Date()
                     try Task.checkCancellation()
                     try withAuthority {
@@ -217,8 +289,7 @@ actor BackgroundUpdateExecutor {
                     }
                     Self.publishHint()
                 } catch {
-                    value.checkedAt = Date()
-                    value.succeeded = false; value.failure = "Rate unavailable"; value.retryAt = value.attempts < 2 ? Date().addingTimeInterval(60) : nil
+                    value.recordFailure("Rate unavailable", interrupted: ConnectivityInterruption.matches(error), at: Date())
                     try withAuthority { try progressStore.save(value) }
                 }
             }
@@ -254,13 +325,13 @@ actor BackgroundUpdateExecutor {
                         }
                         Self.publishHint()
                     } catch {
-                        value.succeeded = false; value.failure = "Price unavailable"; value.retryAt = value.attempts < 2 ? Date().addingTimeInterval(60) : nil
+                        value.recordFailure("Price unavailable", interrupted: (error as? InvestmentPriceError) == .networkInterrupted, at: Date())
                         try withAuthority { try progressStore.save(value) }
                     }
                 }
             }
             let final = try withAuthority { try progressStore.load() }
-            let pending = due.contains { final[$0]?.retryAt != nil }
+            let pending = due.contains { final[$0]?.retryAt != nil || final[$0]?.waitingForConnectivity == true }
             let failed = due.contains { final[$0]?.succeeded != true }
             return finish(claim, pending ? .retryPending : (failed ? .failedFinal : .installedCache))
         } catch { return .authorityRefused }
@@ -311,18 +382,27 @@ actor BackgroundUpdateExecutor {
     }
 
     func refreshISP(configuration: BackgroundScheduleConfiguration, manual: Bool, salaryCheck: Bool = false,
+                    recovering claimID: UUID? = nil,
                     request: ZurichISPRefreshRequest? = nil) async -> Outcome {
         do {
             try Task.checkCancellation()
-            guard let lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP) else { return .alreadyRunning }
-            defer { withExtendedLifetime(lease) {} }
+            var lease = try BackgroundJobLease.acquire(path: provider.databasePath, kind: .zurichISP)
+            guard lease != nil else { return .alreadyRunning }
+            defer {
+                withExtendedLifetime(lease) {}
+                lease = nil
+                Self.releaseHint(.zurichISP)
+            }
             let now = Date(), provider = provider, workspaceID = workspaceID
             let baseline = try await MainActor.run { try provider.investmentRepo.snapshot(workspaceID: workspaceID) }
             let metadata = try await salaryMetadata()
+            let interrupted = try withAuthority { try provider.backgroundJobRepo.jobRecord(.zurichISP) }
+            let recovery = interrupted?.claimID == claimID && interrupted?.outcome == .retryPending ? interrupted : nil
             let pending: [SalaryAssistance]
             if let preferences = metadata?.preferences, preferences.salaryISPEnabled {
                 pending = metadata!.salaries.filter { salary in
-                    SalaryISPVerification.nextCheck(salary, preferences: preferences, now: now, latestFetch: baseline.latestZioAccount?.fetchedAt).map { $0 <= now } == true
+                    SalaryISPVerification.nextCheck(salary, preferences: preferences, now: now, latestFetch: baseline.latestZioAccount?.fetchedAt).map { $0 <= now } == true ||
+                        Self.canRecoverSalary(salary, receipt: recovery, now: now, latestFetch: baseline.latestZioAccount?.fetchedAt)
                 }
             } else { pending = [] }
             if salaryCheck {
@@ -334,29 +414,25 @@ actor BackgroundUpdateExecutor {
                         try await storeSalary(SalaryISPVerification.observation(observed, for: salary), replacing: salary)
                     }
                     let current = try await salaryMetadata()
-                    if let preferences = current?.preferences,
-                       !current!.salaries.contains(where: { SalaryISPVerification.nextCheck($0, preferences: preferences, now: now, latestFetch: observed.fetchedAt).map { $0 <= now } == true }) {
+                    guard let preferences = current?.preferences, preferences.salaryISPEnabled else { return .notDue }
+                    if !current!.salaries.contains(where: {
+                           SalaryISPVerification.nextCheck($0, preferences: preferences, now: now, latestFetch: observed.fetchedAt).map { $0 <= now } == true ||
+                               Self.canRecoverSalary($0, receipt: recovery, now: now, latestFetch: observed.fetchedAt)
+                       }) {
                         Self.publishHint(); return .notDue
                     }
                 }
             }
             guard let slot = BackgroundSchedule.latestOccurrence(of: configuration.zurichISPRule, at: now) else { return .notDue }
-            if !manual && !salaryCheck, try !simpleDue(.zurichISP, slot: slot, nativeSuccess: baseline.latestZioAccount?.fetchedAt) { return .notDue }
-            guard let claim = try withAuthority({ try provider.backgroundJobRepo.claim(.zurichISP, activation: activation, origin: origin, now: now) }) else { return .alreadyRunning }
+            if !manual && !salaryCheck, try !simpleDue(.zurichISP, slot: slot, nativeSuccess: baseline.latestZioAccount?.fetchedAt, recoveringClaim: claimID) { return .notDue }
+            let claim: BackgroundJobRecord
+            switch try await admitISP(salaryCheck: salaryCheck, now: now, baseline: baseline, recovery: recovery) {
+            case .notDue: return .notDue
+            case .alreadyRunning: return .alreadyRunning
+            case .claimed(let value): claim = value
+            }
             do {
-                for salary in try await salaryMetadata()?.salaries ?? [] where ![.verified, .dismissed].contains(salary.ispState) {
-                    guard metadata?.preferences?.salaryISPEnabled == true, SalaryISPVerification.creditDay(salary).map({ $0 <= now }) == true else { continue }
-                    var attempted = salary
-                    attempted.ispLastAttemptAt = ISO8601DateFormatter().string(from: now)
-                    if attempted.ispBaseline == nil, let previous = baseline.latestZioAccount,
-                       SalaryISPVerification.creditDay(salary).map({ previous.fetchedAt < $0 }) == true {
-                        attempted.ispBaseline = previous
-                        attempted.ispBaselineAsOf = previous.policies.map(\.valuationDay).max()
-                    }
-                    attempted.ispExplanation = "A shared ISP holdings check was attempted. Contribution verification remains pending."
-                    try await storeSalary(attempted, replacing: salary)
-                }
-                guard let credentials = try ZurichISPCredentialStore(interaction: .forbidden).load() else { return finish(claim, .refusedCredentialInteraction) }
+                guard let credentials = try ispCredentials() else { return finish(claim, .refusedCredentialInteraction) }
                 let expected = Set(baseline.containers.filter { $0.institution == "Zurich ISP" }.map(\.identity))
                 let raw = try await ispClient.fetch(credentials: credentials, expectedPolicyIDs: expected, status: { _ in })
                 let source = try await Self.parseISP(raw, expected: expected)
@@ -400,6 +476,7 @@ actor BackgroundUpdateExecutor {
                     return .cancelled
                 }
                 if error is ZurichISPCredentialError { return finish(claim, .refusedCredentialInteraction) }
+                if (error as? ZurichISPClientError) == .networkInterrupted { return finish(claim, .retryPending) }
                 let outcome = finish(claim, .failedFinal)
                 guard outcome == .completed(.failedFinal) else { return outcome }
                 let message = Self.ispFailureMessage(error)
@@ -407,6 +484,63 @@ actor BackgroundUpdateExecutor {
             }
         } catch {
             return Task.isCancelled || error is CancellationError ? .cancelled : .authorityRefused
+        }
+    }
+
+    nonisolated static func canRecoverSalary(_ salary: SalaryAssistance, receipt: BackgroundJobRecord?,
+                                             now: Date, latestFetch: Date?) -> Bool {
+        guard ![.verified, .dismissed].contains(salary.ispState),
+              let credit = SalaryISPVerification.creditDay(salary), credit <= now,
+              let receipt, receipt.kind == .zurichISP, receipt.outcome == .retryPending,
+              let completed = receipt.completedAt, completed <= now,
+              let attempted = salary.ispLastAttemptAt.flatMap({ ISO8601DateFormatter().date(from: $0) }),
+              // Salary metadata stores whole ISO seconds; compare at that precision.
+              attempted.timeIntervalSince1970 == receipt.claimedAt.timeIntervalSince1970.rounded(.down),
+              latestFetch.map({ $0 < receipt.claimedAt }) ?? true else { return false }
+        return true
+    }
+
+    enum ISPAdmission: Sendable { case notDue, alreadyRunning, claimed(BackgroundJobRecord) }
+
+    /// Read owner choices, admit the request and mark its attempts on MainActor
+    /// without suspension. A stale preflight cannot authorize salary-only work.
+    func admitISP(salaryCheck: Bool, now: Date, baseline: InvestmentSnapshot,
+                  recovery: BackgroundJobRecord?) async throws -> ISPAdmission {
+        let provider = provider, activation = activation, workspaceID = workspaceID
+        let enrollment = enrollment, store = enrollmentStore, origin = origin
+        return try await MainActor.run {
+            try Task.checkCancellation()
+            return try provider.database.withExclusiveAccess {
+                guard try provider.database.validatedActivationStamp() == activation else { throw LedgerAccessError.staleActivation }
+                let admit = { () throws -> ISPAdmission in
+                    let metadata = try provider.intelligenceRepo.snapshot(workspaceID: workspaceID)
+                    if salaryCheck {
+                        guard let preferences = metadata?.preferences, preferences.salaryISPEnabled,
+                              metadata!.salaries.contains(where: {
+                                  SalaryISPVerification.nextCheck($0, preferences: preferences, now: now, latestFetch: baseline.latestZioAccount?.fetchedAt).map { $0 <= now } == true ||
+                                  Self.canRecoverSalary($0, receipt: recovery, now: now, latestFetch: baseline.latestZioAccount?.fetchedAt)
+                              }) else { return .notDue }
+                    }
+                    guard let claim = try provider.backgroundJobRepo.claim(.zurichISP, activation: activation, origin: origin, now: now) else { return .alreadyRunning }
+                    if metadata?.preferences?.salaryISPEnabled == true {
+                        for salary in metadata!.salaries where ![.verified, .dismissed].contains(salary.ispState) &&
+                            SalaryISPVerification.creditDay(salary).map({ $0 <= now }) == true {
+                            var attempted = salary
+                            attempted.ispLastAttemptAt = ISO8601DateFormatter().string(from: now)
+                            if attempted.ispBaseline == nil, let previous = baseline.latestZioAccount,
+                               SalaryISPVerification.creditDay(salary).map({ previous.fetchedAt < $0 }) == true {
+                                attempted.ispBaseline = previous
+                                attempted.ispBaselineAsOf = previous.policies.map(\.valuationDay).max()
+                            }
+                            attempted.ispExplanation = "A shared ISP holdings check was attempted. Contribution verification remains pending."
+                            try provider.intelligenceRepo.applyPlanning(.salary(attempted, replacing: salary))
+                        }
+                    }
+                    return .claimed(claim)
+                }
+                if let enrollment { return try store.withValid(enrollment, admit) }
+                return try admit()
+            }
         }
     }
 
@@ -542,7 +676,7 @@ actor BackgroundUpdateExecutor {
                   let next = BackgroundSchedule.nextOccurrence(of: configuration.publicReferencesRule, after: now) else { continue }
             if publicBusy { targets.append(next) }
             else if let current = progress[identity], current.slot == slot {
-                if !current.succeeded && current.attempts < 2 { targets.append(max(now, current.retryAt ?? now)) }
+                if !current.succeeded && current.attempts < 2 && current.waitingForConnectivity != true { targets.append(max(now, current.retryAt ?? now)) }
                 else { targets.append(next) }
             } else {
                 targets.append(BackgroundSchedule.publicOpportunity(now: now, lastCovered: nil, rule: configuration.publicReferencesRule) ?? next)
@@ -578,5 +712,8 @@ actor BackgroundUpdateExecutor {
 
     nonisolated static func publishHint() {
         DistributedNotificationCenter.default().postNotificationName(didPublishNotification, object: nil, userInfo: nil, deliverImmediately: true)
+    }
+    nonisolated private static func releaseHint(_ kind: BackgroundJobKind) {
+        DistributedNotificationCenter.default().postNotificationName(didReleaseNotification, object: kind.rawValue, userInfo: nil, deliverImmediately: true)
     }
 }

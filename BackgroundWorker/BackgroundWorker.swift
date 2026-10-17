@@ -145,8 +145,10 @@ private final class BackgroundWorkerRuntime {
         Task { @MainActor [weak self] in
             guard let self else { return }
             var scoped = configuration
-            scoped.alDarCurrencyRatesEnabled = !request.scopes.intersection(.rates).isEmpty
-            scoped.investmentPublicPricesEnabled = !request.scopes.intersection(.prices).isEmpty
+            if request.manual {
+                scoped.alDarCurrencyRatesEnabled = !request.scopes.intersection(.rates).isEmpty
+                scoped.investmentPublicPricesEnabled = !request.scopes.intersection(.prices).isEmpty
+            }
             scoped.gmailCollectionEnabled = false
             scoped.zurichISPHoldingsEnabled = false
             let outcome = await executor.refreshPublic(configuration: scoped, manual: request.manual, scopes: request.scopes)

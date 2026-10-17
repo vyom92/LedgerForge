@@ -1,5 +1,16 @@
 # Current project state
 
+<a id="v12-connectivity-recovery-20261017"></a>
+## 17 October — connectivity recovery accepted; v1.2 (8) release preparation
+
+Sprint Coordinator -20 accepted the owner-requested correction for repeated Live FX and ISP errors after ordinary sleep. Public requests failed during dark wake without a network route and exhausted the generic failure allowance; later wake did not reopen those final states. The ISP receipt correlates closely with a zero-byte offline request whose endpoint is OS-redacted, so its endpoint attribution remains a supported timing inference. No rejected credentials were established. Earlier MCP/helper qualification did not prove this public/ISP recovery boundary.
+
+Typed offline/connection-loss interruptions now wait for an existing network-available lifecycle event without spending the ordinary provider-error allowance. Last-good data and failed-check evidence remain. Existing authority, source switches, exact manual scope, leases and due checks govern recovery; one ISP event cannot consume its own new failure. Current salary preferences and eligibility are checked at the synchronous admission boundary. Configuration changes retire stale passes, and lane-specific completion hints avoid lost recovery and cross-lane loops. Genuine authentication, HTTP, timeout and validation failures retain existing semantics. [ADR-048](ADR.md#adr-048).
+
+**68 focused definitions passed, zero failures/skips:** 11 new recovery regressions, 36 background persistence, seven schedule, four ISP monthly, six ISP command and four ISP request-ownership tests. The accepted eight-file fingerprint is `5b56e24c08761484401617e10fa7770c53900ca1346cbc8c22aa07bab43cb3fe` over published baseline `5dc66d0070abd9ffc33b269242aeb25df7eee35a`. Independent combined-diff review found no blocker. Worker call-site wiring is source-reviewed; actual executor/session boundaries are tested. No full-suite or new physical sleep/wake certification is claimed.
+
+**Installed production remains v1.2 (7)** at this source checkpoint. All 86 production tables, DB identity/schema/metadata and integrity remain unchanged. Two ordinary public-cache preferences and the backup chooser directory preference advanced. A complete verified build7 rollback is retained. The previous native backup remains sealed but predates current Gmail and investment records; fresh native backup completion is pending because the chooser is unavailable through automation. v1.2 (8) documentation/source commit and signed Release preparation are authorized, with installation, native provider checks, final publication and cleanup subject to the [durable receipt](/Users/vyom/.codex/artifacts/ledgerforge/wake-recovery-20261017/STATUS.md). The [accepted candidate outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-connectivity-recovery) preserves the distinction from installed acceptance.
+
 <a id="v12-helper-acknowledgement-20261016"></a>
 ## 16 October — v1.2 (7) salary and helper corrections installed and qualified
 

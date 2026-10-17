@@ -164,7 +164,9 @@ nonisolated struct InvestmentPriceClient: Sendable {
             }
             return results
         } catch {
-            let failure: InvestmentPriceError = error is CancellationError ? .cancelled : (error as? InvestmentPriceError ?? (error is InvestmentError ? .invalidResponse : .unavailable))
+            let failure: InvestmentPriceError = error is CancellationError ? .cancelled :
+                (ConnectivityInterruption.matches(error) ? .networkInterrupted :
+                    (error as? InvestmentPriceError ?? (error is InvestmentError ? .invalidResponse : .unavailable)))
             return Dictionary(uniqueKeysWithValues: definitions.map { ($0.mapping.identity, .failure(failure)) })
         }
     }

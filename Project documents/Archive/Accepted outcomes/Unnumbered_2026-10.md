@@ -4,10 +4,22 @@ Historical outcomes and their explicit evidence boundaries. [Current state](../.
 
 ## Index
 
+- [v1.2 (8) connectivity recovery — 17 October 2026](#v12-connectivity-recovery)
 - [v1.2 (7) helper acknowledgement maintenance — 16 October 2026](#v12-helper-acknowledgement)
 - [v1.2 (6) regular salary reprint correction — 16 October 2026](#v12-salary-reprint-maintenance)
 - [v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026](#v12-net-worth-maintenance)
 - [Seven-page UI campaign, test cleanup and v1.2 release — 16 October 2026](#v12-ui-release)
+
+<a id="v12-connectivity-recovery"></a>
+## v1.2 (8) connectivity recovery — 17 October 2026
+
+**Candidate accepted; release preparation authorized by Sprint Coordinator -20 under the owner's continuing correction/deployment instructions.** The live incident occurred during ordinary dark wakes with no network route. Public generic failures exhausted their retry allowance and later wake did not recover them. ISP's final receipt closely correlates with a zero-byte offline error, but the OS redacts that request's endpoint. No authentication rejection was established. Earlier accepted lifecycle tests remain bounded to their exercised MCP/helper paths; they do not certify these newly identified public/ISP failure sequences.
+
+Only typed offline/connection-loss transport errors acquire connectivity-waiting treatment. Public progress retains failed-check evidence, previous observations and the ordinary provider-error allowance. A later existing network-available lifecycle event retries eligible work under unchanged authority/leases. ISP grants bind the interrupted receipt; current owner choices govern salary-only admission. Lane-specific completion signals cover no-op lease holders without cross-lane replay, and helper fallback cannot preserve a pass after settings change. Nonmanual helper calls keep source switches intact. Generic historical failures remain truthful and require ordinary native refresh; no durable error is retroactively reclassified. [ADR-048](../../ADR.md#adr-048) records the boundary.
+
+**Final focused validation: 68 definitions passed, zero failures/skips.** Eleven new tests cover transport classification, interrupted/final failure separation, reopen, attempt budget, exact currency calls, sibling preservation, lease/timer/slot eligibility, receipt-specific ISP events, current salary choice at admission, real session fallback/configuration cancellation and no-op release. Fifty-seven existing persistence/schedule/ISP ownership and command cases also passed. Independent combined-diff review found no remaining blocker. An earlier 58-test pass preceded the final lane-specific correction and is retained separately. Worker call-site wiring is source-reviewed, not an executed XPC injection test. No full-suite, new physical sleep/wake or universal automatic recovery pass is claimed.
+
+The accepted eight-file source/test fingerprint is `5b56e24c08761484401617e10fa7770c53900ca1346cbc8c22aa07bab43cb3fe`, based on `5dc66d0070abd9ffc33b269242aeb25df7eee35a`; subsequent release preparation changes only app build metadata and the three owning documents. At acceptance all 86 production tables, schema/identity/metadata and integrity remained unchanged. The installed build7 and full signed rollback are preserved. Its prior native backup is sealed but does not cover later Gmail and investment updates; fresh owner-created native backup is required before installation because native chooser automation remains unavailable. The [current state](../../PROJECT_STATE.md#v12-connectivity-recovery-20261017) and [local receipt](/Users/vyom/.codex/artifacts/ledgerforge/wake-recovery-20261017/STATUS.md) own Release identity, eventual native results, exact publication and bounded cleanup. Candidate acceptance is not yet installed acceptance.
 
 <a id="v12-helper-acknowledgement"></a>
 ## v1.2 (7) helper acknowledgement maintenance — 16 October 2026
