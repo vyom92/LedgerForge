@@ -97,6 +97,29 @@ extension SQLiteFinancialIntelligenceRepository {
     func savePlanAssistance(_ plan: FundingPlanDTO) throws {
         let value = plan.assistance, workspaceID = plan.workspaceId, month = plan.planMonthISO
         guard let candidate = try snapshot(workspaceID: workspaceID, replacingPlan: plan) else { throw FinancialIntelligenceError.unavailable }
+        if value?.surplusAllocation != nil || (plan.calculationVersion == "budgetV1" && (plan.keepInCBQMinor ?? 0) > 0) {
+            let input = try plan.allocationCalculationInput()
+            let accounts = try SQLiteAccountRepo(db: db, supportsBankSections: true).accounts(workspaceId: workspaceID)
+            let products = try db.query(sql: "SELECT account_id,product_label FROM bank_statement_sections WHERE workspace_id=?;", params: [workspaceID]) {
+                ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "")
+            }
+            var labels: [String: [String]] = [:]
+            for (id, label) in products { labels[id, default: []].append(label) }
+            let receipts = try input.assistance?.payslipFunding.map {
+                try SQLiteTransactionRepo(db: db).companionReceiptTransactions(workspaceId: workspaceID, accountID: $0.accountID, month: input.month)
+            } ?? []
+            let salaryReceipt = try PayslipReceiptState.resolve(plan: input, receiptDTOs: receipts,
+                excludedAccounts: candidate.preferences?.excludedPlanningAccountIDs ?? [])
+            if value?.surplusAllocation != nil {
+                let calculation = try SurplusAllocationCalculator.calculate(plan: input, reserves: candidate.reserves,
+                    accounts: accounts, productLabels: labels, preferences: candidate.preferences, salaryReceipt: salaryReceipt)
+                try SurplusAllocationCalculator.validatePublication(calculation, plan: input, accounts: accounts,
+                    preferences: candidate.preferences)
+            } else {
+                try SurplusAllocationCalculator.validateUnallocatedKeep(plan: input, accounts: accounts,
+                    preferences: candidate.preferences, salaryReceipt: salaryReceipt)
+            }
+        }
         for id in value?.appliedSalaryIDs ?? [] {
             guard var salary = candidate.salaries.first(where: { $0.id == id && $0.draftState != .dismissed }) else { throw FinancialIntelligenceError.invalidRecord }
             salary.draftState = .consumed
@@ -155,6 +178,23 @@ extension InMemoryFinancialIntelligenceRepository {
         }
     }
     func validatePlanAssistance(_ plan: FundingPlanDTO) throws {
-        guard try snapshot(workspaceID: plan.workspaceId, replacingPlan: plan) != nil else { throw FinancialIntelligenceError.unavailable }
+        guard let candidate = try snapshot(workspaceID: plan.workspaceId, replacingPlan: plan) else { throw FinancialIntelligenceError.unavailable }
+        if plan.assistance?.surplusAllocation != nil || (plan.calculationVersion == "budgetV1" && (plan.keepInCBQMinor ?? 0) > 0) {
+            let input = try plan.allocationCalculationInput()
+            var labels: [String: [String]] = [:]
+            for section in state.bankSectionPlans.values { labels[section.accountId, default: []].append(section.productLabel) }
+            let accounts = Array(state.accounts.values)
+            let salaryReceipt = try PayslipReceiptState.resolve(plan: input, receiptDTOs: Array(state.transactions.values),
+                excludedAccounts: candidate.preferences?.excludedPlanningAccountIDs ?? [])
+            if plan.assistance?.surplusAllocation != nil {
+                let calculation = try SurplusAllocationCalculator.calculate(plan: input, reserves: candidate.reserves,
+                    accounts: accounts, productLabels: labels, preferences: candidate.preferences, salaryReceipt: salaryReceipt)
+                try SurplusAllocationCalculator.validatePublication(calculation, plan: input, accounts: accounts,
+                    preferences: candidate.preferences)
+            } else {
+                try SurplusAllocationCalculator.validateUnallocatedKeep(plan: input, accounts: accounts,
+                    preferences: candidate.preferences, salaryReceipt: salaryReceipt)
+            }
+        }
     }
 }

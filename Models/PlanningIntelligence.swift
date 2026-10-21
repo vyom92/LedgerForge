@@ -211,6 +211,21 @@ nonisolated public enum PlanningMetadataEdit: Sendable {
 }
 
 nonisolated enum PlanningMetadataValidation {
+    static func routeType(account: AccountDTO, productLabels: [String]) -> String? {
+        guard account.accountType == "bank", ["Axis Bank", "HDFC Bank"].contains(account.institutionId ?? "") else { return nil }
+        let roles = Set(productLabels.flatMap { $0.uppercased().split(whereSeparator: { !$0.isLetter }) }
+            .map(String.init).filter { ["NRE", "NRO"].contains($0) })
+        return roles.count == 1 ? roles.first : nil
+    }
+
+    static func permitsPlanningRoute(fromID: String, fromCurrency: String, fromDomain: String, fromRoute: String?,
+                                    toID: String, toCurrency: String, toDomain: String, toRoute: String?, retentionAccountID: String?) -> Bool {
+        guard fromID != toID, fromDomain == "bank", toDomain == "bank" else { return false }
+        if fromCurrency == "QAR", fromID == retentionAccountID { return toCurrency == "INR" && toRoute == "NRE" }
+        guard fromCurrency == "INR", toCurrency == "INR" else { return false }
+        return fromRoute == "NRE" && ["NRE", "NRO"].contains(toRoute ?? "") || fromRoute == "NRO" && toRoute == "NRO"
+    }
+
     static func referencedTransactionIDs(_ snapshot: FinancialIntelligenceSnapshot) -> Set<String> {
         Set(snapshot.occurrences.flatMap(\.transactionIDs) + snapshot.salaries.map(\.transactionID) +
             snapshot.plans.flatMap { $0.datedAdjustments.flatMap { $0.transactionIDs ?? [] } + ($0.transfers ?? []).flatMap { $0.transactionIDs ?? [] } })
@@ -343,6 +358,50 @@ nonisolated enum PlanningMetadataValidation {
                 try require(transfer.fromAccountID != transfer.toAccountID && bank(transfer.fromAccountID, currency: transfer.sent.currency) && bank(transfer.toAccountID, currency: transfer.received.currency) && date(transfer.date))
                 try require(transfer.sent.currency == transfer.received.currency ? transfer.sent.money() == transfer.received.money() : transfer.sent.currency == "QAR" && transfer.received.currency == "INR" && !transfer.conversionBasis.isEmpty)
             }
+            // Old plans retain their previous meaning. New funding links must
+            // belong to an explicit allocation contract, never an implicit edit.
+            if let allocation = value.surplusAllocation {
+                try require(allocation.version == 1 && !allocation.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                try require(Set(allocation.investments.map(\.id)).count == allocation.investments.count)
+                func receipt(_ id: String, accountID: String, currency: String, on day: String) throws -> PlanTransfer {
+                    guard let transfer = transfers.first(where: { $0.id == id }), transfer.toAccountID == accountID,
+                          transfer.received.currency == currency, transfer.date <= day else { throw SurplusAllocationError.invalidFundingLink }
+                    return transfer
+                }
+                for transfer in transfers {
+                    try require(!transfer.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if let mandatory = transfer.requiredIndiaFunding {
+                        try mandatory.validated()
+                        try require(mandatory.currency == "INR" && transfer.sent.currency == "INR" && transfer.received.currency == "INR" && mandatory.money().amount <= transfer.sent.money().amount)
+                    }
+                    var visited: Set<String> = [transfer.id], current = transfer
+                    while let parentID = current.fundingTransferID {
+                        guard visited.insert(parentID).inserted else { throw SurplusAllocationError.invalidFundingLink }
+                        current = try receipt(parentID, accountID: current.fromAccountID, currency: current.sent.currency, on: current.date)
+                    }
+                }
+                if let id = allocation.requiredIndiaTransferID {
+                    try require(transfers.contains { $0.id == id && $0.sent.currency == "QAR" && $0.received.currency == "INR" && $0.fundingTransferID == nil })
+                }
+                if let id = allocation.keepInCBQDesignationID {
+                    try require(value.contributions.contains { $0.designationID == id && $0.amount.currency == "QAR" && $0.fundingTransferID == nil })
+                    try require(snapshot.reserves.contains { $0.id == id && $0.kind == .accountCash && $0.accountID == value.contributions.first(where: { $0.id == id })?.fundingAccountID })
+                }
+                for contribution in value.contributions {
+                    if let id = contribution.fundingTransferID {
+                        let transfer = try receipt(id, accountID: contribution.fundingAccountID, currency: contribution.amount.currency, on: contribution.dueDate)
+                        let reserve = snapshot.reserves.first { $0.id == contribution.designationID }
+                        try require(reserve?.kind == .planningDeposit || reserve?.accountID == transfer.toAccountID)
+                    }
+                }
+                for investment in allocation.investments {
+                    try investment.amount.validated(); try investment.instrument.validated(fundingCurrency: investment.amount.currency)
+                    try require(!investment.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && bank(investment.fundingAccountID, currency: investment.amount.currency) && date(investment.date))
+                    if let id = investment.fundingTransferID { _ = try receipt(id, accountID: investment.fundingAccountID, currency: investment.amount.currency, on: investment.date) }
+                }
+            } else {
+                try require(value.contributions.allSatisfy { $0.fundingTransferID == nil } && transfers.allSatisfy { $0.fundingTransferID == nil && $0.requiredIndiaFunding == nil })
+            }
             for adjustment in value.datedAdjustments {
                 for id in adjustment.transactionIDs ?? [] {
                     guard let fact = factsByID[id] else { throw FinancialIntelligenceError.invalidRecord }
@@ -437,5 +496,309 @@ extension PlanAssistance {
         if value.payslipFunding.map({ ids.contains($0.accountID) }) == true { value.payslipFunding = nil }
         if value.allowanceAccountID.map(ids.contains) == true { value.allowance = nil; value.allowanceAccountID = nil }
         return value
+    }
+}
+
+/// A reservation calculation over one monthly plan, never a ledger or proof of
+/// funding. Each transfer owns a temporary receipt capacity. Linked intentions
+/// consume that receipt instead of charging the original surplus again.
+nonisolated struct SurplusAllocationCalculation: Equatable, Sendable {
+    let monthlySurplus: Money
+    let retainedInCBQ: Money
+    /// Signed capacity still available in the selected retention account after
+    /// Keep and other funded uses. Other Qatar banks cannot supply this pool.
+    let remainingRetentionCapacity: Money
+    let remainingByFundingSource: [String: Money]
+    let requiredIndiaFundingByTransfer: [String: Money]
+    let unallocated: [Money]
+    /// Final native uses of surplus, including retention and existing planned
+    /// costs. Moving the same cash between accounts is not another use.
+    let plannedUsesByCurrency: [Money]
+    /// Ordinary and optional remittance fees actually charged by this plan,
+    /// reported separately from principal and final destination allocations.
+    let transferCostsByCurrency: [Money]
+}
+
+nonisolated enum SurplusAllocationCalculator {
+    /// Apply the retention-bank publication rule to an ordinary budget-v1
+    /// worksheet without adopting an allocation envelope. A zero Keep may
+    /// retain a signed deficit for the native review flow.
+    static func validateUnallocatedKeep(plan: FundingPlan, accounts: [AccountDTO],
+                                        preferences: IntelligencePreferences?,
+                                        salaryReceipt: PayslipReceiptState? = nil) throws {
+        guard plan.calculationVersion == .budgetV1, let keep = plan.keepInCBQ,
+              keep.currency.code == "QAR", keep.amount >= 0 else { throw SurplusAllocationError.invalidRecord }
+        guard keep.amount > 0 else { return }
+        let history = Set(accounts.filter { $0.closedAtISO != nil }.map(\.id))
+        let excluded = (preferences?.excludedPlanningAccountIDs ?? []).union(history)
+        guard let retentionID = preferences?.retentionAccountID,
+              !excluded.contains(retentionID),
+              accounts.contains(where: {
+                  $0.id == retentionID && $0.workspaceId == plan.workspaceID && $0.accountType == "bank"
+                      && $0.nativeCurrency == "QAR" && $0.closedAtISO == nil
+              }) else { throw SurplusAllocationError.invalidFundingLink }
+        let otherQAR = try plan.balances.filter { $0.included && $0.nativeCurrency.code == "QAR" && $0.accountID != retentionID }
+            .compactMap(\.money).reduce(Money(amount: 0, currency: "QAR")) { try $0 + $1 }
+        guard plan.balances.filter(\.included).allSatisfy({ row in
+            !excluded.contains(row.accountID) && accounts.contains {
+                $0.id == row.accountID && $0.workspaceId == plan.workspaceID && $0.accountType == "bank"
+                    && $0.nativeCurrency == row.nativeCurrency.code
+            }
+        }) else { throw SurplusAllocationError.incompletePlan }
+        let monthly = FundingPlanCalculator.calculate(plan, excludingAccounts: excluded,
+            historyOnlyAccountIDs: history, salaryReceipt: salaryReceipt)
+        guard let surplus = monthly.surplusAfterObligations else { throw SurplusAllocationError.incompletePlan }
+        let capacity = try surplus - keep - Money(amount: max(0, otherQAR.amount), currency: "QAR")
+        guard capacity.amount >= 0 else { throw SurplusAllocationError.exceedsCapacity }
+    }
+
+    /// Publishing a positive Keep instruction requires its exact eligible bank
+    /// and bank-local capacity. Calculation alone retains signed deficits for
+    /// review; every canonical writer applies this same publication boundary.
+    static func validatePublication(_ result: SurplusAllocationCalculation, plan: FundingPlan,
+                                    accounts: [AccountDTO], preferences: IntelligencePreferences?) throws {
+        guard result.retainedInCBQ.amount > 0 else { return }
+        guard let retentionID = preferences?.retentionAccountID,
+              preferences?.excludedPlanningAccountIDs?.contains(retentionID) != true,
+              accounts.contains(where: {
+                  $0.id == retentionID && $0.workspaceId == plan.workspaceID && $0.accountType == "bank"
+                      && $0.nativeCurrency == "QAR" && $0.closedAtISO == nil
+              }) else { throw SurplusAllocationError.invalidFundingLink }
+        guard result.remainingRetentionCapacity.amount >= 0 else { throw SurplusAllocationError.exceedsCapacity }
+    }
+
+    static func calculate(plan: FundingPlan, reserves: [ReserveDesignation], accounts: [AccountDTO],
+                          productLabels: [String: [String]] = [:], preferences: IntelligencePreferences?,
+                          salaryReceipt: PayslipReceiptState? = nil) throws -> SurplusAllocationCalculation {
+        guard let assistance = plan.assistance, let allocation = assistance.surplusAllocation,
+              assistance.workspaceID == plan.workspaceID, assistance.month == plan.month.canonical,
+              allocation.version == 1, !allocation.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              plan.calculationVersion == .budgetV1 else { throw SurplusAllocationError.invalidRecord }
+        let history = Set(accounts.filter { $0.closedAtISO != nil }.map(\.id))
+        let excluded = (preferences?.excludedPlanningAccountIDs ?? []).union(history)
+        // Preserve unavailable saved inputs for review instead of silently
+        // assigning their cash to another bank or using a different scope from
+        // the current monthly worksheet. History-scope editing remains explicit.
+        guard plan.balances.filter(\.included).allSatisfy({ row in
+            !excluded.contains(row.accountID) && accounts.contains { $0.id == row.accountID && $0.workspaceId == plan.workspaceID && $0.accountType == "bank" && $0.nativeCurrency == row.nativeCurrency.code }
+        }),
+              (plan.qatarCommitments + plan.indiaCommitments).filter(\.included).allSatisfy({ $0.isInAccountScope(excluding: history, fundingOverrides: assistance.billFundingAccounts) }),
+              assistance.payslipFunding.map({ !excluded.contains($0.accountID) }) ?? true else { throw SurplusAllocationError.incompletePlan }
+        guard let obligations = try? FundingPlanCalculator.effectiveIncludedObligations(plan, excludingAccounts: excluded,
+            historyOnlyAccountIDs: history) else { throw SurplusAllocationError.incompletePlan }
+        let staleReviewIDs = FundingPlanCalculator.staleReviewedObligationIDs(in: plan)
+        // An out-of-cycle statement review cannot replace the upcoming bill
+        // or fall through as a second surplus cost. Keep both saved records
+        // and require review of a remaining nonzero amount.
+        guard assistance.datedAdjustments.filter({ staleReviewIDs.contains($0.id) })
+            .allSatisfy({ (try? $0.amount.money().amount) == 0 }) else { throw SurplusAllocationError.incompletePlan }
+        let monthly = FundingPlanCalculator.calculate(plan, excludingAccounts: excluded, historyOnlyAccountIDs: history, salaryReceipt: salaryReceipt)
+        guard let surplus = monthly.surplusAfterObligations, let inr = monthly.inrAfterObligations,
+              let keep = plan.keepInCBQ, let required = monthly.requiredQARPrincipal,
+              let indiaNeed = monthly.indiaFundingShortfall, monthly.incompleteReasons.isEmpty else {
+            throw SurplusAllocationError.incompletePlan
+        }
+        let transfers = assistance.transfers ?? []
+        guard Set(transfers.map(\.id)).count == transfers.count,
+              transfers.allSatisfy({ !$0.id.isEmpty }),
+              transfers.filter({ $0.sent.currency != $0.received.currency }).count <= 1,
+              Set(assistance.contributions.map(\.id)).count == assistance.contributions.count,
+              Set(allocation.investments.map(\.id)).count == allocation.investments.count,
+              Set(plan.balances.map(\.accountID)).count == plan.balances.count else { throw SurplusAllocationError.invalidRecord }
+        var pools = ["cash:QAR": try surplus - keep, "cash:INR": inr]
+        var mandatoryPools: [String: Money] = [:]
+        var plannedUses = [keep.currency.code: keep]
+        var transferCosts: [String: Money] = [:]
+        if let fee = monthly.effectiveTransferFee, fee.amount > 0 { transferCosts[fee.currency.code] = fee }
+        func recordUse(_ amount: Money) throws {
+            plannedUses[amount.currency.code] = try (plannedUses[amount.currency.code] ?? Money(amount: 0, currency: amount.currency)) + amount
+        }
+        // The worksheet can include several Qatar balances. Supported routes
+        // cannot silently move another bank's cash into the selected CBQ bank.
+        let otherQAR = try plan.balances.filter { $0.included && $0.nativeCurrency.code == "QAR" && $0.accountID != preferences?.retentionAccountID }
+            .compactMap(\.money).reduce(Money(amount: 0, currency: "QAR")) { try $0 + $1 }
+        var retentionCapacity = try surplus - keep - Money(amount: max(0, otherQAR.amount), currency: "QAR")
+        func bank(_ id: String, currency: String) throws -> AccountDTO {
+            guard let account = accounts.first(where: { $0.id == id && $0.workspaceId == plan.workspaceID && $0.accountType == "bank" && $0.nativeCurrency == currency }),
+                  !excluded.contains(id) else { throw SurplusAllocationError.invalidFundingLink }
+            return account
+        }
+        // Even a zero remaining payment requires its exact reviewed paying
+        // bank to remain available; an invalid link must not release capacity.
+        for obligation in obligations where obligation.replacementAdjustmentID != nil {
+            guard let accountID = obligation.fundingAccountID else { throw SurplusAllocationError.invalidFundingLink }
+            _ = try bank(accountID, currency: obligation.money.currency.code)
+        }
+        var accountCapacity = Dictionary(uniqueKeysWithValues: plan.balances.filter { $0.included && $0.nativeCurrency.code == "INR" }
+            .compactMap { row in row.money.map { (row.accountID, $0) } })
+        var locallyReservedINR: Decimal = 0
+        // Account-local known bills also constrain a native-cash source. The
+        // worksheet already subtracts them from the total native capacity.
+        for obligation in obligations where obligation.money.currency.code == "INR" {
+            if let id = obligation.fundingAccountID, let available = accountCapacity[id] {
+                accountCapacity[id] = try available - obligation.money
+                locallyReservedINR += min(max(0, available.amount), obligation.money.amount)
+            }
+        }
+        var nativeMandatoryINR = max(0, (monthly.selectedINRLiquidity?.amount ?? 0) - inr.amount - locallyReservedINR)
+        func consume(_ amount: Money, accountID: String, transferID: String?, date: String) throws {
+            _ = try bank(accountID, currency: amount.currency.code)
+            guard amount.amount >= 0, (try? StatementDate(canonical: date)) != nil else { throw SurplusAllocationError.invalidRecord }
+            let key: String
+            if let transferID {
+                guard let source = transfers.first(where: { $0.id == transferID }), source.toAccountID == accountID,
+                      source.received.currency == amount.currency.code, source.date <= date else { throw SurplusAllocationError.invalidFundingLink }
+                key = "transfer:" + transferID
+            } else {
+                key = "cash:" + amount.currency.code
+                if amount.currency.code == "QAR" {
+                    guard accountID == preferences?.retentionAccountID else { throw SurplusAllocationError.invalidFundingLink }
+                    if amount.amount > 0 && retentionCapacity.amount < amount.amount { throw SurplusAllocationError.exceedsCapacity }
+                    retentionCapacity = try retentionCapacity - amount
+                } else if amount.currency.code == "INR" {
+                    guard let available = accountCapacity[accountID] else { throw SurplusAllocationError.incompletePlan }
+                    if amount.amount > 0 && available.amount < amount.amount { throw SurplusAllocationError.exceedsCapacity }
+                    accountCapacity[accountID] = try available - amount
+                } else { throw SurplusAllocationError.invalidFundingLink }
+            }
+            guard let available = pools[key], available.currency == amount.currency else { throw SurplusAllocationError.invalidFundingLink }
+            if amount.amount > 0 && available.amount < amount.amount { throw SurplusAllocationError.exceedsCapacity }
+            pools[key] = try available - amount
+        }
+        var visited: Set<String> = [], visiting: Set<String> = []
+        func process(_ transfer: PlanTransfer) throws {
+            if visited.contains(transfer.id) { return }
+            guard visiting.insert(transfer.id).inserted else { throw SurplusAllocationError.invalidFundingLink }
+            if let parentID = transfer.fundingTransferID {
+                guard let parent = transfers.first(where: { $0.id == parentID }) else { throw SurplusAllocationError.invalidFundingLink }
+                try process(parent)
+            }
+            let sent = try transfer.sent.money(), received = try transfer.received.money()
+            guard sent.amount >= 0, received.amount >= 0, (try? StatementDate(canonical: transfer.date)) != nil else { throw SurplusAllocationError.invalidRecord }
+            // An intention cannot replay cash already observed in its dated
+            // starting balance. Actual reconciliation needs a fresh review;
+            // never manufacture a second destination receipt while it is open.
+            guard transfer.transactionIDs?.isEmpty ?? true,
+                  plan.balances.filter({ $0.included && [transfer.fromAccountID, transfer.toAccountID].contains($0.accountID) })
+                    .allSatisfy({ $0.financialBalanceDate.map { $0.canonical < transfer.date } ?? true }) else { throw SurplusAllocationError.incompletePlan }
+            let from = try bank(transfer.fromAccountID, currency: sent.currency.code), to = try bank(transfer.toAccountID, currency: received.currency.code)
+            guard PlanningMetadataValidation.permitsPlanningRoute(fromID: from.id, fromCurrency: from.nativeCurrency, fromDomain: from.accountType ?? "",
+                fromRoute: PlanningMetadataValidation.routeType(account: from, productLabels: productLabels[from.id] ?? []),
+                toID: to.id, toCurrency: to.nativeCurrency, toDomain: to.accountType ?? "",
+                toRoute: PlanningMetadataValidation.routeType(account: to, productLabels: productLabels[to.id] ?? []),
+                retentionAccountID: preferences?.retentionAccountID) else { throw SurplusAllocationError.unsupportedRoute }
+            guard FundingPlanCalculator.transferPrincipal(received: received, fromCurrency: sent.currency.code, plan: plan) == sent else {
+                throw SurplusAllocationError.invalidFundingLink
+            }
+            var debit = sent, receipt = received
+            var mandatoryReceipt = try Money(amount: 0, currency: "INR")
+            if sent.currency != received.currency {
+                guard !transfer.conversionBasis.isEmpty else { throw SurplusAllocationError.invalidRecord }
+                if required.amount > 0 {
+                    guard allocation.requiredIndiaTransferID == transfer.id, transfer.fundingTransferID == nil,
+                          sent.amount >= required.amount, received.amount >= indiaNeed.amount else { throw SurplusAllocationError.invalidFundingLink }
+                    debit = try sent - required; receipt = try received - indiaNeed
+                    mandatoryReceipt = indiaNeed
+                } else {
+                    guard allocation.requiredIndiaTransferID == nil else { throw SurplusAllocationError.invalidFundingLink }
+                    if sent.amount > 0 {
+                        debit = try debit + plan.configuredTransferFee
+                        let fee = plan.configuredTransferFee
+                        transferCosts[fee.currency.code] = try (transferCosts[fee.currency.code] ?? Money(amount: 0, currency: fee.currency)) + fee
+                    }
+                }
+            } else if allocation.requiredIndiaTransferID == transfer.id { throw SurplusAllocationError.invalidFundingLink }
+            if let value = transfer.requiredIndiaFunding {
+                let amount = try value.money()
+                guard amount.currency.code == "INR", sent.currency.code == "INR", received.currency.code == "INR",
+                      amount.amount >= 0, amount.amount <= sent.amount else { throw SurplusAllocationError.invalidFundingLink }
+                if let parent = transfer.fundingTransferID {
+                    guard let available = mandatoryPools[parent], available.amount >= amount.amount else { throw SurplusAllocationError.invalidFundingLink }
+                    mandatoryPools[parent] = try available - amount
+                } else {
+                    guard let available = accountCapacity[from.id], nativeMandatoryINR >= amount.amount,
+                          available.amount >= amount.amount else { throw SurplusAllocationError.exceedsCapacity }
+                    accountCapacity[from.id] = try available - amount
+                    nativeMandatoryINR -= amount.amount
+                }
+                mandatoryReceipt = amount
+                debit = try debit - amount; receipt = try receipt - amount
+            }
+            try consume(debit, accountID: from.id, transferID: transfer.fundingTransferID, date: transfer.date)
+            pools["transfer:" + transfer.id] = receipt
+            mandatoryPools[transfer.id] = mandatoryReceipt
+            visiting.remove(transfer.id); visited.insert(transfer.id)
+        }
+        if let id = allocation.requiredIndiaTransferID, !transfers.contains(where: { $0.id == id }) { throw SurplusAllocationError.invalidFundingLink }
+        for transfer in transfers { try process(transfer) }
+        if let id = allocation.keepInCBQDesignationID {
+            guard let reserve = reserves.first(where: { $0.id == id && $0.workspaceID == plan.workspaceID }),
+                  reserve.kind == .accountCash, reserve.accountID == preferences?.retentionAccountID,
+                  let contribution = assistance.contributions.first(where: { $0.id == id }),
+                  contribution.fundingAccountID == reserve.accountID, contribution.amount.currency == "QAR",
+                  contribution.fundingTransferID == nil else { throw SurplusAllocationError.invalidFundingLink }
+        }
+        for contribution in assistance.contributions {
+            guard let reserve = reserves.first(where: { $0.id == contribution.designationID && $0.workspaceID == plan.workspaceID }),
+                  reserve.target.currency == contribution.amount.currency else { throw SurplusAllocationError.invalidFundingLink }
+            var debit = try contribution.amount.money()
+            guard debit.amount >= 0 else { throw SurplusAllocationError.invalidRecord }
+            var fundingID = contribution.fundingAccountID
+            if let transferID = contribution.fundingTransferID {
+                guard let transfer = transfers.first(where: { $0.id == transferID }),
+                      fundingID == transfer.toAccountID,
+                      reserve.kind == .planningDeposit ? fundingID == transfer.toAccountID : reserve.accountID == transfer.toAccountID else {
+                    throw SurplusAllocationError.invalidFundingLink
+                }
+                fundingID = transfer.toAccountID
+            } else if reserve.kind == .accountCash && reserve.accountID != fundingID {
+                // A different bank needs an explicit supported movement.
+                throw SurplusAllocationError.invalidFundingLink
+            }
+            if allocation.keepInCBQDesignationID == contribution.designationID {
+                debit = try Money(amount: max(0, debit.amount - keep.amount), currency: debit.currency)
+            }
+            try consume(debit, accountID: fundingID, transferID: contribution.fundingTransferID, date: contribution.dueDate)
+            try recordUse(debit)
+        }
+        for investment in allocation.investments {
+            guard !investment.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SurplusAllocationError.invalidRecord }
+            try investment.instrument.validated(fundingCurrency: investment.amount.currency)
+            let amount = try investment.amount.money()
+            try consume(amount, accountID: investment.fundingAccountID, transferID: investment.fundingTransferID, date: investment.date)
+            try recordUse(amount)
+        }
+        // Existing discretionary choices cannot become spendable a second time.
+        if let allowance = assistance.allowance {
+            guard let accountID = assistance.allowanceAccountID else { throw SurplusAllocationError.invalidFundingLink }
+            let amount = try allowance.money()
+            try consume(amount, accountID: accountID, transferID: nil, date: plan.recurringEnd.canonical)
+            try recordUse(amount)
+        }
+        let consumedReplacements = Set(obligations.compactMap(\.replacementAdjustmentID))
+        for cost in assistance.datedAdjustments where cost.kind != .expectedIncome {
+            guard cost.transactionIDs?.isEmpty ?? true else { throw SurplusAllocationError.incompletePlan }
+            if consumedReplacements.contains(cost.id) || staleReviewIDs.contains(cost.id) { continue }
+            let amount = try cost.amount.money()
+            if amount.amount == 0 {
+                // A deliberately reviewed zero separate cash need reserves no
+                // opening cash; it must not require an included zero balance.
+                _ = try bank(cost.accountID, currency: amount.currency.code)
+                guard (try? StatementDate(canonical: cost.date)) != nil else { throw SurplusAllocationError.invalidRecord }
+                continue
+            }
+            try consume(amount, accountID: cost.accountID, transferID: nil, date: cost.date)
+            try recordUse(amount)
+        }
+        var totals: [String: Money] = [:]
+        for amount in pools.values {
+            totals[amount.currency.code] = try (totals[amount.currency.code] ?? Money(amount: 0, currency: amount.currency)) + amount
+        }
+        return .init(monthlySurplus: surplus, retainedInCBQ: keep, remainingRetentionCapacity: retentionCapacity,
+                     remainingByFundingSource: pools,
+                     requiredIndiaFundingByTransfer: mandatoryPools,
+                     unallocated: totals.keys.sorted().compactMap { totals[$0] },
+                     plannedUsesByCurrency: plannedUses.keys.sorted().compactMap { plannedUses[$0] },
+                     transferCostsByCurrency: transferCosts.keys.sorted().compactMap { transferCosts[$0] })
     }
 }

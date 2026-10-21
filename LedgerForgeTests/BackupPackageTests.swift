@@ -38,6 +38,14 @@ final class BackupPackageTests: XCTestCase {
         change(&value)
         try JSONSerialization.data(withJSONObject: value).write(to: path)
     }
+    private func replaceFixturePayload(_ writable: URL, in package: URL) throws {
+        // Mutate a copy outside the package. A writable SQLite connection can
+        // create sidecars, whereas a native package has exactly two members.
+        let payload = package.appendingPathComponent("ledger.sqlite")
+        try BackupFiles.regularFile(writable)
+        try FileManager.default.removeItem(at: payload)
+        try FileManager.default.copyItem(at: writable, to: payload)
+    }
 
     func testValidEmptySchemaPackageAndImmutableVerification() throws {
         try withPackage { url in
@@ -81,6 +89,67 @@ final class BackupPackageTests: XCTestCase {
         try BackupCompatibility.verifyDatabase(db)
         XCTAssertEqual(try db.validatedMigrationHistory(against: allMigrations, requiresCompleteChain: true).count, allMigrations.count)
         XCTAssertEqual(try db.queryInt("SELECT count(*) FROM funding_plan_al_dar_references;"), 0)
+    }
+    func testV34PackageUpgradesOnlyIsolatedCandidateToV35() throws {
+        let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try package(at: directory, version: 34)
+        let sourcePayload = source.appendingPathComponent("ledger.sqlite")
+        let originalHash = try BackupFiles.hash(sourcePayload).sha256
+        let manifest = try BackupFiles.verifyPackage(source)
+        let candidate = directory.appendingPathComponent("candidate.sqlite")
+        _ = try BackupCompatibility.prepareCandidate(package: source, manifest: manifest, destination: candidate)
+        XCTAssertEqual(try BackupFiles.hash(sourcePayload).sha256, originalHash)
+        XCTAssertEqual(try BackupFiles.verifyPackage(source), manifest)
+        let db = SQLiteDatabase(path: candidate.path)
+        try db.open(access: .readOnlySnapshot); defer { db.close() }
+        try BackupCompatibility.verifyDatabase(db, schemaVersion: 35)
+        XCTAssertEqual(try db.queryInt("SELECT count(*) FROM planning_write_state;"), 0)
+        XCTAssertEqual(try db.queryInt("SELECT count(*) FROM planning_request_receipts;"), 0)
+    }
+    func testV35ReceiptContentsAreValidatedBeforeRestore() throws {
+        let directory = try temporary(); defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try package(at: directory, version: 35)
+        let payload = source.appendingPathComponent("ledger.sqlite")
+        let writable = directory.appendingPathComponent("writable.sqlite")
+        try FileManager.default.copyItem(at: payload, to: writable)
+        let db = SQLiteDatabase(path: writable.path)
+        try db.open(access: .existing)
+        try db.execute(sql: """
+            INSERT INTO workspaces(id,name,created_at) VALUES('workspace-1','Test','2026-10-21T00:00:00Z');
+            INSERT INTO planning_write_state(workspace_id,plan_month,write_revision,latest_origin)
+              VALUES('workspace-1','2026-10',1,'chatgpt');
+            INSERT INTO planning_request_receipts(request_id,request_digest,workspace_id,plan_month,plan_id,committed_revision,committed_at,outcome,result_json)
+              VALUES('request-1','bad','workspace-1','2026-10','plan-1',1,'2026-10-21T00:00:00Z','saved','{"outcome":"saved"}');
+            """)
+        try db.checkpointAndClose()
+        try replaceFixturePayload(writable, in: source)
+        let invalidHash = try BackupFiles.hash(payload)
+        try changeMetadata(source) { value in
+            value["database"] = ["file": "ledger.sqlite", "byteSize": invalidHash.size, "sha256": invalidHash.sha256]
+        }
+        XCTAssertThrowsError(try BackupFiles.verifyPackage(source)) { XCTAssertEqual($0 as? BackupError, .damaged) }
+
+        let repaired = SQLiteDatabase(path: writable.path)
+        try repaired.open(access: .existing)
+        try repaired.executePrepared(sql: "UPDATE planning_request_receipts SET request_digest=? WHERE request_id='request-1';",
+                                     params: [String(repeating: "a", count: 64)])
+        try repaired.checkpointAndClose()
+        try replaceFixturePayload(writable, in: source)
+        let validHash = try BackupFiles.hash(payload)
+        try changeMetadata(source) { value in
+            value["database"] = ["file": "ledger.sqlite", "byteSize": validHash.size, "sha256": validHash.sha256]
+        }
+        let manifest = try BackupFiles.verifyPackage(source)
+        let candidate = directory.appendingPathComponent("candidate.sqlite")
+        _ = try BackupCompatibility.prepareCandidate(package: source, manifest: manifest, destination: candidate)
+        let restored = SQLiteDatabase(path: candidate.path)
+        try restored.open(access: .readOnlySnapshot); defer { restored.close() }
+        try BackupCompatibility.verifyDatabase(restored)
+        XCTAssertEqual(try restored.queryInt("SELECT write_revision FROM planning_write_state WHERE workspace_id='workspace-1' AND plan_month='2026-10';"), 1)
+        let receipt = try restored.query(sql: "SELECT request_digest,plan_id,result_json FROM planning_request_receipts WHERE request_id='request-1';") {
+            [$0.string(at: 0) ?? "", $0.string(at: 1) ?? "", $0.string(at: 2) ?? ""]
+        }
+        XCTAssertEqual(receipt, [[String(repeating: "a", count: 64), "plan-1", "{\"outcome\":\"saved\"}"]])
     }
     func testSupportedPackagesUpgradeOnlyTheirMissingTail() throws {
         for version in 18...BackupCompatibility.supportedSchemaVersion {

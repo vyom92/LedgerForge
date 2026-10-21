@@ -1,9 +1,17 @@
 import Foundation
+import CryptoKit
 
 /// One current editor state per month. Incomplete text is intentionally separate
 /// from the validated plan used by financial projections; there is no edit log.
 
 extension FundingPlan {
+    /// Versioned content identity for a later plan-specific compare-and-save.
+    /// This is a review token, not a write authorization or an edit history.
+    nonisolated func planningRevision() throws -> String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        return "monthly-plan-v1:" + SHA256.hash(data: try encoder.encode(self)).map { String(format: "%02x", $0) }.joined()
+    }
+
     nonisolated func persistenceDTO() throws -> FundingPlanDTO {
         let plan = self
         func provenance(_ value: FundingPlanValueProvenance) -> (code: String, carried: String?, captured: String?) {
@@ -60,6 +68,88 @@ extension FundingPlan {
             },
             assistance: plan.assistance
         )
+    }
+}
+
+extension FundingPlanDTO {
+    /// Ephemeral input to the one worksheet calculator, after ordinary DTO
+    /// validation. This never hydrates stores or supplies a second formula.
+    nonisolated func allocationCalculationInput() throws -> FundingPlan {
+        try SalaryPersistenceDTOValidator.validate(plan: self)
+        guard let version = FundingPlanCalculationVersion(rawValue: calculationVersion),
+              let mode = FundingPlanReferenceMode(rawValue: referenceMode ?? "alDar") else { throw SurplusAllocationError.invalidRecord }
+        func money(_ decimal: String, _ currency: String = "QAR") throws -> Money {
+            try Money(canonicalDecimal: decimal, currency: currency)
+        }
+        func provenance(_ code: String, source: String? = nil, captured: String? = nil) throws -> FundingPlanValueProvenance {
+            switch code {
+            case "manual": return .manual
+            case "carried":
+                guard let source = source ?? rolloverSourcePlanId else { throw SurplusAllocationError.invalidRecord }
+                return .carried(sourcePlanID: source)
+            case "captured_account_balance":
+                guard let captured else { throw SurplusAllocationError.invalidRecord }
+                return .capturedAccountBalance(capturedAtISO: captured)
+            default: throw SurplusAllocationError.invalidRecord
+            }
+        }
+        func bills(_ region: String) throws -> [FundingPlanCommitment] {
+            try commitments.filter { $0.regionCode == region }.map {
+                .init(id: $0.id, label: $0.label, money: try money($0.amountDecimal, $0.amountCurrency), included: $0.included,
+                      fundingAccountID: $0.fundingAccountId, provenance: try provenance($0.provenanceCode, source: $0.carriedSourcePlanId),
+                      recurs: $0.recurs, temporaryCarryBasis: try $0.temporaryCarryBasisDecimal.map { try money($0, region == "india" ? "INR" : "QAR") },
+                      carriedSourceRowID: $0.carriedSourceRowId, remark: $0.remark,
+                      dueDate: try $0.dueDateISO.map { try StatementDate(canonical: $0) })
+            }
+        }
+        return try FundingPlan(id: id, workspaceID: workspaceId, month: SelectedStatementMonth(canonical: planMonthISO),
+            rolloverSourcePlanID: rolloverSourcePlanId,
+            expectedFixedEarnings: money(expectedFixedDecimal), expectedFixedProvenance: provenance(expectedFixedProvenance),
+            expectedVariableEarnings: money(expectedVariableDecimal), expectedVariableProvenance: provenance(expectedVariableProvenance),
+            expectedDeductions: money(expectedDeductionsDecimal), expectedDeductionsProvenance: provenance(expectedDeductionsProvenance),
+            balances: balances.map { row in
+                .init(id: row.id, accountID: row.accountId, nativeCurrency: try CurrencyCode(row.nativeCurrency), included: row.included,
+                      money: try row.amountDecimal.map { try money($0, row.nativeCurrency) }, provenance: try provenance(row.provenanceCode, source: row.carriedSourcePlanId, captured: row.capturedAtISO),
+                      financialBalanceDate: try row.financialBalanceDateISO.map { try StatementDate(canonical: $0) })
+            }, qatarCommitments: bills("qatar"), indiaCommitments: bills("india"),
+            configuredTransferFee: money(configuredFeeDecimal), configuredTransferFeeProvenance: provenance(configuredFeeProvenance),
+            planningFX: try fxINRPerQARDecimal.map {
+                guard let rate = Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")), let date = fxObservationDateISO else {
+                    throw SurplusAllocationError.incompletePlan
+                }
+                return try FundingPlanFX(inrPerQAR: rate, observationDate: StatementDate(canonical: date))
+            }, alDarReference: try alDarReference?.evidence(),
+            plannedInvestment: money(plannedInvestmentDecimal), plannedInvestmentProvenance: provenance(plannedInvestmentProvenance), updatedAtISO: updatedAtISO,
+            calculationVersion: version,
+            keepInCBQ: try keepInCBQDecimal.map { try money($0) },
+            deductions: deductions.map { .init(id: $0.id, label: $0.label, money: try money($0.amountDecimal), recurs: $0.recurs, carriedSourceRowID: $0.carriedSourceRowId) },
+            referenceMode: mode,
+            effectiveAlDarReference: try effectiveReference?.quote(), assistance: assistance)
+    }
+}
+
+extension PayslipReceiptState {
+    /// Fresh repository facts use exactly the same receipt decision as native
+    /// projections. No receipt, payroll amount or category is inferred here.
+    nonisolated static func resolve(plan: FundingPlan, receiptDTOs: [TransactionDTO], excludedAccounts: Set<String> = []) throws -> Self? {
+        guard let link = plan.assistance?.payslipFunding else { return nil }
+        let rows = receiptDTOs.filter { $0.isTrusted && $0.workspaceId == plan.workspaceID && $0.accountId == link.accountID && String($0.postedDateISO.prefix(7)) == plan.month.canonical }
+        let evidence = try rows.map { row -> PayslipReceiptEvidence in
+            guard row.nativeCurrency == link.net.currency, ["debit", "credit"].contains(row.direction),
+                  FinancialDateRole(rawValue: row.financialDateRole) != nil,
+                  !row.rawRows.isEmpty, Set(row.rawRows.map(\.normalizedRowId)).count == row.rawRows.count,
+                  row.rawRows.allSatisfy({ !$0.normalizedRowId.isEmpty && !($0.normalizedDocumentId ?? "").isEmpty &&
+                      ($0.sourceOrdinal ?? 0) > 0 && !($0.normalizedRecordDigest ?? "").isEmpty &&
+                      !($0.parserProfileId ?? "").isEmpty && !($0.parserProfileVersion ?? "").isEmpty }) else { throw FinancialIntelligenceError.invalidRecord }
+            let documents = Dictionary(grouping: row.rawRows, by: \.normalizedDocumentId)
+            guard documents.values.allSatisfy({ Set($0.map(\.sourceOrdinal)).count == $0.count }),
+                  documents.values.allSatisfy({ Set($0.map { ($0.parserProfileId ?? "") + "|" + ($0.parserProfileVersion ?? "") }).count == 1 }) else { throw FinancialIntelligenceError.invalidRecord }
+            _ = try StatementTimezoneEvidence(validatingPersistenceCode: row.statementTimezoneEvidence)
+            return try .init(id: row.id, accountID: row.accountId, date: StatementDate(canonical: row.postedDateISO),
+                money: MovementValidation.Fact(row).money(), isCredit: row.direction == "credit", narration: row.description ?? "",
+                hasCBQSource: row.rawRows.contains { $0.parserProfileId?.hasPrefix("cbq.") == true })
+        }
+        return resolve(plan: plan, evidence: evidence, excludedAccounts: excludedAccounts)
     }
 }
 

@@ -17,12 +17,13 @@ struct FinancialMCPSettingsView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
       LFSettingsPageHeader(
-        "Financial MCP", subtitle: "Read LedgerForge's financial presentation in ChatGPT."
+        "Financial MCP", subtitle: "Share financial context and allow explicit Budget Planning writes from ChatGPT."
       ) {}
       LFSettingsColumns(availableWidth: availableWidth) {
         sharingPanel
       } trailing: {
         VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+          planningWritePanel
           connectionPanel
           servicePanel
         }
@@ -67,9 +68,30 @@ struct FinancialMCPSettingsView: View {
           }
         }
         Text(
-          "These choices take effect when you save. Financial MCP reads the current presentation while LedgerForge is open. It cannot edit your ledger or refresh financial data."
+          "These read choices take effect when you save. Financial MCP reads the current presentation while LedgerForge is open. Reads do not refresh or save financial data."
         )
         .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+
+  private var planningWritePanel: some View {
+    LFPanel(title: "Budget Planning writes") {
+      VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+        Toggle(
+          "Allow direct Budget Planning writes from ChatGPT",
+          isOn: Binding(
+            get: { service.planningWriteEnabled },
+            set: { service.setPlanningWriteEnabled($0) }
+          )
+        )
+        .toggleStyle(.checkbox)
+        .accessibilityIdentifier("financialMCP.planningWriteEnabled")
+        Text(
+          "Off by default. Also enable Monthly plans sharing to use this. ChatGPT can save exact changes to existing monthly plans after you explicitly ask it to write them. LedgerForge checks the plan revision and requested changes, then saves them directly without another approval step. Planning transfers and investments are instructions, not actual transactions or orders."
+        )
+        .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
       }
     }

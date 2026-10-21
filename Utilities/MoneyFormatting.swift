@@ -16,6 +16,14 @@ enum MoneyFormatting {
         display(money, formatter: formatter(for: money.currency, locale: locale))
     }
 
+    /// Planning decisions expose every native minor unit while keeping whole
+    /// amounts compact. The app's ordinary whole-unit display is unchanged.
+    nonisolated static func planning(_ money: Money, locale: Locale = .current) -> String {
+        let numberFormatter = formatter(for: money.currency, locale: locale)
+        numberFormatter.maximumFractionDigits = (try? CurrencyCatalog.shared.definition(for: money.currency).fractionDigits) ?? displayFractionDigits
+        return display(money, formatter: numberFormatter)
+    }
+
     /// For a total whose surrounding label already names its currency.
     nonisolated static func number(_ money: Money, locale: Locale = .current) -> String {
         let numberFormatter = formatter(for: money.currency, locale: locale)
@@ -97,7 +105,7 @@ enum MoneyFormatting {
 
     nonisolated private static func display(_ money: Money, formatter: NumberFormatter) -> String {
         var source = money.amount, rounded = Decimal()
-        NSDecimalRound(&rounded, &source, displayFractionDigits, .plain)
+        NSDecimalRound(&rounded, &source, formatter.maximumFractionDigits, .plain)
         if rounded == 0 { rounded = .zero }
         return formatter.string(from: NSDecimalNumber(decimal: rounded)) ?? "\(money.currency.code) \(rounded)"
     }

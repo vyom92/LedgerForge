@@ -93,6 +93,7 @@ struct RepositoryRuntimeSnapshot {
     let salaryStatements: [SalaryStatement]
     let fundingPlans: [FundingPlan]
     let monthlyScratchpads: [MonthlyPlanScratchpad]
+    let planningMonthRevisions: [PlanningMonthRevision]
     let investments: InvestmentSnapshot
     let netWorthMembership: NetWorthMembershipSnapshot?
     let intelligence: FinancialIntelligenceSnapshot?
@@ -111,6 +112,7 @@ struct RepositoryRuntimeSnapshot {
         salaryStatements: [SalaryStatement],
         fundingPlans: [FundingPlan],
         monthlyScratchpads: [MonthlyPlanScratchpad] = [],
+        planningMonthRevisions: [PlanningMonthRevision] = [],
         investments: InvestmentSnapshot = .empty,
         netWorthMembership: NetWorthMembershipSnapshot? = nil,
         intelligence: FinancialIntelligenceSnapshot? = nil,
@@ -127,6 +129,7 @@ struct RepositoryRuntimeSnapshot {
         self.salaryStatements = salaryStatements
         self.fundingPlans = fundingPlans
         self.monthlyScratchpads = monthlyScratchpads
+        self.planningMonthRevisions = planningMonthRevisions
         self.investments = investments
         self.netWorthMembership = netWorthMembership
         self.intelligence = intelligence
@@ -555,6 +558,13 @@ final class RepositoryStoreHydrator {
         let salaryDTOs = try salaryRepo.snapshot(workspaceId: workspaceId)
         let fundingPlanDTOs = try fundingPlanRepo.plans(workspaceId: workspaceId)
         let monthlyScratchpads = try fundingPlanRepo.scratchpads(workspaceId: workspaceId).map(MonthlyPlanScratchpad.decode)
+        let planningMonthRevisions: [PlanningMonthRevision]
+        do { planningMonthRevisions = try fundingPlanRepo.planningMonthRevisions(workspaceID: workspaceId) }
+        catch PlanningWriteError.unavailable {
+            // Historical read-only repositories can still hydrate planning
+            // display data, but they cannot grant a write baseline.
+            planningMonthRevisions = []
+        }
         let investments = try investmentRepo.snapshot(workspaceID: workspaceId).validated(workspaceID: workspaceId)
         let identifiersByAccountID = Dictionary(uniqueKeysWithValues: try accountDTOs.map {
             ($0.id, try accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId))
@@ -690,6 +700,7 @@ final class RepositoryStoreHydrator {
             salaryStatements: salaryStatements,
             fundingPlans: fundingPlans,
             monthlyScratchpads: monthlyScratchpads,
+            planningMonthRevisions: planningMonthRevisions,
             investments: investments,
             netWorthMembership: membership,
             intelligence: intelligence,
@@ -873,7 +884,9 @@ final class RepositoryStoreHydrator {
         categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot, sourceWitness: snapshot.categorySourceWitness)
         cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
         salaryStore.installWithoutObservation(snapshot.salaryStatements)
-        fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration, scratchpads: snapshot.monthlyScratchpads)
+        fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration,
+                                                   scratchpads: snapshot.monthlyScratchpads,
+                                                   monthRevisions: snapshot.planningMonthRevisions)
         investmentStore.installWithoutObservation(snapshot.investments, generation: snapshot.providerGeneration)
         netWorthMembershipStore.installWithoutObservation(snapshot.netWorthMembership, generation: snapshot.providerGeneration)
         intelligenceStore.installWithoutObservation(snapshot.intelligence, generation: snapshot.providerGeneration, sources: snapshot.financialSources)
@@ -2447,10 +2460,7 @@ final class RepositoryStoreHydrator {
     static func sourceProductName(account: AccountDTO, productLabels: [String]) -> String? {
         guard account.accountType == "bank", let institution = account.institutionId,
               ["Axis Bank", "HDFC Bank"].contains(institution) else { return nil }
-        let roles = Set(productLabels.flatMap { label in
-            label.uppercased().split(whereSeparator: { !$0.isLetter }).filter { ["NRE", "NRO"].contains(String($0)) }.map(String.init)
-        })
-        guard roles.count == 1, let role = roles.first else { return nil }
+        guard let role = PlanningMetadataValidation.routeType(account: account, productLabels: productLabels) else { return nil }
         return institution.replacingOccurrences(of: " Bank", with: "") + " " + role
     }
 

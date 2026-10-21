@@ -481,7 +481,7 @@ public final class SQLiteRepositoryProvider {
             ? SQLiteSalaryRepository(db: database, generationToken: generationToken)
             : PlaceholderSalaryRepo()
         self.fundingPlanRepo = supportsSalary
-            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 }, supportsScratchpads: verifiedMigrationPrefix.contains { $0.version == 30 }, supportsRefundAllocations: supportsSpendingAndTags)
+            ? SQLiteFundingPlanRepository(db: database, supportsAssistance: migrations.contains { $0.version == 28 }, supportsBalanceDates: migrations.contains { $0.version == 29 }, supportsScratchpads: verifiedMigrationPrefix.contains { $0.version == 30 }, supportsRefundAllocations: supportsSpendingAndTags, supportsPlanningWrites: verifiedMigrationPrefix.contains { $0.version == 35 })
             : PlaceholderFundingPlanRepo()
     }
 

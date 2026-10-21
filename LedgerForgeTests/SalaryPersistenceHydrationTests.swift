@@ -49,8 +49,16 @@ struct SalaryPersistenceHydrationTests {
             fxINRPerQARDecimal: plan.fxINRPerQARDecimal, fxObservationDateISO: plan.fxObservationDateISO,
             plannedInvestmentMinor: plan.plannedInvestmentMinor, plannedInvestmentDecimal: plan.plannedInvestmentDecimal, plannedInvestmentProvenance: "manual",
             updatedAtISO: plan.updatedAtISO, balances: plan.balances, commitments: plan.commitments)
-        #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(invalid) }
-        #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(invalid) }
+        let sqliteRevision = try setup.sqlite.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: workspace.id, month: plan.planMonthISO).monthRevision
+        let memoryRevision = try setup.memory.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: workspace.id, month: plan.planMonthISO).monthRevision
+        #expect(throws: RepositoryError.self) {
+            try setup.sqlite.fundingPlanRepo.savePlan(invalid, expected: sqliteRevision, origin: .manual)
+        }
+        #expect(throws: RepositoryError.self) {
+            try setup.memory.fundingPlanRepo.savePlan(invalid, expected: memoryRevision, origin: .manual)
+        }
         #expect(try setup.sqlite.fundingPlanRepo.plans(workspaceId: workspace.id) == [plan])
 
         let path = setup.folder.appendingPathComponent("provider.sqlite").path
@@ -69,19 +77,31 @@ struct SalaryPersistenceHydrationTests {
         for workspace in [primary, other] { _ = try setup.sqlite.workspaceRepo.upsertWorkspace(workspace); _ = try setup.memory.workspaceRepo.upsertWorkspace(workspace) }
         for account in planAccounts() + [AccountDTO(id: "outside", workspaceId: other.id, name: "Outside", institutionId: "CBQ", accountType: "bank", nativeCurrency: "QAR", createdAtISO: timestamp)] { _ = try setup.sqlite.accountRepo.upsertAccount(account); _ = try setup.memory.accountRepo.upsertAccount(account) }
         let base = fundingPlan(); #expect(try setup.sqlite.fundingPlanRepo.savePlan(base) == base); #expect(try setup.memory.fundingPlanRepo.savePlan(base) == base)
-        let movedMonth = copyPlan(base, planMonthISO: "2026-09"); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(movedMonth) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(movedMonth) }
+        func rejects(_ candidate: FundingPlanDTO) throws {
+            let sqliteRevision = try setup.sqlite.fundingPlanRepo.planningWriteSnapshot(
+                workspaceID: candidate.workspaceId, month: candidate.planMonthISO).monthRevision
+            let memoryRevision = try setup.memory.fundingPlanRepo.planningWriteSnapshot(
+                workspaceID: candidate.workspaceId, month: candidate.planMonthISO).monthRevision
+            #expect(throws: RepositoryError.self) {
+                try setup.sqlite.fundingPlanRepo.savePlan(candidate, expected: sqliteRevision, origin: .manual)
+            }
+            #expect(throws: RepositoryError.self) {
+                try setup.memory.fundingPlanRepo.savePlan(candidate, expected: memoryRevision, origin: .manual)
+            }
+        }
+        let movedMonth = copyPlan(base, planMonthISO: "2026-09"); try rejects(movedMonth)
         let outsideBalance = FundingPlanBalanceDTO(id: "outside-balance", planId: base.id, sourceOrdinal: 1, accountId: "outside", nativeCurrency: "QAR", included: true, amountCurrency: "QAR", amountMinor: 100, amountDecimal: "1.00", provenanceCode: "manual", carriedSourcePlanId: nil, capturedAtISO: nil)
-        let crossWorkspace = copyPlan(base, balances: [outsideBalance]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(crossWorkspace) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(crossWorkspace) }
+        let crossWorkspace = copyPlan(base, balances: [outsideBalance]); try rejects(crossWorkspace)
         let wrongCurrency = FundingPlanBalanceDTO(id: "currency-balance", planId: base.id, sourceOrdinal: 1, accountId: "cbq", nativeCurrency: "INR", included: true, amountCurrency: "INR", amountMinor: 100, amountDecimal: "1.00", provenanceCode: "manual", carriedSourcePlanId: nil, capturedAtISO: nil)
-        let currencyMismatch = copyPlan(base, balances: [wrongCurrency]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(currencyMismatch) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(currencyMismatch) }
+        let currencyMismatch = copyPlan(base, balances: [wrongCurrency]); try rejects(currencyMismatch)
         let indiaViaQAR = FundingPlanCommitmentDTO(id: "bad-routing", planId: base.id, regionCode: "india", sourceOrdinal: 1, label: "India", amountCurrency: "INR", amountMinor: 100, amountDecimal: "1.00", included: true, fundingAccountId: "cbq", provenanceCode: "manual", carriedSourcePlanId: nil)
-        let routingMismatch = copyPlan(base, commitments: [indiaViaQAR]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(routingMismatch) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(routingMismatch) }
+        let routingMismatch = copyPlan(base, commitments: [indiaViaQAR]); try rejects(routingMismatch)
         let qatarInINR = FundingPlanCommitmentDTO(id: "qatar-in-inr", planId: base.id, regionCode: "qatar", sourceOrdinal: 1, label: "Qatar", amountCurrency: "INR", amountMinor: 100, amountDecimal: "1.00", included: true, fundingAccountId: nil, provenanceCode: "manual", carriedSourcePlanId: nil)
-        let qatarCurrencyMismatch = copyPlan(base, commitments: [qatarInINR]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(qatarCurrencyMismatch) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(qatarCurrencyMismatch) }
+        let qatarCurrencyMismatch = copyPlan(base, commitments: [qatarInINR]); try rejects(qatarCurrencyMismatch)
         let indiaInQAR = FundingPlanCommitmentDTO(id: "india-in-qar", planId: base.id, regionCode: "india", sourceOrdinal: 1, label: "India", amountCurrency: "QAR", amountMinor: 100, amountDecimal: "1.00", included: true, fundingAccountId: nil, provenanceCode: "manual", carriedSourcePlanId: nil)
-        let indiaCurrencyMismatch = copyPlan(base, commitments: [indiaInQAR]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(indiaCurrencyMismatch) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(indiaCurrencyMismatch) }
+        let indiaCurrencyMismatch = copyPlan(base, commitments: [indiaInQAR]); try rejects(indiaCurrencyMismatch)
         let badCarried = FundingPlanBalanceDTO(id: "carried-balance", planId: base.id, sourceOrdinal: 1, accountId: "cbq", nativeCurrency: "QAR", included: true, amountCurrency: "QAR", amountMinor: 100, amountDecimal: "1.00", provenanceCode: "carried", carriedSourcePlanId: "not-the-rollover-source", capturedAtISO: nil)
-        let carriedMismatch = copyPlan(base, rolloverSourcePlanId: "plan-source", balances: [badCarried]); #expect(throws: RepositoryError.self) { try setup.sqlite.fundingPlanRepo.savePlan(carriedMismatch) }; #expect(throws: RepositoryError.self) { try setup.memory.fundingPlanRepo.savePlan(carriedMismatch) }
+        let carriedMismatch = copyPlan(base, rolloverSourcePlanId: "plan-source", balances: [badCarried]); try rejects(carriedMismatch)
     }
 
 }

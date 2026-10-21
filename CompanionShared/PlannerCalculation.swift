@@ -1,15 +1,16 @@
 import Foundation
 
-enum FundingPlanIncompleteReason: String, Equatable, Sendable {
+nonisolated enum FundingPlanIncompleteReason: String, Equatable, Sendable {
     case includedQARBalanceMissing
     case includedINRBalanceMissing
     case invalidCurrency
     case missingPlanningFX
     case invalidPlanningReference
     case salaryReceiptNeedsReview
+    case reviewedObligationNeedsReview
 }
 
-struct FundingPlanCalculation: Equatable, Sendable {
+nonisolated struct FundingPlanCalculation: Equatable, Sendable {
     let expectedNet: Money?
     let selectedQARLiquidity: Money?
     let selectedINRLiquidity: Money?
@@ -29,6 +30,13 @@ struct FundingPlanCalculation: Equatable, Sendable {
     var estimatedINR: Money? = nil
     var qatarObligationShortfall: Money? = nil
     var qatarReserveGap: Money? = nil
+    /// Signed native surplus after mandatory obligations and ordinary
+    /// remittance costs, before retention or other surplus allocations.
+    var surplusAfterObligations: Money? = nil
+    var inrAfterObligations: Money? = nil
+    /// The worksheet retains its upcoming manual amount when an older or
+    /// later-cycle review still names the recurring bill's stable identity.
+    var staleReviewedObligationIDs: Set<String> = []
 }
 
 nonisolated enum PayslipReceiptState: Equatable, Sendable {
@@ -46,9 +54,139 @@ nonisolated enum PayslipReceiptState: Equatable, Sendable {
         case .needsReview: "Check salary account and starting balance"
         }
     }
+
+    static func resolve(plan: FundingPlan, evidence: [PayslipReceiptEvidence], excludedAccounts: Set<String> = []) -> Self? {
+        guard let link = plan.assistance?.payslipFunding else { return nil }
+        guard !excludedAccounts.contains(link.accountID),
+              let balance = plan.balances.first(where: { $0.accountID == link.accountID && $0.included }),
+              let amount = balance.money else { return .needsReview }
+        let candidates = evidence.filter {
+            $0.accountID == link.accountID && $0.isCredit && $0.money.currency.code == link.net.currency &&
+                $0.date.map { String($0.canonical.prefix(7)) == plan.month.canonical } == true && $0.hasCBQSource &&
+                $0.narration.uppercased().hasPrefix("SALARY TRANSFER") && $0.narration.uppercased().contains("QATAR AIRWAYS")
+        }
+        guard !candidates.isEmpty else {
+            if let acknowledgement = link.balanceAcknowledgement {
+                guard case .capturedAccountBalance = balance.provenance,
+                      let payday = plan.assistance?.salaryCycle?.recurringStart,
+                      let acknowledgedDate = try? StatementDate(canonical: acknowledgement.financialDate),
+                      acknowledgedDate >= payday else { return .needsReview }
+                return acknowledgement.balanceID == balance.id && acknowledgement.amount == (try? PlanningAmount(amount)) &&
+                    acknowledgement.financialDate == balance.financialBalanceDate?.canonical ? .acknowledgedBalance : .needsReview
+            }
+            if let date = balance.financialBalanceDate, let payday = plan.assistance?.salaryCycle?.recurringStart, date >= payday {
+                return .needsReview
+            }
+            return .pending
+        }
+        guard candidates.count == 1, let credit = candidates.first, let date = credit.date,
+              let id = credit.id, let net = try? link.net.money(), credit.money == net else { return .needsReview }
+        return .bankCredit(id: id, date: date, includedInBalance: balance.financialBalanceDate.map { $0 >= date } ?? false)
+    }
 }
 
-enum FundingPlanCalculator {
+/// Exact inputs consulted by the existing salary-receipt resolver. Adapters
+/// supply canonical facts; this value is neither a transaction nor an estimate.
+nonisolated struct PayslipReceiptEvidence {
+    let id: String?
+    let accountID: String?
+    let date: StatementDate?
+    let money: Money
+    let isCredit: Bool
+    let narration: String
+    let hasCBQSource: Bool
+}
+
+/// One included worksheet obligation after an exact, owner-reviewed card
+/// replacement. The original bill and its source/date/identity stay unchanged.
+nonisolated struct FundingPlanObligation: Equatable, Sendable {
+    let billID: String
+    let money: Money
+    let fundingAccountID: String?
+    let replacementAdjustmentID: String?
+    var staleReplacementAdjustmentID: String? = nil
+}
+
+nonisolated enum FundingPlanCalculator {
+    /// Stable recurring bill IDs can outlive an individual statement review.
+    /// Only this definite cycle mismatch makes a link stale; early payments
+    /// within the same cycle and explicitly overdue manual bills retain their
+    /// existing interpretation. No settlement is inferred from either date.
+    static func reviewedObligationIsStale(_ review: PlanDatedAdjustment, for bill: FundingPlanCommitment,
+                                          in plan: FundingPlan) -> Bool {
+        guard plan.calculationVersion == .budgetV1, let cycle = plan.assistance?.salaryCycle,
+              let billDate = plan.dueDate(for: bill), let reviewDate = try? StatementDate(canonical: review.date) else { return false }
+        return cycle.includesRecurring(dueOn: billDate) && !cycle.includesRecurring(dueOn: reviewDate)
+    }
+
+    static func staleReviewedObligationIDs(in plan: FundingPlan) -> Set<String> {
+        let bills = plan.qatarCommitments + plan.indiaCommitments
+        return Set((plan.assistance?.datedAdjustments ?? []).compactMap { review in
+            guard let billID = review.replacesCommitmentID, let bill = bills.first(where: { $0.id == billID }),
+                  reviewedObligationIsStale(review, for: bill, in: plan) else { return nil }
+            return review.id
+        })
+    }
+
+    /// Resolve only explicit card/statement/bill links. A review of another
+    /// statement on the same card never changes an independent manual estimate.
+    /// Dates describe funding intent; they do not remove an included salary-
+    /// cycle obligation merely because it falls in the next calendar month.
+    static func effectiveIncludedObligations(_ plan: FundingPlan, excludingAccounts: Set<String> = [],
+                                             historyOnlyAccountIDs: Set<String> = []) throws -> [FundingPlanObligation] {
+        let bills = plan.qatarCommitments + plan.indiaCommitments
+        let adjustments = plan.assistance?.datedAdjustments ?? []
+        let replacements = plan.calculationVersion == .budgetV1 ? adjustments.filter { $0.replacesCommitmentID != nil } : []
+        var byBill: [String: PlanDatedAdjustment] = [:]
+        if !replacements.isEmpty {
+            guard Set(bills.map(\.id)).count == bills.count,
+                  Set(adjustments.map(\.id)).count == adjustments.count else { throw FinancialIntelligenceError.invalidRecord }
+            for review in replacements {
+                guard let billID = review.replacesCommitmentID,
+                      let bill = bills.first(where: { $0.id == billID }), byBill[billID] == nil,
+                      review.kind == .irregularCost,
+                      !review.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let cardID = review.cardAccountID, !cardID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      bill.fundingAccountID == cardID,
+                      let statementID = review.cardStatementID, !statementID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      adjustments.filter({ $0.cardStatementID == statementID }).count == 1,
+                      !review.accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      review.accountID != cardID,
+                      let money = try? review.amount.money(), money.currency == bill.money.currency, money.amount >= 0,
+                      (try? StatementDate(canonical: review.date)) != nil else { throw FinancialIntelligenceError.invalidRecord }
+                byBill[billID] = review
+            }
+        }
+        let unavailableAccounts = excludingAccounts.union(historyOnlyAccountIDs)
+        return try bills.filter { $0.included && $0.isInAccountScope(excluding: historyOnlyAccountIDs,
+            fundingOverrides: plan.assistance?.billFundingAccounts) }.map { bill in
+            if let review = byBill[bill.id] {
+                if reviewedObligationIsStale(review, for: bill, in: plan) {
+                    return .init(billID: bill.id, money: bill.money,
+                        fundingAccountID: plan.assistance?.billFundingAccounts?[bill.id] ?? bill.fundingAccountID,
+                        replacementAdjustmentID: nil, staleReplacementAdjustmentID: review.id)
+                }
+                guard !unavailableAccounts.contains(review.accountID) else { throw FinancialIntelligenceError.invalidRecord }
+                return try .init(billID: bill.id, money: review.amount.money(), fundingAccountID: review.accountID,
+                                 replacementAdjustmentID: review.id)
+            }
+            return .init(billID: bill.id, money: bill.money,
+                         fundingAccountID: plan.assistance?.billFundingAccounts?[bill.id] ?? bill.fundingAccountID,
+                         replacementAdjustmentID: nil)
+        }
+    }
+
+    /// The same plan-local quote and upward principal rounding used by the
+    /// worksheet. Investment quote currencies do not create another FX source.
+    static func transferPrincipal(received: Money, fromCurrency: String, plan: FundingPlan) -> Money? {
+        if fromCurrency == received.currency.code { return received }
+        guard fromCurrency == "QAR", received.currency.code == "INR" else { return nil }
+        let rate: AlDarReturnedINRDecimal?
+        if plan.referenceMode == .manual { rate = plan.planningFX.flatMap { try? AlDarReturnedINRDecimal.planningRate($0.inrPerQAR) } }
+        else { rate = plan.effectiveAlDarReference.flatMap { $0.submittedQAR.amount == 1 ? $0.returnedINR : nil } }
+        return try? rate?.principal(for: received, submittedQAR: Money(amount: 1, currency: "QAR"))
+    }
+
     // Monthly worksheet inputs are complete on their own. Saved reserve
     // targets belong to Plan insights and never reduce these selected balances.
     static func calculate(_ savedPlan: FundingPlan, excludingAccounts: Set<String> = [], historyOnlyAccountIDs: Set<String> = [], salaryReceipt: PayslipReceiptState? = nil) -> FundingPlanCalculation {
@@ -69,7 +207,11 @@ enum FundingPlanCalculator {
             case .bankCredit(_, _, false), .needsReview, nil: return unavailable(.salaryReceiptNeedsReview)
             }
         }
-        if plan.calculationVersion == .budgetV1 { return calculateBudget(plan) }
+        if plan.calculationVersion == .budgetV1 {
+            guard let obligations = try? effectiveIncludedObligations(savedPlan, excludingAccounts: excludingAccounts,
+                historyOnlyAccountIDs: historyOnlyAccountIDs) else { return unavailable(.reviewedObligationNeedsReview) }
+            return calculateBudget(plan, obligations: obligations)
+        }
         var reasons = Set<FundingPlanIncompleteReason>()
         guard plan.planningFX == nil || plan.alDarReference == nil else {
             return unavailable(.invalidPlanningReference)
@@ -142,6 +284,9 @@ enum FundingPlanCalculator {
         }
         let finalBuffer = beforeInvestment.flatMap { try? $0 - plan.plannedInvestment }
         let availableForInvestment = beforeInvestment.flatMap { try? Money(amount: max(.zero, $0.amount), currency: qar) }
+        let inrSurplus: Money? = if let selectedINR, let indiaCommitments {
+            try? Money(amount: max(0, selectedINR.amount - indiaCommitments.amount), currency: inr)
+        } else { nil }
         return FundingPlanCalculation(
             expectedNet: expectedNet,
             selectedQARLiquidity: selectedQAR,
@@ -153,11 +298,13 @@ enum FundingPlanCalculator {
             qarBeforeInvestment: beforeInvestment,
             availableForInvestment: availableForInvestment,
             finalQARBuffer: finalBuffer,
-            incompleteReasons: reasons
+            incompleteReasons: reasons,
+            surplusAfterObligations: beforeInvestment,
+            inrAfterObligations: inrSurplus
         )
     }
 
-    private static func calculateBudget(_ plan: FundingPlan) -> FundingPlanCalculation {
+    private static func calculateBudget(_ plan: FundingPlan, obligations: [FundingPlanObligation]) -> FundingPlanCalculation {
         guard let qar = try? CurrencyCode("QAR"), let inr = try? CurrencyCode("INR"),
               let reserve = plan.keepInCBQ,
               [plan.expectedFixedEarnings, plan.expectedVariableEarnings, plan.configuredTransferFee, reserve].allSatisfy({ $0.currency == qar }),
@@ -175,8 +322,8 @@ enum FundingPlanCalculator {
         let e = liquidity(inr, missing: .includedINRBalanceMissing)
         let deductions = sum(plan.deductions.map(\.money), currency: qar)
         let net = deductions.flatMap { try? plan.expectedFixedEarnings + plan.expectedVariableEarnings - $0 }
-        let cq = sum(plan.qatarCommitments.filter(\.included).map(\.money), currency: qar)
-        let ci = sum(plan.indiaCommitments.filter(\.included).map(\.money), currency: inr)
+        let cq = sum(obligations.filter { $0.money.currency == qar }.map(\.money), currency: qar)
+        let ci = sum(obligations.filter { $0.money.currency == inr }.map(\.money), currency: inr)
         let p: Money? = if let b, let net, let cq { try? b + net - cq - reserve } else { nil }
         let a = p.flatMap { try? $0 - plan.configuredTransferFee }
         let t = a.flatMap { try? Money(amount: max(0, $0.amount), currency: qar) }
@@ -202,13 +349,17 @@ enum FundingPlanCalculator {
         let afterQatarBills: Money? = if let b, let net, let cq { try? b + net - cq } else { nil }
         let obligationGap = afterQatarBills.flatMap { try? Money(amount: max(0, -$0.amount), currency: qar) }
         let reserveGap = afterQatarBills.flatMap { try? Money(amount: max(0, reserve.amount - max(0, $0.amount)), currency: qar) }
+        let inrSurplus: Money? = if let e, let ci { try? Money(amount: max(0, e.amount - ci.amount), currency: inr) } else { nil }
         return FundingPlanCalculation(expectedNet: net, selectedQARLiquidity: b, selectedINRLiquidity: e,
             indiaCommitments: ci, indiaFundingShortfall: h, requiredQARPrincipal: principal,
             effectiveTransferFee: fee, qarBeforeInvestment: margin, availableForInvestment: nil,
             finalQARBuffer: margin, incompleteReasons: reasons, totalDeductions: deductions,
             qatarCommitments: cq, positionBeforeTransfer: p, signedPotentialCapacity: a,
             transferablePrincipal: t, estimatedINR: estimate,
-            qatarObligationShortfall: obligationGap, qatarReserveGap: reserveGap)
+            qatarObligationShortfall: obligationGap, qatarReserveGap: reserveGap,
+            surplusAfterObligations: margin.flatMap { try? $0 + reserve },
+            inrAfterObligations: inrSurplus,
+            staleReviewedObligationIDs: Set(obligations.compactMap(\.staleReplacementAdjustmentID)))
     }
 
     private static func sum(_ values: [Money], currency: CurrencyCode) -> Money? {

@@ -5,7 +5,8 @@ Financial MCP exposes four read-only operations from the running Mac app:
 `get_planning_context`. Settings > Financial MCP controls the connection and the
 information permitted for each operation. Saving sharing choices stops the
 service. Start it after reviewing those choices. Revoke stops sharing, removes
-the saved runtime key and clears all four permissions.
+the saved runtime key and clears the read permissions and planning-write grant.
+The separate `apply_planning_changes` capability is off by default.
 
 The app owns its loopback listeners, guardian and tunnel. Quitting the app closes
 them. The guardian also detects unexpected app exit. Sleep tears down transport;
@@ -22,7 +23,8 @@ it was created; save it again after moving the app.
 ## Presentation contract
 
 Reads run synchronously on the UI actor against the existing Dashboard,
-investment and Budget Planning presentation. They do not open a database,
+investment and Budget Planning presentation. A planning read can also inspect
+the canonical repository to attach a current `write_context`. Reads do not
 import statements, fetch prices, save plans or migrate storage. Exact amounts
 are decimal strings or numerator/denominator pairs; displayed strings use the
 same native formatting. Observation dates and cached/partial qualifications
@@ -41,6 +43,46 @@ saved plan, retained entries, validation and unsaved scenario. An explicit
 month or calculating a new projection. Missing records remain null. Retained
 incomplete input remains text and is not represented as an accepted amount.
 
+## Direct planning writes
+
+`apply_planning_changes` saves exact planning changes after the owner explicitly
+instructs ChatGPT to write them. Discussion alone is not a write instruction.
+There is no proposal state, approval token or second Mac confirmation. Settings
+has a separate, default-off planning-write grant, and the planning read grant
+must also be enabled. This grants the capability; it is not a confirmation per
+request. Installation and activation still require the owner's rollout decision.
+
+The closed schema in `Models/PlanningChangeContract.swift` requires `request_id`,
+`workspace_id`, `month`, `plan_id`, `expected_write_revision` and 1–32 typed
+`changes`. It accepts specified monthly amounts, existing deductions, bills and
+planning balances, manual FX, reserve contributions, own-bank transfer plans,
+exact-instrument investment intentions and their funding links. Stable IDs
+address existing records or explicitly created allocation rows. Amounts retain
+native QAR/INR decimal precision. Unknown fields and invalid whole batches fail
+without a partial save. No transactions, trades, deposits, holdings, source
+records, salary predictions, accounts, bills or reserve targets are created.
+
+`get_planning_context.write_context` binds an existing canonical plan, retained
+entries, durable month revision, provider activation and relevant financial
+dependencies. It is distinct from the presentation `snapshot_id`. A conflicting
+native draft makes the write context unavailable; the app does not flush or
+discard that draft. Unrelated investment-price refreshes do not invalidate the
+planning revision. A caller already holding a current context can write directly.
+
+Every native canonical or retained save checks its original month baseline too.
+V35 stores the monotonic month revision, latest canonical origin
+(`unknown`, `manual` or `chatgpt`), and bounded technical retry receipts. The plan,
+retained state, revision, origin, paired companion state and receipt commit in one
+transaction, followed by canonical hydration and readback.
+
+Reuse an identical `request_id` and payload after a lost response. A committed
+retry returns its historical receipt and current readback without reapplying old
+values. Reusing an ID with another payload fails. A true no-op does not advance
+the canonical revision. `committed_refresh_needed` means the save committed but
+runtime hydration needs recovery; retry the same request. Stale revisions require
+reading and reconciling current state. These technical receipts contain no
+conversational approval history.
+
 ## Build and qualification
 
 The Xcode build phase uses `script/embed_financial_mcp.sh`. The
@@ -57,7 +99,7 @@ runtime diagnostics. Debug-only isolated qualification can use
 `LEDGERFORGE_MCP_QUALIFICATION`; these overrides are not available in Release.
 The normal test host never activates Financial MCP.
 
-Run the seven nonfinancial access/protocol definitions through the canonical
+Run the access/protocol definitions through the canonical
 validation driver:
 
 ```sh
@@ -66,6 +108,15 @@ validation driver:
 
 Authentic qualification requires the owner's field-sharing approval and an
 isolated namespace populated from a verified native backup. Compare the actual
-UI and tool responses in memory. Keep financial values, source material and
-credentials out of Git and ordinary evidence files. Operational receipts and
+UI and tool responses in the isolated environment. Keep private financial values,
+source material and credentials out of Git. Operational receipts and
 acceptance limitations belong in the campaign's external evidence directory.
+
+Stage C qualification uses a verified backup copy, fresh loopback credentials
+and an ephemeral injected write permission. It does not enable the persistent
+grant. The focused suites include `PlanningChangeContractTests`,
+`PlanningChangeApplicatorTests`, `PlanningWritePersistenceTests`,
+`PlanningNativeRevisionTests`, `FinancialMCPPlanningWriteTests`,
+`PlanningWriteReceiptContentTests` and `FinancialMCPPlanningRuntimeTests`.
+The last suite requires an explicit `LEDGERFORGE_STAGE_C_BACKUP` native package
+(or `LEDGERFORGE_COMPANION_AUTHENTIC_BACKUP`) forwarded into the isolated test host.

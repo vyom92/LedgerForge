@@ -160,8 +160,15 @@ struct SalaryParserAndPlannerTests {
         ])
         let plans = FundingPlanStore()
         let previous = Self.plan(month: try SelectedStatementMonth(year: 2026, month: 9), id: "previous")
-        plans.installWithoutObservation([previous], generation: DatabaseProvider.shared.generationToken)
-        let viewModel = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(year: 2026, month: 10), workspaceID: "default-workspace", accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: plans)
+        let provider = DatabaseProvider(inMemory: true)
+        _ = try provider.fundingPlanRepo.savePlan(previous.persistenceDTO())
+        let targetMonth = try SelectedStatementMonth(year: 2026, month: 10)
+        let targetRevision = try provider.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: "default-workspace", month: targetMonth.canonical).monthRevision
+        plans.installWithoutObservation([previous], generation: provider.generationToken,
+            monthRevisions: [targetRevision])
+        let viewModel = SalaryWorkspaceViewModel(month: targetMonth, workspaceID: "default-workspace",
+            provider: { provider }, accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: plans)
         #expect(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId) == ["axis-nre", "axis-other", "cbq"])
         #expect(viewModel.plan.balances.isEmpty)
         viewModel.rolloverFromPreviousPlan()

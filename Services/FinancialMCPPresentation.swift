@@ -1,8 +1,8 @@
 import Combine
 import Foundation
 
-/// Observes the same instances used by the Mac UI. It never opens a repository,
-/// requests hydration/network work, saves a plan, or manufactures financial data.
+/// Observes the same instances used by the Mac UI. Planning reads may attach a
+/// repository-bound write context; they never hydrate, refresh or save anything.
 @MainActor
 final class FinancialMCPPresentation {
   static let shared = FinancialMCPPresentation()
@@ -96,6 +96,14 @@ final class FinancialMCPPresentation {
         "Current LedgerForge presentation is unavailable; retained values are not current evidence."
       )
     }
+    let writeContext: [String: Any]?
+    if tool == .planningContext, let planner, planner.generation == current,
+       let month = arguments["month"].flatMap({ try? SelectedStatementMonth(canonical: $0) }) ?? (arguments["month"] == nil ? planner.month : nil) {
+      let workspace = planner.plan.workspaceID
+      writeContext = FinancialMCPPlanningWriteService.shared.writeContext(workspaceID: workspace, month: month,
+        saved: FundingPlanStore.shared.plan(for: month, workspaceID: workspace),
+        retained: FundingPlanStore.shared.scratchpads.first { $0.plan.workspaceID == workspace && $0.plan.month == month })
+    } else { writeContext = nil }
     guard !dirty, generation == current, let dashboard, !dashboard.financialMCPRefreshPending,
       let planner, planner.generation == current,
       let prices, let rates,
@@ -105,10 +113,14 @@ final class FinancialMCPPresentation {
       prices.financialMCPMatches(
         generation: current, snapshot: InvestmentStore.shared.snapshot, legs: rates.legs)
     else {
-      return FinancialMCPProtocol.error(
+      var unavailable = FinancialMCPProtocol.error(
         "presentation_changing",
         "The presentation is updating or belongs to a different provider. Retry after the app finishes updating."
       )
+      // A transient quote refresh must not make planning writes depend on the
+      // investment presentation. The original read error retains its meaning.
+      if let writeContext { unavailable["write_context"] = writeContext }
+      return unavailable
     }
     let snapshot = providerIdentity + ":" + String(revision)
     if let expected = arguments["expected_snapshot"], expected != snapshot {
@@ -125,6 +137,7 @@ final class FinancialMCPPresentation {
       "basis":
         "Existing LedgerForge presentation; exact amounts are decimal strings or exact numerator/denominator pairs. Display strings preserve the app's rounding.",
     ]
+    if let writeContext { result["write_context"] = writeContext }
     do {
       switch tool {
       case .financialStatus, .portfolioOverview:

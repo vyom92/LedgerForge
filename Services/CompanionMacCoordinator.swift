@@ -310,6 +310,8 @@ final class CompanionMacCoordinator: ObservableObject {
             }
             let stored = try saved.decodedEnvelope(session: paired)
             let expected = try Self.durableScratchpad(stored.current.scratchpad, provider: provider)
+            let expectedMonthRevision = try provider.fundingPlanRepo.planningWriteSnapshot(
+                workspaceID: workspaceID, month: proposal.scope.month).monthRevision
             let binding = try stored.current.binding(for: stored.kernel.scope)
             let transition = try stored.kernel.receiving(proposal)
             var scratch = stored.current.scratchpad
@@ -328,6 +330,7 @@ final class CompanionMacCoordinator: ObservableObject {
             let anchor = Self.replacing(stored.current, scratchpad: scratch, metadata: metadata)
             _ = try provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: paired.sessionID, workspaceID: workspaceID,
                 month: proposal.scope.month, expectedActivationEpoch: paired.activationEpoch, expectedStateRevision: saved.stateRevision,
+                expectedMonthRevision: expectedMonthRevision,
                 expectedScratchpad: expected, editor: changesEditor ? try scratch.dto() : expected,
                 canonical: try canonical?.persistenceDTO(), binding: binding, metadata: metadata,
                 operation: .receive(proposal), currentAnchor: anchor))
@@ -352,6 +355,8 @@ final class CompanionMacCoordinator: ObservableObject {
             for scratch in capture.runtime.monthlyScratchpads where scratch.plan.workspaceID == workspaceID {
                 let month = scratch.plan.month.canonical
                 let expected = try Self.durableScratchpad(scratch, provider: provider)
+                let expectedMonthRevision = try provider.fundingPlanRepo.planningWriteSnapshot(
+                    workspaceID: workspaceID, month: month).monthRevision
                 let existing = try provider.fundingPlanRepo.companionMonth(sessionID: paired.sessionID, workspaceID: workspaceID, month: month)
                 let saved: CompanionMonthSyncDTO
                 if let existing {
@@ -360,6 +365,7 @@ final class CompanionMacCoordinator: ObservableObject {
                     if fresh != old.current {
                         saved = try provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: paired.sessionID, workspaceID: workspaceID,
                             month: month, expectedActivationEpoch: paired.activationEpoch, expectedStateRevision: existing.stateRevision,
+                            expectedMonthRevision: expectedMonthRevision,
                             expectedScratchpad: expected, editor: expected, canonical: nil,
                             binding: old.current.binding(for: paired.scope(month: month)), metadata: old.current.metadata,
                             operation: .refreshDependencies, currentAnchor: fresh)).stored
@@ -377,6 +383,7 @@ final class CompanionMacCoordinator: ObservableObject {
                     let binding = try anchor.binding(for: paired.scope(month: month))
                     saved = try provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: paired.sessionID, workspaceID: workspaceID,
                         month: month, expectedActivationEpoch: paired.activationEpoch, expectedStateRevision: nil,
+                        expectedMonthRevision: expectedMonthRevision,
                         expectedScratchpad: expected, editor: expected, canonical: nil,
                         binding: binding, metadata: anchor.metadata, operation: .initialize(binding.baselineDocument), currentAnchor: anchor)).stored
                 }
@@ -417,6 +424,44 @@ final class CompanionMacCoordinator: ObservableObject {
             return (current.scratchpad, MonthlyPlanSyncAdapter.lexicalContext(from: current.metadata))
         }
     }
+
+    /// Prepare the paired-month part of an MCP transaction from the exact
+    /// repository snapshot that was validated for the requested write. The
+    /// caller gives this request to the shared transaction; this helper never
+    /// commits separately or reads a newer month revision as its baseline.
+    static func planningWriteCompanionRequest(snapshot: PlanningWriteSnapshot,
+                                              scratchpad: MonthlyPlanScratchpad,
+                                              provider: DatabaseProvider) throws -> CompanionMonthCommitRequest? {
+        guard let paired = snapshot.activeCompanionSession,
+              let saved = snapshot.companionMonth else { return nil }
+        guard paired.workspaceID == snapshot.monthRevision.workspaceID,
+              saved.month == snapshot.monthRevision.month,
+              scratchpad.plan.workspaceID == paired.workspaceID,
+              scratchpad.plan.month.canonical == saved.month,
+              scratchpad.canonical == scratchpad.plan,
+              let retained = snapshot.scratchpad else { throw CompanionSyncRepositoryError.staleScratchpad }
+        let old = try saved.decodedEnvelope(session: paired)
+        guard try old.current.scratchpad.dto() == retained else { throw CompanionSyncRepositoryError.staleScratchpad }
+        var origins = MonthlyPlanSyncAdapter.lexicalContext(from: old.current.metadata).localeIdentifiersByField
+        for (key, value) in scratchpad.rawText where old.current.scratchpad.rawText[key] != value {
+            origins[key] = "en_US_POSIX"
+        }
+        origins = origins.filter { scratchpad.rawText[$0.key] != nil }
+        let metadata = MonthlyPlanSyncAdapter.metadata(for: scratchpad,
+            lexicalContext: .init(defaultLocaleIdentifier: nil, localeIdentifiersByField: origins),
+            retaining: old.current.metadata, previousScratchpad: old.current.scratchpad)
+        let selectedHistory = old.current.context.allHistoryAccountIDs.subtracting(old.current.excludedHistoryAccountIDs)
+        let draft = try CompanionMacMonthContextReader.read(scratchpad: scratchpad, metadata: metadata,
+            provider: provider, selectedHistoryAccountIDs: selectedHistory, now: Date())
+        let anchor = try normalized(draft, scope: paired.scope(month: saved.month))
+        let newBinding = try anchor.binding(for: paired.scope(month: saved.month))
+        return .init(sessionID: paired.sessionID, workspaceID: paired.workspaceID, month: saved.month,
+            expectedActivationEpoch: paired.activationEpoch, expectedStateRevision: saved.stateRevision,
+            expectedMonthRevision: snapshot.monthRevision, expectedScratchpad: retained,
+            editor: try scratchpad.dto(), canonical: try scratchpad.canonical?.persistenceDTO(),
+            binding: try old.current.binding(for: paired.scope(month: saved.month)), metadata: anchor.metadata,
+            operation: .localEdit(newBinding.baselineDocument), currentAnchor: anchor)
+    }
     private static func activeSession(workspaceID: String, provider: DatabaseProvider) throws -> CompanionSyncSessionDTO? {
         // Older/in-memory providers without companion storage retain their ordinary planner behavior.
         guard provider.sqliteProvider != nil else { return nil }
@@ -424,14 +469,17 @@ final class CompanionMacCoordinator: ObservableObject {
         return try provider.fundingPlanRepo.companionSessions(workspaceID: workspaceID).first { $0.disposition == "active" }
     }
     static func saveLocal(_ scratchpad: MonthlyPlanScratchpad, canonical: FundingPlan?, provider: DatabaseProvider,
-                          knownLocaleIdentifiers: [String: String], selectedHistoryAccountIDs: Set<String>) throws {
+                          expectedMonthRevision: PlanningMonthRevision,
+                          knownLocaleIdentifiers: [String: String], selectedHistoryAccountIDs: Set<String>) throws -> PlanningMonthRevision {
         try provider.withConsistentSnapshot {
             let workspace = scratchpad.plan.workspaceID, month = scratchpad.plan.month
             guard let paired = try activeSession(workspaceID: workspace, provider: provider),
                   let saved = try provider.fundingPlanRepo.companionMonth(sessionID: paired.sessionID, workspaceID: workspace, month: month.canonical) else {
-                if let canonical { _ = try provider.fundingPlanRepo.savePlan(canonical.persistenceDTO(), retaining: scratchpad.dto()) }
-                else { try provider.fundingPlanRepo.saveScratchpad(scratchpad.dto()) }
-                return
+                if let canonical {
+                    return try provider.fundingPlanRepo.savePlan(canonical.persistenceDTO(), retaining: scratchpad.dto(),
+                        expected: expectedMonthRevision, origin: .manual)
+                }
+                return try provider.fundingPlanRepo.saveScratchpad(scratchpad.dto(), expected: expectedMonthRevision)
             }
             let old = try saved.decodedEnvelope(session: paired)
             let expected = try durableScratchpad(old.current.scratchpad, provider: provider)
@@ -442,11 +490,14 @@ final class CompanionMacCoordinator: ObservableObject {
                 provider: provider, selectedHistoryAccountIDs: selectedHistoryAccountIDs, now: Date())
             let anchor = try normalized(draft, scope: paired.scope(month: month.canonical))
             let newBinding = try anchor.binding(for: paired.scope(month: month.canonical))
-            _ = try provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: paired.sessionID, workspaceID: workspace,
+            let committed = try provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: paired.sessionID, workspaceID: workspace,
                 month: month.canonical, expectedActivationEpoch: paired.activationEpoch, expectedStateRevision: saved.stateRevision,
+                expectedMonthRevision: expectedMonthRevision,
                 expectedScratchpad: expected, editor: try scratchpad.dto(), canonical: try canonical?.persistenceDTO(),
                 binding: old.current.binding(for: paired.scope(month: month.canonical)), metadata: anchor.metadata,
                 operation: .localEdit(newBinding.baselineDocument), currentAnchor: anchor))
+            guard let revision = committed.monthRevision else { throw PlanningWriteError.unavailableContext }
+            return revision
         }
     }
     private static func durableScratchpad(_ scratchpad: MonthlyPlanScratchpad, provider: DatabaseProvider) throws -> MonthlyPlanScratchpadDTO {

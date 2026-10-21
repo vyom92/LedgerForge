@@ -26,11 +26,14 @@ final class FundingPlanStore: ObservableObject {
     @ObserverAtomicPublished private(set) var plans: [FundingPlan] = []
     private(set) var generation: ProviderGenerationToken?
     private(set) var scratchpads: [MonthlyPlanScratchpad] = []
+    private(set) var monthRevisions: [PlanningMonthRevision] = []
 
     init() {}
 
-    func installWithoutObservation(_ value: [FundingPlan], generation: ProviderGenerationToken? = nil, scratchpads: [MonthlyPlanScratchpad] = []) {
+    func installWithoutObservation(_ value: [FundingPlan], generation: ProviderGenerationToken? = nil,
+                                   scratchpads: [MonthlyPlanScratchpad] = [], monthRevisions: [PlanningMonthRevision] = []) {
         self.scratchpads = scratchpads
+        self.monthRevisions = monthRevisions
         self.generation = generation
         _plans.installWithoutObservation(value)
     }
@@ -42,5 +45,9 @@ final class FundingPlanStore: ObservableObject {
 
     func plan(for month: SelectedStatementMonth, workspaceID: String = "default-workspace") -> FundingPlan? {
         plans.first { $0.workspaceID == workspaceID && $0.month == month }
+    }
+
+    func revision(for month: SelectedStatementMonth, workspaceID: String = "default-workspace") -> PlanningMonthRevision? {
+        monthRevisions.first { $0.workspaceID == workspaceID && $0.month == month.canonical }
     }
 }

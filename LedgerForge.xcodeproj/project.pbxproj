@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		60B72960D078E4F70A891596 /* PlanningChangePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6481E782F40C96966F8272B8 /* PlanningChangePersistence.swift */; };
+		98344692B04C46679362573D /* PlanningChangePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6481E782F40C96966F8272B8 /* PlanningChangePersistence.swift */; };
+		3DCF8CAD5165A79A636ADA3C /* PlanningWriteReceiptContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21BF280559E4B6C00276E153 /* PlanningWriteReceiptContent.swift */; };
+		2DA544D2B520FC3A07315BE4 /* FinancialMCPPlanningWriteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF79B56331555429F5BF44AB /* FinancialMCPPlanningWriteService.swift */; };
+		32C506831A769A6416681C52 /* PlanningChangePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6481E782F40C96966F8272B8 /* PlanningChangePersistence.swift */; };
+		0D02EC0BFF8B64D48AB3E52D /* PlanningChangeApplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB37522466C4FD2D0D42F66 /* PlanningChangeApplicator.swift */; };
+		E5891971A5AF4BBD77F8AF81 /* PlanningChangeContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9AD8144E0D96E10773F8631 /* PlanningChangeContract.swift */; };
+		5DF9BE16073C2268C11AF213 /* PlanningAllocationInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1A5E1EA08EF2E64ACE8C59 /* PlanningAllocationInspector.swift */; };
+		0F649AB2D337D5876D59B42F /* PlanningAllocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B461C18F8127E33B29F94D /* PlanningAllocationView.swift */; };
+		59BF14E8F3B92403E0F4B2E7 /* PlanningAllocationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B712EC5226F01DE7288F7A29 /* PlanningAllocationEditor.swift */; };
 		009F33FAAF444AB6A8AF668D /* BackupRestoreSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */; };
 		02859D4509623C9692A15707 /* TransactionTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DC3072EC09007DA308 /* TransactionTags.swift */; };
 		09D94D1BFCC5662148D2EC53 /* TransactionTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E768DC3072EC09007DA308 /* TransactionTags.swift */; };
@@ -532,6 +542,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		21BF280559E4B6C00276E153 /* PlanningWriteReceiptContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningWriteReceiptContent.swift; sourceTree = "<group>"; };
+		EF79B56331555429F5BF44AB /* FinancialMCPPlanningWriteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPPlanningWriteService.swift; sourceTree = "<group>"; };
+		6481E782F40C96966F8272B8 /* PlanningChangePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningChangePersistence.swift; sourceTree = "<group>"; };
+		1CB37522466C4FD2D0D42F66 /* PlanningChangeApplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningChangeApplicator.swift; sourceTree = "<group>"; };
+		D9AD8144E0D96E10773F8631 /* PlanningChangeContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningChangeContract.swift; sourceTree = "<group>"; };
+		5A1A5E1EA08EF2E64ACE8C59 /* PlanningAllocationInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningAllocationInspector.swift; sourceTree = "<group>"; };
+		B8B461C18F8127E33B29F94D /* PlanningAllocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningAllocationView.swift; sourceTree = "<group>"; };
+		B712EC5226F01DE7288F7A29 /* PlanningAllocationEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningAllocationEditor.swift; sourceTree = "<group>"; };
 		019AF8974C39833A643DECC3 /* FinancialMCPProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMCPProtocol.swift; sourceTree = "<group>"; };
 		041CBF52CAC0F55B8849EE45 /* BackgroundWorker/BackgroundActivityBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BackgroundWorker/BackgroundActivityBridge.h; sourceTree = "<group>"; };
 		05FCB90FD46EAAA328488D62 /* BackgroundWorker/RepositoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWorker/RepositoryDiagnostics.swift; sourceTree = "<group>"; };
@@ -1083,6 +1101,8 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				1CB37522466C4FD2D0D42F66 /* PlanningChangeApplicator.swift */,
+				D9AD8144E0D96E10773F8631 /* PlanningChangeContract.swift */,
 				36A6D490D0908652CE5CB2C1 /* NetWorthReport.swift */,
 				61CA6A7104898BF64171C413 /* SpendingIntelligence.swift */,
 				3D0744292A1DD8A9DC3A559A /* PlanningProjection.swift */,
@@ -1149,6 +1169,8 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				21BF280559E4B6C00276E153 /* PlanningWriteReceiptContent.swift */,
+				EF79B56331555429F5BF44AB /* FinancialMCPPlanningWriteService.swift */,
 				019AF8974C39833A643DECC3 /* FinancialMCPProtocol.swift */,
 				5DFF5860786298F62AD1F2A1 /* FinancialMCPPresentation.swift */,
 				90FA115F84E10F8A510FCC17 /* FinancialMCPController.swift */,
@@ -1249,6 +1271,7 @@
 		288EB0E22FF7A3D400F09BC9 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				B712EC5226F01DE7288F7A29 /* PlanningAllocationEditor.swift */,
 				7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */,
 				DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */,
 				28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */,
@@ -1261,6 +1284,8 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				5A1A5E1EA08EF2E64ACE8C59 /* PlanningAllocationInspector.swift */,
+				B8B461C18F8127E33B29F94D /* PlanningAllocationView.swift */,
 				60F3B8D9E816B756BA90FC48 /* FinancialMCPSettingsView.swift */,
 				AAEC91E426BBA2FDF1D2F6A9 /* DashboardNetWorthCard.swift */,
 				07095F300A396B37E7FE84A2 /* SpendingAndMovementView.swift */,
@@ -1300,6 +1325,7 @@
 		288EB0E42FF7A3D500F09BC9 /* Database */ = {
 			isa = PBXGroup;
 			children = (
+				6481E782F40C96966F8272B8 /* PlanningChangePersistence.swift */,
 				4CCDDA8542AE7AECDC97273B /* CategoryAutomationRepository.swift */,
 				5E3C6C27820989F516B00667 /* NetWorthMembershipRepository.swift */,
 				20B7FC34F2ABFF2F45558BAE /* FinancialIntelligenceRepository.swift */,
@@ -1795,6 +1821,14 @@
 				AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */,
 				AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */,
 				7A79000F307A000000000001 /* SalaryView.swift in Sources */,
+				5DF9BE16073C2268C11AF213 /* PlanningAllocationInspector.swift in Sources */,
+				0F649AB2D337D5876D59B42F /* PlanningAllocationView.swift in Sources */,
+				3DCF8CAD5165A79A636ADA3C /* PlanningWriteReceiptContent.swift in Sources */,
+				2DA544D2B520FC3A07315BE4 /* FinancialMCPPlanningWriteService.swift in Sources */,
+				32C506831A769A6416681C52 /* PlanningChangePersistence.swift in Sources */,
+				0D02EC0BFF8B64D48AB3E52D /* PlanningChangeApplicator.swift in Sources */,
+				E5891971A5AF4BBD77F8AF81 /* PlanningChangeContract.swift in Sources */,
+				59BF14E8F3B92403E0F4B2E7 /* PlanningAllocationEditor.swift in Sources */,
 				7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */,
 				7A79000B307A000000000001 /* SalaryStore.swift in Sources */,
 				7A790001307A000000000001 /* Salary.swift in Sources */,
@@ -2011,6 +2045,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				98344692B04C46679362573D /* PlanningChangePersistence.swift in Sources */,
 				09D94D1BFCC5662148D2EC53 /* TransactionTags.swift in Sources */,
 				ED3F8EFFC4CE6353F0F3F035 /* CategoryAutomationRepository.swift in Sources */,
 				4239DD616EB3ED3A699AB431 /* NetWorthMembershipRepository.swift in Sources */,
@@ -2092,6 +2127,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				60B72960D078E4F70A891596 /* PlanningChangePersistence.swift in Sources */,
 				02859D4509623C9692A15707 /* TransactionTags.swift in Sources */,
 				5A0FD94952068FC0B6956980 /* CategoryAutomationRepository.swift in Sources */,
 				1A674BAC606280AE725B7867 /* NetWorthMembershipRepository.swift in Sources */,
@@ -2329,7 +2365,7 @@
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2367,7 +2403,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -2392,7 +2428,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LedgerForge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
@@ -2429,7 +2465,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vyom.LedgerForge$(LEDGERFORGE_COMPANION_DEVELOPMENT_SUFFIX)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

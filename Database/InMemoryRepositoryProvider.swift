@@ -66,6 +66,25 @@ public final class InMemoryRepositoryProvider {
         state.supportingSourceFailureInjection = point
         state.stateLock.unlock()
     }
+
+    /// Test-only late failure after candidate publication but before receipt.
+    func injectPlanningFailureBeforeReceipt(_ enabled: Bool) {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        state.planningFailureBeforeReceipt = enabled
+    }
+
+#if DEBUG
+    /// Isolated query-membership fixture. Ordinary imports remain the only
+    /// production path for trusted transactions and salary source records.
+    func injectPlanningReceiptDependencies(statement: SalaryStatementDTO? = nil,
+                                           trustedTransaction: TransactionDTO? = nil) {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        if let statement { state.salaryStatements[statement.id] = statement }
+        if let trustedTransaction, trustedTransaction.isTrusted {
+            state.transactions[trustedTransaction.id] = trustedTransaction
+        }
+    }
+#endif
 }
 
 enum ConfirmedImportFailureInjectionPoint: CaseIterable {
@@ -171,6 +190,9 @@ final class InMemoryRepositoryState {
     var companionActivationEpoch = UUID().uuidString
     var companionSessions: [String: CompanionSyncSessionDTO] = [:]
     var companionMonths: [String: CompanionMonthSyncDTO] = [:]
+    var planningWriteState: [String: (counter: Int64, origin: PlanningSaveOrigin)] = [:]
+    var planningRequestReceipts: [String: PlanningRequestReceipt] = [:]
+    var planningFailureBeforeReceipt = false
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
 }
@@ -425,9 +447,75 @@ private final class InMemorySalaryRepo: SalaryRepository {
 
 private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     private let state: InMemoryRepositoryState
+    private let planningProviderID = UUID().uuidString
     init(state: InMemoryRepositoryState) { self.state = state }
 
     private func monthKey(sessionID: String, month: String) -> String { sessionID + ":" + month }
+    private func planningKey(workspaceID: String, month: String) -> String { workspaceID + ":" + month }
+    private func monthRevision(workspaceID: String, month: String) -> PlanningMonthRevision {
+        let value = state.planningWriteState[planningKey(workspaceID: workspaceID, month: month)]
+        return .init(workspaceID: workspaceID, month: month, counter: value?.counter ?? 0,
+                     providerID: planningProviderID, latestOrigin: value?.origin ?? .unknown)
+    }
+    private func verify(_ expected: PlanningMonthRevision, workspaceID: String, month: String) throws -> PlanningMonthRevision {
+        let current = monthRevision(workspaceID: workspaceID, month: month)
+        guard current == expected else { throw PlanningWriteError.staleRevision }
+        return current
+    }
+    private func advance(_ revision: PlanningMonthRevision, origin: PlanningSaveOrigin?) throws -> PlanningMonthRevision {
+        guard revision.counter < Int64.max else { throw PlanningWriteError.exhaustedRevision }
+        let next = PlanningMonthRevision(workspaceID: revision.workspaceID, month: revision.month,
+            counter: revision.counter + 1, providerID: planningProviderID,
+            latestOrigin: origin ?? revision.latestOrigin)
+        state.planningWriteState[planningKey(workspaceID: revision.workspaceID, month: revision.month)] =
+            (next.counter, next.latestOrigin)
+        return next
+    }
+    func planningMonthRevisions(workspaceID: String) throws -> [PlanningMonthRevision] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        var months = Set(state.fundingPlans.values.filter { $0.workspaceId == workspaceID }.map(\.planMonthISO))
+        months.formUnion(state.monthlyScratchpads.values.filter { $0.workspaceID == workspaceID }.map(\.month))
+        months.formUnion(state.planningWriteState.keys.compactMap { key in
+            key.hasPrefix(workspaceID + ":") ? String(key.dropFirst(workspaceID.count + 1)) : nil
+        })
+        return months.sorted().map { monthRevision(workspaceID: workspaceID, month: $0) }
+    }
+    private func writeSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot {
+        let revision = monthRevision(workspaceID: workspaceID, month: month)
+        let plan = state.fundingPlans.values.first { $0.workspaceId == workspaceID && $0.planMonthISO == month }
+        let raw = state.monthlyScratchpads[planningKey(workspaceID: workspaceID, month: month)]
+        let financial = try InMemoryFinancialIntelligenceRepository(state: state).snapshot(workspaceID: workspaceID)
+        let accounts = state.accounts.values.filter { $0.workspaceId == workspaceID }.sorted { $0.id < $1.id }
+        let salary = state.salaryStatements.values.filter { $0.workspaceId == workspaceID }.sorted { $0.id < $1.id }
+        var labels: [String: [String]] = [:]
+        for section in state.bankSectionPlans.values where state.accounts[section.accountId]?.workspaceId == workspaceID {
+            labels[section.accountId, default: []].append(section.productLabel)
+        }
+        let receiptAccount = (try? plan?.allocationCalculationInput())?.assistance?.payslipFunding?.accountID
+        let receipts = state.transactions.values.filter { transaction in
+            transaction.workspaceId == workspaceID && transaction.isTrusted &&
+            transaction.accountId == receiptAccount && transaction.postedDateISO.hasPrefix(month)
+        }.sorted { $0.id < $1.id }
+        let session = state.companionSessions.values.first { $0.workspaceID == workspaceID && $0.disposition == "active" }
+        let companionMonth = session.flatMap { state.companionMonths[monthKey(sessionID: $0.sessionID, month: month)] }
+        let blank = PlanningWriteSnapshot(plan: plan, scratchpad: raw, monthRevision: revision,
+            writeRevision: nil, financial: financial, accounts: accounts, salaryStatements: salary,
+            productLabels: labels, receiptTransactions: receipts, activeCompanionSession: session,
+            companionMonth: companionMonth)
+        let fingerprint = try PlanningWriteFingerprint.make(blank, companion: companionMonth.map { [$0] } ?? [])
+        return PlanningWriteSnapshot(plan: plan, scratchpad: raw, monthRevision: revision,
+            writeRevision: fingerprint, financial: financial, accounts: accounts, salaryStatements: salary,
+            productLabels: labels, receiptTransactions: receipts, activeCompanionSession: session,
+            companionMonth: companionMonth)
+    }
+    func planningWriteSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return try writeSnapshot(workspaceID: workspaceID, month: month)
+    }
+    func planningRequestReceipt(requestID: String) throws -> PlanningRequestReceipt? {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.planningRequestReceipts[requestID]
+    }
     private func refuseLegacyWrite(workspaceID: String, month: String) throws {
         let paired = state.companionMonths.values.contains { value in
             guard value.month == month, let session = state.companionSessions[value.sessionID] else { return false }
@@ -495,10 +583,17 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
         }
         let key = monthKey(sessionID: request.sessionID, month: request.month)
         let scratchpadKey = request.workspaceID + ":" + request.month
+        let previousScratchpad = state.monthlyScratchpads[scratchpadKey]
         let prepared = try CompanionSyncValidation.prepare(request, session: session,
-            existing: state.companionMonths[key], scratchpad: state.monthlyScratchpads[scratchpadKey],
+            existing: state.companionMonths[key], scratchpad: previousScratchpad,
             activationEpoch: companionActivationEpoch())
-        if prepared.isReplay { return prepared.result }
+        if prepared.isReplay {
+            var result = prepared.result
+            result.monthRevision = monthRevision(workspaceID: request.workspaceID, month: request.month)
+            return result
+        }
+        let currentRevision = try verify(request.expectedMonthRevision, workspaceID: request.workspaceID, month: request.month)
+        guard currentRevision.counter < Int64.max else { throw PlanningWriteError.exhaustedRevision }
         let durableCanonical = state.fundingPlans.values.first { $0.workspaceId == request.workspaceID && $0.planMonthISO == request.month }
         guard try request.binding.baselineScratchpad.canonical?.persistenceDTO() == durableCanonical else {
             throw CompanionSyncRepositoryError.staleScratchpad
@@ -514,7 +609,11 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
             _ = try persistPlan(canonical, scratchpad: request.editor, companionWrite: true)
         } else { state.monthlyScratchpads[scratchpadKey] = request.editor }
         state.companionMonths[key] = prepared.result.stored
-        return prepared.result
+        let published = request.canonical != nil || request.editor != previousScratchpad
+        let nextRevision = published ? try advance(currentRevision, origin: request.canonical == nil ? nil : .manual) : currentRevision
+        var result = prepared.result
+        result.monthRevision = nextRevision
+        return result
     }
 
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] {
@@ -526,6 +625,14 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
         let scratch = try MonthlyPlanScratchpad.decode(value)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         try refuseLegacyWrite(workspaceID: value.workspaceID, month: value.month)
+        guard state.monthlyScratchpads[planningKey(workspaceID: value.workspaceID, month: value.month)] == nil,
+              !state.fundingPlans.values.contains(where: { $0.workspaceId == value.workspaceID && $0.planMonthISO == value.month }),
+              monthRevision(workspaceID: value.workspaceID, month: value.month).counter == 0 else {
+            throw PlanningWriteError.staleRevision
+        }
+        guard monthRevision(workspaceID: value.workspaceID, month: value.month).counter < Int64.max else {
+            throw PlanningWriteError.exhaustedRevision
+        }
         guard state.workspaces[value.workspaceID] != nil || value.workspaceID == "default-workspace" else {
             throw RepositoryError.relationshipViolation("Monthly scratchpad workspace is invalid.")
         }
@@ -533,12 +640,37 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
             state.workspaces[value.workspaceID] = WorkspaceDTO(id: value.workspaceID, name: "Default Workspace", createdAtISO: scratch.plan.updatedAtISO)
         }
         state.monthlyScratchpads[value.workspaceID + ":" + value.month] = value
+        _ = try advance(monthRevision(workspaceID: value.workspaceID, month: value.month), origin: nil)
     }
 
     func removeScratchpad(workspaceId: String, month: String) throws {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         try refuseLegacyWrite(workspaceID: workspaceId, month: month)
-        state.monthlyScratchpads[workspaceId + ":" + month] = nil
+        throw PlanningWriteError.staleRevision
+    }
+
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO, expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        let scratch = try MonthlyPlanScratchpad.decode(value)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let current = try verify(expected, workspaceID: value.workspaceID, month: value.month)
+        guard current.counter < Int64.max else { throw PlanningWriteError.exhaustedRevision }
+        try refuseLegacyWrite(workspaceID: value.workspaceID, month: value.month)
+        guard state.workspaces[value.workspaceID] != nil || value.workspaceID == "default-workspace" else {
+            throw RepositoryError.relationshipViolation("Monthly scratchpad workspace is invalid.")
+        }
+        if state.workspaces[value.workspaceID] == nil {
+            state.workspaces[value.workspaceID] = WorkspaceDTO(id: value.workspaceID, name: "Default Workspace", createdAtISO: scratch.plan.updatedAtISO)
+        }
+        state.monthlyScratchpads[planningKey(workspaceID: value.workspaceID, month: value.month)] = value
+        return try advance(current, origin: nil)
+    }
+    func removeScratchpad(workspaceId: String, month: String, expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let current = try verify(expected, workspaceID: workspaceId, month: month)
+        guard current.counter < Int64.max else { throw PlanningWriteError.exhaustedRevision }
+        try refuseLegacyWrite(workspaceID: workspaceId, month: month)
+        state.monthlyScratchpads[planningKey(workspaceID: workspaceId, month: month)] = nil
+        return try advance(current, origin: nil)
     }
 
     func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
@@ -559,17 +691,137 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
         try persistPlan(plan, scratchpad: nil)
     }
 
-    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?, companionWrite: Bool = false) throws -> FundingPlanDTO {
+    func savePlan(_ plan: FundingPlanDTO, expected: PlanningMonthRevision,
+                  origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        try guardedPlanSave(plan, scratchpad: nil, expected: expected, origin: origin)
+    }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO,
+                  expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        let decoded = try MonthlyPlanScratchpad.decode(scratchpad)
+        guard decoded.canonical == decoded.plan, try decoded.plan.persistenceDTO() == plan,
+              scratchpad.workspaceID == plan.workspaceId, scratchpad.month == plan.planMonthISO else {
+            throw PlanningWriteError.invalidCandidate
+        }
+        return try guardedPlanSave(plan, scratchpad: scratchpad, expected: expected, origin: origin)
+    }
+    private func guardedPlanSave(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?,
+                                 expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let current = try verify(expected, workspaceID: plan.workspaceId, month: plan.planMonthISO)
+        guard current.counter < Int64.max else { throw PlanningWriteError.exhaustedRevision }
+        _ = try persistPlan(plan, scratchpad: scratchpad, companionWrite: false, guardedWrite: true)
+        return try advance(current, origin: origin)
+    }
+
+    func commitPlanningChange(_ request: PlanningChangeCommitRequest,
+                              build: (PlanningWriteSnapshot) throws -> PlanningChangeCommitCandidate) throws -> PlanningRequestReceipt {
+        try PlanningWriteFingerprint.validateRequest(request)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        if let prior = state.planningRequestReceipts[request.requestID] {
+            guard prior.requestDigest == request.requestDigest,
+                  prior.workspaceID == request.workspaceID, prior.month == request.month,
+                  prior.planID == request.planID else { throw PlanningWriteError.requestIDConflict }
+            return prior
+        }
+        let current = try writeSnapshot(workspaceID: request.workspaceID, month: request.month)
+        guard let oldPlan = current.plan, oldPlan.id == request.planID,
+              oldPlan.calculationVersion == FundingPlanCalculationVersion.budgetV1.rawValue else {
+            throw PlanningWriteError.unsupportedPlan
+        }
+        guard current.writeRevision == request.expectedWriteRevision else { throw PlanningWriteError.staleRevision }
+        let candidate = try build(current)
+        try PlanningWriteFingerprint.validateCandidate(candidate, request: request)
+        let noChange = oldPlan == candidate.plan && current.scratchpad == candidate.scratchpad
+        var preparedCompanion: CompanionSyncValidation.Prepared?
+        if !noChange, let session = current.activeCompanionSession, let monthState = current.companionMonth {
+            guard let companionRequest = candidate.companionRequest,
+                  companionRequest.sessionID == session.sessionID,
+                  companionRequest.workspaceID == request.workspaceID,
+                  companionRequest.month == request.month,
+                  companionRequest.expectedMonthRevision == current.monthRevision,
+                  companionRequest.canonical == candidate.plan,
+                  companionRequest.editor == candidate.scratchpad,
+                  case .localEdit = companionRequest.operation else {
+                throw PlanningWriteError.pairedMonthRequiresAtomicWrite
+            }
+            preparedCompanion = try CompanionSyncValidation.prepare(companionRequest, session: session,
+                existing: monthState, scratchpad: current.scratchpad,
+                activationEpoch: state.companionActivationEpoch)
+            guard preparedCompanion?.isReplay == false,
+                  preparedCompanion?.result.disposition == .localEdit else { throw PlanningWriteError.invalidCandidate }
+        } else if candidate.companionRequest != nil { throw PlanningWriteError.invalidCandidate }
+        // Validate all throwing financial relationships before dictionary publication.
+        if !noChange {
+            try SalaryPersistenceDTOValidator.validate(plan: candidate.plan)
+            try validatePlanRelationships(candidate.plan)
+            try InMemoryFinancialIntelligenceRepository(state: state).validatePlanAssistance(candidate.plan)
+        }
+        let oldPlans = state.fundingPlans, oldRaw = state.monthlyScratchpads
+        let oldWorkspaces = state.workspaces, oldSalary = state.salaryAssistance
+        let oldCompanion = state.companionMonths
+        let oldRevision = state.planningWriteState, oldReceipts = state.planningRequestReceipts
+        do {
+            var savedRevision = current.monthRevision
+            if !noChange {
+                _ = try persistPlan(candidate.plan, scratchpad: candidate.scratchpad,
+                    companionWrite: preparedCompanion != nil, guardedWrite: preparedCompanion == nil)
+                if let preparedCompanion, let session = current.activeCompanionSession {
+                    state.companionMonths[monthKey(sessionID: session.sessionID, month: request.month)] = preparedCompanion.result.stored
+                }
+                savedRevision = try advance(current.monthRevision, origin: .chatgpt)
+            } else {
+                state.planningWriteState[planningKey(workspaceID: request.workspaceID, month: request.month)] =
+                    (savedRevision.counter, savedRevision.latestOrigin)
+            }
+            if state.planningFailureBeforeReceipt { throw PlanningWriteError.unavailable }
+            let receipt = PlanningRequestReceipt(requestID: request.requestID,
+                requestDigest: request.requestDigest, workspaceID: request.workspaceID, month: request.month,
+                planID: request.planID, committedRevision: savedRevision.counter,
+                committedAtISO: request.committedAtISO, outcome: noChange ? .noChange : .saved,
+                resultJSON: candidate.resultJSON)
+            state.planningRequestReceipts[request.requestID] = receipt
+            let readback = try writeSnapshot(workspaceID: request.workspaceID, month: request.month)
+            guard readback.plan == candidate.plan, readback.scratchpad == candidate.scratchpad,
+                  readback.monthRevision == savedRevision else { throw PlanningWriteError.unavailableContext }
+            return receipt
+        } catch {
+            state.fundingPlans = oldPlans; state.monthlyScratchpads = oldRaw
+            state.workspaces = oldWorkspaces; state.salaryAssistance = oldSalary
+            state.companionMonths = oldCompanion; state.planningWriteState = oldRevision
+            state.planningRequestReceipts = oldReceipts
+            throw error
+        }
+    }
+
+    private func persistPlan(_ plan: FundingPlanDTO, scratchpad: MonthlyPlanScratchpadDTO?, companionWrite: Bool = false,
+                             guardedWrite: Bool = false) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         if !companionWrite { try refuseLegacyWrite(workspaceID: plan.workspaceId, month: plan.planMonthISO) }
+        if !companionWrite && !guardedWrite &&
+           (state.fundingPlans.values.contains(where: { $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO }) ||
+            state.monthlyScratchpads[planningKey(workspaceID: plan.workspaceId, month: plan.planMonthISO)] != nil ||
+            monthRevision(workspaceID: plan.workspaceId, month: plan.planMonthISO).counter != 0) {
+            // Guarded saves have already established their original baseline.
+            // The legacy entry point cannot overwrite an existing month.
+            throw PlanningWriteError.staleRevision
+        }
+        if !companionWrite && !guardedWrite && monthRevision(workspaceID: plan.workspaceId, month: plan.planMonthISO).counter == Int64.max {
+            throw PlanningWriteError.exhaustedRevision
+        }
         try validatePlanRelationships(plan)
+        // Retained companion drafts use structural relationships below. Only
+        // canonical publication requires complete, affordable assistance.
+        try InMemoryFinancialIntelligenceRepository(state: state).validatePlanAssistance(plan)
         if state.workspaces[plan.workspaceId] == nil {
             state.workspaces[plan.workspaceId] = WorkspaceDTO(id: plan.workspaceId, name: "Default Workspace", createdAtISO: plan.updatedAtISO)
         }
         for id in plan.assistance?.appliedSalaryIDs ?? [] { state.salaryAssistance[id]?.draftState = .consumed }
         state.fundingPlans[plan.id] = plan
         if let scratchpad { state.monthlyScratchpads[plan.workspaceId + ":" + plan.planMonthISO] = scratchpad }
+        if !companionWrite && !guardedWrite {
+            _ = try advance(monthRevision(workspaceID: plan.workspaceId, month: plan.planMonthISO), origin: .manual)
+        }
         return plan
     }
     private func validatePlanRelationships(_ plan: FundingPlanDTO) throws {
@@ -590,7 +842,6 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
                   guard let account = state.accounts[accountID] else { return false }
                   return account.workspaceId == plan.workspaceId && account.nativeCurrency == commitment.amountCurrency
               }) else { throw RepositoryError.relationshipViolation("Funding plan relationships are invalid.") }
-        try InMemoryFinancialIntelligenceRepository(state: state).validatePlanAssistance(plan)
     }
 
 }

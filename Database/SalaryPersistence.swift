@@ -229,6 +229,19 @@ public protocol FundingPlanRepository {
     func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws
     func removeScratchpad(workspaceId: String, month: String) throws
     @discardableResult func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO
+    func planningMonthRevisions(workspaceID: String) throws -> [PlanningMonthRevision]
+    func planningWriteSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot
+    func planningRequestReceipt(requestID: String) throws -> PlanningRequestReceipt?
+    @discardableResult func savePlan(_ plan: FundingPlanDTO, expected: PlanningMonthRevision,
+                                     origin: PlanningSaveOrigin) throws -> PlanningMonthRevision
+    @discardableResult func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO,
+                                     expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision
+    @discardableResult func saveScratchpad(_ value: MonthlyPlanScratchpadDTO,
+                                           expected: PlanningMonthRevision) throws -> PlanningMonthRevision
+    @discardableResult func removeScratchpad(workspaceId: String, month: String,
+                                             expected: PlanningMonthRevision) throws -> PlanningMonthRevision
+    func commitPlanningChange(_ request: PlanningChangeCommitRequest,
+                              build: (PlanningWriteSnapshot) throws -> PlanningChangeCommitCandidate) throws -> PlanningRequestReceipt
 }
 
 public extension FundingPlanRepository {
@@ -247,6 +260,15 @@ public extension FundingPlanRepository {
     func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
         throw RepositoryError.persistenceUnavailable
     }
+    func planningMonthRevisions(workspaceID: String) throws -> [PlanningMonthRevision] { [] }
+    func planningWriteSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot { throw PlanningWriteError.unavailable }
+    func planningRequestReceipt(requestID: String) throws -> PlanningRequestReceipt? { throw PlanningWriteError.unavailable }
+    func savePlan(_ plan: FundingPlanDTO, expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision { throw PlanningWriteError.unavailable }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO, expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision { throw PlanningWriteError.unavailable }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO, expected: PlanningMonthRevision) throws -> PlanningMonthRevision { throw PlanningWriteError.unavailable }
+    func removeScratchpad(workspaceId: String, month: String, expected: PlanningMonthRevision) throws -> PlanningMonthRevision { throw PlanningWriteError.unavailable }
+    func commitPlanningChange(_ request: PlanningChangeCommitRequest,
+                              build: (PlanningWriteSnapshot) throws -> PlanningChangeCommitCandidate) throws -> PlanningRequestReceipt { throw PlanningWriteError.unavailable }
 }
 
 nonisolated enum SalaryPersistenceDTOValidator {

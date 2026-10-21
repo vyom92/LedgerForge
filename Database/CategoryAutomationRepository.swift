@@ -713,6 +713,7 @@ nonisolated struct CategorySourceRows: Sendable {
         background_investment_quote_cache background_public_progress background_schedule_configuration background_update_receipts
         companion_month_sync companion_sync_sessions fts_transactions gmail_inbox_state
         gmail_originals tag_definitions transaction_tag_memberships
+        planning_write_state planning_request_receipts
         """.split(whereSeparator: \.isWhitespace).map(String.init)
 
     fileprivate struct TableColumns: Sendable {
@@ -733,7 +734,7 @@ nonisolated struct CategorySourceRows: Sendable {
 
     fileprivate static func descriptor(_ db: SQLiteDatabase) throws -> Descriptor? {
         let schemaVersion = try db.query(sql: "SELECT MAX(version) FROM schema_migrations;") { $0.int64(at: 0) ?? 0 }.first
-        guard schemaVersion == 34 else { return nil }
+        guard schemaVersion == 35 else { return nil }
         let names = try db.query(sql: "SELECT name FROM sqlite_schema WHERE type='table';") { $0.string(at: 0) ?? "" }
             .filter { !$0.hasPrefix("sqlite_") }
         guard Set(names) == Set(sourceTables + otherTables) else { return nil }

@@ -39,6 +39,7 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
     private struct SelectedMonth {
         let session: CompanionSyncSessionDTO
         let initial: CompanionMonthSyncDTO
+        let initialMonthRevision: PlanningMonthRevision
         let originalScratchpad: MonthlyPlanScratchpadDTO
         let canonicalPlans: [FundingPlanDTO]
         let canonicalDigest: SHA256.Digest
@@ -121,19 +122,23 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
                            "Incomplete input changed canonical SQLite rows")
 
             let actual = try self.actualScratchpad(ledger, month: selected.month)
+            let currentMonthRevision = try XCTUnwrap(committed.monthRevision)
             let binding = try envelope.current.binding(for: envelope.kernel.scope)
             let staleRevision = CompanionMonthCommitRequest(sessionID: selected.session.sessionID, workspaceID: ledger.workspaceID,
                 month: selected.month, expectedActivationEpoch: selected.session.activationEpoch,
-                expectedStateRevision: selected.initial.stateRevision, expectedScratchpad: actual, editor: actual,
+                expectedStateRevision: selected.initial.stateRevision, expectedMonthRevision: selected.initialMonthRevision,
+                expectedScratchpad: actual, editor: actual,
                 canonical: nil, binding: binding, metadata: envelope.current.metadata,
                 operation: .localEdit(envelope.kernel.current), currentAnchor: envelope.current)
             do {
                 _ = try ledger.provider.fundingPlanRepo.commitCompanionMonth(staleRevision)
                 throw Failure.assertion("Stale revision unexpectedly committed")
             } catch CompanionSyncRepositoryError.staleRevision { }
+              catch PlanningWriteError.staleRevision { }
             let staleBytes = CompanionMonthCommitRequest(sessionID: selected.session.sessionID, workspaceID: ledger.workspaceID,
                 month: selected.month, expectedActivationEpoch: selected.session.activationEpoch,
-                expectedStateRevision: retained.stateRevision, expectedScratchpad: selected.originalScratchpad, editor: actual,
+                expectedStateRevision: retained.stateRevision, expectedMonthRevision: currentMonthRevision,
+                expectedScratchpad: selected.originalScratchpad, editor: actual,
                 canonical: nil, binding: binding, metadata: envelope.current.metadata,
                 operation: .localEdit(envelope.kernel.current), currentAnchor: envelope.current)
             do {
@@ -180,7 +185,8 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             let envelope = try retained.decodedEnvelope(session: selected.session)
             let stale = CompanionMonthCommitRequest(sessionID: selected.session.sessionID, workspaceID: ledger.workspaceID,
                 month: selected.month, expectedActivationEpoch: selected.session.activationEpoch,
-                expectedStateRevision: retained.stateRevision, expectedScratchpad: actual, editor: actual, canonical: nil,
+                expectedStateRevision: retained.stateRevision, expectedMonthRevision: selected.initialMonthRevision,
+                expectedScratchpad: actual, editor: actual, canonical: nil,
                 binding: try envelope.current.binding(for: envelope.kernel.scope), metadata: envelope.current.metadata,
                 operation: .receive(proposal), currentAnchor: envelope.current)
             do {
@@ -306,7 +312,9 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             let actual = try self.actualScratchpad(ledger, month: selected.month)
             _ = try ledger.provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: selected.session.sessionID,
                 workspaceID: ledger.workspaceID, month: selected.month, expectedActivationEpoch: selected.session.activationEpoch,
-                expectedStateRevision: beforeRefresh.stateRevision, expectedScratchpad: actual, editor: actual, canonical: nil,
+                expectedStateRevision: beforeRefresh.stateRevision,
+                expectedMonthRevision: try XCTUnwrap(first.monthRevision),
+                expectedScratchpad: actual, editor: actual, canonical: nil,
                 binding: old.current.binding(for: old.kernel.scope), metadata: old.current.metadata,
                 operation: .refreshDependencies, currentAnchor: fresh))
             let refreshed = try self.savedMonth(ledger, selected).decodedEnvelope(session: selected.session)
@@ -572,7 +580,9 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             let actual = try self.actualScratchpad(restored, month: selected.month)
             let stale = CompanionMonthCommitRequest(sessionID: oldSelection.session.sessionID, workspaceID: ledger.workspaceID,
                 month: oldSelection.month, expectedActivationEpoch: oldSelection.session.activationEpoch,
-                expectedStateRevision: oldSelection.initial.stateRevision, expectedScratchpad: oldSelection.originalScratchpad,
+                expectedStateRevision: oldSelection.initial.stateRevision,
+                expectedMonthRevision: oldSelection.initialMonthRevision,
+                expectedScratchpad: oldSelection.originalScratchpad,
                 editor: oldSelection.originalScratchpad, canonical: nil,
                 binding: try oldStored.current.binding(for: oldStored.kernel.scope), metadata: oldStored.current.metadata,
                 operation: .receive(oldProposal), currentAnchor: oldStored.current)
@@ -734,7 +744,11 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
         return EditorChange(editor: editor, document: document)
     }
     private func saveMac(_ change: EditorChange, ledger: Ledger) throws {
-        try CompanionMacCoordinator.saveLocal(change.editor.scratchpad, canonical: nil, provider: ledger.provider,
+        let revision = try ledger.provider.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: change.editor.scratchpad.plan.workspaceID,
+            month: change.editor.scratchpad.plan.month.canonical).monthRevision
+        _ = try CompanionMacCoordinator.saveLocal(change.editor.scratchpad, canonical: nil, provider: ledger.provider,
+            expectedMonthRevision: revision,
             knownLocaleIdentifiers: change.editor.lexicalContext.localeIdentifiersByField,
             selectedHistoryAccountIDs: change.editor.selectedHistoryAccountIDs)
     }
@@ -816,13 +830,17 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             let binding = try draft.binding(for: session.scope(month: scratch.plan.month.canonical))
             let anchor = replacing(draft, scratchpad: scratch, metadata: binding.baselineMetadata)
             let normalized = try anchor.binding(for: session.scope(month: scratch.plan.month.canonical))
+            let originalMonthRevision = try ledger.provider.fundingPlanRepo.planningWriteSnapshot(
+                workspaceID: ledger.workspaceID, month: scratch.plan.month.canonical).monthRevision
             let initialized = try ledger.provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: session.sessionID,
                 workspaceID: ledger.workspaceID, month: scratch.plan.month.canonical, expectedActivationEpoch: session.activationEpoch,
-                expectedStateRevision: nil, expectedScratchpad: actual, editor: actual, canonical: nil,
+                expectedStateRevision: nil, expectedMonthRevision: originalMonthRevision,
+                expectedScratchpad: actual, editor: actual, canonical: nil,
                 binding: normalized, metadata: anchor.metadata, operation: .initialize(normalized.baselineDocument), currentAnchor: anchor))
             try check(initialized.disposition == .initialized && initialized.stored.stateRevision == 0,
                       "Actual month did not initialize through the production repository")
-            return SelectedMonth(session: session, initial: initialized.stored, originalScratchpad: actual,
+            return SelectedMonth(session: session, initial: initialized.stored,
+                                 initialMonthRevision: try XCTUnwrap(initialized.monthRevision), originalScratchpad: actual,
                                  canonicalPlans: plans, canonicalDigest: canonicalDigest, month: scratch.plan.month.canonical)
         }
     }
@@ -857,6 +875,7 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             let saved = try savedMonth(ledger, selected)
             let stored = try saved.decodedEnvelope(session: selected.session)
             let expected = try actualScratchpad(ledger, month: selected.month)
+            let expectedMonthRevision = try monthRevision(ledger, month: selected.month)
             let binding = try stored.current.binding(for: stored.kernel.scope)
             let transition = try stored.kernel.receiving(proposal)
             let anchor: CompanionMonthAnchor
@@ -868,7 +887,8 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
             } else { anchor = stored.current; editor = expected }
             return try ledger.provider.fundingPlanRepo.commitCompanionMonth(.init(sessionID: selected.session.sessionID,
                 workspaceID: ledger.workspaceID, month: selected.month, expectedActivationEpoch: selected.session.activationEpoch,
-                expectedStateRevision: saved.stateRevision, expectedScratchpad: expected, editor: editor, canonical: nil,
+                expectedStateRevision: saved.stateRevision, expectedMonthRevision: expectedMonthRevision,
+                expectedScratchpad: expected, editor: editor, canonical: nil,
                 binding: binding, metadata: anchor.metadata, operation: .receive(proposal), currentAnchor: anchor))
         }
     }
@@ -877,6 +897,11 @@ final class CompanionAuthenticStorageQualificationTests: XCTestCase {
         guard let result = try ledger.provider.fundingPlanRepo.companionMonth(sessionID: selected.session.sessionID,
             workspaceID: ledger.workspaceID, month: selected.month) else { throw Failure.assertion("Durable companion month disappeared") }
         return result
+    }
+
+    private func monthRevision(_ ledger: Ledger, month: String) throws -> PlanningMonthRevision {
+        try ledger.provider.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: ledger.workspaceID, month: month).monthRevision
     }
     private func actualScratchpad(_ ledger: Ledger, month: String) throws -> MonthlyPlanScratchpadDTO {
         guard let result = try ledger.provider.fundingPlanRepo.scratchpads(workspaceId: ledger.workspaceID).first(where: { $0.month == month }) else {

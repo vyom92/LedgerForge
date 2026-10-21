@@ -42,6 +42,8 @@ nonisolated public struct PlanContribution: Codable, Equatable, Sendable, Identi
     var fundingAccountID: String
     var amount: PlanningAmount
     var dueDate: String
+    /// The transfer supplies this intention; it is not another expense.
+    var fundingTransferID: String? = nil
 }
 
 nonisolated public struct PlanDatedAdjustment: Codable, Equatable, Sendable, Identifiable {
@@ -67,6 +69,70 @@ nonisolated public struct PlanTransfer: Codable, Equatable, Sendable, Identifiab
     var date: String
     var conversionBasis: String
     var transactionIDs: [String]?
+    /// An earlier own-account transfer can supply this movement's principal.
+    var fundingTransferID: String? = nil
+    /// INR principal in an onward own-bank movement that is still reserved for
+    /// the worksheet's mandatory India obligations, never surplus to invest.
+    var requiredIndiaFunding: PlanningAmount? = nil
+}
+
+/// Exact owner-selected identity. A name or ticker alone cannot select an
+/// instrument. Funding Money is separate from the instrument's quote currency;
+/// this record promises neither purchased units nor a conversion/settlement.
+nonisolated public enum PlannedInvestmentInstrument: Codable, Equatable, Sendable {
+    case ibkr(conid: String, title: String, quoteCurrency: String)
+    case indianMutualFund(schemeCode: String, title: String)
+
+    func validated(fundingCurrency: String) throws {
+        func selected(_ code: String, _ title: String) -> Bool {
+            !code.isEmpty && code.utf8.allSatisfy { (48...57).contains($0) } && code.utf8.contains { $0 != 48 }
+                && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        switch self {
+        case let .ibkr(conid, title, currency):
+            guard selected(conid, title), (try? CurrencyCode(currency))?.code == currency else { throw SurplusAllocationError.invalidInstrument }
+        case let .indianMutualFund(code, title):
+            guard selected(code, title), fundingCurrency == "INR" else { throw SurplusAllocationError.invalidInstrument }
+        }
+    }
+}
+
+nonisolated public struct PlanInvestmentIntention: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    var instrument: PlannedInvestmentInstrument
+    var fundingAccountID: String
+    var amount: PlanningAmount
+    var date: String
+    var fundingTransferID: String? = nil
+}
+
+/// Optional, month-local allocation contract in the existing plan-assistance
+/// JSON. Absence preserves every previous worksheet/draft interpretation.
+/// Contributions and transfers keep their existing IDs and monetary owners.
+nonisolated public struct PlanSurplusAllocation: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    var version = 1
+    var investments: [PlanInvestmentIntention] = []
+    /// This one QAR→INR transfer includes the worksheet's required India funding.
+    /// Only its additional principal consumes surplus; its fee is charged once.
+    var requiredIndiaTransferID: String? = nil
+    /// Explicitly identifies a cash contribution which includes Keep in CBQ.
+    /// The overlap is credited once; the saved Keep amount is never rewritten.
+    var keepInCBQDesignationID: String? = nil
+}
+
+nonisolated enum SurplusAllocationError: Error, Equatable, LocalizedError {
+    case invalidRecord, incompletePlan, unsupportedRoute, invalidFundingLink, exceedsCapacity, invalidInstrument
+    var errorDescription: String? {
+        switch self {
+        case .invalidRecord: "Review the monthly allocation records."
+        case .incompletePlan: "Complete the monthly plan before allocating its surplus."
+        case .unsupportedRoute: "This account route is not supported for planning."
+        case .invalidFundingLink: "Review the allocation's exact funding account and transfer."
+        case .exceedsCapacity: "The allocations exceed the available planning capacity."
+        case .invalidInstrument: "Select the exact IBKR instrument or mutual fund scheme."
+        }
+    }
 }
 
 nonisolated public struct SalaryFundingCycle: Codable, Equatable, Sendable {
@@ -131,6 +197,7 @@ nonisolated public struct PlanAssistance: Codable, Equatable, Sendable {
     /// A regular payslip is expected income, never a fabricated bank credit.
     /// This source link is saved only with the reviewed monthly plan.
     var payslipFunding: PayslipFunding?
+    var surplusAllocation: PlanSurplusAllocation? = nil
 
     /// Filters presentation and forecast assumptions only; the saved plan is retained intact.
 

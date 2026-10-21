@@ -154,7 +154,9 @@ struct PlannerEditorTests {
             untouchedZeroFields: [], unavailableBalanceAccountIDs: [], preReductionBasis: [:],
             excludedRecurringOccurrenceIDs: [])
         if hasCanonical { _ = try setup.spy.base.savePlan(canonical.persistenceDTO()) }
-        try setup.spy.base.saveScratchpad(retained.dto())
+        let retainedBaseline = try setup.spy.base.planningWriteSnapshot(
+            workspaceID: draft.workspaceID, month: draft.month.canonical).monthRevision
+        _ = try setup.spy.base.saveScratchpad(retained.dto(), expected: retainedBaseline)
         setup.store.installWithoutObservation(hasCanonical ? [canonical] : [],
             generation: setup.holder.active.generationToken, scratchpads: [retained])
         let savedBefore = try setup.spy.plans(workspaceId: draft.workspaceID)
@@ -817,10 +819,18 @@ struct PlannerEditorTests {
             #expect(try pair.1.workspace(id: "default-workspace") == nil)
             #expect(try pair.0.plans(workspaceId: "default-workspace").isEmpty)
             #expect(try pair.0.savePlan(zero) == zero)
-            #expect(throws: RepositoryError.self) { try pair.0.savePlan(negative) }
+            let zeroRevision = try pair.0.planningWriteSnapshot(
+                workspaceID: "default-workspace", month: zero.planMonthISO).monthRevision
+            #expect(throws: RepositoryError.self) {
+                _ = try pair.0.savePlan(negative, expected: zeroRevision, origin: .manual)
+            }
             #expect(try pair.0.plans(workspaceId: "default-workspace") == [zero])
-            #expect(try pair.0.savePlan(positive) == positive)
-            #expect(throws: RepositoryError.self) { try pair.0.savePlan(negative) }
+            _ = try pair.0.savePlan(positive, expected: zeroRevision, origin: .manual)
+            let positiveRevision = try pair.0.planningWriteSnapshot(
+                workspaceID: "default-workspace", month: positive.planMonthISO).monthRevision
+            #expect(throws: RepositoryError.self) {
+                _ = try pair.0.savePlan(negative, expected: positiveRevision, origin: .manual)
+            }
             #expect(try pair.0.plans(workspaceId: "default-workspace") == [positive])
         }
         try sqlite.database.checkpointAndClose()
@@ -891,18 +901,46 @@ private final class PlanWriteSpy: FundingPlanRepository {
     let base: FundingPlanRepository
     init(_ base: FundingPlanRepository) { self.base = base }
     func plans(workspaceId: String) throws -> [FundingPlanDTO] { try base.plans(workspaceId: workspaceId) }
+    func planningMonthRevisions(workspaceID: String) throws -> [PlanningMonthRevision] {
+        try base.planningMonthRevisions(workspaceID: workspaceID)
+    }
+    func planningWriteSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot {
+        try base.planningWriteSnapshot(workspaceID: workspaceID, month: month)
+    }
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO { saves += 1; if reject { throw RepositoryError.relationshipViolation("injected failure") }; return try base.savePlan(plan) }
+    func savePlan(_ plan: FundingPlanDTO, expected: PlanningMonthRevision,
+                  origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        saves += 1
+        if reject { throw RepositoryError.relationshipViolation("injected failure") }
+        return try base.savePlan(plan, expected: expected, origin: origin)
+    }
     func scratchpads(workspaceId: String) throws -> [MonthlyPlanScratchpadDTO] { try base.scratchpads(workspaceId: workspaceId) }
     func saveScratchpad(_ value: MonthlyPlanScratchpadDTO) throws {
         scratchpadSaves += 1
         if rejectRetention { throw RepositoryError.persistenceUnavailable }
         try base.saveScratchpad(value)
     }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO,
+                        expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        scratchpadSaves += 1
+        if rejectRetention { throw RepositoryError.persistenceUnavailable }
+        return try base.saveScratchpad(value, expected: expected)
+    }
     func removeScratchpad(workspaceId: String, month: String) throws { try base.removeScratchpad(workspaceId: workspaceId, month: month) }
+    func removeScratchpad(workspaceId: String, month: String,
+                          expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        try base.removeScratchpad(workspaceId: workspaceId, month: month, expected: expected)
+    }
     func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
         saves += 1
         if reject { throw RepositoryError.relationshipViolation("injected failure") }
         return try base.savePlan(plan, retaining: scratchpad)
+    }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO,
+                  expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        saves += 1
+        if reject { throw RepositoryError.relationshipViolation("injected failure") }
+        return try base.savePlan(plan, retaining: scratchpad, expected: expected, origin: origin)
     }
 }
 

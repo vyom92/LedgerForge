@@ -121,6 +121,21 @@ struct MoneyTests {
         #expect(try money.canonicalDecimalString() == "-4.125")
     }
 
+    @Test func planningPresentationRetainsNativeMinorUnits() throws {
+        let locale = Locale(identifier: "en_US")
+        for (currency, token, expected) in [
+            ("QAR", "1234.56", "QR\u{00a0}1,234.56"),
+            ("QAR", "-0.01", "-QR\u{00a0}0.01"),
+            ("INR", "123456.50", "₹1,23,456.5"),
+            ("INR", "100000.00", "₹1,00,000"),
+            ("KWD", "4.125", "KWD\u{00a0}4.125")
+        ] {
+            let money = try Money(canonicalDecimal: token, currency: currency)
+            #expect(MoneyFormatting.planning(money, locale: locale) == expected)
+            #expect(try money.canonicalDecimalString() == token)
+        }
+    }
+
     @Test func wholeUnitSymbolsAreDisplayOnlyAndKeepExactMoney() throws {
         let locale = Locale(identifier: "en_US")
         for (token, expected) in [("1234.49", "$1,234"), ("1234.50", "$1,235"),

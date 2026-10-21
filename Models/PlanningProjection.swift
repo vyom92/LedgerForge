@@ -142,19 +142,12 @@ nonisolated enum PlanningIntelligence {
     /// Uses the same month-local reference and upward principal rounding as the
     /// accepted worksheet. The one configured fee stays a separate cash flow.
     static func transferPrincipal(received: Money, fromCurrency: String, plan: FundingPlan) -> Money? {
-        if fromCurrency == received.currency.code { return received }
-        guard fromCurrency == "QAR", received.currency.code == "INR" else { return nil }
-        let rate: AlDarReturnedINRDecimal?
-        if plan.referenceMode == .manual { rate = plan.planningFX.flatMap { try? AlDarReturnedINRDecimal.planningRate($0.inrPerQAR) } }
-        else { rate = plan.effectiveAlDarReference.flatMap { $0.submittedQAR.amount == 1 ? $0.returnedINR : nil } }
-        return try? rate?.principal(for: received, submittedQAR: Money(amount: 1, currency: "QAR"))
+        FundingPlanCalculator.transferPrincipal(received: received, fromCurrency: fromCurrency, plan: plan)
     }
 
     static func permitsPlanningRoute(from: IntelligenceAccountContext, to: IntelligenceAccountContext, retentionAccountID: String?) -> Bool {
-        guard from.id != to.id, from.domain == "bank", to.domain == "bank" else { return false }
-        if from.currency == "QAR", from.id == retentionAccountID { return to.currency == "INR" && to.routeType == "NRE" }
-        guard from.currency == "INR", to.currency == "INR" else { return false }
-        return from.routeType == "NRE" && ["NRE","NRO"].contains(to.routeType ?? "") || from.routeType == "NRO" && to.routeType == "NRO"
+        PlanningMetadataValidation.permitsPlanningRoute(fromID: from.id, fromCurrency: from.currency, fromDomain: from.domain, fromRoute: from.routeType,
+            toID: to.id, toCurrency: to.currency, toDomain: to.domain, toRoute: to.routeType, retentionAccountID: retentionAccountID)
     }
     static func dueDate(definition: RecurringDefinition, month: SelectedStatementMonth) -> (StatementDate, RecurringRevision)? {
         // The latest revision which actually applies on its due date wins. A
@@ -351,11 +344,16 @@ nonisolated enum PlanningIntelligence {
         var planned: [String: Decimal] = [:]
         for value in selectedPayments where !value.isWaived && !value.isExcludedFromPlan { planned[value.currency, default: 0] += value.expected }
         let representedRows = Set(payments.compactMap { assistance?.appliedRecurringIDs[$0.id] })
-        let replacedBills = Set(assistance?.datedAdjustments.compactMap(\.replacesCommitmentID) ?? [])
+        let staleReviewIDs = FundingPlanCalculator.staleReviewedObligationIDs(in: plan)
+        let replacedBills = Set(assistance?.datedAdjustments.filter { !staleReviewIDs.contains($0.id) }.compactMap(\.replacesCommitmentID) ?? [])
         let genericBills = (plan.qatarCommitments + plan.indiaCommitments).filter { $0.included && !representedRows.contains($0.id) && !replacedBills.contains($0.id)
             && $0.isInAccountScope(excluding: excludedHistory, fundingOverrides: assistance?.billFundingAccounts) }
         for value in genericBills { planned[value.money.currency.code, default: 0] += value.money.amount }
         var cardNeeds: [String] = []
+        for review in assistance?.datedAdjustments ?? [] where staleReviewIDs.contains(review.id) {
+            guard let bill = (plan.qatarCommitments + plan.indiaCommitments).first(where: { $0.id == review.replacesCommitmentID }) else { continue }
+            cardNeeds.append("\(bill.label): the linked card review is outside this salary cycle. The upcoming worksheet amount is retained; review the statement link.")
+        }
         let boundaryNeedsReview = assistance?.salaryCycle?.needsPreviousBoundaryReview(in: metadata) == true
         if boundaryNeedsReview { cardNeeds.append("The previous salary date changed. Review salary funding dates before assigning bills; the stored bill window has not been silently moved.") }
         for anchor in cardAnchors {
@@ -460,6 +458,10 @@ nonisolated enum PlanningIntelligence {
                 guard let destination = metadata.reserves.first(where: { $0.id == contribution.designationID }),
                       let date = try? StatementDate(canonical: contribution.dueDate), date >= start, date <= end, date > anchorDate,
                       let amount = try? contribution.amount.money().amount else { continue }
+                // A linked cash contribution earmarks the transfer's receipt.
+                // Its transfer already supplies both bank movement legs.
+                if plan.assistance?.surplusAllocation != nil, contribution.fundingTransferID != nil,
+                   destination.kind == .accountCash { continue }
                 if contribution.fundingAccountID == anchor.id && destination.accountID != anchor.id {
                     events.append(.init(id: "contribution-out:" + contribution.id, accountID: anchor.id, date: date, title: destination.title,
                         change: -amount, kind: .contribution, transactionIDs: []))

@@ -167,6 +167,9 @@ final class FinancialMCPController: NSObject, ObservableObject {
   @Published private(set) var enabled = false
   @Published private(set) var state = "Disabled"
   @Published private(set) var allowed = Set<String>()
+  @Published private(set) var planningWriteEnabled = false
+  /// An isolated qualification hook. Production uses the app-lifetime write service.
+  var planningWriteHandler: ((PlanningChangeRequest) -> [String: Any])?
   @Published private(set) var tunnelID = ""
   @Published private(set) var lastFailure = ""
   @Published private(set) var lastInvocation = "None this session"
@@ -258,7 +261,9 @@ final class FinancialMCPController: NSObject, ObservableObject {
     stop()
     enabled = false
     allowed = []
+    planningWriteEnabled = false
     defaults.set(false, forKey: "FinancialMCP.enabled")
+    defaults.set(false, forKey: "FinancialMCP.planningWriteEnabled")
     defaults.removeObject(forKey: "FinancialMCP.allowedTools")
     let status = SecItemDelete(credentialQuery as CFDictionary)
     let removed = status == errSecSuccess || status == errSecItemNotFound
@@ -274,6 +279,11 @@ final class FinancialMCPController: NSObject, ObservableObject {
     enabled = value
     defaults.set(value, forKey: "FinancialMCP.enabled")
     if value { start() } else { stop(final: "Disabled") }
+  }
+  func setPlanningWriteEnabled(_ value: Bool) {
+    planningWriteEnabled = value
+    defaults.set(value, forKey: "FinancialMCP.planningWriteEnabled")
+    saveStatus()
   }
   func activate() {
     guard !activated, environment["LEDGERFORGE_TEST_HOST"] != "1" else { return }
@@ -295,6 +305,7 @@ final class FinancialMCPController: NSObject, ObservableObject {
       _ = fcntl(lockFD, F_SETFD, FD_CLOEXEC)
       controlToken = UUID().uuidString + UUID().uuidString
       enabled = defaults.bool(forKey: "FinancialMCP.enabled")
+      planningWriteEnabled = defaults.bool(forKey: "FinancialMCP.planningWriteEnabled")
       allowed = Set(defaults.stringArray(forKey: "FinancialMCP.allowedTools") ?? [])
       tunnelID = defaults.string(forKey: "FinancialMCP.tunnelID") ?? ""
       control = try FinancialMCPLocalHTTP()
@@ -586,6 +597,7 @@ final class FinancialMCPController: NSObject, ObservableObject {
     [
       "instance": instance, "pid": Int(getpid()), "generation": generation, "state": state,
       "desired": desired, "enabledOnLaunch": enabled, "allowedTools": allowed.sorted(),
+      "planningWriteEnabled": planningWriteEnabled,
       "localPort": Int(localPort), "controlPort": Int(controlPort),
       "guardianPID": Int(guardian?.processIdentifier ?? 0), "tunnelReady": tunnelReady,
       "lastPollSuccess": lastPollSuccess, "lastInvocation": lastInvocation,
@@ -658,7 +670,19 @@ final class FinancialMCPController: NSObject, ObservableObject {
     else { return (401, Data()) }
     guard desired, endpoint != nil else { return (503, Data()) }
     guard request.method == "POST" else { return (405, Data()) }
-    return FinancialMCPProtocol.handle(request.body, allowed: allowed) { tool, arguments in
+    return FinancialMCPProtocol.handle(
+      request.body, allowed: allowed, writeAllowed: planningWriteEnabled,
+      write: { [self] changeRequest in
+        let result = planningWriteHandler?(changeRequest)
+          ?? FinancialMCPPlanningWriteService.shared.apply(changeRequest)
+        lastInvocation =
+          FinancialMCPProtocol.planningWriteToolName + " · "
+          + (result["error"] == nil ? "returned" : "unavailable") + " · "
+          + ISO8601DateFormatter().string(from: Date())
+        saveStatus()
+        return result
+      }
+    ) { tool, arguments in
       let result = FinancialMCPPresentation.shared.read(tool, arguments: arguments)
       self.lastInvocation =
         tool.rawValue + " · " + (result["error"] == nil ? "returned" : "unavailable") + " · "

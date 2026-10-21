@@ -16,7 +16,7 @@ struct FinancialMCPProtocolTests {
     ])
   }
 
-  @Test func advertisesExactlyFourReadOnlyOperationsWithoutReading() throws {
+  @Test func advertisesFourCompatibleReadsAndOneBoundedWriteWithoutReading() throws {
     var reads = 0
     let response = FinancialMCPProtocol.handle(request("tools/list"), allowed: names) { _, _ in
       reads += 1
@@ -26,15 +26,104 @@ struct FinancialMCPProtocolTests {
     let result = try #require(rpc["result"] as? [String: Any])
     let tools = try #require(result["tools"] as? [[String: Any]])
     #expect(response.0 == 200)
-    #expect(Set(tools.compactMap { $0["name"] as? String }) == names)
+    #expect(Set(tools.compactMap { $0["name"] as? String }) == names.union([FinancialMCPProtocol.planningWriteToolName]))
+    #expect(tools.count == 5)
     #expect(reads == 0)
-    for tool in tools {
+    for tool in tools where names.contains(tool["name"] as? String ?? "") {
       let annotations = try #require(tool["annotations"] as? [String: Bool])
       #expect(annotations["readOnlyHint"] == true)
       #expect(annotations["destructiveHint"] == false)
       let schema = try #require(tool["inputSchema"] as? [String: Any])
       #expect(schema["additionalProperties"] as? Bool == false)
     }
+    let writeTool = try #require(tools.first { $0["name"] as? String == FinancialMCPProtocol.planningWriteToolName })
+    let writeAnnotations = try #require(writeTool["annotations"] as? [String: Bool])
+    #expect(writeAnnotations["readOnlyHint"] == false)
+    #expect(writeAnnotations["destructiveHint"] == true)
+    #expect(writeAnnotations["idempotentHint"] == true)
+    let writeSchema = try #require(writeTool["inputSchema"] as? [String: Any])
+    #expect(writeSchema["additionalProperties"] as? Bool == false)
+    #expect(Set(writeSchema["required"] as? [String] ?? []) == ["request_id", "workspace_id", "month", "plan_id", "expected_write_revision", "changes"])
+  }
+
+  private func validPlanningArguments() -> [String: Any] {
+    [
+      "request_id": "68cb8090-3f23-4bca-97d8-7c6b60023f63",
+      "workspace_id": "workspace-id", "month": "2026-11", "plan_id": "plan-id",
+      "expected_write_revision": "planning-write-v1:" + String(repeating: "1", count: 64),
+      "changes": [[
+        "type": "monthly_amount", "field": "keep_in_cbq",
+        "amount": ["currency": "QAR", "decimal": "2000.00"],
+      ]],
+    ]
+  }
+
+  @Test func writeIsDefaultDeniedThenDispatchesOnlyAnExactTypedRequest() throws {
+    let body = request("tools/call", params: [
+      "name": FinancialMCPProtocol.planningWriteToolName,
+      "arguments": validPlanningArguments(),
+    ])
+    var writes = 0
+    let denied = FinancialMCPProtocol.handle(body, allowed: names, write: { _ in
+      writes += 1
+      return [:]
+    }) { _, _ in Issue.record("Write unexpectedly reached read presentation"); return [:] }
+    let deniedResult = try #require(FinancialMCPProtocol.object(denied.1)?["result"] as? [String: Any])
+    let deniedValue = try #require(deniedResult["structuredContent"] as? [String: Any])
+    #expect(deniedResult["isError"] as? Bool == true)
+    #expect(deniedValue["error"] as? String == "planning_write_not_authorized")
+    #expect(writes == 0)
+
+    let withoutPlanningRead = FinancialMCPProtocol.handle(
+      body, allowed: names.subtracting([FinancialMCPProtocol.Tool.planningContext.rawValue]),
+      writeAllowed: true, write: { _ in writes += 1; return [:] }
+    ) { _, _ in Issue.record("Write unexpectedly reached read presentation"); return [:] }
+    let withoutPlanningReadResult = try #require(FinancialMCPProtocol.object(withoutPlanningRead.1)?["result"] as? [String: Any])
+    let withoutPlanningReadValue = try #require(withoutPlanningReadResult["structuredContent"] as? [String: Any])
+    #expect(withoutPlanningReadValue["error"] as? String == "planning_write_not_authorized")
+    #expect(writes == 0)
+
+    let allowed = FinancialMCPProtocol.handle(body, allowed: names, writeAllowed: true, write: { parsed in
+      writes += 1
+      #expect(parsed.requestID == "68cb8090-3f23-4bca-97d8-7c6b60023f63")
+      #expect(parsed.month.canonical == "2026-11")
+      return ["outcome": "applied", "committed": true]
+    }) { _, _ in Issue.record("Write unexpectedly reached read presentation"); return [:] }
+    let allowedResult = try #require(FinancialMCPProtocol.object(allowed.1)?["result"] as? [String: Any])
+    #expect(allowedResult["isError"] as? Bool == false)
+    #expect(writes == 1)
+  }
+
+  @Test func malformedPlanningArgumentsNeverReachWriteHandler() {
+    let baseline = validPlanningArguments()
+    var cases: [[String: Any]] = []
+    var unknownTop = baseline
+    unknownTop["surprise"] = true
+    cases.append(unknownTop)
+    var unknownNested = baseline
+    unknownNested["changes"] = [[
+      "type": "monthly_amount", "field": "keep_in_cbq",
+      "amount": ["currency": "QAR", "decimal": "2000.00", "extra": "x"],
+    ]]
+    cases.append(unknownNested)
+    var wrongRevision = baseline
+    wrongRevision["expected_write_revision"] = "snapshot-id"
+    cases.append(wrongRevision)
+    var noChanges = baseline
+    noChanges["changes"] = []
+    cases.append(noChanges)
+    var calls = 0
+    for arguments in cases {
+      let body = request("tools/call", params: [
+        "name": FinancialMCPProtocol.planningWriteToolName, "arguments": arguments,
+      ])
+      let result = FinancialMCPProtocol.handle(body, allowed: names, writeAllowed: true, write: { _ in
+        calls += 1
+        return [:]
+      }) { _, _ in Issue.record("Malformed write unexpectedly reached read presentation"); return [:] }
+      #expect(FinancialMCPProtocol.object(result.1)?["error"] != nil)
+    }
+    #expect(calls == 0)
   }
 
   @Test(arguments: FinancialMCPProtocol.Tool.allCases)
@@ -164,5 +253,50 @@ struct FinancialMCPProtocolTests {
     #expect(controller.allowed.isEmpty)
     #expect(controller.localPort == 0)
     #expect(!controller.enabled)
+  }
+
+  @Test func authenticatedControllerWriteUsesSeparateEphemeralGrantAndInjectedHandler() throws {
+    let scope = "LedgerForge.FinancialMCP.write-qualification." + UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: scope))
+    let controller = FinancialMCPController(defaults: defaults, credentialService: scope)
+    defer {
+      controller.revoke()
+      defaults.removePersistentDomain(forName: scope)
+    }
+    try controller.configure(
+      tunnel: "tunnel_qualification", key: "",
+      permissions: [FinancialMCPProtocol.Tool.planningContext.rawValue])
+    controller.endpoint = try FinancialMCPLocalHTTP()
+    controller.desired = true
+    controller.localToken = "isolated-test-token"
+    var writes = 0
+    controller.planningWriteHandler = { change in
+      writes += 1
+      return ["outcome": "applied", "committed": true, "request_id": change.requestID]
+    }
+    let body = request("tools/call", params: [
+      "name": FinancialMCPProtocol.planningWriteToolName,
+      "arguments": validPlanningArguments(),
+    ])
+    func call(token: String) -> (Int, Data) {
+      controller.mcp(FinancialMCPRequest(
+        method: "POST", path: "/mcp", headers: ["authorization": "Bearer " + token], body: body))
+    }
+    #expect(call(token: "wrong-token").0 == 401)
+    let denied = call(token: "isolated-test-token")
+    let deniedResult = try #require(FinancialMCPProtocol.object(denied.1)?["result"] as? [String: Any])
+    let deniedValue = try #require(deniedResult["structuredContent"] as? [String: Any])
+    #expect(deniedValue["error"] as? String == "planning_write_not_authorized")
+    #expect(writes == 0)
+    controller.setPlanningWriteEnabled(true)
+    #expect(defaults.bool(forKey: "FinancialMCP.planningWriteEnabled"))
+    let allowed = call(token: "isolated-test-token")
+    let allowedResult = try #require(FinancialMCPProtocol.object(allowed.1)?["result"] as? [String: Any])
+    let allowedValue = try #require(allowedResult["structuredContent"] as? [String: Any])
+    #expect(allowedValue["outcome"] as? String == "applied")
+    #expect(writes == 1)
+    controller.revoke()
+    #expect(!controller.planningWriteEnabled)
+    #expect(!defaults.bool(forKey: "FinancialMCP.planningWriteEnabled"))
   }
 }

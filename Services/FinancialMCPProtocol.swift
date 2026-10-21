@@ -1,10 +1,11 @@
 import CoreFoundation
 import Foundation
 
-/// Four operations, all value-only. Transport, permission and schema validation
-/// run before invoking the presentation closure; no repository is accessible here.
+/// Four value-only read operations plus a separately granted planning write.
+/// Transport, permission and schema validation run before invoking either closure.
 @MainActor
 enum FinancialMCPProtocol {
+  static let planningWriteToolName = "apply_planning_changes"
   enum Tool: String, CaseIterable {
     case financialStatus = "get_financial_status"
     case portfolioOverview = "get_portfolio_overview"
@@ -77,7 +78,8 @@ enum FinancialMCPProtocol {
   }
 
   static func handle(
-    _ body: Data, allowed: Set<String>,
+    _ body: Data, allowed: Set<String>, writeAllowed: Bool = false,
+    write: ((PlanningChangeRequest) -> [String: Any])? = nil,
     read: (Tool, [String: String]) -> [String: Any]
   ) -> (Int, Data) {
     guard let rpc = object(body), rpc["jsonrpc"] as? String == "2.0",
@@ -105,13 +107,34 @@ enum FinancialMCPProtocol {
         "serverInfo": ["name": "LedgerForge Financial MCP", "version": "1.0.0"],
       ])
     case "ping": return reply([:])
-    case "tools/list": return reply(["tools": Tool.allCases.map(\.schema)])
+    case "tools/list":
+      return reply(["tools": Tool.allCases.map(\.schema) + [try! PlanningWriteToolSchema.toolDefinition]])
     case "resources/list", "prompts/list":
       return reply([method == "prompts/list" ? "prompts" : "resources": []])
     case "tools/call":
-      guard let params = rpc["params"] as? [String: Any], let name = params["name"] as? String,
-        let tool = Tool(rawValue: name)
+      guard let params = rpc["params"] as? [String: Any], let name = params["name"] as? String
       else { return fail(-32602, "Unknown financial tool") }
+      if name == planningWriteToolName {
+        guard let raw = params["arguments"] as? [String: Any],
+          let arguments = try? PlanningChangeRequest.decode(encode(raw))
+        else { return fail(-32602, "Invalid planning change arguments") }
+        let value: [String: Any]
+        if !writeAllowed || !allowed.contains(Tool.planningContext.rawValue) {
+          value = error(
+            "planning_write_not_authorized",
+            "Enable Monthly plans sharing and direct Budget Planning writes in LedgerForge Settings > Financial MCP.")
+        } else if let write {
+          value = write(arguments)
+        } else {
+          value = error("planning_write_unavailable", "Planning writes are unavailable in this app session.")
+        }
+        return reply([
+          "isError": value["error"] != nil,
+          "content": [["type": "text", "text": String(decoding: encode(value), as: UTF8.self)]],
+          "structuredContent": value,
+        ])
+      }
+      guard let tool = Tool(rawValue: name) else { return fail(-32602, "Unknown financial tool") }
       let raw = params["arguments"] ?? [String: Any]()
       guard let arguments = raw as? [String: String],
         Set(arguments.keys).isSubset(

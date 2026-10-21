@@ -3624,7 +3624,34 @@ BEGIN
 END;
 """)
 
-nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29, migrationV30, migrationV31, migrationV32, migrationV33, migrationV34]
+nonisolated public let migrationV35 = Migration(version: 35, name: "planning_write_revisions_and_request_receipts", sql: """
+CREATE TABLE planning_write_state (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  plan_month TEXT NOT NULL,
+  write_revision INTEGER NOT NULL DEFAULT 0 CHECK(write_revision >= 0),
+  latest_origin TEXT NOT NULL DEFAULT 'unknown' CHECK(latest_origin IN ('unknown','manual','chatgpt')),
+  PRIMARY KEY(workspace_id, plan_month)
+);
+INSERT INTO planning_write_state(workspace_id, plan_month, write_revision, latest_origin)
+SELECT workspace_id, plan_month, 0, 'unknown' FROM (
+  SELECT workspace_id, plan_month FROM funding_plans
+  UNION
+  SELECT workspace_id, plan_month FROM monthly_plan_scratchpads
+);
+CREATE TABLE planning_request_receipts (
+  request_id TEXT PRIMARY KEY NOT NULL,
+  request_digest TEXT NOT NULL,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+  plan_month TEXT NOT NULL,
+  plan_id TEXT NOT NULL,
+  committed_revision INTEGER NOT NULL CHECK(committed_revision >= 0),
+  committed_at TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK(outcome IN ('saved','no_change')),
+  result_json TEXT NOT NULL CHECK(length(CAST(result_json AS BLOB)) BETWEEN 1 AND 65536)
+);
+""")
+
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19, migrationV20, migrationV21, migrationV22, migrationV23, migrationV24, migrationV25, migrationV26, migrationV27, migrationV28, migrationV29, migrationV30, migrationV31, migrationV32, migrationV33, migrationV34, migrationV35]
 
 nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

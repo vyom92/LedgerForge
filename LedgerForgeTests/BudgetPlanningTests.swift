@@ -416,16 +416,30 @@ final class BudgetPlanningTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         let path = folder.appendingPathComponent("plan.sqlite").path
         let sqlite = try SQLiteRepositoryProvider(path: path)
+        let workspace = "default-workspace", retentionAccount = "owner-cbq-cash"
+        let createdAt = "2026-09-01T00:00:00Z"
+        _ = try sqlite.workspaceRepo.upsertWorkspace(.init(id: workspace, name: "Owner planning workspace", createdAtISO: createdAt))
+        let cashAccount = AccountDTO(id: retentionAccount, workspaceId: workspace, name: "Owner CBQ cash",
+            accountType: "bank", nativeCurrency: "QAR", createdAtISO: createdAt)
+        _ = try sqlite.accountRepo.upsertAccount(cashAccount)
+        try sqlite.intelligenceRepo.applyPlanning(.preferences(.init(workspaceID: workspace,
+            retentionAccountID: retentionAccount), replacing: nil))
         let (vm, _, _) = try editor(active: .verifiedSQLite(sqlite))
         _ = vm.updateMoney(.fixed, text: "100"); _ = vm.updateMoney(.reserve, text: "20")
         let billID = try bill(vm, region: "india", amount: "30")
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Qatar")!
         vm.setBillDate(region: "india", id: billID, date: calendar.date(from: DateComponents(year: 2026, month: 9, day: 20, hour: 12)), timeZone: calendar.timeZone)
+        vm.setFX(rateText: "3", dateText: "2026-09-15")
         vm.addDeduction(); let id = try XCTUnwrap(vm.plan.deductions.first?.id)
         vm.editDeduction(id: id, label: "My deduction", amount: "5"); vm.save()
         XCTAssertEqual(vm.saveState, .saved)
         let saved = try XCTUnwrap(sqlite.fundingPlanRepo.plans(workspaceId: "default-workspace").first)
-        let memory = InMemoryRepositoryProvider(); _ = try memory.fundingPlanRepo.savePlan(saved)
+        let memory = InMemoryRepositoryProvider()
+        _ = try memory.workspaceRepo.upsertWorkspace(.init(id: workspace, name: "Owner planning workspace", createdAtISO: createdAt))
+        _ = try memory.accountRepo.upsertAccount(cashAccount)
+        try memory.intelligenceRepo.applyPlanning(.preferences(.init(workspaceID: workspace,
+            retentionAccountID: retentionAccount), replacing: nil))
+        _ = try memory.fundingPlanRepo.savePlan(saved)
         XCTAssertEqual(try memory.fundingPlanRepo.plans(workspaceId: "default-workspace"), [saved])
         try sqlite.database.checkpointAndClose()
         let reopened = try SQLiteRepositoryProvider(path: path, migrations: allMigrations, access: .existing); defer { reopened.database.close() }

@@ -89,6 +89,8 @@ nonisolated public struct CompanionMonthCommitRequest: Sendable {
     let month: String
     let expectedActivationEpoch: String
     let expectedStateRevision: Int64?
+    /// Original durable month baseline carried by the Mac editor or sync read.
+    let expectedMonthRevision: PlanningMonthRevision
     /// Exact durable bytes are compared inside the transaction, not merely a view-model generation.
     let expectedScratchpad: MonthlyPlanScratchpadDTO
     let editor: MonthlyPlanScratchpadDTO
@@ -107,6 +109,7 @@ nonisolated public struct CompanionMonthCommitResult: Sendable {
     public let reply: CompanionMerge.Reply?
     public let disposition: CompanionCommitDisposition
     let replyAnchor: CompanionMonthAnchor?
+    public var monthRevision: PlanningMonthRevision? = nil
 }
 nonisolated enum CompanionSyncRepositoryError: Error {
     case unavailable, invalidSession, invalidState, invalidMonth, staleActivation

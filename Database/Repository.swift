@@ -922,6 +922,32 @@ private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
     func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO) throws -> FundingPlanDTO {
         try validity.withValidOperation { try base.savePlan(plan, retaining: scratchpad) }
     }
+    func planningMonthRevisions(workspaceID: String) throws -> [PlanningMonthRevision] {
+        try validity.withValidOperation { try base.planningMonthRevisions(workspaceID: workspaceID) }
+    }
+    func planningWriteSnapshot(workspaceID: String, month: String) throws -> PlanningWriteSnapshot {
+        try validity.withValidOperation { try base.planningWriteSnapshot(workspaceID: workspaceID, month: month) }
+    }
+    func planningRequestReceipt(requestID: String) throws -> PlanningRequestReceipt? {
+        try validity.withValidOperation { try base.planningRequestReceipt(requestID: requestID) }
+    }
+    func savePlan(_ plan: FundingPlanDTO, expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        try validity.withValidOperation { try base.savePlan(plan, expected: expected, origin: origin) }
+    }
+    func savePlan(_ plan: FundingPlanDTO, retaining scratchpad: MonthlyPlanScratchpadDTO,
+                  expected: PlanningMonthRevision, origin: PlanningSaveOrigin) throws -> PlanningMonthRevision {
+        try validity.withValidOperation { try base.savePlan(plan, retaining: scratchpad, expected: expected, origin: origin) }
+    }
+    func saveScratchpad(_ value: MonthlyPlanScratchpadDTO, expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        try validity.withValidOperation { try base.saveScratchpad(value, expected: expected) }
+    }
+    func removeScratchpad(workspaceId: String, month: String, expected: PlanningMonthRevision) throws -> PlanningMonthRevision {
+        try validity.withValidOperation { try base.removeScratchpad(workspaceId: workspaceId, month: month, expected: expected) }
+    }
+    func commitPlanningChange(_ request: PlanningChangeCommitRequest,
+                              build: (PlanningWriteSnapshot) throws -> PlanningChangeCommitCandidate) throws -> PlanningRequestReceipt {
+        try validity.withValidOperation { try base.commitPlanningChange(request, build: build) }
+    }
 }
 
 private struct GenerationCheckedInvestmentRepository: InvestmentRepository {

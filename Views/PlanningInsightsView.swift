@@ -164,6 +164,7 @@ struct PlanningInsightsView: View {
     @ObservedObject var model: PlanningAnalysisModel
     let onTransactions: (Set<String>) -> Void
     let onMonthlyPlan: () -> Void
+    var onAllocation: (() -> Void)? = nil
     var availableWidth: CGFloat = 1000
     private var columnLayout: AnyLayout {
         availableWidth >= 820 ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
@@ -565,7 +566,10 @@ struct PlanningInsightsView: View {
                         Text("Planned this month: " + (assistance.contributions.contains { $0.designationID == value.id } ? amount(value.proposedContribution, currency) : "Not selected")).font(theme.typography.secondary)
                     }
                     Button("Edit target") { editor = .reserve(value.designation) }.lfSecondaryAction()
-                    Button("Plan contribution") { editor = .contribution(value.designation) }.lfSecondaryAction()
+                    Button("Plan contribution") {
+                        if let onAllocation { onAllocation() }
+                        else { editor = .contribution(value.designation) }
+                    }.lfSecondaryAction()
                 }.padding(.vertical, 9)
                 Divider()
             }

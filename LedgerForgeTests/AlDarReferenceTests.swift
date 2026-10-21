@@ -248,8 +248,15 @@ final class AlDarReferenceTests: XCTestCase {
         let store = FundingPlanStore(); store.installWithoutObservation([], generation: active.generationToken)
         let unopened = SalaryWorkspaceViewModel(month: vm.month, provider: { active }, accountStore: AccountStore(),
             salaryStore: SalaryStore(), fundingPlanStore: store, refresh: { _ in })
-        store.installWithoutObservation(savedStore.plans, generation: active.generationToken); store.notifyInstalledValue()
+        XCTAssertNil(unopened.plan.effectiveAlDarReference)
+        XCTAssertEqual(unopened.saveState, .providerChanged)
+        let revision = try active.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: "default-workspace", month: vm.month.canonical).monthRevision
+        store.installWithoutObservation(savedStore.plans, generation: active.generationToken,
+            scratchpads: savedStore.scratchpads, monthRevisions: [revision])
+        store.notifyInstalledValue()
         XCTAssertEqual(unopened.plan.effectiveAlDarReference, vm.plan.effectiveAlDarReference)
+        XCTAssertEqual(unopened.saveState, .ready)
         XCTAssertFalse(unopened.hasUnsavedDrafts)
     }
 
@@ -317,7 +324,9 @@ final class AlDarReferenceTests: XCTestCase {
         legacy.calculationVersion = "legacy"; legacy.keepInCBQMinor = nil; legacy.keepInCBQDecimal = nil
         legacy.referenceMode = nil; legacy.effectiveReference = nil
         legacy.alDarReference = try FundingPlanAlDarReferenceDTO(planID: legacy.id, evidence: AlDarReferenceEvidence(quote: quote(money("1.00")), boundShortfallINR: money("1.00", "INR")))
-        _ = try reopened.fundingPlanRepo.savePlan(legacy)
+        let originalRevision = try reopened.fundingPlanRepo.planningWriteSnapshot(
+            workspaceID: legacy.workspaceId, month: legacy.planMonthISO).monthRevision
+        _ = try reopened.fundingPlanRepo.savePlan(legacy, expected: originalRevision, origin: .manual)
         XCTAssertThrowsError(try reopened.database.executePrepared(sql: "UPDATE funding_plans SET fx_inr_per_qar_decimal='1', fx_observation_date='2026-09-15', fx_provenance='user_entered' WHERE id=?;", params: [legacy.id]))
         try reopened.database.executePrepared(sql: "UPDATE funding_plan_commitments SET amount_minor=200, amount_decimal='2.00' WHERE funding_plan_id=? AND region='india';", params: [legacy.id])
         XCTAssertThrowsError(try RepositoryStoreHydrator(databaseProvider: .verifiedSQLite(reopened), participatesInLifecycleGate: false).stageHydration())

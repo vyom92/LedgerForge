@@ -69,7 +69,7 @@ nonisolated struct BackupManifest: Codable, Equatable, Sendable {
 /// This is the one backup compatibility policy. A future schema requires an
 /// explicit policy decision here; the migration registry alone does not grant it.
 nonisolated enum BackupCompatibility {
-    static let supportedSchemaVersion = 34
+    static let supportedSchemaVersion = 35
     static var migrationIdentities: [BackupManifest.MigrationIdentity] {
         allMigrations.map { .init(version: $0.version, name: $0.name, checksum: $0.checksum) }
     }
@@ -105,6 +105,7 @@ nonisolated enum BackupCompatibility {
     private static let v32Inventory = Result { try expectedInventory(version: 32) }
     private static let v33Inventory = Result { try expectedInventory(version: 33) }
     private static let v34Inventory = Result { try expectedInventory(version: 34) }
+    private static let v35Inventory = Result { try expectedInventory(version: 35) }
     private static func expectedInventory(version: Int) throws -> [SchemaObject] {
         // Empty, source-independent schema authority; no financial fixture/data.
         let schema = SQLiteDatabase(path: ":memory:")
@@ -136,17 +137,43 @@ nonisolated enum BackupCompatibility {
         // parent/source-validation failure must not become an empty backup.
         if schemaVersion >= 28 {
             do {
-                try SQLiteCategoryRepo.verifyBackupContents(db, schemaVersion: schemaVersion)
+                // V35 adds planning-only tables; category metadata retains its
+                // exact V34 layout and validator contract.
+                try SQLiteCategoryRepo.verifyBackupContents(db, schemaVersion: min(schemaVersion, 34))
                 try SQLiteFinancialIntelligenceRepository.verifyBackupContents(db, supportsRefundAllocations: schemaVersion >= 34)
                 if schemaVersion >= 34 { try SQLiteTransactionTagRepository.verifyBackupContents(db) }
             } catch { throw BackupError.damaged }
+        }
+        if schemaVersion >= 35 {
+            // SQLite constraints prevent new invalid rows, but an existing or
+            // externally modified backup still needs its stored content checked.
+            let invalidState = try db.queryInt("""
+                SELECT count(*) FROM planning_write_state
+                WHERE length(trim(workspace_id)) = 0 OR length(trim(plan_month)) = 0
+                   OR typeof(write_revision) != 'integer' OR write_revision < 0
+                   OR latest_origin NOT IN ('unknown','manual','chatgpt');
+                """)
+            let invalidReceipts = try db.queryInt("""
+                SELECT count(*) FROM planning_request_receipts r
+                LEFT JOIN planning_write_state s
+                  ON s.workspace_id = r.workspace_id AND s.plan_month = r.plan_month
+                WHERE length(trim(r.request_id)) = 0 OR length(r.request_digest) != 64
+                   OR r.request_digest GLOB '*[^0-9a-f]*'
+                   OR length(trim(r.plan_id)) = 0 OR length(trim(r.committed_at)) = 0
+                   OR typeof(r.committed_revision) != 'integer' OR r.committed_revision < 0
+                   OR r.outcome NOT IN ('saved','no_change')
+                   OR length(CAST(r.result_json AS BLOB)) NOT BETWEEN 1 AND 65536
+                   OR json_valid(r.result_json) != 1
+                   OR s.write_revision IS NULL OR r.committed_revision > s.write_revision;
+                """)
+            guard invalidState == 0, invalidReceipts == 0 else { throw BackupError.damaged }
         }
     }
     static func verifyDatabase(_ db: SQLiteDatabase, schemaVersion: Int = supportedSchemaVersion) throws {
         let chain = try migrations(for: schemaVersion)
         do { _ = try db.validatedMigrationHistory(against: chain, requiresCompleteChain: true) }
         catch { throw BackupError.incompatible }
-        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : schemaVersion == 22 ? v22Inventory : schemaVersion == 23 ? v23Inventory : schemaVersion == 24 ? v24Inventory : schemaVersion == 25 ? v25Inventory : schemaVersion == 26 ? v26Inventory : schemaVersion == 27 ? v27Inventory : schemaVersion == 28 ? v28Inventory : schemaVersion == 29 ? v29Inventory : schemaVersion == 30 ? v30Inventory : schemaVersion == 31 ? v31Inventory : schemaVersion == 32 ? v32Inventory : schemaVersion == 33 ? v33Inventory : v34Inventory).get()
+        let inventory = try (schemaVersion == 17 ? v17Inventory : schemaVersion == 18 ? v18Inventory : schemaVersion == 19 ? v19Inventory : schemaVersion == 20 ? v20Inventory : schemaVersion == 21 ? v21Inventory : schemaVersion == 22 ? v22Inventory : schemaVersion == 23 ? v23Inventory : schemaVersion == 24 ? v24Inventory : schemaVersion == 25 ? v25Inventory : schemaVersion == 26 ? v26Inventory : schemaVersion == 27 ? v27Inventory : schemaVersion == 28 ? v28Inventory : schemaVersion == 29 ? v29Inventory : schemaVersion == 30 ? v30Inventory : schemaVersion == 31 ? v31Inventory : schemaVersion == 32 ? v32Inventory : schemaVersion == 33 ? v33Inventory : schemaVersion == 34 ? v34Inventory : v35Inventory).get()
         guard try schemaInventory(db) == inventory else { throw BackupError.incompatible }
         let integrity = try db.query(sql: "PRAGMA integrity_check;") { $0.string(at: 0) }
         guard integrity == ["ok"], try db.query(sql: "PRAGMA foreign_key_check;", map: { _ in true }).isEmpty else {
@@ -164,7 +191,7 @@ nonisolated enum BackupCompatibility {
         if history.count < supportedSchemaVersion {
             try verifyDatabase(db, schemaVersion: history.count)
             // runMigrations validates the immutable prefix and applies only
-            // its exact missing tail through V34 inside SQLite migration ownership.
+            // its exact missing tail through V35 inside SQLite migration ownership.
             try db.runMigrations(chain)
         }
         try verifyDatabase(db)

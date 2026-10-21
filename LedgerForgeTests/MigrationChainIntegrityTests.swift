@@ -64,7 +64,8 @@ struct MigrationChainIntegrityTests {
         #expect(migrationV30.version == 30)
         #expect(migrationV32.version == 32)
         #expect(migrationV33.version == 33)
-        #expect(migrationV34.version == allMigrations.count)
+        #expect(migrationV34.version == 34)
+        #expect(migrationV35.version == allMigrations.count)
     }
 
     @Test
@@ -87,6 +88,8 @@ struct MigrationChainIntegrityTests {
                 ,"bank_section_identity_observations"
                 ,"bank_transaction_occurrences"
                 ,"monthly_plan_scratchpads"
+                ,"planning_write_state"
+                ,"planning_request_receipts"
             ]
             let placeholders = requiredTables.map { _ in "?" }.joined(separator: ",")
             let installed = try provider.database.query(
@@ -113,6 +116,50 @@ struct MigrationChainIntegrityTests {
             try expectCurrentHistory(in: reopened.database)
             #expect(try reopened.database.queryInt("PRAGMA foreign_keys;") == 1)
             #expect(try reopened.database.queryInt("PRAGMA legacy_alter_table;") == connectionDefault)
+        }
+    }
+
+    @Test
+    func v35AddsUnknownZeroBaselinesWithoutChangingV34Records() throws {
+        try withTemporaryDatabase(named: "PlanningWriteV35") { path in
+            let db = SQLiteDatabase(path: path)
+            try db.runMigrations(Array(allMigrations.prefix(34)))
+            try db.execute(sql: """
+                INSERT INTO workspaces(id,name,created_at) VALUES('workspace-1','Test','2026-10-21T00:00:00Z');
+                INSERT INTO funding_plans(
+                  id,workspace_id,plan_month,expected_fixed_minor,expected_fixed_decimal,expected_fixed_provenance,
+                  expected_variable_minor,expected_variable_decimal,expected_variable_provenance,
+                  expected_deductions_minor,expected_deductions_decimal,expected_deductions_provenance,
+                  configured_fee_minor,configured_fee_decimal,configured_fee_provenance,
+                  planned_investment_minor,planned_investment_decimal,planned_investment_provenance,updated_at
+                ) VALUES(
+                  'plan-1','workspace-1','2026-10',0,'0','manual',0,'0','manual',
+                  0,'0','manual',0,'0','manual',0,'0','manual','2026-10-21T00:00:00Z'
+                );
+                INSERT INTO monthly_plan_scratchpads(workspace_id,plan_month,state_json)
+                  VALUES('workspace-1','2026-10','{"draft":true}');
+                INSERT INTO monthly_plan_scratchpads(workspace_id,plan_month,state_json)
+                  VALUES('workspace-1','2026-11','{"draft":true}');
+                """)
+            let oldHistory = try db.query(sql: "SELECT version,name,checksum FROM schema_migrations ORDER BY version;") {
+                "\($0.int64(at: 0) ?? -1)|\($0.string(at: 1) ?? "")|\($0.string(at: 2) ?? "")"
+            }
+
+            try db.runMigrations(allMigrations)
+            let preservedHistory = try db.query(sql: "SELECT version,name,checksum FROM schema_migrations WHERE version <= 34 ORDER BY version;") {
+                "\($0.int64(at: 0) ?? -1)|\($0.string(at: 1) ?? "")|\($0.string(at: 2) ?? "")"
+            }
+            #expect(preservedHistory == oldHistory)
+            #expect(try db.queryInt("SELECT count(*) FROM funding_plans WHERE id='plan-1';") == 1)
+            #expect(try db.queryInt("SELECT count(*) FROM monthly_plan_scratchpads WHERE workspace_id='workspace-1';") == 2)
+            let states = try db.query(sql: "SELECT plan_month,write_revision,latest_origin FROM planning_write_state ORDER BY plan_month;") {
+                "\($0.string(at: 0) ?? "")|\($0.int64(at: 1) ?? -1)|\($0.string(at: 2) ?? "")"
+            }
+            #expect(states == ["2026-10|0|unknown", "2026-11|0|unknown"])
+            #expect(try db.queryInt("SELECT count(*) FROM planning_request_receipts;") == 0)
+            try db.runMigrations(allMigrations)
+            #expect(try db.queryInt("SELECT count(*) FROM planning_write_state;") == 2)
+            try db.closeChecked()
         }
     }
 
