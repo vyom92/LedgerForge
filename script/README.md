@@ -243,9 +243,10 @@ or deployment behavior.
 
 ## Owner-authorized local releases
 
-The app target’s Debug and Release metadata currently specifies **1.2 (4)**.
+The app target’s Debug and Release metadata currently specifies **1.3 (10)**.
 `build-release` creates the optimized signed candidate but does not install it.
-The release executor must verify the fresh native backup, retain the prior app,
+The release executor must establish a current native verified backup, accepting
+an owner's explicit verification without repeating it, retain the prior app,
 check signature/entitlements and complete bundle identity, then install only the
 qualified artifact after normal quit. Ordinary installed launch/relaunch and
 Current-ledger preservation are separate checks. Do not use `build_and_run.sh`
@@ -253,5 +254,6 @@ as a production installer; its Debug memory-host behavior is deliberate.
 
 Only delete inventoried task-owned temporary output after retaining required
 results, source/build receipts and native evidence. Preserve the native backup
-and app-only rollback separately. See the [build/rollback contract](../Project%20documents/BUILD_AND_PROJECT_CONVENTIONS.md#local-installed-upgrade-and-rollback)
-and [v1.2 outcome](../Project%20documents/Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v12-ui-release).
+and previous app separately. App-only rollback requires that binary to support
+the current ledger schema; v1.2 (9) does not support V35. See the [build/rollback contract](../Project%20documents/BUILD_AND_PROJECT_CONVENTIONS.md#local-installed-upgrade-and-rollback)
+and [v1.3 outcome](../Project%20documents/Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v13-budget-planning-release).

@@ -4,11 +4,45 @@ Historical outcomes and their explicit evidence boundaries. [Current state](../.
 
 ## Index
 
+- [v1.3 (10) Budget Planning production release — 23 October 2026](#v13-budget-planning-release)
 - [v1.2 (9) connectivity recovery and price warnings — 17 October 2026](#v12-connectivity-recovery)
 - [v1.2 (7) helper acknowledgement maintenance — 16 October 2026](#v12-helper-acknowledgement)
 - [v1.2 (6) regular salary reprint correction — 16 October 2026](#v12-salary-reprint-maintenance)
 - [v1.2 (5) net-worth completeness and upper-card maintenance — 16 October 2026](#v12-net-worth-maintenance)
 - [Seven-page UI campaign, test cleanup and v1.2 release — 16 October 2026](#v12-ui-release)
+
+<a id="v13-budget-planning-release"></a>
+## v1.3 (10) Budget Planning production release — 23 October 2026
+
+The owner authorized production installation, additive V35 migration, documentation publication and bounded cleanup of the already published Stage A+B+C implementation. Application source is `46c917c38d4965f58e419e7df9e10d005684c43c`; this closeout changes documentation only. Installation and native qualification were performed on 23 October after the Mac was unlocked and the backup destination selection completed. No production planning edit, financial transaction, import, source rewrite, write-grant activation or data restoration was performed.
+
+### Installed artifact and recovery
+
+`/Applications/LedgerForge.app` is **1.3 (10)**, bundle `com.vyom.LedgerForge`, with a clean Release build identity at the application source commit above. The installed executable SHA256 is `d144ea447e8245bbe8c9bffa4e22f1e4c3f094877e117fdd7d92a99aa145ac15`; the canonical path/size/SHA/mode manifest SHA256 is `3c1502dc226fe3121292288795927ab69f6e99bfbd382c6fdf6362532c71b607`. All 14 runtime files match the qualified retained bundle. Strict/deep code-signing verification and the existing production identity, designated requirement and entitlements pass. No private evidence, database, statement, credential or development output is packaged.
+
+The packet-named earlier optimized build was located, but its embedded identity named the parent commit plus dirty worktree; exact equivalence to the final publication was not proved. A fresh supported optimized Release build from clean `46c917c…` closed that provenance gap without source changes. Both build receipts are retained, and only the clean-build artifact was installed.
+
+The owner-verified backup is `/Users/vyom/Documents/LedgerForge Backups/LedgerForge-2026-10-21T11-09-37Z-BEF8B9A1.ledgerforgebackup`. The owner confirmed that exact suffix; the packet's `BEFB89A1` was a filename transposition. Its seal, checksum, integrity and restore verification were not repeated. Activity during the two-day interruption prompted a fresh native backup, `/Users/vyom/Documents/LedgerForge Backups/LedgerForge-2026-10-23T05-17-26Z-499A3A4A.ledgerforgebackup`; the app reported integrity and compatibility verified. Only its quote-cache table was later read in query-only mode to classify serialization differences against the captured preinstall digest. That inspection created a zero-byte WAL and SQLite shared-memory sidecar. After confirming no open readers and that the new backup database still matched its native manifest, only those proven task-created files were removed, restoring the two-member package. This verifier incident is retained in the local receipt. Neither backup was restored; the older owner's package was never opened.
+
+The complete signed prior app is retained at `/Users/vyom/.codex/artifacts/ledgerforge/v1.3-release-20261021/Rollback/LedgerForge-v1.2-9.app`, executable SHA256 `e0d2b009f670eb123178c2f10969cf368526db4c1d412c9bdf78233cbf63195b`. **This is not a safe app-only rollback against V35.** Static review established that v1.2 rejects V35 and can publish a transitioning stamp before rejection. Preserve V35 for a compatible repair; restoring older financial data requires separate owner authorization. [Compatibility](../../ADR.md#v35-planning-write-backup-20261023).
+
+### Migration, preservation and installed runtime
+
+Normal quit completed, app/helper processes exited, and a WAL-aware query-only snapshot captured all 86 original tables. App-only replacement changed no table or preference. Normal installed launch used the same Current path/device/inode and migrated V34→V35 through the established app path. The new activation epoch stayed stable on ordinary quit/relaunch. Integrity is `ok` and foreign-key violations are zero before and after.
+
+All 83 original tables outside migration history/sequence and the quote cache remain byte-exact, including accounts, transactions, imports/source evidence, salary/payslips, holdings and containers, plans, incomplete drafts, reserve targets, allocation metadata and companion state. The schema history and its sequence advance by one. All 38 quote-cache BLOBs were reserialized, with identical decoded JSON records and identities. Only two public-cache preference payloads changed; other preferences and connection settings remain unchanged. V35 creates `planning_write_state` with four zero/unknown baselines and `planning_request_receipts` with zero rows. These technical rows do not invent approval history or financial instructions.
+
+The actual installed Monthly Plan shows saved earnings/deductions, Qatar and India obligations, account routing and retention. November due dates remain inside the displayed October salary payment cycle. The older linked card-payment review stays separate from the upcoming estimate. Allocation & Reserves shows the real saved targets and monthly retention; no discretionary decision was invented, so its uncalculated allocation summaries remain explicit. Salary History and the selected payslip components open; Forecast & reviews and its reserve view remain reachable. No demonstration allocation was created. Installed Settings reports 1.3 (10) and Ledger verified.
+
+Four Financial MCP reads succeeded coherently before installation, after first launch and after relaunch. Dashboard and portfolio financial payloads, explicit-month saved/retained planning and calculations remain exact. The in-memory reserve filter initially resets from QAR to INR on restart; selecting the same QAR filter reproduces the exact preinstall reserve payload. Saved reserve records do not change. The planning response adds the accepted revision context with zero/unknown baseline. Native permission UI, controller status and persisted effective permission all show **planning writes OFF**. The protocol catalog contains the write schema independently of grants; actual invocation requires both Monthly plans sharing and direct-write permission. No production write call was made; runtime rejection remains covered by isolated Stage C evidence, not a new production mutation test.
+
+Both installed launches used Current, with normal helper startup and Financial MCP Connected. No TestRun identity or scratch ledger was used. Live FX, IBKR and Background Updates show Connected; iPhone remains Disconnected. ISP's Error state was already present before installation. Gmail's restarted session reports an expired/revoked grant; its prior long-running session had shown Connected. Saved inbox/state/settings are preserved. The rejection's onset/cause is not established, and no reconnection or credential change was attempted. No new physical sleep/wake certification is claimed.
+
+### Validation, publication and boundaries
+
+The retained ordinary TestPlan result is **963 passed, 0 failed, 1 skipped**, run `1c041c70-9232-4dac-b303-78b4028a5f75`. The retained executor log identifies `IBKRNasdaqPricingQualificationTests.currentFlexPositionsUseNasdaqAcrossForegroundBackgroundAndReopen()`, explicitly excluded by the ordinary TestPlan and requiring separate authentic-backup/live-provider opt-in. It is an established environment-dependent exclusion, not passed coverage. The original `.xcresult` path is no longer available; retained run metadata/log support the classification. The fresh Debug/Release source validation and final clean optimized Release passed. Existing Keychain deprecation and no-AppIntents-dependency notices remain; no functional change or full-suite rerun was introduced for documentation.
+
+The independent iPhone checkout at `/Users/vyom/.codex/worktrees/iphone-companion/LedgerForge` remains on `codex/iphone-companion`, HEAD `7f6fa6dd10a7dc4a34fec03d52307393f0714025`; its dirty tracked/untracked work and index are preserved. No iOS install, signing renewal, merge or cleanup is part of this release. The [durable release receipt](/Users/vyom/.codex/artifacts/ledgerforge/v1.3-release-20261021/STATUS.md) owns final independent review, documentation commit/remote convergence, clean-tree proof, exact artifact retention and task-only cleanup. Documentation commits do not rebind the installed executable to a later source revision.
 
 <a id="v12-connectivity-recovery"></a>
 ## v1.2 (9) connectivity recovery and price warnings — 17 October 2026

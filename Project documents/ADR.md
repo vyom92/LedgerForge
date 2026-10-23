@@ -6358,6 +6358,13 @@ ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-
 
 # ADR-047 — Verified User Backup and Receipt-Owned Restore
 
+<a id="v35-planning-write-backup-20261023"></a>
+## v1.3 planning-write compatibility alignment — 2026-10-23
+
+The owner-authorized v1.3 (10) release adds V35 `planning_write_state` and `planning_request_receipts` through the established migration path. Existing saved/retained months start at revision zero with unknown historical origin; retry receipts start empty. These are technical conflict/retry records, not proposal or approval history. Format-1 native backup remains the same sealed database/manifest package, and older supported backups upgrade only in an operation-owned destination. Earlier migration identities and financial/source records remain unchanged.
+
+Production V34→V35, exact protected-state preservation and normal installed relaunch are qualified in the [release outcome](Archive/Accepted%20outcomes/Unnumbered_2026-10.md#v13-budget-planning-release). The retained v1.2 (9) binary does not support V35 and must not be launched against it; its migration path can leave a transitioning activation stamp before rejecting the newer schema. A retained previous app is therefore a recovery artifact, not proof of safe app-only rollback. Any restoration of older financial data requires a separate explicit owner decision. This alignment changes neither the backup format nor the generic mutation/reversal architecture of ADR-037.
+
 <a id="category-spending-tags-backup-20261004"></a>
 ## Owner-approved isolated category/spending/tag metadata alignment — 2026-10-04
 
