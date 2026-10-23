@@ -134,6 +134,12 @@ struct EmailStatementsSettingsView: View {
                     session.connect()
                 }
                 .buttonStyle(LFActionButtonStyle(kind: session.isConnected ? .secondary : .positive)).disabled(session.isChecking)
+                if session.isConnected {
+                    Button("Renew access in browser…") { session.connect(reauthorize: true) }
+                        .lfSecondaryAction()
+                        .disabled(session.isChecking)
+                        .accessibilityIdentifier("emailStatements.renewAccess")
+                }
             }
         }
     }
